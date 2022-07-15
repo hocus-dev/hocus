@@ -1,0 +1,9 @@
+# Commands to start on workspace startup
+tasks:
+  - init: yarn install
+    command: |
+      ops/bin/up.sh && npm run dev
+# Ports to expose on workspace startup
+ports:
+  - port: 3000
+    onOpen: open-preview
