@@ -10,3 +10,6 @@ ports:
 vscode:
   extensions:
     - Prisma.prisma
+    - esbenp.prettier-vscode
+    - dbaeumer.vscode-eslint
+    - GitHub.copilot

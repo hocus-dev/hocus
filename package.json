@@ -15,18 +15,23 @@
     "start": "next start",
     "type-check": "tsc",
     "lint": "eslint --ignore-path .gitignore \"src/**/*.+(ts|js|tsx)\"",
-    "format": "prettier --ignore-path .gitignore \"src/**/*.+(ts|js|tsx)\" --write"
+    "format": "prettier --ignore-path .gitignore \"src/**/*.+(ts|js|tsx)\" --write",
+    "test": "echo 'module.exports = {Migrate, ensureDatabaseExists}' >> node_modules/prisma/build/index.js"
   },
   "dependencies": {
     "@prisma/client": "4.0.0",
     "next": "12.2.2",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
+    "@types/jest": "^28.1.6",
     "@types/node": "16.11.43",
+    "@types/pg": "^8.6.5",
     "@types/react": "18.0.15",
     "@types/react-dom": "18.0.6",
+    "@types/uuid": "^8.3.4",
     "@typescript-eslint/eslint-plugin": "5.30.5",
     "@typescript-eslint/parser": "5.30.5",
     "eslint": "8.19.0",
@@ -34,6 +39,8 @@
     "eslint-config-prettier": "8.5.0",
     "eslint-import-resolver-typescript": "3.2.5",
     "eslint-plugin-prettier": "4.2.1",
+    "jest": "^28.1.3",
+    "pg": "^8.7.3",
     "prettier": "2.7.1",
     "prisma": "^4.0.0",
     "typescript": "4.7.4"
