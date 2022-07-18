@@ -38,3 +38,5 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+prisma/tmp-*

@@ -12,4 +12,3 @@ vscode:
     - Prisma.prisma
     - esbenp.prettier-vscode
     - dbaeumer.vscode-eslint
-    - GitHub.copilot
