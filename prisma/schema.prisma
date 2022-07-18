@@ -11,6 +11,14 @@ datasource db {
 }
 
 model Player {
-  id       Int    @id @default(autoincrement())
+  id       BigInt @id @default(autoincrement())
   username String
+  Room     Room[]
+}
+
+model Room {
+  id       BigInt @id @default(autoincrement())
+  name     String
+  playerId BigInt
+  Player   Player @relation(fields: [playerId], references: [id])
 }

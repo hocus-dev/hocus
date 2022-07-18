@@ -23,7 +23,8 @@
     "next": "12.2.2",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "zod": "^3.17.9"
   },
   "devDependencies": {
     "@types/jest": "^28.1.6",
