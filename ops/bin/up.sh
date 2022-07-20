@@ -12,3 +12,5 @@ cd "$PROJECT_DIR""/docker" &&
     docker-compose \
         -p rooms \
         up -d
+
+npx prisma migrate deploy
