@@ -20,7 +20,10 @@
   },
   "dependencies": {
     "@prisma/client": "4.0.0",
+    "babel-loader": "^8.2.5",
+    "babel-plugin-superjson-next": "^0.4.3",
     "next": "12.2.2",
+    "next-superjson": "^0.0.4",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "superjson": "^1.9.1",
