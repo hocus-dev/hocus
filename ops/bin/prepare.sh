@@ -12,7 +12,4 @@ export DOCKER_BUILDKIT=1
 cd "$PROJECT_DIR""/ops/docker" &&
     docker-compose \
         -p rooms \
-        up -d
-# postgres needs a second to start up
-sleep 1
-cd "$PROJECT_DIR" && npx prisma migrate deploy
+        pull

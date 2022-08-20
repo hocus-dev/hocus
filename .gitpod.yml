@@ -1,6 +1,6 @@
 # Commands to start on workspace startup
 tasks:
-  - init: yarn install
+  - init: yarn install && ops/bin/prepare.sh
     command: |
       ops/bin/up.sh && npm run dev
 # Ports to expose on workspace startup
@@ -12,3 +12,4 @@ vscode:
     - Prisma.prisma
     - esbenp.prettier-vscode
     - dbaeumer.vscode-eslint
+    - eamodio.gitlens
