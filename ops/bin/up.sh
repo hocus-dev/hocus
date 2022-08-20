@@ -13,4 +13,4 @@ cd "$PROJECT_DIR""/docker" &&
         -p rooms \
         up -d
 
-npx prisma migrate deploy
+cd "$PROJECT_DIR" && npx prisma migrate deploy
