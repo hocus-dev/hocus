@@ -2,7 +2,7 @@
 tasks:
   - init: yarn install && ops/bin/prepare.sh
     command: |
-      ops/bin/up.sh && npm run dev
+      ops/bin/link.sh && ops/bin/up.sh && npm run dev
 # Ports to expose on workspace startup
 ports:
   - port: 3000

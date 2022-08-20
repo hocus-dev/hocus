@@ -1,0 +1,5 @@
+{
+  "name": "~",
+  "description": "this is used to perform `yarn link` in ops/bin/up.sh",
+  "private": true
+}

@@ -13,3 +13,4 @@ cd "$PROJECT_DIR""/ops/docker" &&
     docker-compose \
         -p rooms \
         pull
+cd "$PROJECT_DIR" && npx prisma generate
