@@ -1,5 +1,5 @@
 // must be the first import
-import "./prisma-override";
+import "./prisma-export-patch";
 
 // eslint-disable-next-line no-restricted-imports
 import { PrismaClient } from "@prisma/client";

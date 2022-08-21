@@ -13,3 +13,4 @@ vscode:
     - esbenp.prettier-vscode
     - dbaeumer.vscode-eslint
     - eamodio.gitlens
+    - GitHub.copilot

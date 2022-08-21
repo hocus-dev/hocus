@@ -1,3 +1,5 @@
+// Here we patch the Prisma client file to export some items which will
+// be used to create temporary databases for testing.
 import fs from "fs";
 
 const filepath = "node_modules/prisma/build/index.js";
