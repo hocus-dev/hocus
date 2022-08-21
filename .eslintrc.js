@@ -39,6 +39,11 @@ module.exports = {
                 importNames: ["PrismaClient"],
                 message: "Please use the client from the request context instead.",
               },
+              {
+                name: "@remix-run/node",
+                importNames: ["json", "useActionData", "useLoaderData"],
+                message: "Please use the corresponding item from '~/remix-superjson' instead.",
+              },
             ],
           },
         ],

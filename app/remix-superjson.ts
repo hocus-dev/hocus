@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // adapted from https://github.com/cjenaro/superjson-remix/blob/ea13038f814fc1e5aa0713391ad2ec1a6724c715/src/index.tsx
 import type { MetaFunction } from "@remix-run/node";
+// eslint-disable-next-line no-restricted-imports
 import { json as remixJson } from "@remix-run/node";
 import type { HtmlMetaDescriptor } from "@remix-run/react";
 import {
