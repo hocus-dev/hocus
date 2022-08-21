@@ -1,13 +1,14 @@
 // must be the first import
 import "./prisma-export-patch";
 
+import fs from "fs";
+
 // eslint-disable-next-line no-restricted-imports
 import { PrismaClient } from "@prisma/client";
+import { Client as PgClient } from "pg";
 import * as build from "prisma/build";
 import { v4 as uuidv4 } from "uuid";
 import "process";
-import { Client as PgClient } from "pg";
-import fs from "fs";
 
 export const provideDb = (testFn: (db: PrismaClient) => Promise<void>): (() => Promise<void>) => {
   return async () => {
@@ -28,6 +29,7 @@ export const provideDb = (testFn: (db: PrismaClient) => Promise<void>): (() => P
     await build.ensureDatabaseExists("apply", true, schemaPath);
     const migrate = new build.Migrate(schemaPath);
 
+    // eslint-disable-next-line no-console
     console.info = () => {};
     await migrate.applyMigrations();
     fs.unlinkSync(schemaPath);

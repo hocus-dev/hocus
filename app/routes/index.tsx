@@ -1,5 +1,6 @@
-import { json, useActionData, useLoaderData } from "~/remix-superjson";
 import type { LoaderArgs, ActionArgs } from "@remix-run/node";
+
+import { json, useActionData, useLoaderData } from "~/remix-superjson";
 
 export const loader = async (_args: LoaderArgs) => {
   return json({

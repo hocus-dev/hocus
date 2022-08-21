@@ -3545,6 +3545,11 @@ eslint-plugin-es@^3.0.0:
     eslint-utils "^2.0.0"
     regexpp "^3.0.0"
 
+eslint-plugin-filename-rules@^1.2.0:
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-filename-rules/-/eslint-plugin-filename-rules-1.2.0.tgz#45bd24d2970ac7237700ed6c945e98af5c9ff947"
+  integrity sha512-iPVuHb+VZRt0k9r2ejBRSZM7n+LIJ1OWKiOj/E1ZQiII7AaKZ28JE0lVdxQ7LI2rBem7dqcmC/0QAnAyis0xTA==
+
 eslint-plugin-import@^2.25.4:
   version "2.26.0"
   resolved "https://registry.yarnpkg.com/eslint-plugin-import/-/eslint-plugin-import-2.26.0.tgz#f812dc47be4f2b72b478a021605a59fc6fe8b88b"

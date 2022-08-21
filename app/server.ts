@@ -1,7 +1,7 @@
-import express from "express";
-import remix from "@remix-run/express";
 // eslint-disable-next-line no-restricted-imports
 import { PrismaClient } from "@prisma/client";
+import remix from "@remix-run/express";
+import express from "express";
 
 const app = express();
 

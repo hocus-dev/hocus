@@ -1,11 +1,13 @@
+/* eslint-disable @typescript-eslint/ban-types */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // adapted from https://github.com/cjenaro/superjson-remix/blob/ea13038f814fc1e5aa0713391ad2ec1a6724c715/src/index.tsx
+import type { MetaFunction } from "@remix-run/node";
+import { json as remixJson } from "@remix-run/node";
 import type { HtmlMetaDescriptor } from "@remix-run/react";
 import {
   useLoaderData as useRemixLoaderData,
   useActionData as useRemixActionData,
 } from "@remix-run/react";
-import type { MetaFunction } from "@remix-run/node";
-import { json as remixJson } from "@remix-run/node";
 import { serialize, deserialize } from "superjson";
 import type { SuperJSONResult } from "superjson/dist/types";
 
@@ -83,13 +85,13 @@ export const withSuperJSON =
 
 export const useLoaderData: typeof useLoaderDataType = <Data>() => {
   const loaderData = useRemixLoaderData<SuperJSONResult>();
-  return parse<Data>(loaderData);
+  return parse<Data>(loaderData as SuperJSONResult);
 };
 
 export const useActionData: typeof useActionDataType = <Data>() => {
   const actionData = useRemixActionData<SuperJSONResult>();
   if (actionData) {
-    return parse<Data>(actionData);
+    return parse<Data>(actionData as SuperJSONResult);
   }
   return;
 };
