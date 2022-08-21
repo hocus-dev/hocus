@@ -6,7 +6,9 @@ tasks:
 # Ports to expose on workspace startup
 ports:
   - port: 3000
-    onOpen: notify
+    onOpen: ignore
+  - port: 5432
+    onOpen: ignore
 vscode:
   extensions:
     - Prisma.prisma
