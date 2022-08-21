@@ -9,6 +9,8 @@ ports:
     onOpen: ignore
   - port: 5432
     onOpen: ignore
+  - port: 9999
+    onOpen: ignore
 vscode:
   extensions:
     - Prisma.prisma

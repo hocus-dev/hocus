@@ -3,15 +3,17 @@ import path from "path";
 // eslint-disable-next-line no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import { createRequestHandler } from "@remix-run/express";
+import type { LoaderArgs } from "@remix-run/node";
+import cookieParser from "cookie-parser";
 import express from "express";
 
-function getLoadContext() {
-  return { db: new PrismaClient() };
-}
+const db = new PrismaClient();
 
 const BUILD_DIR = path.join(process.cwd(), "build");
 
 const app = express();
+
+app.use(cookieParser());
 
 // http://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 app.disable("x-powered-by");
@@ -23,24 +25,17 @@ app.use("/build", express.static("public/build", { immutable: true, maxAge: "1y"
 // more aggressive with this caching.
 app.use(express.static("public", { maxAge: "1h" }));
 
-app.all(
-  "*",
-  process.env.NODE_ENV === "development"
-    ? (req, res, next) => {
-        purgeRequireCache();
+app.all("*", (req, res, next) => {
+  if (process.env.NODE_ENV === "development") {
+    purgeRequireCache();
+  }
+  return createRequestHandler({
+    build: require(BUILD_DIR),
+    mode: process.env.NODE_ENV,
+    getLoadContext: (): LoaderArgs["context"] => ({ db, req }),
+  })(req, res, next);
+});
 
-        return createRequestHandler({
-          build: require(BUILD_DIR),
-          mode: process.env.NODE_ENV,
-          getLoadContext,
-        })(req, res, next);
-      }
-    : createRequestHandler({
-        build: require(BUILD_DIR),
-        mode: process.env.NODE_ENV,
-        getLoadContext,
-      }),
-);
 const port = process.env.PORT || 3000;
 
 app.listen(port, () => {
