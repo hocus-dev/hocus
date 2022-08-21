@@ -1,6 +1,7 @@
 import type { LoaderArgs, ActionArgs } from "@remix-run/node";
 
 import { json, useActionData, useLoaderData } from "~/remix-superjson";
+import { ActionFormSchema } from "~/schema/index.schema";
 
 export const loader = async ({ context: { db } }: LoaderArgs) => {
   const players = await db.player.findMany();
@@ -10,30 +11,33 @@ export const loader = async ({ context: { db } }: LoaderArgs) => {
 };
 
 export const action = async (args: ActionArgs) => {
+  const db = args.context.db;
   const formData = Object.fromEntries(await args.request.formData());
-  console.log(formData);
-  return json({ xd: "3d" });
+  const checkedFormData = ActionFormSchema.parse(formData);
+  const fname = checkedFormData.fname;
+  const newPlayer = await db.player.create({ data: { username: fname } });
+  return json({ player: newPlayer.username });
 };
 
 export default function Index() {
   const { players } = useLoaderData<typeof loader>();
-  // const actionData = useActionData<typeof action>();
+  const actionData = useActionData<typeof action>();
 
   return (
     <div>
       <form method="post" action="?index">
         <label htmlFor="fname">First name:</label>
         <br />
-        <input type="text" id="fname" name="fname" value="John" readOnly></input>
+        <input type="text" id="fname" name="fname" placeholder="John"></input>
         <br />
         <input type="submit" value="Submit"></input>
         <br />
       </form>
       <h1>Players</h1>
+      {actionData && <p>New player created: {actionData.player}</p>}
       {players.map(({ username }) => (
         <p key={username}>{username}</p>
       ))}
-      {/* <p>actionData: {JSON.stringify(actionData)}</p> */}
     </div>
   );
 }
