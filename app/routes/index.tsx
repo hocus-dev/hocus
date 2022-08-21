@@ -2,11 +2,10 @@ import type { LoaderArgs, ActionArgs } from "@remix-run/node";
 
 import { json, useActionData, useLoaderData } from "~/remix-superjson";
 
-export const loader = async (_args: LoaderArgs) => {
+export const loader = async ({ context: { db } }: LoaderArgs) => {
+  const players = await db.player.findMany();
   return json({
-    names: ["Hugo", "Bruno", "Teodor", "Kajetan"],
-    ids: [BigInt(1), BigInt(2), BigInt(3)],
-    dates: [new Date()],
+    players,
   });
 };
 
@@ -17,8 +16,8 @@ export const action = async (args: ActionArgs) => {
 };
 
 export default function Index() {
-  const { names, ids, dates } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const { players } = useLoaderData<typeof loader>();
+  // const actionData = useActionData<typeof action>();
 
   return (
     <div>
@@ -30,17 +29,11 @@ export default function Index() {
         <input type="submit" value="Submit"></input>
         <br />
       </form>
-      <h1>Hey everyone!</h1>
-      {names.map((name) => (
-        <p key={name}>{name}</p>
+      <h1>Players</h1>
+      {players.map(({ username }) => (
+        <p key={username}>{username}</p>
       ))}
-      {ids.map((id) => (
-        <p key={id.toString()}>{typeof id}</p>
-      ))}
-      {dates.map((d) => (
-        <p key={d.toString()}>{d.getFullYear()}</p>
-      ))}
-      <p>actionData: {JSON.stringify(actionData)}</p>
+      {/* <p>actionData: {JSON.stringify(actionData)}</p> */}
     </div>
   );
 }
