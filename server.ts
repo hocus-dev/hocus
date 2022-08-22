@@ -32,7 +32,7 @@ app.all("*", (req, res, next) => {
   return createRequestHandler({
     build: require(BUILD_DIR),
     mode: process.env.NODE_ENV,
-    getLoadContext: (): LoaderArgs["context"] => ({ db, req }),
+    getLoadContext: (): LoaderArgs["context"] => ({ db, req, res }),
   })(req, res, next);
 });
 

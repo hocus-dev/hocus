@@ -5,8 +5,7 @@ import { json, useLoaderData } from "~/remix-superjson";
 
 export const loader = async (args: LoaderArgs) => {
   const api = new GoTrueApi({ url: "http://localhost:9999" });
-  // TODO: add a secret so the JWT is verified
-  const response = await api.getUserByCookie(args.context.req);
+  const response = await api.getUserByCookie(args.context.req, args.context.res);
   if (response.user == null) {
     throw new Error("No user");
   }

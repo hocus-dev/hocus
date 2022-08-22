@@ -1,3 +1,8 @@
+# Auth
+
+If gotrue is deployed on a different domain than the main app, its cookie domain must be configured.
+https://github.com/supabase/gotrue/blob/1c9a4dca45298eb534b03a2c2521603b6ee45728/conf/configuration.go#L205
+
 # Welcome to Remix!
 
 - [Remix Docs](https://remix.run/docs)

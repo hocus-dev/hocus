@@ -16,10 +16,12 @@
     "@remix-run/serve": "^1.6.5",
     "@supabase/gotrue-js": "^1.22.22",
     "cookie-parser": "^1.4.6",
+    "http-status-codes": "^2.2.0",
     "prisma": "4.2.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "superjson": "^1.9.1",
+    "typed-inject": "^3.0.1",
     "zod": "^3.18.0"
   },
   "devDependencies": {
