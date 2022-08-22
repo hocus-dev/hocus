@@ -7,7 +7,11 @@ import type { LoaderArgs } from "@remix-run/node";
 import cookieParser from "cookie-parser";
 import express from "express";
 
+import { createAppInjector } from "./app/services/app-injector";
+
 const db = new PrismaClient();
+const appInjector = createAppInjector();
+const authService = appInjector.resolve("AuthService");
 
 const BUILD_DIR = path.join(process.cwd(), "build");
 
@@ -25,15 +29,26 @@ app.use("/build", express.static("public/build", { immutable: true, maxAge: "1y"
 // more aggressive with this caching.
 app.use(express.static("public", { maxAge: "1h" }));
 
-app.all("*", (req, res, next) => {
-  if (process.env.NODE_ENV === "development") {
-    purgeRequireCache();
+app.all("*", async (req, res, next) => {
+  try {
+    if (process.env.NODE_ENV === "development") {
+      purgeRequireCache();
+    }
+    const authResult = await authService.authorize(req, res);
+    return createRequestHandler({
+      build: require(BUILD_DIR),
+      mode: process.env.NODE_ENV,
+      getLoadContext: (): LoaderArgs["context"] => ({
+        db,
+        req,
+        res,
+        app: appInjector,
+        user: authResult.user,
+      }),
+    })(req, res, next);
+  } catch (err) {
+    next(err);
   }
-  return createRequestHandler({
-    build: require(BUILD_DIR),
-    mode: process.env.NODE_ENV,
-    getLoadContext: (): LoaderArgs["context"] => ({ db, req, res }),
-  })(req, res, next);
 });
 
 const port = process.env.PORT || 3000;

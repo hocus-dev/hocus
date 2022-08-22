@@ -13,6 +13,7 @@ module.exports = {
         project: ["./tsconfig.json"], // Specify it only for TypeScript files
       },
       rules: {
+        "@typescript-eslint/no-redeclare": "off",
         "@typescript-eslint/no-empty-function": ["error", { allow: ["arrowFunctions"] }],
         "@typescript-eslint/no-floating-promises": "error",
         "no-console": "warn",

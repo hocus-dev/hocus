@@ -1,12 +1,12 @@
 import type { LoaderArgs, ActionArgs } from "@remix-run/node";
-
 import { json, useActionData, useLoaderData } from "~/remix-superjson";
 import { ActionFormSchema } from "~/schema/index.schema";
 
-export const loader = async ({ context: { db } }: LoaderArgs) => {
+export const loader = async ({ context: { db, user } }: LoaderArgs) => {
   const players = await db.player.findMany();
   return json({
     players,
+    userEmail: user?.email,
   });
 };
 
@@ -20,11 +20,12 @@ export const action = async (args: ActionArgs) => {
 };
 
 export default function Index() {
-  const { players } = useLoaderData<typeof loader>();
+  const { players, userEmail } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   return (
     <div>
+      <h1>Your email is {userEmail ?? "undefined"}</h1>
       <form method="post" action="?index">
         <label htmlFor="fname">First name:</label>
         <br />

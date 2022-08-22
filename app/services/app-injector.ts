@@ -1,6 +1,12 @@
-import { createInjector } from "typed-inject";
+import { createInjector, Scope } from "typed-inject";
+import { getConfig } from "~/config";
+import { newLogger } from "~/logger";
 
-import { CONFIG_INJECT_TOKEN, getConfig } from "~/config";
+import { AuthService } from "./auth.service";
 
 export const createAppInjector = () =>
-  createInjector().provideValue(CONFIG_INJECT_TOKEN, getConfig());
+  createInjector()
+    .provideFactory("Config", getConfig)
+    .provideFactory("Logger", newLogger, Scope.Transient)
+    .provideClass("AuthService", AuthService);
+export type AppInjector = ReturnType<typeof createAppInjector>;

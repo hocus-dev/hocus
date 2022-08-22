@@ -1,13 +1,11 @@
 import type { LoaderArgs } from "@remix-run/node";
-import { GoTrueApi } from "@supabase/gotrue-js";
-
 import { json, useLoaderData } from "~/remix-superjson";
 
 export const loader = async (args: LoaderArgs) => {
-  const api = new GoTrueApi({ url: "http://localhost:9999" });
-  const response = await api.getUserByCookie(args.context.req, args.context.res);
+  const authService = args.context.app.resolve("AuthService");
+  const response = await authService.authorize(args.context.req, args.context.res);
   if (response.user == null) {
-    throw new Error("No user");
+    throw response.error;
   }
   return json({ user: response.user });
 };
