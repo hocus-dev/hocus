@@ -1,4 +1,5 @@
 import type { valueof } from "./types/utils";
+import { SuperJsonCrasher } from "./utils";
 
 const env = process.env.NODE_ENV;
 
@@ -17,6 +18,7 @@ export type Env = valueof<typeof Env>;
 export const Env = {
   Production: "production",
   Development: "development",
+  Test: "test",
 } as const;
 
 const getEnv = (): Env => {
@@ -34,5 +36,9 @@ export const getConfig = () =>
     gotrueCookieDuration: parseInt(get("GOTRUE_COOKIE_DURATION", "2592000")),
     gotrueCookieDomain: get("GOTRUE_COOKIE_DOMAIN", "localhost"),
     logLevel: get("LOG_LEVEL", "debug"),
+    // This class contains a circular reference to itself, so when superjson
+    // tries to serialize it, it will throw an error. This is a precaution
+    // not to inadvertently pass the config object to the frontend.
+    _superjsonCrasher: new SuperJsonCrasher(),
   } as const);
 export type Config = ReturnType<typeof getConfig>;

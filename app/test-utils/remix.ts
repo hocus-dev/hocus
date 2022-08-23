@@ -9,9 +9,7 @@ const provideArgs = (
 ): (() => Promise<void>) => {
   return provideDb(async (db) => {
     const args: LoaderArgs | ActionArgs = {
-      request: null as any,
-      context: { db },
-      params: null as any,
+      context: { db, req: {} as any, res: {} as any, app: {} as any, user: null },
     };
     await testFn(args);
   });
