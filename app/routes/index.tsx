@@ -1,7 +1,8 @@
 import type { LoaderArgs, ActionArgs } from "@remix-run/node";
 import CsrfInput from "~/components/csrf-input";
 import { json, useActionData, useLoaderData } from "~/remix-superjson";
-import { ActionFormSchema } from "~/schema/index.schema";
+
+import { ActionFormSchema } from "./index.schema";
 
 export const loader = async ({ context: { db, user, req } }: LoaderArgs) => {
   const players = await db.player.findMany();

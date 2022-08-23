@@ -1,5 +1,7 @@
 import type { LoaderArgs } from "@remix-run/node";
-import { json, useLoaderData } from "~/remix-superjson";
+import { redirect } from "@remix-run/node";
+
+import { REDIRECT_TO_COOKIE_NAME } from "./login-redirect.constant";
 
 export const loader = async (args: LoaderArgs) => {
   const authService = args.context.app.resolve("AuthService");
@@ -7,10 +9,7 @@ export const loader = async (args: LoaderArgs) => {
   if (response.user == null) {
     throw response.error;
   }
-  return json({ user: response.user });
+  const url = args.context.req.cookies[REDIRECT_TO_COOKIE_NAME] ?? "/";
+  args.context.res.clearCookie(REDIRECT_TO_COOKIE_NAME);
+  return redirect(url);
 };
-
-export default function Token() {
-  const { user } = useLoaderData<typeof loader>();
-  return <div>Email: {user.email}</div>;
-}
