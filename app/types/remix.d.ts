@@ -14,12 +14,16 @@ type Context = {
   user: User | null;
 };
 
+// we omit these fields because they act weirdly with express
+// if accessed
+type Args = Omit<DataFunctionArgs, "request" | "params">;
+
 declare module "@remix-run/node" {
-  export interface LoaderArgs extends DataFunctionArgs {
+  export interface LoaderArgs extends Args {
     context: Context;
   }
 
-  export interface ActionArgs extends DataFunctionArgs {
+  export interface ActionArgs extends Args {
     context: Context;
   }
 }

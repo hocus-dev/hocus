@@ -4,7 +4,9 @@ import path from "path";
 import { PrismaClient } from "@prisma/client";
 import { createRequestHandler } from "@remix-run/express";
 import type { LoaderArgs } from "@remix-run/node";
+import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
+import csrf from "csurf";
 import express from "express";
 
 import { createAppInjector } from "./app/services/app-injector";
@@ -17,7 +19,7 @@ const BUILD_DIR = path.join(process.cwd(), "build");
 
 const app = express();
 
-app.use(cookieParser());
+app.use(bodyParser.urlencoded({ extended: false }));
 
 // http://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 app.disable("x-powered-by");
@@ -28,6 +30,8 @@ app.use("/build", express.static("public/build", { immutable: true, maxAge: "1y"
 // Everything else (like favicon.ico) is cached for an hour. You may want to be
 // more aggressive with this caching.
 app.use(express.static("public", { maxAge: "1h" }));
+app.use(cookieParser());
+app.use(csrf({ cookie: true }));
 
 app.all("*", async (req, res, next) => {
   try {
