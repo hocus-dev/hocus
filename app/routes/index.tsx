@@ -38,7 +38,7 @@ export default function Index() {
         <input type="submit" value="Submit"></input>
         <br />
       </form>
-      <h1>Players</h1>
+      <h1 className="text-3xl font-bold underline">Players</h1>
       {actionData && <p>New player created: {actionData.player}</p>}
       {players.map(({ username }) => (
         <p key={username}>{username}</p>

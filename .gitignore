@@ -5,3 +5,4 @@ node_modules
 /public/build
 *.log
 core*
+app/styles
