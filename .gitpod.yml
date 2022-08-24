@@ -1,4 +1,6 @@
 # Commands to start on workspace startup
+image:
+  file: .gitpod.Dockerfile
 tasks:
   - init: yarn install && ops/bin/prepare.sh
     command: |
