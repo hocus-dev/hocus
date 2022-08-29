@@ -1,5 +1,8 @@
 import type { LoaderArgs, ActionArgs } from "@remix-run/node";
 import CsrfInput from "~/components/csrf-input";
+import { LandingHero } from "~/components/landing/hero";
+import { LandingNavbar } from "~/components/landing/navbar";
+import { SupportsSection } from "~/components/landing/supports-section";
 import { json, useActionData, useLoaderData } from "~/remix-superjson";
 
 import { ActionFormSchema } from "./index.schema";
@@ -27,7 +30,10 @@ export default function Index() {
   const actionData = useActionData<typeof action>();
 
   return (
-    <div>
+    <>
+      <LandingNavbar />
+      <LandingHero />
+      <SupportsSection />
       <h1>Your email is {userEmail ?? "undefined"}</h1>
       <form method="post" action="?index">
         <CsrfInput token={csrfToken} />
@@ -43,6 +49,6 @@ export default function Index() {
       {players.map(({ username }) => (
         <p key={username}>{username}</p>
       ))}
-    </div>
+    </>
   );
 }
