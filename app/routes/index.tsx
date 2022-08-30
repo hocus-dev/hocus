@@ -3,6 +3,7 @@ import CsrfInput from "~/components/csrf-input";
 import { LandingHero } from "~/components/landing/hero";
 import { LandingNavbar } from "~/components/landing/navbar";
 import { SupportsSection } from "~/components/landing/supports-section";
+import { TerminalScreenshot } from "~/components/landing/terminal-screenshot";
 import { json, useActionData, useLoaderData } from "~/remix-superjson";
 
 import { ActionFormSchema } from "./index.schema";
@@ -34,6 +35,7 @@ export default function Index() {
       <LandingNavbar />
       <LandingHero />
       <SupportsSection />
+      <TerminalScreenshot />
       <h1>Your email is {userEmail ?? "undefined"}</h1>
       <form method="post" action="?index">
         <CsrfInput token={csrfToken} />
