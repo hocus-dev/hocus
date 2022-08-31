@@ -22,6 +22,7 @@ export const loader = async (args: LoaderArgs) => {
 
 export default function AppIndex(): JSX.Element {
   const { redirectToAfterLogin } = useLoaderData<typeof loader>();
+  const href = `/app/sign-in/oauth?${PROVIDER_PARAM_NAME}=${GOOGLE_PROVIDER_ID}&${REDIRECT_QUERY_PARAM_NAME}=${redirectToAfterLogin}`;
 
   return (
     <div className="flex flex-col justify-center w-full h-full">
@@ -31,13 +32,14 @@ export default function AppIndex(): JSX.Element {
             <img src="/logo-leaf.png" className="h-8" alt="Hocus Logo" />
           </div>
           <h1 className="text-3xl font-bold text-center mb-16">Hocus</h1>
-          <form action="/app/sign-in/oauth" method="GET">
-            <input type="hidden" name={PROVIDER_PARAM_NAME} value={GOOGLE_PROVIDER_ID} />
-            <input type="hidden" name={REDIRECT_QUERY_PARAM_NAME} value={redirectToAfterLogin} />
-            <Button outline={true} type="submit">
+          {/* The rel="noreferrer" is crucial. When gotrue sees a referrer it ignores */}
+          {/* the redirect url it should redirect to after /callback, and redirects to */}
+          {/* http://localhost:3000/. I've just spent 3 hours debugging this. */}
+          <a rel="noreferrer" href={href}>
+            <Button size="lg" outline={true} type="submit">
               <i className="devicon-google-plain mr-4"></i>Continue with Google
             </Button>
-          </form>
+          </a>
         </div>
       </div>
     </div>
