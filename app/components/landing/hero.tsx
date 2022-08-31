@@ -1,4 +1,5 @@
 import { Button } from "flowbite-react";
+import { LOGIN_URL } from "~/routes/app/sign-in/login-redirect.constant";
 
 export const LandingHero = (): JSX.Element => {
   return (
@@ -14,9 +15,11 @@ export const LandingHero = (): JSX.Element => {
       </div>
 
       <div className="flex w-full justify-center space-x-4 mt-12">
-        <Button size="lg" gradientDuoTone="cyanToBlue">
-          <span className="w-28">Use Hocus</span>
-        </Button>
+        <form action={LOGIN_URL} method="GET">
+          <Button type="submit" size="lg" gradientDuoTone="cyanToBlue">
+            <span className="w-28">Use Hocus</span>
+          </Button>
+        </form>
         <Button size="lg" color="light">
           <span className="w-28">Read the docs</span>
         </Button>

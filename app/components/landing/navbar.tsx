@@ -1,4 +1,5 @@
 import { Button, Navbar } from "flowbite-react";
+import { LOGIN_URL } from "~/routes/app/sign-in/login-redirect.constant";
 
 export const LandingNavbar = (): JSX.Element => {
   return (
@@ -10,7 +11,11 @@ export const LandingNavbar = (): JSX.Element => {
         </span>
       </Navbar.Brand>
       <div className="flex md:order-2">
-        <Button gradientDuoTone="cyanToBlue">Use Hocus</Button>
+        <form action={LOGIN_URL} method="GET">
+          <Button type="submit" gradientDuoTone="cyanToBlue">
+            Use Hocus
+          </Button>
+        </form>
       </div>
     </Navbar>
   );
