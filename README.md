@@ -17,6 +17,12 @@ npm run dev
 
 This starts your app in development mode, which will purge the server require cache when Remix rebuilds assets so you don't need a process manager restarting the express server.
 
+## How to pg_dump a database
+
+```bash
+docker run --network=host -it -e PGPASSWORD=pass postgres:alpine pg_dump -h localhost -U postgres zitadel > backup.sql
+```
+
 ## Deployment
 
 First, build your app for production:
