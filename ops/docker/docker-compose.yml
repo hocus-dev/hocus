@@ -1,56 +1,43 @@
 version: "3"
 services:
+  gen:
+    image: alpine:latest
+    volumes:
+      - ./:/data
+    command: >
+      sh -c '
+        cd /data && \
+        cp resources/keycloak-setup.sh db-init/keycloak-setup.sh && \
+        sed -i -e "/-- SQL_DB_DUMP_GOES_HERE/r resources/keycloak-db-dump.sql" db-init/keycloak-setup.sh && \
+        sed -i \
+          "s/github_client_secret_goes_here/${GITHUB_APP_HOCUS_DEV_CLIENT_SECRET}/g" \
+          db-init/keycloak-setup.sh
+      '
   db:
     image: "postgres:alpine"
     command: postgres -c 'max_connections=10000' -c 'shared_buffers=2GB' -c 'effective_cache_size=6GB' -c 'maintenance_work_mem=512MB' -c 'random_page_cost=1.1' -c 'effective_io_concurrency=200' -c 'work_mem=4MB' -c 'min_wal_size=2GB' -c 'max_wal_size=8GB' -c 'max_worker_processes=8' -c 'max_parallel_workers_per_gather=4' -c 'max_parallel_workers=8' -c 'max_parallel_maintenance_workers=4' -c 'fsync=off' -c 'full_page_writes=off' -c 'synchronous_commit=off' -c 'wal_level=minimal' -c 'max_wal_senders=0' -c 'log_error_verbosity=terse'
     restart: unless-stopped
     ports:
       - 5432:5432
+    depends_on:
+      gen:
+        condition: service_completed_successfully
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: rooms
       PGDATA: /pgtmpfs
     volumes:
-      - ./db-schema:/docker-entrypoint-initdb.d/
+      - ./db-init:/docker-entrypoint-initdb.d/
     tmpfs:
       - /pgtmpfs
-  auth:
-    container_name: supabase-auth
-    image: supabase/gotrue:v2.10.0
+  keycloak:
     depends_on:
-      - db
-    restart: unless-stopped
+      db:
+        condition: service_started
+    command: "start --import-realm"
+    build:
+      dockerfile: keycloak-dev.Dockerfile
     ports:
-      - 9999:9999
-    environment:
-      GOTRUE_API_HOST: 0.0.0.0
-      GOTRUE_API_PORT: 9999
-      API_EXTERNAL_URL: ${API_EXTERNAL_URL}
-
-      GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?search_path=auth
-
-      GOTRUE_SITE_URL: ${SITE_URL}
-      GOTRUE_URI_ALLOW_LIST: ${GOTRUE_URI_ALLOW_LIST}
-      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP}
-
-      GOTRUE_JWT_ADMIN_ROLES: service_role
-      GOTRUE_JWT_AUD: authenticated
-      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
-      GOTRUE_JWT_EXP: ${JWT_EXPIRY}
-      GOTRUE_JWT_SECRET: ${JWT_SECRET}
-
-      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP}
-      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM}
-
-      GOTRUE_EXTERNAL_PHONE_ENABLED: ${ENABLE_PHONE_SIGNUP}
-      GOTRUE_SMS_AUTOCONFIRM: ${ENABLE_PHONE_AUTOCONFIRM}
-
-      GOTRUE_EXTERNAL_REDIRECT_URL: ${GOTRUE_EXTERNAL_REDIRECT_URL}
-      GOTRUE_EXTERNAL_GOOGLE_ENABLED: ${GOTRUE_EXTERNAL_GOOGLE_ENABLED}
-      GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: ${GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI}
-      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID}
-      GOTRUE_EXTERNAL_GOOGLE_SECRET: ${GOTRUE_EXTERNAL_GOOGLE_SECRET}
-
-      GOTRUE_COOKIE_DOMAIN: ${GOTRUE_COOKIE_DOMAIN}
-      GOTRUE_COOKIE_DURATION: ${GOTRUE_COOKIE_DURATION}
+      - "4200:8080"
+    restart: unless-stopped
