@@ -1,6 +1,15 @@
 # Commands to start on workspace startup
 tasks:
-  - init: yarn install && ops/bin/prepare.sh
+  - name: tailscaled
+    command: sudo tailscaled
+  - name: tailscale
+    command: |
+      sudo -E tailscale up \
+        --login-server=https://hs.hugodutka.com \
+        --auth-key=$TAILSCALE_PREAUTHKEY \
+        --hostname=gitpod-hocus
+  - name: dev-env setup
+    init: yarn install && ops/bin/prepare.sh
     command: |
       ops/bin/link.sh && ops/bin/up.sh && npm run dev
 # Ports to expose on workspace startup
@@ -9,7 +18,7 @@ ports:
     onOpen: ignore
   - port: 5432
     onOpen: ignore
-  - port: 9999
+  - port: 4200
     onOpen: ignore
 vscode:
   extensions:
