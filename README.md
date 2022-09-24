@@ -17,10 +17,11 @@ npm run dev
 
 This starts your app in development mode, which will purge the server require cache when Remix rebuilds assets so you don't need a process manager restarting the express server.
 
-## How to pg_dump a database
+## How to pg_dump the keycloak database
 
 ```bash
-docker run --network=host -it -e PGPASSWORD=pass postgres:alpine pg_dump -h localhost -U postgres zitadel > backup.sql
+docker run --network=host -it -e PGPASSWORD=pass postgres:alpine pg_dump -h localhost -U postgres keycloak > ops/docker/resources/keycloak-db-dump.sql
+sed -i "s/$GITHUB_APP_HOCUS_DEV_CLIENT_SECRET/github_client_secret_goes_here/g" ops/docker/resources/keycloak-db-dump.sql
 ```
 
 ## Deployment
