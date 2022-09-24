@@ -1652,19 +1652,19 @@ COPY public.broker_link (identity_provider, storage_provider_id, realm_id, broke
 
 COPY public.client (id, enabled, full_scope_allowed, client_id, not_before, public_client, secret, base_url, bearer_only, management_url, surrogate_auth_required, realm_id, protocol, node_rereg_timeout, frontchannel_logout, consent_required, name, service_accounts_enabled, client_authenticator_type, root_url, description, registration_token, standard_flow_enabled, implicit_flow_enabled, direct_access_grants_enabled, always_display_in_console) FROM stdin;
 852e20a2-bc82-4a22-bd43-3d09702452fa	t	f	master-realm	0	f	\N	\N	t	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	\N	0	f	f	master Realm	f	client-secret	\N	\N	\N	t	f	f	f
-e549e79e-4e77-425f-8611-8eefc4f267da	t	f	account	0	t	\N	/realms/master/account/	f	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f	${client_account}	f	client-secret	${authBaseUrl}	\N	\N	t	f	f	f
-3fb776f9-9b41-4997-b3b8-cff334bc72fc	t	f	account-console	0	t	\N	/realms/master/account/	f	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f	${client_account-console}	f	client-secret	${authBaseUrl}	\N	\N	t	f	f	f
-26393c65-dd94-4211-8bfa-ad080c4a2726	t	f	broker	0	f	\N	\N	t	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f	${client_broker}	f	client-secret	\N	\N	\N	t	f	f	f
-e6857f1f-a8d7-4fe0-bdf8-b7dd7685d50f	t	f	security-admin-console	0	t	\N	/admin/master/console/	f	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f	${client_security-admin-console}	f	client-secret	${authAdminUrl}	\N	\N	t	f	f	f
-c7766ac6-9664-4577-a7ac-cf83c8901a93	t	f	admin-cli	0	t	\N	\N	f	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f	${client_admin-cli}	f	client-secret	\N	\N	\N	f	f	t	f
+e549e79e-4e77-425f-8611-8eefc4f267da	t	f	account	0	t	\N	/realms/master/account/	f	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f		f	client-secret		\N	\N	t	f	f	f
+3fb776f9-9b41-4997-b3b8-cff334bc72fc	t	f	account-console	0	t	\N	/realms/master/account/	f	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f	console	f	client-secret		\N	\N	t	f	f	f
+26393c65-dd94-4211-8bfa-ad080c4a2726	t	f	broker	0	f	\N	\N	t	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f		f	client-secret	\N	\N	\N	t	f	f	f
+e6857f1f-a8d7-4fe0-bdf8-b7dd7685d50f	t	f	security-admin-console	0	t	\N	/admin/master/console/	f	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f	admin-console	f	client-secret		\N	\N	t	f	f	f
+c7766ac6-9664-4577-a7ac-cf83c8901a93	t	f	admin-cli	0	t	\N	\N	f	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	openid-connect	0	f	f	cli	f	client-secret	\N	\N	\N	f	f	t	f
 7c83487d-a523-408e-ad85-666f44f21031	t	f	hocus-realm	0	f	\N	\N	t	\N	f	65e9a13f-13e5-431c-8500-c136a2014a70	\N	0	f	f	hocus Realm	f	client-secret	\N	\N	\N	t	f	f	f
-fecc6bc0-e452-4102-8c7c-f8364d65a61a	t	f	account	0	t	\N	/realms/hocus/account/	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	${client_account}	f	client-secret	${authBaseUrl}	\N	\N	t	f	f	f
-9707a210-df0d-4283-9cc6-99c93ab34982	t	f	account-console	0	t	\N	/realms/hocus/account/	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	${client_account-console}	f	client-secret	${authBaseUrl}	\N	\N	t	f	f	f
-dfc79924-01ec-4507-9647-1964c2fc427a	t	f	admin-cli	0	t	\N	\N	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	${client_admin-cli}	f	client-secret	\N	\N	\N	f	f	t	f
-7e7a1ccd-b003-4ed9-91f7-13fb6e2eb2d6	t	f	broker	0	f	\N	\N	t	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	${client_broker}	f	client-secret	\N	\N	\N	t	f	f	f
-0bd9714f-a8a2-40b2-844a-d07386362f95	t	t	hocus	0	f	dev-client-secret		f		f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	-1	t	f		f	client-secret			\N	t	f	t	f
-024e7161-fb12-44a1-bc21-b2d03e26d3ee	t	f	security-admin-console	0	t	\N	/admin/hocus/console/	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	${client_security-admin-console}	f	client-secret	${authAdminUrl}	\N	\N	t	f	f	f
-ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	f	realm-management	0	f	\N	\N	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	${client_realm-management}	t	client-secret	\N	\N	\N	t	f	f	f
+fecc6bc0-e452-4102-8c7c-f8364d65a61a	t	f	account	0	t	\N	/realms/hocus/account/	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f		f	client-secret		\N	\N	t	f	f	f
+dfc79924-01ec-4507-9647-1964c2fc427a	t	f	admin-cli	0	t	\N	\N	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	cli	f	client-secret	\N	\N	\N	f	f	t	f
+7e7a1ccd-b003-4ed9-91f7-13fb6e2eb2d6	t	f	broker	0	f	\N	\N	t	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f		f	client-secret	\N	\N	\N	t	f	f	f
+024e7161-fb12-44a1-bc21-b2d03e26d3ee	t	f	security-admin-console	0	t	\N	/admin/hocus/console/	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	admin-console	f	client-secret		\N	\N	t	f	f	f
+ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	f	realm-management	0	f	\N	\N	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	management	t	client-secret	\N	\N	\N	t	f	f	f
+a16f9d56-89da-4707-8e7b-8e351372e3d3	t	f	account-console	0	t	\N	/realms/hocus/account/	f	\N	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	0	f	f	console	f	client-secret		\N	\N	t	f	f	f
+ade0aace-88fa-4e18-90ae-a7d816a349e6	t	t	hocus	0	f	**********		f		f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	openid-connect	-1	t	f		f	client-secret			\N	t	t	t	f
 \.
 
 
@@ -1679,26 +1679,27 @@ e549e79e-4e77-425f-8611-8eefc4f267da	+	post.logout.redirect.uris
 e6857f1f-a8d7-4fe0-bdf8-b7dd7685d50f	+	post.logout.redirect.uris
 e6857f1f-a8d7-4fe0-bdf8-b7dd7685d50f	S256	pkce.code.challenge.method
 fecc6bc0-e452-4102-8c7c-f8364d65a61a	+	post.logout.redirect.uris
-9707a210-df0d-4283-9cc6-99c93ab34982	+	post.logout.redirect.uris
-9707a210-df0d-4283-9cc6-99c93ab34982	S256	pkce.code.challenge.method
 dfc79924-01ec-4507-9647-1964c2fc427a	+	post.logout.redirect.uris
 7e7a1ccd-b003-4ed9-91f7-13fb6e2eb2d6	+	post.logout.redirect.uris
-0bd9714f-a8a2-40b2-844a-d07386362f95	1664023100	client.secret.creation.time
-0bd9714f-a8a2-40b2-844a-d07386362f95	http://localhost:3000/	post.logout.redirect.uris
-0bd9714f-a8a2-40b2-844a-d07386362f95	false	oauth2.device.authorization.grant.enabled
-0bd9714f-a8a2-40b2-844a-d07386362f95	false	backchannel.logout.revoke.offline.tokens
-0bd9714f-a8a2-40b2-844a-d07386362f95	true	use.refresh.tokens
-0bd9714f-a8a2-40b2-844a-d07386362f95	false	tls-client-certificate-bound-access-tokens
-0bd9714f-a8a2-40b2-844a-d07386362f95	false	oidc.ciba.grant.enabled
-0bd9714f-a8a2-40b2-844a-d07386362f95	true	backchannel.logout.session.required
-0bd9714f-a8a2-40b2-844a-d07386362f95	false	client_credentials.use_refresh_token
-0bd9714f-a8a2-40b2-844a-d07386362f95	{}	acr.loa.map
-0bd9714f-a8a2-40b2-844a-d07386362f95	false	require.pushed.authorization.requests
-0bd9714f-a8a2-40b2-844a-d07386362f95	false	display.on.consent.screen
-0bd9714f-a8a2-40b2-844a-d07386362f95	false	token.response.type.bearer.lower-case
 ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	+	post.logout.redirect.uris
 024e7161-fb12-44a1-bc21-b2d03e26d3ee	+	post.logout.redirect.uris
 024e7161-fb12-44a1-bc21-b2d03e26d3ee	S256	pkce.code.challenge.method
+a16f9d56-89da-4707-8e7b-8e351372e3d3	+	post.logout.redirect.uris
+a16f9d56-89da-4707-8e7b-8e351372e3d3	S256	pkce.code.challenge.method
+ade0aace-88fa-4e18-90ae-a7d816a349e6	1664023100	client.secret.creation.time
+ade0aace-88fa-4e18-90ae-a7d816a349e6	http://localhost:3000/	post.logout.redirect.uris
+ade0aace-88fa-4e18-90ae-a7d816a349e6	false	oauth2.device.authorization.grant.enabled
+ade0aace-88fa-4e18-90ae-a7d816a349e6	false	use.jwks.url
+ade0aace-88fa-4e18-90ae-a7d816a349e6	false	backchannel.logout.revoke.offline.tokens
+ade0aace-88fa-4e18-90ae-a7d816a349e6	true	use.refresh.tokens
+ade0aace-88fa-4e18-90ae-a7d816a349e6	false	tls-client-certificate-bound-access-tokens
+ade0aace-88fa-4e18-90ae-a7d816a349e6	false	oidc.ciba.grant.enabled
+ade0aace-88fa-4e18-90ae-a7d816a349e6	true	backchannel.logout.session.required
+ade0aace-88fa-4e18-90ae-a7d816a349e6	false	client_credentials.use_refresh_token
+ade0aace-88fa-4e18-90ae-a7d816a349e6	{}	acr.loa.map
+ade0aace-88fa-4e18-90ae-a7d816a349e6	false	require.pushed.authorization.requests
+ade0aace-88fa-4e18-90ae-a7d816a349e6	false	display.on.consent.screen
+ade0aace-88fa-4e18-90ae-a7d816a349e6	false	token.response.type.bearer.lower-case
 \.
 
 
@@ -1760,23 +1761,23 @@ fc51ff5e-3f5c-440e-9709-2e51bbd7610d	address	8ce1928e-b671-44b2-ab2f-ba0a2fc4676
 
 COPY public.client_scope_attributes (scope_id, value, name) FROM stdin;
 acf0a738-9931-42c4-9b1d-9e79bf5d0542	true	display.on.consent.screen
-acf0a738-9931-42c4-9b1d-9e79bf5d0542	${offlineAccessScopeConsentText}	consent.screen.text
+acf0a738-9931-42c4-9b1d-9e79bf5d0542		consent.screen.text
 4a2871f7-b05b-45c3-b4e3-9d66c7f1c456	true	display.on.consent.screen
-4a2871f7-b05b-45c3-b4e3-9d66c7f1c456	${samlRoleListScopeConsentText}	consent.screen.text
+4a2871f7-b05b-45c3-b4e3-9d66c7f1c456		consent.screen.text
 1670ffaf-0dcc-43ab-9542-20a5d061cb70	true	display.on.consent.screen
-1670ffaf-0dcc-43ab-9542-20a5d061cb70	${profileScopeConsentText}	consent.screen.text
+1670ffaf-0dcc-43ab-9542-20a5d061cb70		consent.screen.text
 1670ffaf-0dcc-43ab-9542-20a5d061cb70	true	include.in.token.scope
 8c633ac3-01a1-4768-bf94-09d6a8eefe67	true	display.on.consent.screen
-8c633ac3-01a1-4768-bf94-09d6a8eefe67	${emailScopeConsentText}	consent.screen.text
+8c633ac3-01a1-4768-bf94-09d6a8eefe67		consent.screen.text
 8c633ac3-01a1-4768-bf94-09d6a8eefe67	true	include.in.token.scope
 8b652e2f-5418-4389-b295-db3f2db7c238	true	display.on.consent.screen
-8b652e2f-5418-4389-b295-db3f2db7c238	${addressScopeConsentText}	consent.screen.text
+8b652e2f-5418-4389-b295-db3f2db7c238		consent.screen.text
 8b652e2f-5418-4389-b295-db3f2db7c238	true	include.in.token.scope
 47680830-c71d-4277-aa35-bd6e499b1777	true	display.on.consent.screen
-47680830-c71d-4277-aa35-bd6e499b1777	${phoneScopeConsentText}	consent.screen.text
+47680830-c71d-4277-aa35-bd6e499b1777		consent.screen.text
 47680830-c71d-4277-aa35-bd6e499b1777	true	include.in.token.scope
 919a49fc-a46a-4cc4-a055-db381f8f45ab	true	display.on.consent.screen
-919a49fc-a46a-4cc4-a055-db381f8f45ab	${rolesScopeConsentText}	consent.screen.text
+919a49fc-a46a-4cc4-a055-db381f8f45ab		consent.screen.text
 919a49fc-a46a-4cc4-a055-db381f8f45ab	false	include.in.token.scope
 75f5e8eb-66b0-4e97-b477-c819eb979d33	false	display.on.consent.screen
 75f5e8eb-66b0-4e97-b477-c819eb979d33		consent.screen.text
@@ -1787,27 +1788,27 @@ acf0a738-9931-42c4-9b1d-9e79bf5d0542	${offlineAccessScopeConsentText}	consent.sc
 28466805-58b3-44ac-a00e-3b67deb134bd	false	include.in.token.scope
 f9307808-d664-47b2-8c29-907b86184053	true	include.in.token.scope
 f9307808-d664-47b2-8c29-907b86184053	true	display.on.consent.screen
-f9307808-d664-47b2-8c29-907b86184053	${emailScopeConsentText}	consent.screen.text
+f9307808-d664-47b2-8c29-907b86184053		consent.screen.text
 8761fac6-8355-47c7-9db0-a09805dbf0d5	true	include.in.token.scope
 8761fac6-8355-47c7-9db0-a09805dbf0d5	false	display.on.consent.screen
 1539e1f7-ffa4-4dc7-9c8b-b19d76234078	false	include.in.token.scope
 1539e1f7-ffa4-4dc7-9c8b-b19d76234078	false	display.on.consent.screen
 3752181d-a7af-48a4-bd1d-cd5690f3998c	true	include.in.token.scope
 3752181d-a7af-48a4-bd1d-cd5690f3998c	true	display.on.consent.screen
-3752181d-a7af-48a4-bd1d-cd5690f3998c	${phoneScopeConsentText}	consent.screen.text
-aeeaa569-8888-4607-a030-c9f979c44f61	${samlRoleListScopeConsentText}	consent.screen.text
+3752181d-a7af-48a4-bd1d-cd5690f3998c		consent.screen.text
+aeeaa569-8888-4607-a030-c9f979c44f61		consent.screen.text
 aeeaa569-8888-4607-a030-c9f979c44f61	true	display.on.consent.screen
-10e311ca-7b29-4122-b23a-ee3854f11c8a	${offlineAccessScopeConsentText}	consent.screen.text
+10e311ca-7b29-4122-b23a-ee3854f11c8a		consent.screen.text
 10e311ca-7b29-4122-b23a-ee3854f11c8a	true	display.on.consent.screen
 56b9fbab-32f2-44a5-8554-7d5c116dbbde	true	include.in.token.scope
 56b9fbab-32f2-44a5-8554-7d5c116dbbde	true	display.on.consent.screen
-56b9fbab-32f2-44a5-8554-7d5c116dbbde	${profileScopeConsentText}	consent.screen.text
+56b9fbab-32f2-44a5-8554-7d5c116dbbde		consent.screen.text
 fc51ff5e-3f5c-440e-9709-2e51bbd7610d	true	include.in.token.scope
 fc51ff5e-3f5c-440e-9709-2e51bbd7610d	true	display.on.consent.screen
-fc51ff5e-3f5c-440e-9709-2e51bbd7610d	${addressScopeConsentText}	consent.screen.text
+fc51ff5e-3f5c-440e-9709-2e51bbd7610d		consent.screen.text
 60b6f750-8b18-4e73-81e4-47df8d247e71	false	include.in.token.scope
 60b6f750-8b18-4e73-81e4-47df8d247e71	true	display.on.consent.screen
-60b6f750-8b18-4e73-81e4-47df8d247e71	${rolesScopeConsentText}	consent.screen.text
+60b6f750-8b18-4e73-81e4-47df8d247e71		consent.screen.text
 376c7112-f871-403d-930f-4cc72d34a411	false	include.in.token.scope
 376c7112-f871-403d-930f-4cc72d34a411	false	display.on.consent.screen
 376c7112-f871-403d-930f-4cc72d34a411		consent.screen.text
@@ -1882,15 +1883,6 @@ fecc6bc0-e452-4102-8c7c-f8364d65a61a	fc51ff5e-3f5c-440e-9709-2e51bbd7610d	f
 fecc6bc0-e452-4102-8c7c-f8364d65a61a	3752181d-a7af-48a4-bd1d-cd5690f3998c	f
 fecc6bc0-e452-4102-8c7c-f8364d65a61a	10e311ca-7b29-4122-b23a-ee3854f11c8a	f
 fecc6bc0-e452-4102-8c7c-f8364d65a61a	8761fac6-8355-47c7-9db0-a09805dbf0d5	f
-9707a210-df0d-4283-9cc6-99c93ab34982	376c7112-f871-403d-930f-4cc72d34a411	t
-9707a210-df0d-4283-9cc6-99c93ab34982	1539e1f7-ffa4-4dc7-9c8b-b19d76234078	t
-9707a210-df0d-4283-9cc6-99c93ab34982	56b9fbab-32f2-44a5-8554-7d5c116dbbde	t
-9707a210-df0d-4283-9cc6-99c93ab34982	60b6f750-8b18-4e73-81e4-47df8d247e71	t
-9707a210-df0d-4283-9cc6-99c93ab34982	f9307808-d664-47b2-8c29-907b86184053	t
-9707a210-df0d-4283-9cc6-99c93ab34982	fc51ff5e-3f5c-440e-9709-2e51bbd7610d	f
-9707a210-df0d-4283-9cc6-99c93ab34982	3752181d-a7af-48a4-bd1d-cd5690f3998c	f
-9707a210-df0d-4283-9cc6-99c93ab34982	10e311ca-7b29-4122-b23a-ee3854f11c8a	f
-9707a210-df0d-4283-9cc6-99c93ab34982	8761fac6-8355-47c7-9db0-a09805dbf0d5	f
 dfc79924-01ec-4507-9647-1964c2fc427a	376c7112-f871-403d-930f-4cc72d34a411	t
 dfc79924-01ec-4507-9647-1964c2fc427a	1539e1f7-ffa4-4dc7-9c8b-b19d76234078	t
 dfc79924-01ec-4507-9647-1964c2fc427a	56b9fbab-32f2-44a5-8554-7d5c116dbbde	t
@@ -1909,15 +1901,6 @@ dfc79924-01ec-4507-9647-1964c2fc427a	8761fac6-8355-47c7-9db0-a09805dbf0d5	f
 7e7a1ccd-b003-4ed9-91f7-13fb6e2eb2d6	3752181d-a7af-48a4-bd1d-cd5690f3998c	f
 7e7a1ccd-b003-4ed9-91f7-13fb6e2eb2d6	10e311ca-7b29-4122-b23a-ee3854f11c8a	f
 7e7a1ccd-b003-4ed9-91f7-13fb6e2eb2d6	8761fac6-8355-47c7-9db0-a09805dbf0d5	f
-0bd9714f-a8a2-40b2-844a-d07386362f95	376c7112-f871-403d-930f-4cc72d34a411	t
-0bd9714f-a8a2-40b2-844a-d07386362f95	1539e1f7-ffa4-4dc7-9c8b-b19d76234078	t
-0bd9714f-a8a2-40b2-844a-d07386362f95	56b9fbab-32f2-44a5-8554-7d5c116dbbde	t
-0bd9714f-a8a2-40b2-844a-d07386362f95	60b6f750-8b18-4e73-81e4-47df8d247e71	t
-0bd9714f-a8a2-40b2-844a-d07386362f95	f9307808-d664-47b2-8c29-907b86184053	t
-0bd9714f-a8a2-40b2-844a-d07386362f95	fc51ff5e-3f5c-440e-9709-2e51bbd7610d	f
-0bd9714f-a8a2-40b2-844a-d07386362f95	3752181d-a7af-48a4-bd1d-cd5690f3998c	f
-0bd9714f-a8a2-40b2-844a-d07386362f95	10e311ca-7b29-4122-b23a-ee3854f11c8a	f
-0bd9714f-a8a2-40b2-844a-d07386362f95	8761fac6-8355-47c7-9db0-a09805dbf0d5	f
 ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	376c7112-f871-403d-930f-4cc72d34a411	t
 ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	1539e1f7-ffa4-4dc7-9c8b-b19d76234078	t
 ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	56b9fbab-32f2-44a5-8554-7d5c116dbbde	t
@@ -1936,6 +1919,24 @@ ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	8761fac6-8355-47c7-9db0-a09805dbf0d5	f
 024e7161-fb12-44a1-bc21-b2d03e26d3ee	3752181d-a7af-48a4-bd1d-cd5690f3998c	f
 024e7161-fb12-44a1-bc21-b2d03e26d3ee	10e311ca-7b29-4122-b23a-ee3854f11c8a	f
 024e7161-fb12-44a1-bc21-b2d03e26d3ee	8761fac6-8355-47c7-9db0-a09805dbf0d5	f
+a16f9d56-89da-4707-8e7b-8e351372e3d3	376c7112-f871-403d-930f-4cc72d34a411	t
+a16f9d56-89da-4707-8e7b-8e351372e3d3	1539e1f7-ffa4-4dc7-9c8b-b19d76234078	t
+a16f9d56-89da-4707-8e7b-8e351372e3d3	56b9fbab-32f2-44a5-8554-7d5c116dbbde	t
+a16f9d56-89da-4707-8e7b-8e351372e3d3	60b6f750-8b18-4e73-81e4-47df8d247e71	t
+a16f9d56-89da-4707-8e7b-8e351372e3d3	f9307808-d664-47b2-8c29-907b86184053	t
+a16f9d56-89da-4707-8e7b-8e351372e3d3	fc51ff5e-3f5c-440e-9709-2e51bbd7610d	f
+a16f9d56-89da-4707-8e7b-8e351372e3d3	3752181d-a7af-48a4-bd1d-cd5690f3998c	f
+a16f9d56-89da-4707-8e7b-8e351372e3d3	10e311ca-7b29-4122-b23a-ee3854f11c8a	f
+a16f9d56-89da-4707-8e7b-8e351372e3d3	8761fac6-8355-47c7-9db0-a09805dbf0d5	f
+ade0aace-88fa-4e18-90ae-a7d816a349e6	376c7112-f871-403d-930f-4cc72d34a411	t
+ade0aace-88fa-4e18-90ae-a7d816a349e6	1539e1f7-ffa4-4dc7-9c8b-b19d76234078	t
+ade0aace-88fa-4e18-90ae-a7d816a349e6	56b9fbab-32f2-44a5-8554-7d5c116dbbde	t
+ade0aace-88fa-4e18-90ae-a7d816a349e6	60b6f750-8b18-4e73-81e4-47df8d247e71	t
+ade0aace-88fa-4e18-90ae-a7d816a349e6	f9307808-d664-47b2-8c29-907b86184053	t
+ade0aace-88fa-4e18-90ae-a7d816a349e6	fc51ff5e-3f5c-440e-9709-2e51bbd7610d	f
+ade0aace-88fa-4e18-90ae-a7d816a349e6	3752181d-a7af-48a4-bd1d-cd5690f3998c	f
+ade0aace-88fa-4e18-90ae-a7d816a349e6	10e311ca-7b29-4122-b23a-ee3854f11c8a	f
+ade0aace-88fa-4e18-90ae-a7d816a349e6	8761fac6-8355-47c7-9db0-a09805dbf0d5	f
 \.
 
 
@@ -2453,7 +2454,7 @@ COPY public.group_role_mapping (role_id, group_id) FROM stdin;
 --
 
 COPY public.identity_provider (internal_id, enabled, provider_alias, provider_id, store_token, authenticate_by_default, realm_id, add_token_role, trust_email, first_broker_login_flow_id, post_broker_login_flow_id, provider_display_name, link_only) FROM stdin;
-ca3bba68-b448-4166-ae20-7f4bd9a340fa	t	github	github	f	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	f	f	4cf8e0d3-9efb-4c20-be8d-6b2e4919de8f	\N	\N	f
+b8b63c96-7b3e-47a7-92f7-d5c0c8959101	t	github	github	f	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	f	f	4cf8e0d3-9efb-4c20-be8d-6b2e4919de8f	\N	\N	f
 \.
 
 
@@ -2462,12 +2463,12 @@ ca3bba68-b448-4166-ae20-7f4bd9a340fa	t	github	github	f	f	8ce1928e-b671-44b2-ab2f
 --
 
 COPY public.identity_provider_config (identity_provider_id, value, name) FROM stdin;
-ca3bba68-b448-4166-ae20-7f4bd9a340fa	false	hideOnLoginPage
-ca3bba68-b448-4166-ae20-7f4bd9a340fa	false	acceptsPromptNoneForwardFromClient
-ca3bba68-b448-4166-ae20-7f4bd9a340fa	2087dfc1cb8f1a0b2f66	clientId
-ca3bba68-b448-4166-ae20-7f4bd9a340fa	false	disableUserInfo
-ca3bba68-b448-4166-ae20-7f4bd9a340fa	IMPORT	syncMode
-ca3bba68-b448-4166-ae20-7f4bd9a340fa	github_client_secret_goes_here	clientSecret
+b8b63c96-7b3e-47a7-92f7-d5c0c8959101	false	hideOnLoginPage
+b8b63c96-7b3e-47a7-92f7-d5c0c8959101	false	acceptsPromptNoneForwardFromClient
+b8b63c96-7b3e-47a7-92f7-d5c0c8959101	2087dfc1cb8f1a0b2f66	clientId
+b8b63c96-7b3e-47a7-92f7-d5c0c8959101	false	disableUserInfo
+b8b63c96-7b3e-47a7-92f7-d5c0c8959101	IMPORT	syncMode
+b8b63c96-7b3e-47a7-92f7-d5c0c8959101	github_client_secret_goes_here	clientSecret
 \.
 
 
@@ -2500,80 +2501,80 @@ COPY public.keycloak_group (id, name, parent_group, realm_id) FROM stdin;
 --
 
 COPY public.keycloak_role (id, client_realm_constraint, client_role, description, name, realm_id, client, realm) FROM stdin;
-c3729e00-622c-4432-b7c4-30929326b88f	65e9a13f-13e5-431c-8500-c136a2014a70	f	${role_default-roles}	default-roles-master	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
-88d4f17e-2eb0-4b28-8ce2-7d53301ad91a	65e9a13f-13e5-431c-8500-c136a2014a70	f	${role_admin}	admin	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
-a15967b7-68eb-432f-bb81-41e8e6790dbf	65e9a13f-13e5-431c-8500-c136a2014a70	f	${role_create-realm}	create-realm	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
-a597e125-acc5-451b-a6cf-b38ccbc595bb	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_create-client}	create-client	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-d37ab9fb-07be-4130-9441-9b530c9fc6a9	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_view-realm}	view-realm	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-fd39cd72-2cbf-4653-94e5-62d24b168818	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_view-users}	view-users	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-afc835f8-6277-4f63-9173-2c5855159462	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_view-clients}	view-clients	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-4da9c86d-55f6-4107-b914-20bb95a91e34	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_view-events}	view-events	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-b48eb883-b7f4-4ec3-9792-6a87d5c2f525	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_view-identity-providers}	view-identity-providers	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-ac080123-5ea2-49dd-9b55-582eed3a4183	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_view-authorization}	view-authorization	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-f9061798-3ae6-4773-a3c6-9da30f156f2d	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_manage-realm}	manage-realm	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-d4dd55e4-acdb-4d98-b235-1890cd09ee2c	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_manage-users}	manage-users	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-4d06737e-feb5-464c-bd54-76095ab54646	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_manage-clients}	manage-clients	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-7125808b-4127-4d1f-b168-ddcc13dfc106	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_manage-events}	manage-events	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-0adfb59d-6561-4d35-9073-4326b1971e57	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_manage-identity-providers}	manage-identity-providers	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-fdbebaa5-eb32-4c94-b913-6a4b8c3bf64c	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_manage-authorization}	manage-authorization	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-5db2bbd4-caa8-4bed-bc3c-1e51d403efbc	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_query-users}	query-users	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-5f997de8-76ce-4a16-ac5a-5932b3b348a4	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_query-clients}	query-clients	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-1aeb92eb-b1e2-46ce-8446-db96f750465e	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_query-realms}	query-realms	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-85fd2e0c-1d39-4ba6-916f-4c52cd526adb	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_query-groups}	query-groups	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-0c2bdcc1-aec1-4ca6-8312-f146e266db95	e549e79e-4e77-425f-8611-8eefc4f267da	t	${role_view-profile}	view-profile	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
-6fb1586d-36cd-4b67-84d7-b3d8b6b0e468	e549e79e-4e77-425f-8611-8eefc4f267da	t	${role_manage-account}	manage-account	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
-07edb37f-819f-441f-821b-7f273053bd65	e549e79e-4e77-425f-8611-8eefc4f267da	t	${role_manage-account-links}	manage-account-links	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
-afd4d092-22ad-4166-9756-5bd4f176339a	e549e79e-4e77-425f-8611-8eefc4f267da	t	${role_view-applications}	view-applications	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
-16dea087-0a72-4672-9efe-f2a7c56f1b1d	e549e79e-4e77-425f-8611-8eefc4f267da	t	${role_view-consent}	view-consent	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
-97f79fea-d057-4b83-91aa-7212ae2600f9	e549e79e-4e77-425f-8611-8eefc4f267da	t	${role_manage-consent}	manage-consent	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
-79821c33-1f55-466f-9f18-03ca223531fd	e549e79e-4e77-425f-8611-8eefc4f267da	t	${role_delete-account}	delete-account	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
-5154d251-947b-4768-8b73-b7ed11dfc58f	26393c65-dd94-4211-8bfa-ad080c4a2726	t	${role_read-token}	read-token	65e9a13f-13e5-431c-8500-c136a2014a70	26393c65-dd94-4211-8bfa-ad080c4a2726	\N
-c1f9a997-d404-459a-9cde-68975c2f2c9c	852e20a2-bc82-4a22-bd43-3d09702452fa	t	${role_impersonation}	impersonation	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
-46d240ee-9839-4dc4-b1ff-fdc1d067ce70	65e9a13f-13e5-431c-8500-c136a2014a70	f	${role_offline-access}	offline_access	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
-4d619a87-64bd-41c8-878b-8b4d32d200dc	65e9a13f-13e5-431c-8500-c136a2014a70	f	${role_uma_authorization}	uma_authorization	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
-e8c01625-cda6-4510-a2d6-29214855ce90	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	f	${role_default-roles}	default-roles-hocus	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N	\N
-2490abeb-9550-49c9-8110-04f214defa07	7c83487d-a523-408e-ad85-666f44f21031	t	${role_create-client}	create-client	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-bf37b9e5-fba0-44b7-bfb6-eda946cdabe8	7c83487d-a523-408e-ad85-666f44f21031	t	${role_view-realm}	view-realm	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-24ab2cec-5293-467b-bd30-0a329f8a69be	7c83487d-a523-408e-ad85-666f44f21031	t	${role_view-users}	view-users	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-8f79a5fd-3259-4a2f-ac18-627aa9cd59d0	7c83487d-a523-408e-ad85-666f44f21031	t	${role_view-clients}	view-clients	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-356751dc-098d-4540-b866-27d70bc58aad	7c83487d-a523-408e-ad85-666f44f21031	t	${role_view-events}	view-events	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-9862cc78-f1d1-4de2-aa33-943aa5fa3bac	7c83487d-a523-408e-ad85-666f44f21031	t	${role_view-identity-providers}	view-identity-providers	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-1affecc8-f820-4195-87fb-b569670d4dbf	7c83487d-a523-408e-ad85-666f44f21031	t	${role_view-authorization}	view-authorization	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-e7a3c11c-a97f-471e-8da8-6740f15aee82	7c83487d-a523-408e-ad85-666f44f21031	t	${role_manage-realm}	manage-realm	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-be2a5918-a320-43ba-9593-e9fb3ec9a684	7c83487d-a523-408e-ad85-666f44f21031	t	${role_manage-users}	manage-users	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-fb972515-64bf-49fa-b284-3e3d9d8b1f70	7c83487d-a523-408e-ad85-666f44f21031	t	${role_manage-clients}	manage-clients	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-dfdcef3c-58c0-4dbd-bb79-e0485735db27	7c83487d-a523-408e-ad85-666f44f21031	t	${role_manage-events}	manage-events	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-8a033534-b955-4485-87bb-8aad704e382b	7c83487d-a523-408e-ad85-666f44f21031	t	${role_manage-identity-providers}	manage-identity-providers	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-641895e2-e368-438a-ad77-c04543840c42	7c83487d-a523-408e-ad85-666f44f21031	t	${role_manage-authorization}	manage-authorization	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-9ff17634-c68a-4d9a-b580-d5be62df37e1	7c83487d-a523-408e-ad85-666f44f21031	t	${role_query-users}	query-users	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-19f320bd-8269-46e6-b597-ab6815adbbf3	7c83487d-a523-408e-ad85-666f44f21031	t	${role_query-clients}	query-clients	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-c09efdff-83aa-4093-8ba9-b6941b3e0343	7c83487d-a523-408e-ad85-666f44f21031	t	${role_query-realms}	query-realms	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-eb7d41c5-fc19-4635-af6c-4aff5a4e7f05	7c83487d-a523-408e-ad85-666f44f21031	t	${role_query-groups}	query-groups	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-feff0cce-4e03-43e6-96c6-decd66171a38	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	f	${role_offline-access}	offline_access	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N	\N
+c3729e00-622c-4432-b7c4-30929326b88f	65e9a13f-13e5-431c-8500-c136a2014a70	f	roles	default-roles-master	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
+88d4f17e-2eb0-4b28-8ce2-7d53301ad91a	65e9a13f-13e5-431c-8500-c136a2014a70	f		admin	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
+a15967b7-68eb-432f-bb81-41e8e6790dbf	65e9a13f-13e5-431c-8500-c136a2014a70	f	realm	create-realm	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
+a597e125-acc5-451b-a6cf-b38ccbc595bb	852e20a2-bc82-4a22-bd43-3d09702452fa	t	client	create-client	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+d37ab9fb-07be-4130-9441-9b530c9fc6a9	852e20a2-bc82-4a22-bd43-3d09702452fa	t	realm	view-realm	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+fd39cd72-2cbf-4653-94e5-62d24b168818	852e20a2-bc82-4a22-bd43-3d09702452fa	t	users	view-users	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+afc835f8-6277-4f63-9173-2c5855159462	852e20a2-bc82-4a22-bd43-3d09702452fa	t	clients	view-clients	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+4da9c86d-55f6-4107-b914-20bb95a91e34	852e20a2-bc82-4a22-bd43-3d09702452fa	t	events	view-events	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+b48eb883-b7f4-4ec3-9792-6a87d5c2f525	852e20a2-bc82-4a22-bd43-3d09702452fa	t	identity-providers	view-identity-providers	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+ac080123-5ea2-49dd-9b55-582eed3a4183	852e20a2-bc82-4a22-bd43-3d09702452fa	t	authorization	view-authorization	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+f9061798-3ae6-4773-a3c6-9da30f156f2d	852e20a2-bc82-4a22-bd43-3d09702452fa	t	realm	manage-realm	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+d4dd55e4-acdb-4d98-b235-1890cd09ee2c	852e20a2-bc82-4a22-bd43-3d09702452fa	t	users	manage-users	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+4d06737e-feb5-464c-bd54-76095ab54646	852e20a2-bc82-4a22-bd43-3d09702452fa	t	clients	manage-clients	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+7125808b-4127-4d1f-b168-ddcc13dfc106	852e20a2-bc82-4a22-bd43-3d09702452fa	t	events	manage-events	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+0adfb59d-6561-4d35-9073-4326b1971e57	852e20a2-bc82-4a22-bd43-3d09702452fa	t	identity-providers	manage-identity-providers	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+fdbebaa5-eb32-4c94-b913-6a4b8c3bf64c	852e20a2-bc82-4a22-bd43-3d09702452fa	t	authorization	manage-authorization	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+5db2bbd4-caa8-4bed-bc3c-1e51d403efbc	852e20a2-bc82-4a22-bd43-3d09702452fa	t	users	query-users	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+5f997de8-76ce-4a16-ac5a-5932b3b348a4	852e20a2-bc82-4a22-bd43-3d09702452fa	t	clients	query-clients	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+1aeb92eb-b1e2-46ce-8446-db96f750465e	852e20a2-bc82-4a22-bd43-3d09702452fa	t	realms	query-realms	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+85fd2e0c-1d39-4ba6-916f-4c52cd526adb	852e20a2-bc82-4a22-bd43-3d09702452fa	t	groups	query-groups	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+0c2bdcc1-aec1-4ca6-8312-f146e266db95	e549e79e-4e77-425f-8611-8eefc4f267da	t	profile	view-profile	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
+6fb1586d-36cd-4b67-84d7-b3d8b6b0e468	e549e79e-4e77-425f-8611-8eefc4f267da	t	account	manage-account	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
+07edb37f-819f-441f-821b-7f273053bd65	e549e79e-4e77-425f-8611-8eefc4f267da	t	account-links	manage-account-links	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
+afd4d092-22ad-4166-9756-5bd4f176339a	e549e79e-4e77-425f-8611-8eefc4f267da	t	applications	view-applications	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
+16dea087-0a72-4672-9efe-f2a7c56f1b1d	e549e79e-4e77-425f-8611-8eefc4f267da	t	consent	view-consent	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
+97f79fea-d057-4b83-91aa-7212ae2600f9	e549e79e-4e77-425f-8611-8eefc4f267da	t	consent	manage-consent	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
+79821c33-1f55-466f-9f18-03ca223531fd	e549e79e-4e77-425f-8611-8eefc4f267da	t	account	delete-account	65e9a13f-13e5-431c-8500-c136a2014a70	e549e79e-4e77-425f-8611-8eefc4f267da	\N
+5154d251-947b-4768-8b73-b7ed11dfc58f	26393c65-dd94-4211-8bfa-ad080c4a2726	t	token	read-token	65e9a13f-13e5-431c-8500-c136a2014a70	26393c65-dd94-4211-8bfa-ad080c4a2726	\N
+c1f9a997-d404-459a-9cde-68975c2f2c9c	852e20a2-bc82-4a22-bd43-3d09702452fa	t		impersonation	65e9a13f-13e5-431c-8500-c136a2014a70	852e20a2-bc82-4a22-bd43-3d09702452fa	\N
+46d240ee-9839-4dc4-b1ff-fdc1d067ce70	65e9a13f-13e5-431c-8500-c136a2014a70	f	access	offline_access	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
+4d619a87-64bd-41c8-878b-8b4d32d200dc	65e9a13f-13e5-431c-8500-c136a2014a70	f		uma_authorization	65e9a13f-13e5-431c-8500-c136a2014a70	\N	\N
+e8c01625-cda6-4510-a2d6-29214855ce90	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	f	roles	default-roles-hocus	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N	\N
+2490abeb-9550-49c9-8110-04f214defa07	7c83487d-a523-408e-ad85-666f44f21031	t	client	create-client	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+bf37b9e5-fba0-44b7-bfb6-eda946cdabe8	7c83487d-a523-408e-ad85-666f44f21031	t	realm	view-realm	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+24ab2cec-5293-467b-bd30-0a329f8a69be	7c83487d-a523-408e-ad85-666f44f21031	t	users	view-users	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+8f79a5fd-3259-4a2f-ac18-627aa9cd59d0	7c83487d-a523-408e-ad85-666f44f21031	t	clients	view-clients	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+356751dc-098d-4540-b866-27d70bc58aad	7c83487d-a523-408e-ad85-666f44f21031	t	events	view-events	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+9862cc78-f1d1-4de2-aa33-943aa5fa3bac	7c83487d-a523-408e-ad85-666f44f21031	t	identity-providers	view-identity-providers	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+1affecc8-f820-4195-87fb-b569670d4dbf	7c83487d-a523-408e-ad85-666f44f21031	t	authorization	view-authorization	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+e7a3c11c-a97f-471e-8da8-6740f15aee82	7c83487d-a523-408e-ad85-666f44f21031	t	realm	manage-realm	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+be2a5918-a320-43ba-9593-e9fb3ec9a684	7c83487d-a523-408e-ad85-666f44f21031	t	users	manage-users	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+fb972515-64bf-49fa-b284-3e3d9d8b1f70	7c83487d-a523-408e-ad85-666f44f21031	t	clients	manage-clients	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+dfdcef3c-58c0-4dbd-bb79-e0485735db27	7c83487d-a523-408e-ad85-666f44f21031	t	events	manage-events	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+8a033534-b955-4485-87bb-8aad704e382b	7c83487d-a523-408e-ad85-666f44f21031	t	identity-providers	manage-identity-providers	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+641895e2-e368-438a-ad77-c04543840c42	7c83487d-a523-408e-ad85-666f44f21031	t	authorization	manage-authorization	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+9ff17634-c68a-4d9a-b580-d5be62df37e1	7c83487d-a523-408e-ad85-666f44f21031	t	users	query-users	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+19f320bd-8269-46e6-b597-ab6815adbbf3	7c83487d-a523-408e-ad85-666f44f21031	t	clients	query-clients	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+c09efdff-83aa-4093-8ba9-b6941b3e0343	7c83487d-a523-408e-ad85-666f44f21031	t	realms	query-realms	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+eb7d41c5-fc19-4635-af6c-4aff5a4e7f05	7c83487d-a523-408e-ad85-666f44f21031	t	groups	query-groups	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+feff0cce-4e03-43e6-96c6-decd66171a38	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	f	access	offline_access	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N	\N
 e9517220-c13f-4441-90a6-495d5d3e384e	fecc6bc0-e452-4102-8c7c-f8364d65a61a	t	\N	manage-account	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	fecc6bc0-e452-4102-8c7c-f8364d65a61a	\N
 0a774aaf-3eb8-4c1c-94e4-ee959852be09	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	\N	uma_protection	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-20da747e-168f-405f-a92d-7ed1d53060c6	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_realm-admin}	realm-admin	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-0cc35a9e-37d9-4970-9b63-4e173ab8223b	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_create-client}	create-client	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-eca1901b-02c0-4bfe-8d18-dac948248389	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_view-realm}	view-realm	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-9f7ea7dd-745a-454a-b4e3-40106ca04ca9	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_view-users}	view-users	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-15586d42-a56d-4d16-8a70-d18b78dfd79f	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_view-clients}	view-clients	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-6c2366a8-04ae-4af9-afda-3754fcc97360	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_view-events}	view-events	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-1152ffba-aba0-41f7-b01f-05a415ea6d45	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_view-identity-providers}	view-identity-providers	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-ac5d1940-8f22-4822-beb5-266f7fe047fe	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_view-authorization}	view-authorization	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-3786733d-00e6-4578-92a7-56ac6a4794e1	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_manage-realm}	manage-realm	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-87d629ac-6864-4d30-8569-c069c1364075	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_manage-users}	manage-users	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-fd78854c-2d52-4313-8deb-e15aca94b90a	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_manage-clients}	manage-clients	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-ea559493-7476-4ec9-9e87-0ffc787176ca	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_manage-events}	manage-events	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-0adecfab-3162-4eb5-add3-a58a157b1738	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_manage-identity-providers}	manage-identity-providers	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-e75026c4-67bd-4242-8fd0-0e47157ae9cc	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_manage-authorization}	manage-authorization	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-4e519f62-0a7e-47cd-b316-a3250dbf7da4	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_query-users}	query-users	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-f6d949b1-8daa-4d5c-85db-d932b519c219	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_query-clients}	query-clients	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-44429678-bbda-4bd7-925a-d36a70f2ee69	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_query-realms}	query-realms	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-b506ab77-fc49-4146-81b0-83545d6c8945	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_query-groups}	query-groups	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-11419487-bfd4-4ad2-9e28-c1cda8f7fcff	7c83487d-a523-408e-ad85-666f44f21031	t	${role_impersonation}	impersonation	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
-04086f50-8d9d-4f9f-886c-8bce2426821b	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	${role_impersonation}	impersonation	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
-c0e1fca7-7937-4f8f-948d-d3850400edbd	fecc6bc0-e452-4102-8c7c-f8364d65a61a	t	${role_delete-account}	delete-account	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	fecc6bc0-e452-4102-8c7c-f8364d65a61a	\N
-24999798-ea13-42cc-b508-051af1110258	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	f	${role_uma_authorization}	uma_authorization	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N	\N
+20da747e-168f-405f-a92d-7ed1d53060c6	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	admin	realm-admin	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+0cc35a9e-37d9-4970-9b63-4e173ab8223b	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	client	create-client	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+eca1901b-02c0-4bfe-8d18-dac948248389	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	realm	view-realm	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+9f7ea7dd-745a-454a-b4e3-40106ca04ca9	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	users	view-users	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+15586d42-a56d-4d16-8a70-d18b78dfd79f	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	clients	view-clients	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+6c2366a8-04ae-4af9-afda-3754fcc97360	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	events	view-events	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+1152ffba-aba0-41f7-b01f-05a415ea6d45	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	identity-providers	view-identity-providers	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+ac5d1940-8f22-4822-beb5-266f7fe047fe	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	authorization	view-authorization	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+3786733d-00e6-4578-92a7-56ac6a4794e1	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	realm	manage-realm	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+87d629ac-6864-4d30-8569-c069c1364075	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	users	manage-users	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+fd78854c-2d52-4313-8deb-e15aca94b90a	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	clients	manage-clients	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+ea559493-7476-4ec9-9e87-0ffc787176ca	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	events	manage-events	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+0adecfab-3162-4eb5-add3-a58a157b1738	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	identity-providers	manage-identity-providers	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+e75026c4-67bd-4242-8fd0-0e47157ae9cc	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	authorization	manage-authorization	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+4e519f62-0a7e-47cd-b316-a3250dbf7da4	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	users	query-users	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+f6d949b1-8daa-4d5c-85db-d932b519c219	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	clients	query-clients	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+44429678-bbda-4bd7-925a-d36a70f2ee69	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	realms	query-realms	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+b506ab77-fc49-4146-81b0-83545d6c8945	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t	groups	query-groups	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+11419487-bfd4-4ad2-9e28-c1cda8f7fcff	7c83487d-a523-408e-ad85-666f44f21031	t		impersonation	65e9a13f-13e5-431c-8500-c136a2014a70	7c83487d-a523-408e-ad85-666f44f21031	\N
+04086f50-8d9d-4f9f-886c-8bce2426821b	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	t		impersonation	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+c0e1fca7-7937-4f8f-948d-d3850400edbd	fecc6bc0-e452-4102-8c7c-f8364d65a61a	t	account	delete-account	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	fecc6bc0-e452-4102-8c7c-f8364d65a61a	\N
+24999798-ea13-42cc-b508-051af1110258	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	f		uma_authorization	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N	\N
 \.
 
 
@@ -2671,11 +2672,11 @@ b243583f-f3c2-40a7-9e12-66df219b6f2d	given name	openid-connect	oidc-usermodel-pr
 0b9a6052-c890-48fc-984f-2184c7ce71d3	audience resolve	openid-connect	oidc-audience-resolve-mapper	\N	60b6f750-8b18-4e73-81e4-47df8d247e71
 47c2c7be-bd45-4e9a-8ac1-7e9c7358ab1b	realm roles	openid-connect	oidc-usermodel-realm-role-mapper	\N	60b6f750-8b18-4e73-81e4-47df8d247e71
 1807f26d-3bdd-40c7-9ff3-108fa597761f	allowed web origins	openid-connect	oidc-allowed-origins-mapper	\N	376c7112-f871-403d-930f-4cc72d34a411
-4c77817f-6233-429a-89b4-7104b8db9a09	audience resolve	openid-connect	oidc-audience-resolve-mapper	9707a210-df0d-4283-9cc6-99c93ab34982	\N
 3aed8952-89c0-4e29-a0b0-1c39c47a0e7e	locale	openid-connect	oidc-usermodel-attribute-mapper	024e7161-fb12-44a1-bc21-b2d03e26d3ee	\N
 3bb06d10-7e9d-4cc7-8b67-b6fe06c018a9	Client ID	openid-connect	oidc-usersessionmodel-note-mapper	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
 69377f53-7a4f-4e9a-8169-9d65c3ef006a	Client Host	openid-connect	oidc-usersessionmodel-note-mapper	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
 0647931a-4824-4b51-be5a-01fee1de6c25	Client IP Address	openid-connect	oidc-usersessionmodel-note-mapper	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	\N
+591a44ff-3872-4175-a806-c2b71b55a5b3	audience resolve	openid-connect	oidc-audience-resolve-mapper	a16f9d56-89da-4707-8e7b-8e351372e3d3	\N
 \.
 
 
@@ -2810,7 +2811,7 @@ ee5f0efa-5b56-4575-8ab4-a0f983033b7f	boolean	jsonType.label
 249baa07-5689-4404-9e9c-3a2fa7763474	true	multivalued
 249baa07-5689-4404-9e9c-3a2fa7763474	foo	user.attribute
 249baa07-5689-4404-9e9c-3a2fa7763474	true	access.token.claim
-249baa07-5689-4404-9e9c-3a2fa7763474	resource_access.${client_id}.roles	claim.name
+249baa07-5689-4404-9e9c-3a2fa7763474	resource_access..roles	claim.name
 249baa07-5689-4404-9e9c-3a2fa7763474	String	jsonType.label
 ea3f667d-9e68-4665-9bbf-511cdcd4e181	true	multivalued
 ea3f667d-9e68-4665-9bbf-511cdcd4e181	foo	user.attribute
@@ -2966,7 +2967,7 @@ f0b4fabc-ab56-4c40-9358-bce0db238c9a	String	jsonType.label
 088a070d-b7b2-4544-b884-04cf99e098dc	locality	user.attribute.locality
 3f7e4202-cef3-49c1-88e1-ec66cb83cbdf	foo	user.attribute
 3f7e4202-cef3-49c1-88e1-ec66cb83cbdf	true	access.token.claim
-3f7e4202-cef3-49c1-88e1-ec66cb83cbdf	resource_access.${client_id}.roles	claim.name
+3f7e4202-cef3-49c1-88e1-ec66cb83cbdf	resource_access..roles	claim.name
 3f7e4202-cef3-49c1-88e1-ec66cb83cbdf	String	jsonType.label
 3f7e4202-cef3-49c1-88e1-ec66cb83cbdf	true	multivalued
 47c2c7be-bd45-4e9a-8ac1-7e9c7358ab1b	foo	user.attribute
@@ -3156,9 +3157,9 @@ e549e79e-4e77-425f-8611-8eefc4f267da	/realms/master/account/*
 3fb776f9-9b41-4997-b3b8-cff334bc72fc	/realms/master/account/*
 e6857f1f-a8d7-4fe0-bdf8-b7dd7685d50f	/admin/master/console/*
 fecc6bc0-e452-4102-8c7c-f8364d65a61a	/realms/hocus/account/*
-9707a210-df0d-4283-9cc6-99c93ab34982	/realms/hocus/account/*
-0bd9714f-a8a2-40b2-844a-d07386362f95	http://localhost:3000/app/sign-in/tokens
 024e7161-fb12-44a1-bc21-b2d03e26d3ee	/admin/hocus/console/*
+a16f9d56-89da-4707-8e7b-8e351372e3d3	/realms/hocus/account/*
+ade0aace-88fa-4e18-90ae-a7d816a349e6	http://localhost:3000/app/callback
 \.
 
 
@@ -3283,7 +3284,6 @@ COPY public.role_attribute (id, role_id, name, value) FROM stdin;
 
 COPY public.scope_mapping (client_id, role_id) FROM stdin;
 3fb776f9-9b41-4997-b3b8-cff334bc72fc	6fb1586d-36cd-4b67-84d7-b3d8b6b0e468
-9707a210-df0d-4283-9cc6-99c93ab34982	e9517220-c13f-4441-90a6-495d5d3e384e
 \.
 
 
@@ -3324,8 +3324,8 @@ COPY public.user_consent_client_scope (user_consent_id, scope_id) FROM stdin;
 --
 
 COPY public.user_entity (id, email, email_constraint, email_verified, enabled, federation_link, first_name, last_name, realm_id, username, created_timestamp, service_account_client_link, not_before) FROM stdin;
-52311373-8bad-49dd-b25c-9555288a6c12	\N	6a1eb986-1801-4318-b9f9-0f0da26a0906	f	t	\N	\N	\N	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	service-account-realm-management	1664040029576	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	0
 08766cb6-30f0-4060-bbae-b5cde0c325be	\N	b1366559-0f3b-41a3-92a6-ab0c31095a30	f	t	\N	\N	\N	65e9a13f-13e5-431c-8500-c136a2014a70	admin	1664040029975	\N	0
+62f57438-be34-4c20-8901-c6cb7c893db4	\N	7334e327-848f-42fc-978f-15bc1da0430f	f	t	\N	\N	\N	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	service-account-realm-management	1664040029576	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	0
 \.
 
 
@@ -3382,8 +3382,6 @@ COPY public.user_required_action (user_id, required_action) FROM stdin;
 --
 
 COPY public.user_role_mapping (role_id, user_id) FROM stdin;
-e8c01625-cda6-4510-a2d6-29214855ce90	52311373-8bad-49dd-b25c-9555288a6c12
-0a774aaf-3eb8-4c1c-94e4-ee959852be09	52311373-8bad-49dd-b25c-9555288a6c12
 c3729e00-622c-4432-b7c4-30929326b88f	08766cb6-30f0-4060-bbae-b5cde0c325be
 88d4f17e-2eb0-4b28-8ce2-7d53301ad91a	08766cb6-30f0-4060-bbae-b5cde0c325be
 \.

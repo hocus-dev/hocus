@@ -32,10 +32,16 @@ const getEnv = (): Env => {
 export const getConfig = () =>
   ({
     env: getEnv(),
-    gotrueUrl: get("GOTRUE_URL", "http://localhost:9999"),
-    gotrueCookieDuration: parseInt(get("GOTRUE_COOKIE_DURATION", "2592000")),
-    gotrueCookieDomain: get("GOTRUE_COOKIE_DOMAIN", "localhost"),
     logLevel: get("LOG_LEVEL", "debug"),
+    oidc: {
+      issuerBaseURL: get("OIDC_ISSUER_BASE_URL", "http://localhost:4200/realms/hocus"),
+      baseURL: get("OIDC_BASE_URL", "http://localhost:3000/app"),
+      clientID: get("OIDC_CLIENT_ID", "hocus"),
+      clientSecret: get("OIDC_CLIENT_SECRET", "dev-client-secret"),
+      secret: get("OIDC_SECRET", "LONG_RANDOM_VALUE"),
+      routes: { postLogoutRedirect: get("OIDC_POST_LOGOUT_REDIRECT", "http://localhost:3000/") },
+      idpLogout: true,
+    },
     // This class contains a circular reference to itself, so when superjson
     // tries to serialize it, it will throw an error. This is a precaution
     // not to inadvertently pass the config object to the frontend.
