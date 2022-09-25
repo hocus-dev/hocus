@@ -1,3 +1,4 @@
+/* eslint-disable filename-rules/match */
 import type { MetaFunction, LinksFunction } from "@remix-run/node";
 import { Links, LiveReload, Meta, Outlet, Scripts, ScrollRestoration } from "@remix-run/react";
 

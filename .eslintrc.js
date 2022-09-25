@@ -4,6 +4,19 @@ module.exports = {
   overrides: [
     {
       files: ["*.ts", "*.tsx"],
+      excludedFiles: ["app/routes/**/*.tsx"],
+      parserOptions: {
+        project: "./tsconfig.json",
+      },
+      rules: {
+        "filename-rules/match": [
+          "warn",
+          /^[a-z0-9\-]+(\.[a-z0-9\-]+)?\.((test)|(d)|(server)|(client)|(shared))\.((ts)|(tsx))$/,
+        ],
+      },
+    },
+    {
+      files: ["*.ts", "*.tsx"],
       extends: [
         "@remix-run/eslint-config",
         "@remix-run/eslint-config/node",
@@ -17,10 +30,6 @@ module.exports = {
         "@typescript-eslint/no-empty-function": ["error", { allow: ["arrowFunctions"] }],
         "@typescript-eslint/no-floating-promises": "error",
         "no-console": "warn",
-        "filename-rules/match": [
-          "warn",
-          /^[a-z0-9\-]+(\.[a-z0-9\-]+)?\.((((test)|(d)|(server)|(client)|(shared))\.ts)|(tsx))$/,
-        ],
         "import/order": [
           "warn",
           {
