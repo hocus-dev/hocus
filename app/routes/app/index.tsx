@@ -1,18 +1,17 @@
 import type { LoaderArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 import { Button } from "flowbite-react";
-import { json, useLoaderData } from "~/remix-superjson.server";
-import { unwrap } from "~/utils.shared";
 
 export const loader = async (args: LoaderArgs) => {
-  return json({ user: unwrap(args.context.req.oidc.user) });
+  return json({ gaUserId: args.context.user.gaUserId });
 };
 
 export default function AppIndex(): JSX.Element {
-  const { user } = useLoaderData<typeof loader>();
+  const { gaUserId } = useLoaderData<typeof loader>();
   return (
     <div>
-      <p>{`Hello ${user.email}!`}</p>
-      <p>{`Hello ${JSON.stringify(user)}!`}</p>
+      <p>{`Hello ${gaUserId}!`}</p>
       <form action="/app/logout" method="GET">
         <Button outline={true} type="submit">
           Sign out

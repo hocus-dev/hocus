@@ -1,4 +1,4 @@
-import type { User, PrismaClient, Prisma } from "@prisma/client";
+import type { User, PrismaClient } from "@prisma/client";
 
 export class UserService {
   async getUser(db: PrismaClient, externalId: string): Promise<User | null> {
@@ -6,7 +6,7 @@ export class UserService {
     return user;
   }
 
-  async getOrCreateUser(db: Prisma.TransactionClient, externalId: string): Promise<User> {
+  async upsertUser(db: PrismaClient, externalId: string): Promise<User> {
     await db.$queryRaw`
       INSERT INTO "User" ("externalId")
       VALUES (${externalId})

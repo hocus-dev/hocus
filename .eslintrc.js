@@ -4,7 +4,7 @@ module.exports = {
   overrides: [
     {
       files: ["*.ts", "*.tsx"],
-      excludedFiles: ["app/routes/**/*.tsx"],
+      excludedFiles: ["app/routes/**/*.tsx", "app/components/**/*.tsx"],
       parserOptions: {
         project: "./tsconfig.json",
       },
@@ -49,11 +49,6 @@ module.exports = {
                 importNames: ["PrismaClient"],
                 message: "Please use the client from the request context instead.",
                 allowTypeImports: true,
-              },
-              {
-                name: "@remix-run/node",
-                importNames: ["json", "useActionData", "useLoaderData"],
-                message: "Please use the corresponding item from '~/remix-superjson' instead.",
               },
             ],
           },

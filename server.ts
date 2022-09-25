@@ -1,7 +1,8 @@
 /* eslint-disable filename-rules/match */
 import path from "path";
 
-// eslint-disable-next-line no-restricted-imports
+import type { User } from "@prisma/client";
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import { createRequestHandler } from "@remix-run/express";
 import type { LoaderArgs } from "@remix-run/node";
@@ -10,12 +11,15 @@ import cookieParser from "cookie-parser";
 import csrf from "csurf";
 import express from "express";
 import { auth } from "express-openid-connect";
+import type { OidcUser } from "~/schema/oidc-user.schema.server";
+import { OidcUserSchema } from "~/schema/oidc-user.schema.server";
 
 import { createAppInjector } from "./app/services/app-injector.server";
 
 const db = new PrismaClient();
 const appInjector = createAppInjector();
 const config = appInjector.resolve("Config");
+const userService = appInjector.resolve("UserService");
 
 const BUILD_DIR = path.join(process.cwd(), "build");
 
@@ -41,6 +45,16 @@ app.all("*", async (req, res, next) => {
     if (process.env.NODE_ENV === "development") {
       purgeRequireCache();
     }
+
+    let user: User | null = null;
+    const oidcUser = req.oidc?.user != null ? OidcUserSchema.parse(req.oidc.user) : null;
+    if (oidcUser != null) {
+      user = await userService.getUser(db, oidcUser.sub);
+      if (user == null) {
+        user = await userService.upsertUser(db, oidcUser.sub);
+      }
+    }
+
     return createRequestHandler({
       build: require(BUILD_DIR),
       mode: process.env.NODE_ENV,
@@ -49,7 +63,8 @@ app.all("*", async (req, res, next) => {
         req,
         res,
         app: appInjector,
-        user: null,
+        user: user as User,
+        oidcUser: oidcUser as OidcUser,
       }),
     })(req, res, next);
   } catch (err) {

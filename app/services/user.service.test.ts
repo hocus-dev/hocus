@@ -16,14 +16,14 @@ const provideUserService = (testFn: (args: Args) => Promise<void>): (() => Promi
 };
 
 test.concurrent(
-  "getUser and getOrCreateUser",
+  "getUser and upsertUser",
   provideUserService(async ({ db, userService }) => {
     const externalId = "123";
 
     const user = await userService.getUser(db, externalId);
     expect(user).toBeNull();
 
-    const createdUser = await userService.getOrCreateUser(db, externalId);
+    const createdUser = await userService.upsertUser(db, externalId);
     expect(createdUser.externalId).toEqual(externalId);
 
     const user2 = await userService.getUser(db, externalId);

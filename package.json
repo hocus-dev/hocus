@@ -26,7 +26,6 @@
     "prisma": "4.2.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
-    "superjson": "^1.9.1",
     "typed-inject": "^3.0.1",
     "winston": "^3.8.1",
     "zod": "^3.18.0"
