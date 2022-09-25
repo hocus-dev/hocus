@@ -2,7 +2,7 @@
 import type { LoaderArgs, ActionArgs, TypedResponse } from "@remix-run/node";
 import { parse } from "superjson";
 
-import { provideDb } from "./db";
+import { provideDb } from "./db.server";
 
 const provideArgs = (
   testFn: (args: LoaderArgs | ActionArgs) => Promise<void>,

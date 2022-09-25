@@ -1,5 +1,5 @@
 import type { LoaderArgs } from "@remix-run/node";
-import { json, useLoaderData } from "~/remix-superjson";
+import { json, useLoaderData } from "~/remix-superjson.server";
 
 export const loader = async ({ context: { user } }: LoaderArgs) => {
   return json({

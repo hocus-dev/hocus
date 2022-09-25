@@ -19,7 +19,7 @@ module.exports = {
         "no-console": "warn",
         "filename-rules/match": [
           "warn",
-          /^[a-z0-9\-]+(\.[a-z0-9\-]+)?(\.test)?\.((tsx)|(ts)|(d\.ts))$/,
+          /^[a-z0-9\-]+(\.[a-z0-9\-]+)?\.((((test)|(d)|(server)|(client)|(shared))\.ts)|(tsx))$/,
         ],
         "import/order": [
           "warn",

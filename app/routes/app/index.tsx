@@ -1,7 +1,7 @@
 import type { LoaderArgs } from "@remix-run/node";
 import { Button } from "flowbite-react";
-import { json, useLoaderData } from "~/remix-superjson";
-import { unwrap } from "~/utils";
+import { json, useLoaderData } from "~/remix-superjson.server";
+import { unwrap } from "~/utils.shared";
 
 export const loader = async (args: LoaderArgs) => {
   return json({ user: unwrap(args.context.req.oidc.user) });

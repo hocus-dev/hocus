@@ -4,9 +4,9 @@ import { LandingHero } from "~/components/landing/hero";
 import { LandingNavbar } from "~/components/landing/navbar";
 import { SupportsSection } from "~/components/landing/supports-section";
 import { TerminalScreenshot } from "~/components/landing/terminal-screenshot";
-import { json, useActionData, useLoaderData } from "~/remix-superjson";
+import { json, useActionData, useLoaderData } from "~/remix-superjson.server";
 
-import { ActionFormSchema } from "./index.schema";
+import { ActionFormSchema } from "./index.schema.server";
 
 export const loader = async ({ context: { db, user, req } }: LoaderArgs) => {
   const players = await db.player.findMany();

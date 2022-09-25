@@ -1,6 +1,6 @@
 import { serialize } from "superjson";
 
-import { getConfig } from "./config";
+import { getConfig } from "./config.server";
 
 test.concurrent("superjson cannot serialze config", () => {
   const config = getConfig();

@@ -1,5 +1,5 @@
 import type { valueof } from "./types/utils";
-import { SuperJsonCrasher } from "./utils";
+import { SuperJsonCrasher } from "./utils.shared";
 
 const env = process.env.NODE_ENV;
 

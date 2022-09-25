@@ -1,6 +1,6 @@
 import { createInjector, Scope } from "typed-inject";
-import { getConfig } from "~/config";
-import { newLogger } from "~/logger";
+import { getConfig } from "~/config.server";
+import { newLogger } from "~/logger.server";
 
 export const createAppInjector = () =>
   createInjector()

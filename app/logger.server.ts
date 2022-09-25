@@ -1,6 +1,6 @@
 import winston from "winston";
 
-import type { Config } from "./config";
+import type { Config } from "./config.server";
 
 export const newLogger = (config: Config): winston.Logger => {
   return winston.createLogger({

@@ -1,3 +1,4 @@
+/* eslint-disable filename-rules/match */
 import path from "path";
 
 // eslint-disable-next-line no-restricted-imports
@@ -10,7 +11,7 @@ import csrf from "csurf";
 import express from "express";
 import { auth } from "express-openid-connect";
 
-import { createAppInjector } from "./app/services/app-injector";
+import { createAppInjector } from "./app/services/app-injector.server";
 
 const db = new PrismaClient();
 const appInjector = createAppInjector();

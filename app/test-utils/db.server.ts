@@ -1,5 +1,5 @@
 // must be the first import
-import "./prisma-export-patch";
+import "./prisma-export-patch.server";
 
 import fs from "fs";
 

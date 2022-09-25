@@ -2,16 +2,15 @@
 import type { PrismaClient } from "@prisma/client";
 import "@remix-run/node";
 import type { DataFunctionArgs } from "@remix-run/node";
-import type { User } from "@supabase/gotrue-js";
 import type { Request, Response } from "express";
-import type { AppInjector } from "~/services/app-injector";
+import type { AppInjector } from "~/services/app-injector.server";
 
 type Context = {
   db: PrismaClient;
   app: AppInjector;
   req: Request;
   res: Response;
-  user: User | null;
+  user: Record<string, string> | null;
 };
 
 // we omit these fields because they act weirdly with express

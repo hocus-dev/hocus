@@ -1,4 +1,4 @@
-import { parseRemixData, provideLoaderArgs } from "~/test-utils/remix";
+import { parseRemixData, provideLoaderArgs } from "~/test-utils/remix.server";
 
 import { loader } from "../routes/index";
 
