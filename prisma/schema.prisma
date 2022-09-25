@@ -11,15 +11,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Player {
-  id       BigInt @id @default(autoincrement())
-  username String
-  Room     Room[]
-}
-
-model Room {
-  id       BigInt @id @default(autoincrement())
-  name     String
-  playerId BigInt
-  Player   Player @relation(fields: [playerId], references: [id])
+model User {
+  id         BigInt @id @default(autoincrement())
+  externalId String @unique
+  gaUserId   String @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
 }

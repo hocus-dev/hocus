@@ -40,7 +40,7 @@ module.exports = {
             "newlines-between": "always",
           },
         ],
-        "no-restricted-imports": [
+        "@typescript-eslint/no-restricted-imports": [
           "error",
           {
             paths: [
@@ -48,6 +48,7 @@ module.exports = {
                 name: "@prisma/client",
                 importNames: ["PrismaClient"],
                 message: "Please use the client from the request context instead.",
+                allowTypeImports: true,
               },
               {
                 name: "@remix-run/node",

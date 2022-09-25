@@ -3,7 +3,7 @@ import "./prisma-export-patch.server";
 
 import fs from "fs";
 
-// eslint-disable-next-line no-restricted-imports
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import { Client as PgClient } from "pg";
 import * as build from "prisma/build";
