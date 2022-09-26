@@ -31,11 +31,17 @@ services:
       - ./db-init:/docker-entrypoint-initdb.d/
     tmpfs:
       - /pgtmpfs
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 1s
+      timeout: 10s
+      retries: 30
+
   keycloak:
     depends_on:
       db:
-        condition: service_started
-    command: "start --import-realm"
+        condition: service_healthy
+    command: "start"
     build:
       dockerfile: keycloak-dev.Dockerfile
     ports:
