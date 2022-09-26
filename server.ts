@@ -11,8 +11,8 @@ import cookieParser from "cookie-parser";
 import csrf from "csurf";
 import express from "express";
 import { auth } from "express-openid-connect";
-import type { OidcUser } from "~/schema/oidc-user.schema.server";
-import { OidcUserSchema } from "~/schema/oidc-user.schema.server";
+import type { OidcUser } from "~/schema/oidc-user.validator.server";
+import { OidcUserValidator } from "~/schema/oidc-user.validator.server";
 
 import { createAppInjector } from "./app/services/app-injector.server";
 
@@ -47,7 +47,7 @@ app.all("*", async (req, res, next) => {
     }
 
     let user: User | null = null;
-    const oidcUser = req.oidc?.user != null ? OidcUserSchema.parse(req.oidc.user) : null;
+    const oidcUser = req.oidc?.user != null ? OidcUserValidator.Parse(req.oidc.user) : null;
     if (oidcUser != null) {
       user = await userService.getUser(db, oidcUser.sub);
       if (user == null) {

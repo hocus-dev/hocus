@@ -1,7 +1,6 @@
-import { z } from "zod";
+import { Type as t } from "@sinclair/typebox";
 
-export type OidcUser = z.infer<typeof OidcUserSchema>;
-export const OidcUserSchema = z.object({
-  sub: z.string(),
-  email: z.string(),
+export const OidcUserSchema = t.Object({
+  sub: t.String(),
+  email: t.String(),
 });
