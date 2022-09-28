@@ -4,5 +4,22 @@
   "editor.tabSize": 2,
   "[prisma]": {
     "editor.defaultFormatter": "Prisma.prisma"
-  }
+  },
+  "remote.SSH.defaultForwardedPorts": [
+    {
+      "localPort": 3000,
+      "name": "main-app",
+      "remotePort": 3000
+    },
+    {
+      "localPort": 4200,
+      "name": "keycloak",
+      "remotePort": 4200
+    },
+    {
+      "localPort": 5432,
+      "name": "postgres",
+      "remotePort": 5432
+    }
+  ]
 }
