@@ -26,15 +26,16 @@ export const links: LinksFunction = () => {
 export const loader = async (args: LoaderArgs) => {
   return json({
     csrfToken: args.context.req.csrfToken(),
-    gaUserId: args.context.user?.gaUserId ?? void 0,
+    gaUserId: args.context.user?.gaUserId,
+    userEmail: args.context.oidcUser?.email,
   });
 };
 
 export default function App() {
-  const { gaUserId, csrfToken } = useLoaderData<typeof loader>();
+  const { gaUserId, csrfToken, userEmail } = useLoaderData<typeof loader>();
 
   return (
-    <GlobalContext.Provider value={{ gaUserId, csrfToken }}>
+    <GlobalContext.Provider value={{ gaUserId, csrfToken, userEmail }}>
       <html className="dark h-full" lang="en">
         <head>
           <Meta />

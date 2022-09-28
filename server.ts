@@ -46,10 +46,10 @@ app.all("*", async (req, res, next) => {
       purgeRequireCache();
     }
 
-    let user: User | null = null;
-    const oidcUser = req.oidc?.user != null ? OidcUserValidator.Parse(req.oidc.user) : null;
+    let user: User | undefined = void 0;
+    const oidcUser = req.oidc?.user != null ? OidcUserValidator.Parse(req.oidc.user) : void 0;
     if (oidcUser != null) {
-      user = await userService.getUser(db, oidcUser.sub);
+      user = (await userService.getUser(db, oidcUser.sub)) ?? void 0;
       if (user == null) {
         user = await userService.upsertUser(db, oidcUser.sub);
       }
@@ -63,8 +63,8 @@ app.all("*", async (req, res, next) => {
         req,
         res,
         app: appInjector,
-        user: user as User,
-        oidcUser: oidcUser as OidcUser,
+        user,
+        oidcUser,
       }),
     })(req, res, next);
   } catch (err) {

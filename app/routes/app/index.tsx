@@ -5,8 +5,12 @@ export default function AppIndex(): JSX.Element {
   return (
     <div>
       <GlobalContext.Consumer>
-        {({ gaUserId, csrfToken }) => (
-          <p>{`Your GA userId is ${gaUserId}, and the csrfToken is ${csrfToken}`}</p>
+        {({ gaUserId, csrfToken, userEmail }) => (
+          <>
+            <p>{`Your email is ${userEmail},`}</p>
+            <p>{`GA userId is ${gaUserId},`}</p>
+            <p>{`and the csrfToken is ${csrfToken}.`}</p>
+          </>
         )}
       </GlobalContext.Consumer>
       <form action="/app/logout" method="GET">
