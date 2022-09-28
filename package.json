@@ -8,6 +8,8 @@
     "dev:node": "cross-env NODE_ENV=development nodemon --exec 'remix build && ts-node server.ts' --watch ./server.ts",
     "dev:css": "tailwindcss -w -i ./styles/app.css -o app/styles/app.css",
     "dev:remix": "remix watch",
+    "dev-prebuild": "run-p \"dev-prebuild:*\"",
+    "dev-prebuild:css": "tailwindcss -i ./styles/app.css -o app/styles/app.css",
     "start": "cross-env NODE_ENV=production ts-node ./server.ts",
     "test": "jest"
   },

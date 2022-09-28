@@ -9,7 +9,7 @@ tasks:
         --auth-key=$TAILSCALE_PREAUTHKEY \
         --hostname=gitpod-hocus
   - name: dev-env setup
-    init: yarn install && ops/bin/prepare.sh
+    init: yarn install && npm run dev-prebuild && ops/bin/prepare.sh
     command: |
       ops/bin/link.sh && ops/bin/up.sh && npm run dev
 # Ports to expose on workspace startup
