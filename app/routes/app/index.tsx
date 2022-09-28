@@ -1,17 +1,14 @@
-import type { LoaderArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
 import { Button } from "flowbite-react";
-
-export const loader = async (args: LoaderArgs) => {
-  return json({ gaUserId: args.context.user.gaUserId });
-};
+import { GlobalContext } from "~/components/global-context";
 
 export default function AppIndex(): JSX.Element {
-  const { gaUserId } = useLoaderData<typeof loader>();
   return (
     <div>
-      <p>{`Hello ${gaUserId}!`}</p>
+      <GlobalContext.Consumer>
+        {({ gaUserId, csrfToken }) => (
+          <p>{`Your GA userId is ${gaUserId}, and the csrfToken is ${csrfToken}`}</p>
+        )}
+      </GlobalContext.Consumer>
       <form action="/app/logout" method="GET">
         <Button outline={true} type="submit">
           Sign out
