@@ -47,3 +47,5 @@ services:
     ports:
       - "4200:8080"
     restart: unless-stopped
+    volumes:
+      - ./resources/keycloak-theme/hocus:/opt/keycloak/themes/hocus

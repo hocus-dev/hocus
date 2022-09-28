@@ -2027,6 +2027,7 @@ e914359c-a7d8-4ab2-82cb-cdf7abc13465	Allowed Protocol Mapper Types	8ce1928e-b671
 a8939957-72ac-47d0-99e7-ab7e85e4c8dd	rsa-enc-generated	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	rsa-enc-generated	org.keycloak.keys.KeyProvider	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N
 5ec6cc62-57b1-4fbc-a274-de95c8210ebe	aes-generated	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	aes-generated	org.keycloak.keys.KeyProvider	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N
 e81316e1-7b1a-43ec-9a09-da3873896b98	rsa-generated	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	rsa-generated	org.keycloak.keys.KeyProvider	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N
+ffdf834f-0528-48ed-9e78-f06bbf131e87	\N	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	declarative-user-profile	org.keycloak.userprofile.UserProfileProvider	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N
 \.
 
 
@@ -3005,7 +3006,7 @@ f0b4fabc-ab56-4c40-9358-bce0db238c9a	String	jsonType.label
 
 COPY public.realm (id, access_code_lifespan, user_action_lifespan, access_token_lifespan, account_theme, admin_theme, email_theme, enabled, events_enabled, events_expiration, login_theme, name, not_before, password_policy, registration_allowed, remember_me, reset_password_allowed, social, ssl_required, sso_idle_timeout, sso_max_lifespan, update_profile_on_soc_login, verify_email, master_admin_client, login_lifespan, internationalization_enabled, default_locale, reg_email_as_username, admin_events_enabled, admin_events_details_enabled, edit_username_allowed, otp_policy_counter, otp_policy_window, otp_policy_period, otp_policy_digits, otp_policy_alg, otp_policy_type, browser_flow, registration_flow, direct_grant_flow, reset_credentials_flow, client_auth_flow, offline_session_idle_timeout, revoke_refresh_token, access_token_life_implicit, login_with_email_allowed, duplicate_emails_allowed, docker_auth_flow, refresh_token_max_reuse, allow_user_managed_access, sso_max_lifespan_remember_me, sso_idle_timeout_remember_me, default_role) FROM stdin;
 65e9a13f-13e5-431c-8500-c136a2014a70	60	300	60	\N	\N	\N	t	f	0	\N	master	0	\N	f	f	f	f	EXTERNAL	1800	36000	f	f	852e20a2-bc82-4a22-bd43-3d09702452fa	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	fe605ee4-a865-4142-8ad5-2ff12a1816d1	89e71be5-0fce-4c06-a542-6b6f8952444d	04e8e7ab-6450-4440-9a6f-6e0edafe5589	3c8babf4-e626-45a8-9fa2-35c503e7a05b	7bcb46cd-c5c1-4f5b-8333-82449cfa5b13	2592000	f	900	t	f	9f04ad5f-f308-4f56-82ac-2e96fc0aa0bb	0	f	0	0	c3729e00-622c-4432-b7c4-30929326b88f
-8ce1928e-b671-44b2-ab2f-ba0a2fc46762	60	300	300	\N	\N	\N	t	f	0	\N	hocus	0	\N	f	f	f	f	EXTERNAL	1800	36000	f	f	7c83487d-a523-408e-ad85-666f44f21031	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	6b950abd-0602-4993-9837-c2a4e0d72f35	d9619104-b36e-46f2-bc36-92d2cd74fbd4	77c83491-af58-412d-97eb-1490ae30a233	9badc312-6bac-4212-a42a-26b329c8d75b	3fe1323e-b3b4-43a0-b8c8-b084d05b3c39	2592000	f	900	t	f	4034bbd9-d9b2-4ea7-a860-4da8a1dac0ee	0	f	0	0	e8c01625-cda6-4510-a2d6-29214855ce90
+8ce1928e-b671-44b2-ab2f-ba0a2fc46762	60	300	300				t	f	0	hocus	hocus	0	\N	f	f	f	f	EXTERNAL	1800	36000	f	f	7c83487d-a523-408e-ad85-666f44f21031	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	6b950abd-0602-4993-9837-c2a4e0d72f35	d9619104-b36e-46f2-bc36-92d2cd74fbd4	77c83491-af58-412d-97eb-1490ae30a233	9badc312-6bac-4212-a42a-26b329c8d75b	3fe1323e-b3b4-43a0-b8c8-b084d05b3c39	2592000	f	900	t	f	4034bbd9-d9b2-4ea7-a860-4da8a1dac0ee	0	f	0	0	e8c01625-cda6-4510-a2d6-29214855ce90
 \.
 
 
@@ -3034,13 +3035,17 @@ displayNameHtml	65e9a13f-13e5-431c-8500-c136a2014a70	<div class="kc-logo-text"><
 defaultSignatureAlgorithm	65e9a13f-13e5-431c-8500-c136a2014a70	RS256
 offlineSessionMaxLifespanEnabled	65e9a13f-13e5-431c-8500-c136a2014a70	false
 offlineSessionMaxLifespan	65e9a13f-13e5-431c-8500-c136a2014a70	5184000
-_browser_header.contentSecurityPolicyReportOnly	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	
-_browser_header.xContentTypeOptions	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	nosniff
-_browser_header.xRobotsTag	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	none
-_browser_header.xFrameOptions	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	SAMEORIGIN
-_browser_header.contentSecurityPolicy	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	frame-src 'self'; frame-ancestors 'self'; object-src 'none';
-_browser_header.xXSSProtection	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	1; mode=block
-_browser_header.strictTransportSecurity	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	max-age=31536000; includeSubDomains
+clientSessionIdleTimeout	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	0
+clientSessionMaxLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	0
+clientOfflineSessionIdleTimeout	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	0
+clientOfflineSessionMaxLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	0
+oauth2DeviceCodeLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	600
+oauth2DevicePollingInterval	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	5
+cibaBackchannelTokenDeliveryMode	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	poll
+cibaExpiresIn	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	120
+cibaInterval	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	5
+cibaAuthRequestedUserHint	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	login_hint
+parRequestUriLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	60
 bruteForceProtected	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	false
 permanentLockout	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	false
 maxFailureWaitSeconds	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	900
@@ -3049,17 +3054,11 @@ waitIncrementSeconds	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	60
 quickLoginCheckMilliSeconds	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	1000
 maxDeltaTimeSeconds	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	43200
 failureFactor	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	30
+actionTokenGeneratedByAdminLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	43200
+actionTokenGeneratedByUserLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	300
 defaultSignatureAlgorithm	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	RS256
 offlineSessionMaxLifespanEnabled	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	false
 offlineSessionMaxLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	5184000
-clientSessionIdleTimeout	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	0
-clientSessionMaxLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	0
-clientOfflineSessionIdleTimeout	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	0
-clientOfflineSessionMaxLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	0
-actionTokenGeneratedByAdminLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	43200
-actionTokenGeneratedByUserLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	300
-oauth2DeviceCodeLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	600
-oauth2DevicePollingInterval	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	5
 webAuthnPolicyRpEntityName	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	keycloak
 webAuthnPolicySignatureAlgorithms	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	ES256
 webAuthnPolicyRpId	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	
@@ -3078,13 +3077,15 @@ webAuthnPolicyRequireResidentKeyPasswordless	8ce1928e-b671-44b2-ab2f-ba0a2fc4676
 webAuthnPolicyUserVerificationRequirementPasswordless	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	not specified
 webAuthnPolicyCreateTimeoutPasswordless	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	0
 webAuthnPolicyAvoidSameAuthenticatorRegisterPasswordless	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	false
-cibaBackchannelTokenDeliveryMode	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	poll
-cibaExpiresIn	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	120
-cibaInterval	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	5
-cibaAuthRequestedUserHint	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	login_hint
-parRequestUriLifespan	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	60
 client-policies.profiles	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	{"profiles":[]}
 client-policies.policies	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	{"policies":[]}
+_browser_header.contentSecurityPolicyReportOnly	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	
+_browser_header.xContentTypeOptions	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	nosniff
+_browser_header.xRobotsTag	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	none
+_browser_header.xFrameOptions	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	SAMEORIGIN
+_browser_header.contentSecurityPolicy	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	frame-src 'self'; frame-ancestors 'self'; object-src 'none';
+_browser_header.xXSSProtection	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	1; mode=block
+_browser_header.strictTransportSecurity	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	max-age=31536000; includeSubDomains
 \.
 
 
