@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { LoaderArgs, ActionArgs, TypedResponse } from "@remix-run/node";
-import { parse } from "superjson";
 
 import { provideDb } from "./db.server";
 
@@ -9,7 +8,7 @@ const provideArgs = (
 ): (() => Promise<void>) => {
   return provideDb(async (db) => {
     const args: LoaderArgs | ActionArgs = {
-      context: { db, req: {} as any, res: {} as any, app: {} as any, user: null },
+      context: { db, req: {} as any, res: {} as any, app: {} as any, user: undefined },
     };
     await testFn(args);
   });
@@ -23,5 +22,5 @@ export const provideActionArgs: (
 ) => () => Promise<void> = provideArgs;
 
 export const parseRemixData = async <T>(response: Promise<TypedResponse<T>>): Promise<T> => {
-  return parse(await (await response).text());
+  return JSON.parse(await (await response).text());
 };

@@ -8,10 +8,13 @@
     "dev:node": "cross-env NODE_ENV=development nodemon --exec 'remix build && ts-node entrypoints/server.ts' --watch entrypoints/server.ts",
     "dev:css": "tailwindcss -w -i ./styles/app.css -o app/styles/app.css",
     "dev:remix": "remix watch",
+    "dev:graphile-worker": "ts-node entrypoints/graphile-worker.server.ts",
     "dev-prebuild": "run-p \"dev-prebuild:*\"",
     "dev-prebuild:css": "tailwindcss -i ./styles/app.css -o app/styles/app.css",
     "start": "cross-env NODE_ENV=production ts-node entrypoints/server.ts",
-    "test": "jest"
+    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@prisma/client": "4.2.1",

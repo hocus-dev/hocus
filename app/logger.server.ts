@@ -1,10 +1,10 @@
 import winston from "winston";
 
-import type { Config } from "./config.server";
+import type { Config } from "./config";
 
 export const newLogger = (config: Config): winston.Logger => {
   return winston.createLogger({
-    level: config.logLevel,
+    level: config.logLevel(),
     defaultMeta: {},
     format: winston.format.combine(
       winston.format.timestamp(),
