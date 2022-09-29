@@ -7,7 +7,7 @@ declare module "@prisma/client" {
        * this is a hack to make the typescript compiler not allow assigning
        * a PrismaClient to a Prisma.TransactionClient
        * */
-      "dont-assign-a-regular-PrismaClient-to-a-Prisma.TransactionClient": null;
+      "Don't assign a regular PrismaClient to a Prisma.TransactionClient!": null;
     }
   }
 }
