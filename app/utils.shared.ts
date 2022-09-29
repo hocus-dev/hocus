@@ -4,10 +4,3 @@ export const unwrap = <T>(value: T | undefined | null): T => {
   }
   return value;
 };
-
-export class SuperJsonCrasher {
-  public instance: SuperJsonCrasher;
-  constructor() {
-    this.instance = this;
-  }
-}

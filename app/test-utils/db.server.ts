@@ -23,7 +23,7 @@ export const provideDb = (testFn: (db: PrismaClient) => Promise<void>): (() => P
     const schemaContents = fs
       .readFileSync("prisma/schema.prisma")
       .toString()
-      .replace(`env("DATABASE_URL")`, `"${dbUrl}"`);
+      .replace(`env("PRISMA_DATABASE_URL")`, `"${dbUrl}"`);
     fs.writeFileSync(schemaPath, schemaContents);
 
     await build.ensureDatabaseExists("apply", true, schemaPath);

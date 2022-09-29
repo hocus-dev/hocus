@@ -1,5 +1,6 @@
 /* eslint-disable filename-rules/match */
-import { MetaFunction, LinksFunction, LoaderArgs, json } from "@remix-run/node";
+import type { MetaFunction, LinksFunction, LoaderArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import {
   Links,
   LiveReload,
@@ -9,8 +10,8 @@ import {
   ScrollRestoration,
   useLoaderData,
 } from "@remix-run/react";
-import { GlobalContext } from "./components/global-context";
 
+import { GlobalContext } from "./components/global-context.client";
 import styles from "./styles/app.css";
 
 export const meta: MetaFunction = () => ({

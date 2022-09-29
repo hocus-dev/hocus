@@ -1,6 +1,6 @@
 module.exports = {
-  plugins: ["@typescript-eslint", "filename-rules"],
-  ignorePatterns: ["node_modules/**/*", "public/**/*", "build/**/*"],
+  plugins: ["filename-rules"],
+  ignorePatterns: ["node_modules/**/*", "public/**/*", "build/**/*", "ops/**/*"],
   overrides: [
     {
       files: ["*.ts", "*.tsx"],
@@ -17,11 +17,7 @@ module.exports = {
     },
     {
       files: ["*.ts", "*.tsx"],
-      extends: [
-        "@remix-run/eslint-config",
-        "@remix-run/eslint-config/node",
-        "plugin:@typescript-eslint/recommended",
-      ],
+      extends: ["@remix-run/eslint-config", "@remix-run/eslint-config/node"],
       parserOptions: {
         project: ["./tsconfig.json"], // Specify it only for TypeScript files
       },

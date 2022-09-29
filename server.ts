@@ -11,7 +11,6 @@ import cookieParser from "cookie-parser";
 import csrf from "csurf";
 import express from "express";
 import { auth } from "express-openid-connect";
-import type { OidcUser } from "~/schema/oidc-user.validator.server";
 import { OidcUserValidator } from "~/schema/oidc-user.validator.server";
 
 import { createAppInjector } from "./app/services/app-injector.server";
@@ -37,7 +36,7 @@ app.use("/build", express.static("public/build", { immutable: true, maxAge: "1y"
 // more aggressive with this caching.
 app.use(express.static("public", { maxAge: "1h" }));
 app.use(cookieParser());
-app.use("/app", auth(config.oidc));
+app.use("/app", auth(config.oidc()));
 app.use(csrf({ cookie: true }));
 
 app.all("*", async (req, res, next) => {
