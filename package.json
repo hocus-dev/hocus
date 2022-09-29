@@ -14,7 +14,8 @@
     "start": "cross-env NODE_ENV=production ts-node entrypoints/server.ts",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "ops/bin/override-prisma-types.sh"
   },
   "dependencies": {
     "@prisma/client": "4.2.1",

@@ -1,8 +1,8 @@
-// eslint-disable-next-line no-restricted-imports
 import type { PrismaClient, User } from "@prisma/client";
 import "@remix-run/node";
 import type { DataFunctionArgs } from "@remix-run/node";
 import type { Request, Response } from "express";
+
 import type { OidcUser } from "~/schema/oidc-user.validator.server";
 import type { AppInjector } from "~/services/app-injector.server";
 

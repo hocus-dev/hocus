@@ -22,6 +22,10 @@ module.exports = {
         project: ["./tsconfig.json"], // Specify it only for TypeScript files
       },
       rules: {
+        "@typescript-eslint/no-unused-vars": [
+          "warn",
+          { args: "after-used", argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+        ],
         "@typescript-eslint/no-redeclare": "off",
         "@typescript-eslint/no-empty-function": ["error", { allow: ["arrowFunctions"] }],
         "@typescript-eslint/no-floating-promises": "error",
