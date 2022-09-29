@@ -12,8 +12,7 @@ import csrf from "csurf";
 import express from "express";
 import { auth } from "express-openid-connect";
 import { OidcUserValidator } from "~/schema/oidc-user.validator.server";
-
-import { createAppInjector } from "./app/services/app-injector.server";
+import { createAppInjector } from "~/services/app-injector.server";
 
 const db = new PrismaClient();
 const appInjector = createAppInjector();

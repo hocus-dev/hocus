@@ -1,5 +1,5 @@
 import { Button } from "flowbite-react";
-import { GlobalContext } from "~/components/global-context.client";
+import { GlobalContext } from "~/components/global-context.shared";
 
 export default function AppIndex(): JSX.Element {
   return (

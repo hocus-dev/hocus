@@ -11,7 +11,7 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 
-import { GlobalContext } from "./components/global-context.client";
+import { GlobalContext } from "./components/global-context.shared";
 import styles from "./styles/app.css";
 
 export const meta: MetaFunction = () => ({
