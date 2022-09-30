@@ -8,7 +8,7 @@
   "remote.SSH.defaultForwardedPorts": [
     {
       "localPort": 3000,
-      "name": "main-app",
+      "name": "app",
       "remotePort": 3000
     },
     {

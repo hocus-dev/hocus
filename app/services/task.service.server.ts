@@ -1,7 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { TaskSpec, Job } from "graphile-worker";
-
-import type { TaskParams } from "~/tasks/tasks";
+import type { TaskParams } from "~/tasks/types.server";
 
 export class TaskService {
   async scheduleTask(db: PrismaClient, params: TaskParams, spec: TaskSpec = {}): Promise<Job> {

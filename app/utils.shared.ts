@@ -4,3 +4,8 @@ export const unwrap = <T>(value: T | undefined | null): T => {
   }
   return value;
 };
+
+export const mapenum =
+  <K extends string | number | symbol>() =>
+  <V, T extends Record<K, V>>(map: T): { [key in K]: T[key] } =>
+    map;
