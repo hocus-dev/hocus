@@ -2,8 +2,8 @@ import type { PrismaClient, User } from "@prisma/client";
 import "@remix-run/node";
 import type { DataFunctionArgs } from "@remix-run/node";
 import type { Request, Response } from "express";
+import type { AppInjector } from "~/app-injector.server";
 import type { OidcUser } from "~/schema/oidc-user.validator.server";
-import type { AppInjector } from "~/services/app-injector.server";
 
 type Context = {
   db: PrismaClient;

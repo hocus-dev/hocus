@@ -11,13 +11,14 @@ import cookieParser from "cookie-parser";
 import csrf from "csurf";
 import express from "express";
 import { auth } from "express-openid-connect";
+import { createAppInjector } from "~/app-injector.server";
 import { OidcUserValidator } from "~/schema/oidc-user.validator.server";
-import { createAppInjector } from "~/services/app-injector.server";
+import { Token } from "~/token";
 
 const db = new PrismaClient();
 const appInjector = createAppInjector();
-const config = appInjector.resolve("Config");
-const userService = appInjector.resolve("UserService");
+const config = appInjector.resolve(Token.Config);
+const userService = appInjector.resolve(Token.UserService);
 
 const BUILD_DIR = path.join(process.cwd(), "build");
 

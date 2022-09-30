@@ -1,12 +1,12 @@
 import { createInjector, Scope } from "typed-inject";
 import { config } from "~/config";
 import { newLogger } from "~/logger.server";
-
-import { UserService } from "./user.service.server";
+import { Token } from "~/token";
+import { UserService } from "~/user/user.service.server";
 
 export const createAppInjector = () =>
   createInjector()
-    .provideValue("Config", config)
-    .provideFactory("Logger", newLogger, Scope.Transient)
-    .provideClass("UserService", UserService);
+    .provideValue(Token.Config, config)
+    .provideFactory(Token.Logger, newLogger, Scope.Transient)
+    .provideClass(Token.UserService, UserService);
 export type AppInjector = ReturnType<typeof createAppInjector>;

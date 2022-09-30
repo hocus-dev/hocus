@@ -1,8 +1,7 @@
 import type { JobHelpers } from "graphile-worker";
+import { AbstractTaskRunnerService } from "~/tasks/abstract-task-runner.service.server";
 import { TaskId } from "~/tasks/schemas.server";
 import type { TaskPayload } from "~/tasks/types.server";
-
-import { AbstractTaskRunnerService } from "./abstract-task-runner.service.server";
 
 const TASK_ID = TaskId.SendGAEvent;
 

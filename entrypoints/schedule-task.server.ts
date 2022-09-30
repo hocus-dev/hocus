@@ -1,6 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
-import { TaskService } from "~/services/task.service.server";
+import { TaskService } from "~/tasks/task.service.server";
 
 const db = new PrismaClient();
 

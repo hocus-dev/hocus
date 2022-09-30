@@ -1,6 +1,7 @@
 import winston from "winston";
 
 import type { Config } from "./config";
+import { Token } from "./token";
 
 export const newLogger = (config: Config): winston.Logger => {
   return winston.createLogger({
@@ -14,4 +15,4 @@ export const newLogger = (config: Config): winston.Logger => {
     transports: [new winston.transports.Console()],
   });
 };
-newLogger.inject = ["Config"] as const;
+newLogger.inject = [Token.Config] as const;

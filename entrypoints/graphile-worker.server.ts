@@ -1,8 +1,8 @@
 import type { Task } from "graphile-worker";
 import { run } from "graphile-worker";
 import { config } from "~/config";
-import type { AbstractTaskRunnerService } from "~/services/abstract-task-runner.service.server";
-import { SendGAEventTaskRunnerService } from "~/services/send-ga-event-task-runner.service.server";
+import type { AbstractTaskRunnerService } from "~/tasks/abstract-task-runner.service.server";
+import { SendGAEventTaskRunnerService } from "~/tasks/runners/send-ga-event-task-runner.service.server";
 import { TaskId } from "~/tasks/schemas.server";
 
 const taskServices: { [Id in TaskId]: AbstractTaskRunnerService<Id> } = {
