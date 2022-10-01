@@ -10,9 +10,19 @@ export const TaskId = {
 } as const;
 
 export const TaskSchemas = mapenum<TaskId>()({
-  [TaskId.SendGAEvent]: t.Object({
-    name: t.Literal(GAEventName.SignUp),
-    userId: t.String(),
-    params: GAEventSchema[GAEventName.SignUp],
-  }),
+  /**
+   * TODO: generate this union automatically
+   */
+  [TaskId.SendGAEvent]: t.Union([
+    t.Object({
+      name: t.Literal(GAEventName.SignUp),
+      userId: t.String(),
+      params: GAEventSchema[GAEventName.SignUp],
+    }),
+    t.Object({
+      name: t.Literal(GAEventName.LogIn),
+      userId: t.String(),
+      params: GAEventSchema[GAEventName.LogIn],
+    }),
+  ]),
 } as const);

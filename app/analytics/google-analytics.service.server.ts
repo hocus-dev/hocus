@@ -2,6 +2,7 @@ import { Axios } from "axios";
 import type { Any } from "ts-toolbelt";
 import type { Logger } from "winston";
 import type { Config } from "~/config";
+import { Env } from "~/config/utils.server";
 import { Token } from "~/token";
 import { removeTrailingSlash } from "~/utils.shared";
 
@@ -25,9 +26,11 @@ export class GoogleAnalyticsService {
   static inject = [Token.Logger, Token.Config] as const;
   private readonly httpClient: Axios;
   private readonly config: ReturnType<Config["googleAnalytics"]>;
+  private readonly env: ReturnType<Config["env"]>;
 
   constructor(private readonly logger: Logger, config: Config) {
     this.config = config.googleAnalytics();
+    this.env = config.env();
     this.httpClient = new Axios({ baseURL: removeTrailingSlash(this.config.url) });
   }
 
@@ -38,10 +41,18 @@ export class GoogleAnalyticsService {
       JSON.stringify({
         client_id: this.config.clientId,
         user_id: args.userId,
-        events: [{ name: args.name, args: args.params }],
+        events: [{ name: args.name, params: args.params }],
       }),
       { params: { measurement_id: this.config.measurementId, api_secret: this.config.apiSecret } },
     );
+
+    if (this.env === Env.Test) {
+      this.logger.debug(response.data);
+      const validationMessages = JSON.parse(response.data).validationMessages;
+      if (validationMessages.length !== 0) {
+        throw new Error(`Invalid GA event: ${response.data}`);
+      }
+    }
     /* eslint-enable camelcase */
     this.logger.debug(
       `Google Analytics Response: ${response.status}, ${response.statusText}, ${JSON.stringify(

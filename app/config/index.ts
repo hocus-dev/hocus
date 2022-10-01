@@ -28,6 +28,6 @@ export const config = makeConfig()({
     clientId: get("GOOGLE_ANALYTICS_CLIENT_ID", "server"),
     measurementId: get("GOOGLE_ANALYTICS_MEASUREMENT_ID", "G-XXXXXXXXXX"),
     apiSecret: get("GOOGLE_ANALYTICS_API_SECRET", "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"),
-    url: get("GOOGLE_ANALYTICS_URL", "https://www.google-analytics.com/"),
+    url: get("GOOGLE_ANALYTICS_URL", "https://www.google-analytics.com/debug"),
   }),
 });

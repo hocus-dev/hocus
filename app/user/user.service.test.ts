@@ -18,11 +18,11 @@ const provideUserService = (testFn: (args: Args) => Promise<void>): (() => Promi
 };
 
 test.concurrent(
-  "getOrCreateUser",
+  "loginOrRegisterUser",
   provideUserService(async ({ db, userService }) => {
     const externalId = "123";
 
-    const user = await userService.getOrCreateUser(db, externalId, "github");
+    const user = await userService.loginOrRegisterUser(db, externalId, "github");
     expect(user.externalId).toEqual(externalId);
   }),
 );
