@@ -28,6 +28,7 @@ export class TaskService {
       spec.jobKeyMode ?? null,
     );
     const job = rows[0];
+    // eslint-disable-next-line camelcase
     job.task_identifier = params.id;
     return job;
   }

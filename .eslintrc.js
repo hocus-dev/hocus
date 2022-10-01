@@ -26,6 +26,7 @@ module.exports = {
           "warn",
           { args: "after-used", argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
         ],
+        camelcase: ["warn"],
         "@typescript-eslint/no-redeclare": "off",
         "@typescript-eslint/no-empty-function": ["error", { allow: ["arrowFunctions"] }],
         "@typescript-eslint/no-floating-promises": "error",

@@ -30,9 +30,11 @@ export class GoogleAnalyticsService {
 
   async sendEvent(params: SendEventParams): Promise<void> {
     await this.httpClient.post("/mp/collect", {
+      /* eslint-disable camelcase */
       client_id: this.config.clientId,
       user_id: params.userId,
       events: [params.payload],
+      /* eslint-enable camelcase */
     });
   }
 }
