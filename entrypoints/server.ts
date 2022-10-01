@@ -1,7 +1,6 @@
 /* eslint-disable filename-rules/match */
 import path from "path";
 
-import type { User } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import { createRequestHandler } from "@remix-run/express";
@@ -45,14 +44,9 @@ app.all("*", async (req, res, next) => {
       purgeRequireCache();
     }
 
-    let user: User | undefined = void 0;
     const oidcUser = req.oidc?.user != null ? OidcUserValidator.Parse(req.oidc.user) : void 0;
-    if (oidcUser != null) {
-      user = (await userService.getUser(db, oidcUser.sub)) ?? void 0;
-      if (user == null) {
-        user = await userService.upsertUser(db, oidcUser.sub);
-      }
-    }
+    const user =
+      oidcUser != null ? await userService.getOrCreateUser(db, oidcUser.sub, "github") : void 0;
 
     return createRequestHandler({
       build: require(BUILD_DIR),

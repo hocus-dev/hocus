@@ -1,7 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
+import { createAppInjector } from "~/app-injector.server";
 import { provideDb } from "~/test-utils/db.server";
+import { Token } from "~/token";
 
-import { UserService } from "./user.service.server";
+import type { UserService } from "./user.service.server";
 
 type Args = {
   db: PrismaClient;
@@ -10,23 +12,17 @@ type Args = {
 
 const provideUserService = (testFn: (args: Args) => Promise<void>): (() => Promise<void>) => {
   return provideDb(async (db) => {
-    const userService = new UserService();
+    const userService = createAppInjector().resolve(Token.UserService);
     await testFn({ db, userService });
   });
 };
 
 test.concurrent(
-  "getUser and upsertUser",
+  "getOrCreateUser",
   provideUserService(async ({ db, userService }) => {
     const externalId = "123";
 
-    const user = await userService.getUser(db, externalId);
-    expect(user).toBeNull();
-
-    const createdUser = await userService.upsertUser(db, externalId);
-    expect(createdUser.externalId).toEqual(externalId);
-
-    const user2 = await userService.getUser(db, externalId);
-    expect(user2?.id).toEqual(createdUser.id);
+    const user = await userService.getOrCreateUser(db, externalId, "github");
+    expect(user.externalId).toEqual(externalId);
   }),
 );

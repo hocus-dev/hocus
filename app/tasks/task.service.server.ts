@@ -1,9 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { TaskSpec, Job } from "graphile-worker";
 import type { TaskParams } from "~/tasks/types.server";
 
 export class TaskService {
-  async scheduleTask(db: PrismaClient, params: TaskParams, spec: TaskSpec = {}): Promise<Job> {
+  async scheduleTask(db: Prisma.Client, params: TaskParams, spec: TaskSpec = {}): Promise<Job> {
     // copied from https://github.com/graphile/worker/blob/9d484820b97f0f4f677dccdf810905547ee2e74c/src/helpers.ts#L23
     const rows: Job[] = await db.$queryRawUnsafe(
       `SELECT * FROM graphile_worker.add_job(
@@ -17,7 +17,7 @@ export class TaskService {
         flags => $8::text[],
         job_key_mode => $9::text
       );`,
-      params.id,
+      params.taskId,
       JSON.stringify(params.payload),
       spec.queueName ?? null,
       spec.runAt != void 0 ? spec.runAt.toISOString() : null,
@@ -29,7 +29,7 @@ export class TaskService {
     );
     const job = rows[0];
     // eslint-disable-next-line camelcase
-    job.task_identifier = params.id;
+    job.task_identifier = params.taskId;
     return job;
   }
 }

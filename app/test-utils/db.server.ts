@@ -5,6 +5,7 @@ import fs from "fs";
 
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
+import { runMigrations } from "graphile-worker";
 import { Client as PgClient } from "pg";
 import * as build from "prisma/build";
 import { v4 as uuidv4 } from "uuid";
@@ -13,7 +14,7 @@ import "process";
 export const provideDb = (testFn: (db: PrismaClient) => Promise<void>): (() => Promise<void>) => {
   return async () => {
     const dbName = uuidv4();
-    const dbUrl = `postgresql://postgres:pass@localhost:5432/${dbName}?schema=public`;
+    const dbUrl = `postgresql://postgres:pass@localhost:5432/${dbName}`;
     const db = new PrismaClient({
       datasources: {
         db: { url: dbUrl },
@@ -35,6 +36,9 @@ export const provideDb = (testFn: (db: PrismaClient) => Promise<void>): (() => P
     fs.unlinkSync(schemaPath);
 
     migrate.stop();
+
+    await runMigrations({ connectionString: dbUrl });
+
     let error = null;
     try {
       await testFn(db);

@@ -1,4 +1,5 @@
 import { Type as t } from "@sinclair/typebox";
+import { GAEventName, GAEventSchema } from "~/analytics/event.server";
 import { mapenum } from "~/utils.shared";
 
 import type { valueof } from "~/types/utils";
@@ -9,5 +10,9 @@ export const TaskId = {
 } as const;
 
 export const TaskSchemas = mapenum<TaskId>()({
-  [TaskId.SendGAEvent]: t.Object({ category: t.String() }),
+  [TaskId.SendGAEvent]: t.Object({
+    name: t.Literal(GAEventName.SignUp),
+    userId: t.String(),
+    params: GAEventSchema[GAEventName.SignUp],
+  }),
 } as const);
