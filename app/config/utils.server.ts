@@ -5,7 +5,7 @@ const env = process.env.NODE_ENV;
 export const get = <D>(envVarName: string, defaultValue: D): string | D => {
   const envVar = process.env[envVarName];
   if (envVar == null) {
-    if (env === "development" || env === "test") {
+    if (env === Env.Development || env === Env.Test) {
       return defaultValue;
     }
     throw new Error(`Missing env var ${envVarName}`);
