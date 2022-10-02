@@ -10,4 +10,7 @@ export const Token = {
   Config: "ConfigT",
   Logger: "LoggerT",
   UserService: "UserServiceT",
+  GoogleAnalyticsService: "GoogleAnalyticsServiceT",
+  TaskService: "TaskServiceT",
+  SendGAEventTaskRunnerService: "SendGAEventTaskRunnerServiceT",
 } as const;

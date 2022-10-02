@@ -10,5 +10,5 @@ export type TaskPayload = {
 };
 
 export type TaskParams = valueof<{
-  [Id in TaskId]: { id: Id; payload: TaskPayload[Id] };
+  [Id in TaskId]: { taskId: Id; payload: TaskPayload[Id] };
 }>;

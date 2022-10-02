@@ -2,11 +2,14 @@ import type { Task } from "graphile-worker";
 import { run } from "graphile-worker";
 import { config } from "~/config";
 import type { AbstractTaskRunnerService } from "~/tasks/abstract-task-runner.service.server";
-import { SendGAEventTaskRunnerService } from "~/tasks/runners/send-ga-event-task-runner.service.server";
+import { createTaskRunnerInjector } from "~/tasks/injector.server";
 import { TaskId } from "~/tasks/schemas.server";
+import { Token } from "~/token";
+
+const injector = createTaskRunnerInjector();
 
 const taskServices: { [Id in TaskId]: AbstractTaskRunnerService<Id> } = {
-  [TaskId.SendGAEvent]: new SendGAEventTaskRunnerService(),
+  [TaskId.SendGAEvent]: injector.resolve(Token.SendGAEventTaskRunnerService),
 };
 
 const taskList: { [key in TaskId]: Task } = Object.entries(taskServices).reduce(
