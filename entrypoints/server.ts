@@ -46,7 +46,7 @@ app.all("*", async (req, res, next) => {
 
     const oidcUser = req.oidc?.user != null ? OidcUserValidator.Parse(req.oidc.user) : void 0;
     const user =
-      oidcUser != null ? await userService.loginOrRegisterUser(db, oidcUser.sub, "github") : void 0;
+      oidcUser != null ? await userService.getOrCreateUser(db, oidcUser.sub, "github") : void 0;
 
     return createRequestHandler({
       build: require(BUILD_DIR),

@@ -9,21 +9,13 @@ export class UserService {
 
   constructor(private readonly taskService: TaskService) {}
 
-  async loginOrRegisterUser(
+  async getOrCreateUser(
     db: Prisma.NonTransactionClient,
     externalId: string,
     loginMethod: string,
   ): Promise<User> {
     const user = await db.user.findUnique({ where: { externalId } });
     if (user != null) {
-      await this.taskService.scheduleTask(db, {
-        taskId: TaskId.SendGAEvent,
-        payload: {
-          userId: user.gaUserId,
-          name: GAEventName.LogIn,
-          params: { method: loginMethod },
-        },
-      });
       return user;
     }
 
