@@ -1,6 +1,7 @@
-import { createInjector, Scope } from "typed-inject";
+import * as sinon from "ts-sinon";
+import { createInjector } from "typed-inject";
+import winston from "winston";
 import { config } from "~/config";
-import { newLogger } from "~/logger.server";
 import { Token } from "~/token";
 
 import { GAEventName } from "./event.server";
@@ -22,7 +23,7 @@ const customConfig: typeof config = {
 const makeInjector = () =>
   createInjector()
     .provideValue(Token.Config, customConfig)
-    .provideFactory(Token.Logger, newLogger, Scope.Transient)
+    .provideValue(Token.Logger, sinon.stubObject(winston.createLogger()))
     .provideClass(Token.GoogleAnalyticsService, GoogleAnalyticsService);
 
 const provideGAService = (testFn: (args: Args) => Promise<void>): (() => Promise<void>) => {
@@ -43,13 +44,12 @@ test.concurrent(
       },
     });
 
-    // TODO: expect an invalid event to throw an error
-    await gaService.sendEvent({
-      name: GAEventName.SignUp,
-      userId: "123",
-      params: {
-        xd: "google",
-      } as any,
-    });
+    await expect(
+      gaService.sendEvent({
+        params: {
+          xd: "google",
+        },
+      } as any),
+    ).rejects.toThrow();
   }),
 );

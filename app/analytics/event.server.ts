@@ -5,6 +5,9 @@ import { mapenum } from "~/utils.shared";
 
 import type { valueof } from "~/types/utils";
 
+/**
+ * Possible events: https://developers.google.com/analytics/devguides/collection/protocol/ga4/reference/events
+ */
 export type GAEventName = valueof<typeof GAEventName>;
 export const GAEventName = {
   SignUp: "sign_up",
