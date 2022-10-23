@@ -2,9 +2,10 @@
 tasks:
   - name: ssh setup
     command: |
-      echo "$DEV_MACHINE_PRIVATE_SSH_KEY" > /tmp/ssh_key && \
-      chmod 600 /tmp/ssh_key && \
-      ssh -i /tmp/ssh_key $DEV_MACHINE_USER@$DEV_MACHINE_HOSTNAME
+      echo -ne "$DEV_MACHINE_PRIVATE_SSH_KEY" > /tmp/ssh_key
+      chmod 600 /tmp/ssh_key
+      sleep 5
+      ssh -o StrictHostKeyChecking=false -i /tmp/ssh_key $DEV_MACHINE_USER@$DEV_MACHINE_HOSTNAME
   - name: tailscaled
     command: sudo tailscaled
   - name: tailscale
