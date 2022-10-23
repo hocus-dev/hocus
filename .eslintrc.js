@@ -11,7 +11,7 @@ module.exports = {
       rules: {
         "filename-rules/match": [
           "warn",
-          /^[a-z0-9\-]+(\.[a-z0-9\-]+)?\.((test)|(d)|(server)|(client)|(shared))\.((ts)|(tsx))$/,
+          /^[a-z0-9\-]+(\.[a-z0-9\-]+)?\.((test)|(d)|(server)|(client)|(shared))?\.((ts)|(tsx))$/,
         ],
       },
     },
