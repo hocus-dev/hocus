@@ -1,5 +1,5 @@
 {
-  "name": "~",
+  "name": "~agent",
   "description": "this is used to perform `yarn link` in ops/bin/link.sh",
   "private": true
 }
