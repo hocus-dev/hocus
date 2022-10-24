@@ -7,7 +7,7 @@ openapi-schema.yaml taken from https://github.com/firecracker-microvm/firecracke
 ```bash
 npx openapi-generator-cli generate \
   -i ./openapi-schema.yaml \
-  -o . \
-  -g typescript-axios \
+  -o ./generated \
+  -g typescript-fetch \
   --additional-properties=supportsES6=true,npmVersion=6.9.0,typescriptThreePlus=true
 ```

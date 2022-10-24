@@ -1,17 +1,21 @@
-/* eslint-disable camelcase */
-import { DefaultApi } from "firecracker-client";
+import { Configuration, DefaultApi } from "firecracker-client";
+import fetch from "node-fetch";
 
 export class FirecrackerService {
   private api: DefaultApi;
 
   constructor(pathToSocket: string) {
-    this.api = new DefaultApi(void 0, `http://unix:${pathToSocket}`);
+    this.api = new DefaultApi(
+      new Configuration({ basePath: `http://unix:${pathToSocket}`, fetchApi: fetch as any }),
+    );
   }
 
   async createVM() {
     const response = await this.api.putGuestBootSource({
-      kernel_image_path: "/home/centos/vmlinux.bin",
-      boot_args: "console=ttyS0 reboot=k panic=1 pci=off",
+      body: {
+        kernelImagePath: "/home/centos/vmlinux.bin",
+        bootArgs: "console=ttyS0 reboot=k panic=1 pci=off",
+      },
     });
     console.log(response);
   }

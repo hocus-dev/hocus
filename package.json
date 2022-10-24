@@ -31,7 +31,7 @@
     "csurf": "^1.11.0",
     "dotenv": "^16.0.2",
     "express-openid-connect": "^2.8.0",
-    "firecracker-client": "./deps/firecracker-client/",
+    "firecracker-client": "./deps/firecracker-client",
     "flowbite": "^1.5.2",
     "flowbite-react": "^0.1.10",
     "graphile-worker": "^0.13.0",
