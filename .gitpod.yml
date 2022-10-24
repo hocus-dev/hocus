@@ -39,3 +39,4 @@ vscode:
     - firsttris.vscode-jest-runner
     - dcortes92.FreeMarker
     - AntonLilleby.xp-freemarker-formatter
+    - emeraldwalk.RunOnSave
