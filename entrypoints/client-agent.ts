@@ -1,8 +1,7 @@
 /* eslint-disable no-console */
 import { Connection, WorkflowClient } from "@temporalio/client";
 import { nanoid } from "nanoid";
-
-import { example } from "./workflows";
+import { example } from "~/agent/workflows";
 
 async function run() {
   const connection = await Connection.connect();
