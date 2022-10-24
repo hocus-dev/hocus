@@ -1,0 +1,12 @@
+{
+  "name": "firecracker-client",
+  "version": "1.1.2",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.5.2"
+  },
+  "dependencies": {
+    "axios": "^1.1.3"
+  }
+}
