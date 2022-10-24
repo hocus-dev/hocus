@@ -1,3 +1,5 @@
+image:
+  file: ops/docker/gitpod.Dockerfile
 # Commands to start on workspace startup
 tasks:
   - name: ssh setup
