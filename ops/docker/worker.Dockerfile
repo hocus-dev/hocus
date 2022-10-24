@@ -1,6 +1,8 @@
 FROM node:16-bullseye
 
-COPY . /app
-WORKDIR /app
+RUN groupadd -r --gid 1002 hocus && useradd -r -g hocus -m -u 1002 hocus
+RUN mkdir -p /app && chown -R hocus:hocus /app
+USER hocus
+RUN yarn config set cache-folder /app/.yarn-cache
 
-RUN npm install --only=production
+WORKDIR /app

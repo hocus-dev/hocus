@@ -16,6 +16,9 @@ tasks:
         --login-server=https://hs.hugodutka.com \
         --auth-key=$TAILSCALE_PREAUTHKEY \
         --hostname=gitpod-hocus
+      sleep 3
+      echo "export GITPOD_IP=$(tailscale ip)" > ops/resources/gitpod-ip.sh
+      ops/bin/rsync.sh
   - name: dev-env setup
     init: yarn install && npm run dev-prebuild && ops/bin/prepare.sh
     command: |

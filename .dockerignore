@@ -6,5 +6,3 @@ node_modules
 *.log
 core*
 app/styles
-.yarn-cache
-ops/resources/gitpod-ip.sh
