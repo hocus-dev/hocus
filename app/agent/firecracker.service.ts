@@ -1,22 +1,30 @@
+import { DefaultLogger } from "@temporalio/worker";
 import { Configuration, DefaultApi } from "firecracker-client";
-import fetch from "node-fetch";
+import { fetch } from "got-fetch";
 
 export class FirecrackerService {
   private api: DefaultApi;
+  private logger: DefaultLogger;
 
   constructor(pathToSocket: string) {
+    this.logger = new DefaultLogger();
     this.api = new DefaultApi(
-      new Configuration({ basePath: `http://unix:${pathToSocket}`, fetchApi: fetch as any }),
+      new Configuration({
+        basePath: `http://unix:${pathToSocket}:`,
+        fetchApi: fetch as any,
+      }),
     );
   }
 
   async createVM() {
-    const response = await this.api.putGuestBootSource({
+    await this.api.putLogger({
       body: {
-        kernelImagePath: "/home/centos/vmlinux.bin",
-        bootArgs: "console=ttyS0 reboot=k panic=1 pci=off",
+        logPath: "/tmp/fc.log",
+        level: "Warning",
+        showLevel: false,
+        showLogOrigin: false,
       },
     });
-    console.log(response);
+    this.logger.info("fc logger configured");
   }
 }
