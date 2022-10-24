@@ -20,3 +20,8 @@ cd "$PROJECT_DIR""/ops/docker" &&
         -p rooms \
         build
 cd "$PROJECT_DIR" && npx prisma generate
+cd "$PROJECT_DIR""/ops/docker" &&
+    docker-compose \
+        --file temporal.docker-compose.yml \
+        -p temporal \
+        pull
