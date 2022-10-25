@@ -17,6 +17,7 @@ tasks:
         --auth-key=$TAILSCALE_PREAUTHKEY \
         --hostname=gitpod-hocus
       sleep 3
+      mkdir -p ops/resources
       echo "export GITPOD_IP=$(tailscale ip)" > ops/resources/gitpod-ip.sh
       ops/bin/rsync.sh
   - name: dev-env setup
