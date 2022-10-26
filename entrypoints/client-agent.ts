@@ -1,15 +1,15 @@
 /* eslint-disable no-console */
 import { Connection, WorkflowClient } from "@temporalio/client";
 import { nanoid } from "nanoid";
-import { example } from "~/agent/workflows";
+import { startVM } from "~/agent/workflows";
 
 async function run() {
   const connection = await Connection.connect();
   const client = new WorkflowClient({
     connection,
   });
-  const handle = await client.start(example, {
-    args: ["Hugo"],
+  const handle = await client.start(startVM, {
+    args: ["agent-vm"],
     taskQueue: "hello-world",
     workflowId: "workflow-" + nanoid(),
   });

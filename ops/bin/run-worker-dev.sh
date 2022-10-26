@@ -9,7 +9,9 @@ docker run \
   --rm \
   --privileged \
   -v $(pwd):/app \
+  -v $(pwd)/../hocus-resources:/hocus-resources \
   -v /dev/kvm:/dev/kvm \
+  --name agent \
   worker-dev \
   /bin/bash -c \
   "yarn && ops/bin/link.sh && source ops/resources/gitpod-ip.sh && TEMPORAL_ADDRESS=\$GITPOD_IP:7233 /bin/bash"

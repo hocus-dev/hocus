@@ -1,7 +1,39 @@
+import { DefaultLogger } from "@temporalio/worker";
+
 import { FirecrackerService } from "./firecracker.service";
 
-export const greet = async (name: string): Promise<string> => {
-  const fc = new FirecrackerService("/tmp/fc.sock");
-  fc.startFirecrackerInstance({ stdout: "/tmp/fc.stdout", stderr: "/tmp/fc.stderr" });
-  return `Hello, ${name}! I started a VM for you!`;
+/**
+ * Returns the pid of the firecracker process.
+ */
+export const startFirecrackerInstance = async (instanceId: string): Promise<void> => {
+  const logger = new DefaultLogger();
+  const socketPath = `/tmp/${instanceId}.sock`;
+  const fc = new FirecrackerService(socketPath);
+
+  await fc.startFirecrackerInstance({
+    log: `/tmp/${instanceId}.log`,
+  });
+  logger.info("firecracker process started");
+
+  const vmIp = "168.254.0.21";
+  const tapDeviceIp = "168.254.0.22";
+  const tapDeviceCidr = 24;
+  const tapDeviceName = "hocus-tap-0";
+  fc.setupNetworking({
+    vmIp,
+    tapDeviceName,
+    tapDeviceIp,
+    tapDeviceCidr,
+  });
+  logger.info("networking set up");
+
+  await fc.createVM({
+    kernelPath: "/hocus-resources/vmlinux-5.6-x86_64.bin",
+    fsPath: "/hocus-resources/hocus.ext4",
+    vmIp,
+    tapDeviceIp,
+    tapDeviceName,
+    tapDeviceCidr,
+  });
+  logger.info("vm created");
 };

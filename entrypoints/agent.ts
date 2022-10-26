@@ -12,6 +12,7 @@ async function run() {
     taskQueue: "hello-world",
   });
   console.log("Starting worker...");
+
   await worker.run();
 }
 

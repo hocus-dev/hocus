@@ -2,10 +2,13 @@ import { proxyActivities } from "@temporalio/workflow";
 
 import type * as activities from "./activities";
 
-const { greet } = proxyActivities<typeof activities>({
+const { startFirecrackerInstance } = proxyActivities<typeof activities>({
   startToCloseTimeout: "1 minute",
+  retry: {
+    maximumAttempts: 1,
+  },
 });
 
-export async function example(name: string): Promise<string> {
-  return await greet(name);
+export async function startVM(vmId: string): Promise<void> {
+  await startFirecrackerInstance(vmId);
 }
