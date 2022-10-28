@@ -10,9 +10,7 @@ export const startFirecrackerInstance = async (instanceId: string): Promise<void
   const socketPath = `/tmp/${instanceId}.sock`;
   const fc = new FirecrackerService(socketPath);
 
-  await fc.startFirecrackerInstance({
-    log: `/tmp/${instanceId}.log`,
-  });
+  await fc.startFirecrackerInstance(`/tmp/${instanceId}`);
   logger.info("firecracker process started");
 
   const vmIp = "168.254.0.21";

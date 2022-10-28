@@ -8,6 +8,7 @@ import { Netmask } from "netmask";
 import { fetch, Agent } from "undici";
 import { unwrap } from "~/utils.shared";
 
+import { FifoFlags } from "./fifo-flags";
 import { execCmd } from "./utils";
 
 export class FirecrackerService {
@@ -30,17 +31,25 @@ export class FirecrackerService {
     );
   }
 
-  startFirecrackerInstance(outputFilepaths: { log: string }): number {
+  startFirecrackerInstance(filesPrefix: string): number {
     this.logger.info(`starting firecracker instance with socket at ${this.pathToSocket}`);
-    if (fs.existsSync(this.pathToSocket)) {
-      this.logger.info(`socket already exists at ${this.pathToSocket}, deleting`);
-      fs.unlinkSync(this.pathToSocket);
-    }
 
-    const childStdout = fs.openSync(outputFilepaths.log, "a");
-    const childStderr = fs.openSync(outputFilepaths.log, "a");
+    const stdinPath = `${filesPrefix}.stdin`;
+    const logPath = `${filesPrefix}.log`;
+    for (const path of [stdinPath, logPath, this.pathToSocket]) {
+      if (fs.existsSync(path)) {
+        this.logger.info(`file already exists at ${path}, deleting`);
+        fs.unlinkSync(path);
+      }
+    }
+    this.logger.info("opening stdin");
+    execCmd("mkfifo", stdinPath);
+    // learned it here: https://github.com/firecracker-microvm/firecracker-go-sdk/blob/9a0d3b28f7f7ae1ac96e970dec4d28a09f10c4a9/machine.go#L742
+    const childStdin = fs.openSync(stdinPath, FifoFlags.O_NONBLOCK | FifoFlags.O_RDONLY, "0400");
+    const childStdout = fs.openSync(logPath, "a");
+    const childStderr = fs.openSync(logPath, "a");
     const child = spawn("firecracker", ["--api-sock", this.pathToSocket], {
-      stdio: ["ignore", childStdout, childStderr],
+      stdio: [childStdin, childStdout, childStderr],
       detached: true,
     });
     child.unref();
