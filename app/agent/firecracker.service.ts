@@ -44,8 +44,18 @@ export class FirecrackerService {
     }
     this.logger.info("opening stdin");
     execCmd("mkfifo", stdinPath);
-    // learned it here: https://github.com/firecracker-microvm/firecracker-go-sdk/blob/9a0d3b28f7f7ae1ac96e970dec4d28a09f10c4a9/machine.go#L742
-    const childStdin = fs.openSync(stdinPath, FifoFlags.O_NONBLOCK | FifoFlags.O_RDONLY, "0400");
+    // The pipe is opened with O_RDWR even though the firecracker process only reads from it.
+    // This is because of how FIFOs work in linux - when the last writer closes the pipe,
+    // the reader gets an EOF. When the VM receives an EOF on the stdin, it detaches
+    // serial input and we can no longer interact with its console. If we opened this pipe
+    // as read only and later opened it again as a writer to run some commands, once we stopped
+    // writing to it, the VM would receive an EOF and detach the serial input, making it impossible
+    // to make any more writes. Since we open it as read/write here, there is always a writer and
+    // the VM never receives an EOF.
+    //
+    // Learned how to open a FIFO here: https://github.com/firecracker-microvm/firecracker-go-sdk/blob/9a0d3b28f7f7ae1ac96e970dec4d28a09f10c4a9/machine.go#L742
+    // Learned about read/write/EOF behaviour here: https://stackoverflow.com/a/40390938
+    const childStdin = fs.openSync(stdinPath, FifoFlags.O_NONBLOCK | FifoFlags.O_RDWR, "0600");
     const childStdout = fs.openSync(logPath, "a");
     const childStderr = fs.openSync(logPath, "a");
     const child = spawn("firecracker", ["--api-sock", this.pathToSocket], {
