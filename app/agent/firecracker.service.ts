@@ -157,6 +157,13 @@ export class FirecrackerService {
       ifaceId: "eth0",
       body: { ifaceId: "eth0", hostDevName: cfg.tapDeviceName },
     });
+    await this.api.putMachineConfiguration({
+      body: {
+        vcpuCount: 2,
+        memSizeMib: 4096,
+        smt: true,
+      },
+    });
     await this.api.createSyncAction({
       info: {
         actionType: "InstanceStart",
