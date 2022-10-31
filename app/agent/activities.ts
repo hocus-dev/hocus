@@ -5,12 +5,17 @@ import { FirecrackerService } from "./firecracker.service";
 /**
  * Returns the pid of the firecracker process.
  */
-export const startFirecrackerInstance = async (instanceId: string): Promise<void> => {
+export const startVM = async (args: {
+  instanceId: string;
+  kernelPath: string;
+  rootFsPath: string;
+  drives: Parameters<FirecrackerService["createVM"]>[0]["extraDrives"];
+}): Promise<void> => {
   const logger = new DefaultLogger();
-  const socketPath = `/tmp/${instanceId}.sock`;
+  const socketPath = `/tmp/${args.instanceId}.sock`;
   const fc = new FirecrackerService(socketPath);
 
-  await fc.startFirecrackerInstance(`/tmp/${instanceId}`);
+  await fc.startFirecrackerInstance(`/tmp/${args.instanceId}`);
   logger.info("firecracker process started");
 
   const vmIp = "168.254.0.21";
@@ -26,12 +31,13 @@ export const startFirecrackerInstance = async (instanceId: string): Promise<void
   logger.info("networking set up");
 
   await fc.createVM({
-    kernelPath: "/hocus-resources/vmlinux-5.6-x86_64.bin",
-    fsPath: "/hocus-resources/hocus.ext4",
+    kernelPath: args.kernelPath,
+    rootFsPath: args.rootFsPath,
     vmIp,
     tapDeviceIp,
     tapDeviceName,
     tapDeviceCidr,
+    extraDrives: args.drives,
   });
   logger.info("vm created");
 };

@@ -17,3 +17,4 @@ RUN chmod 755 /etc/init.d/dnssetup && \
     update-rc.d dnssetup defaults
 RUN curl -sSL https://get.docker.com/ | sh
 RUN echo 'root:root' | chpasswd
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config

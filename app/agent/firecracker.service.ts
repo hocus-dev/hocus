@@ -2,7 +2,7 @@ import { spawn, spawnSync } from "child_process";
 import fs from "fs";
 
 import { DefaultLogger } from "@temporalio/worker";
-import type { FullVmConfiguration } from "firecracker-client";
+import type { FullVmConfiguration, PutGuestDriveByIDRequest } from "firecracker-client";
 import { Configuration, DefaultApi } from "firecracker-client";
 import { Netmask } from "netmask";
 import { fetch, Agent } from "undici";
@@ -130,11 +130,12 @@ export class FirecrackerService {
 
   async createVM(cfg: {
     kernelPath: string;
-    fsPath: string;
+    rootFsPath: string;
     vmIp: string;
     tapDeviceIp: string;
     tapDeviceName: string;
     tapDeviceCidr: number;
+    extraDrives: PutGuestDriveByIDRequest["body"][];
   }): Promise<FullVmConfiguration> {
     const mask = new Netmask(`255.255.255.255/${cfg.tapDeviceCidr}`).mask;
     const ipArg = `ip=${cfg.vmIp}::${cfg.tapDeviceIp}:${mask}::eth0:off`;
@@ -148,11 +149,17 @@ export class FirecrackerService {
       driveId: "rootfs",
       body: {
         driveId: "rootfs",
-        pathOnHost: cfg.fsPath,
+        pathOnHost: cfg.rootFsPath,
         isReadOnly: false,
         isRootDevice: true,
       },
     });
+    for (const drive of cfg.extraDrives) {
+      await this.api.putGuestDriveByID({
+        driveId: drive.driveId,
+        body: drive,
+      });
+    }
     await this.api.putGuestNetworkInterfaceByID({
       ifaceId: "eth0",
       body: { ifaceId: "eth0", hostDevName: cfg.tapDeviceName },
