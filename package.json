@@ -41,6 +41,7 @@
     "prisma": "4.2.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
+    "tail": "^2.2.4",
     "typed-inject": "^3.0.1",
     "undici": "^5.11.0",
     "winston": "^3.8.1"
@@ -61,6 +62,8 @@
     "@types/react": "^17.0.45",
     "@types/react-dom": "^17.0.17",
     "@types/ssh2": "^1.11.6",
+    "@types/ssh2-streams": "^0.1.9",
+    "@types/tail": "^2.2.1",
     "@types/uuid": "^8.3.4",
     "@typescript-eslint/eslint-plugin": "^5.33.1",
     "@typescript-eslint/parser": "^5.33.1",

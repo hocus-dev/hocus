@@ -2,6 +2,7 @@ import type { SpawnSyncReturns } from "child_process";
 import { spawnSync } from "child_process";
 
 import { NodeSSH } from "node-ssh";
+import { Tail } from "tail";
 
 export const execCmd = (...args: string[]): SpawnSyncReturns<Buffer> => {
   const output = args.length > 1 ? spawnSync(args[0], args.slice(1)) : spawnSync(args[0]);
@@ -37,4 +38,51 @@ export const withSsh = async <T>(
   } finally {
     ssh.dispose();
   }
+};
+
+export const watchFileUntilLineMatches = (
+  regex: RegExp,
+  filePath: string,
+  timeoutMs: number,
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(
+        new Error(`Timeout reached while waiting for line matching ${regex} in file ${filePath}`),
+      );
+    }, timeoutMs);
+    const tail = new Tail(filePath);
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      tail.unwatch();
+    };
+    const handleError = <T extends (...args: any[]) => any>(fn: T) => {
+      return (...args: Parameters<T>) => {
+        try {
+          fn(...args);
+        } catch (err) {
+          reject(err);
+        }
+      };
+    };
+
+    tail.on(
+      "line",
+      handleError((line) => {
+        if (regex.test(line)) {
+          cleanup();
+          resolve();
+        }
+      }),
+    );
+    tail.on(
+      "error",
+      handleError((error) => {
+        cleanup();
+        reject(error);
+      }),
+    );
+    tail.watch();
+  });
 };

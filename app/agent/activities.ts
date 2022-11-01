@@ -1,7 +1,9 @@
+import fs from "fs";
+
 import { DefaultLogger } from "@temporalio/worker";
 
 import { FirecrackerService } from "./firecracker.service";
-import { createExt4Image, withSsh } from "./utils";
+import { createExt4Image, watchFileUntilLineMatches, withSsh } from "./utils";
 
 /**
  * Returns the pid of the firecracker process.
@@ -96,8 +98,23 @@ export const buildfs = async (args: {
       password: "root",
     },
     async (ssh) => {
-      const response = await ssh.execCommand("echo 'hello from nodejs' > /hello2.txt");
-      logger.info(`ssh response: ${response.code}`);
+      const logfilePath = `/tmp/${args.instanceId}-buildfs-ssh.log`;
+      const logFile = fs.openSync(logfilePath, "w");
+      try {
+        await ssh.exec("poweroff", [], {
+          onStdout: (chunk) => fs.writeSync(logFile, chunk),
+          onStderr: (chunk) => fs.writeSync(logFile, chunk),
+        });
+      } finally {
+        fs.closeSync(logFile);
+      }
+      logger.info(`ssh finished`);
+      await watchFileUntilLineMatches(
+        /reboot: System halted/,
+        `/tmp/${args.instanceId}.log`,
+        10000,
+      );
+      logger.info(`vm shutdown finished`);
     },
   );
 };
