@@ -1,6 +1,7 @@
 import { DefaultLogger } from "@temporalio/worker";
 
 import { FirecrackerService } from "./firecracker.service";
+import { createExt4Image, withSsh } from "./utils";
 
 /**
  * Returns the pid of the firecracker process.
@@ -23,7 +24,6 @@ export const startVM = async (args: {
   const tapDeviceCidr = 24;
   const tapDeviceName = "hocus-tap-0";
   fc.setupNetworking({
-    vmIp,
     tapDeviceName,
     tapDeviceIp,
     tapDeviceCidr,
@@ -40,4 +40,64 @@ export const startVM = async (args: {
     extraDrives: args.drives,
   });
   logger.info("vm created");
+};
+
+export const buildfs = async (args: {
+  instanceId: string;
+  rootFsPath: string;
+  kernelPath: string;
+  outputDrive: {
+    pathOnHost: string;
+    sizeMiB: number;
+  };
+}): Promise<void> => {
+  const logger = new DefaultLogger();
+  const socketPath = `/tmp/${args.instanceId}.sock`;
+  const fc = new FirecrackerService(socketPath);
+
+  await fc.startFirecrackerInstance(`/tmp/${args.instanceId}`);
+  logger.info("firecracker process started");
+
+  const vmIp = "168.254.1.21";
+  const tapDeviceIp = "168.254.1.22";
+  const tapDeviceCidr = 24;
+  const tapDeviceName = "hocus-tap-1";
+  fc.setupNetworking({
+    tapDeviceName,
+    tapDeviceIp,
+    tapDeviceCidr,
+  });
+  logger.info("networking set up");
+
+  createExt4Image(args.outputDrive.pathOnHost, args.outputDrive.sizeMiB, true);
+  logger.info(`empty output image created at ${args.outputDrive.pathOnHost}`);
+
+  await fc.createVM({
+    kernelPath: args.kernelPath,
+    rootFsPath: args.rootFsPath,
+    vmIp,
+    tapDeviceIp,
+    tapDeviceName,
+    tapDeviceCidr,
+    extraDrives: [
+      {
+        driveId: "output",
+        pathOnHost: args.outputDrive.pathOnHost,
+        isReadOnly: false,
+        isRootDevice: false,
+      },
+    ],
+  });
+  logger.info("vm created");
+  await withSsh(
+    {
+      host: vmIp,
+      username: "root",
+      password: "root",
+    },
+    async (ssh) => {
+      const response = await ssh.execCommand("echo 'hello from nodejs' > /hello2.txt");
+      logger.info(`ssh response: ${response.code}`);
+    },
+  );
 };

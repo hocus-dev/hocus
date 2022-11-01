@@ -81,7 +81,6 @@ export class FirecrackerService {
   }
 
   setupNetworking(args: {
-    vmIp: string;
     tapDeviceName: string;
     tapDeviceIp: string;
     tapDeviceCidr: number;
