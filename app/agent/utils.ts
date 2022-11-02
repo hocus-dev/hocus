@@ -1,8 +1,11 @@
 import type { SpawnSyncReturns } from "child_process";
 import { spawnSync } from "child_process";
+import fs from "fs";
 
+import type { SSHExecCommandResponse, SSHExecOptions } from "node-ssh";
 import { NodeSSH } from "node-ssh";
 import { Tail } from "tail";
+import { unwrap } from "~/utils.shared";
 
 export const execCmd = (...args: string[]): SpawnSyncReturns<Buffer> => {
   const output = args.length > 1 ? spawnSync(args[0], args.slice(1)) : spawnSync(args[0]);
@@ -14,6 +17,46 @@ export const execCmd = (...args: string[]): SpawnSyncReturns<Buffer> => {
     );
   }
   return output;
+};
+
+export const execSshCmd = async (
+  options: {
+    ssh: NodeSSH;
+    opts?: SSHExecOptions;
+    allowNonZeroExitCode?: boolean;
+    logFilePath?: string;
+  },
+  args: string[],
+): Promise<SSHExecCommandResponse> => {
+  const { ssh, opts, logFilePath, allowNonZeroExitCode } = options;
+  let logFile: number | undefined = void 0;
+  try {
+    if (logFilePath != null) {
+      logFile = fs.openSync(logFilePath, "w");
+    }
+    const output = await ssh.exec(args[0], args.slice(1), {
+      ...opts,
+      stream: "both",
+      ...(logFile != null
+        ? {
+            onStdout: (chunk) => fs.writeSync(unwrap(logFile), chunk),
+            onStderr: (chunk) => fs.writeSync(unwrap(logFile), chunk),
+          }
+        : {}),
+    });
+    if (!allowNonZeroExitCode && output.code !== 0) {
+      throw new Error(
+        `Command "${args.join(" ")}" failed with code ${output.code}, stdout:\n${
+          output.stdout
+        }\n\nstderr:\n${output.stderr}`,
+      );
+    }
+    return output;
+  } finally {
+    if (logFile != null) {
+      fs.closeSync(logFile);
+    }
+  }
 };
 
 export const createExt4Image = (

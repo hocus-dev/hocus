@@ -2,19 +2,20 @@
 # Build a filesystem for a VM using Docker.
 
 set -o errexit
-set -o nounset
 set -o pipefail
 set -o xtrace
+
+if [ -z "${1}" ] || [ -z "${2}" ] || [ -z "${3}" ] || [ -z "${4}" ]; then
+    echo "Usage: ${0} DOCKERFILE_PATH OUTPUT_PATH CONTEXT_DIR FS_MAX_SIZE_MIB"
+    exit 1
+fi
+
+set -o nounset
 
 DOCKERFILE_PATH="$(realpath ${1})"
 OUTPUT_PATH="$(realpath ${2})"
 CONTEXT_DIR="$(realpath ${3})"
 FS_MAX_SIZE_MIB="${4}"
-
-if [ -z "${DOCKERFILE_PATH}" ] || [ -z "${OUTPUT_PATH}" ] || [ -z "${CONTEXT_DIR}" ] || [ -z "${FS_MAX_SIZE_MIB}" ]; then
-    echo "Usage: ${0} DOCKERFILE_PATH OUTPUT_PATH CONTEXT_DIR FS_MAX_SIZE_MIB"
-    exit 1
-fi
 
 # Generate 8 random characters.
 IMAGE_TAG="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 8 || true)"

@@ -10,6 +10,7 @@ async function run() {
       pathOnHost: "/hocus-resources/buildfs-extra.ext4",
       sizeMiB: 1000,
     },
+    resourcesDir: "/app/resources",
   });
 }
 

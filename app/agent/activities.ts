@@ -1,9 +1,7 @@
-import fs from "fs";
-
 import { DefaultLogger } from "@temporalio/worker";
 
 import { FirecrackerService } from "./firecracker.service";
-import { createExt4Image, watchFileUntilLineMatches, withSsh } from "./utils";
+import { createExt4Image, execSshCmd, watchFileUntilLineMatches, withSsh } from "./utils";
 
 /**
  * Returns the pid of the firecracker process.
@@ -52,12 +50,13 @@ export const buildfs = async (args: {
     pathOnHost: string;
     sizeMiB: number;
   };
+  resourcesDir: string;
 }): Promise<void> => {
   const logger = new DefaultLogger();
   const socketPath = `/tmp/${args.instanceId}.sock`;
   const fc = new FirecrackerService(socketPath);
 
-  await fc.startFirecrackerInstance(`/tmp/${args.instanceId}`);
+  const fcPid = await fc.startFirecrackerInstance(`/tmp/${args.instanceId}`);
   logger.info("firecracker process started");
 
   const vmIp = "168.254.1.21";
@@ -91,30 +90,42 @@ export const buildfs = async (args: {
     ],
   });
   logger.info("vm created");
-  await withSsh(
-    {
-      host: vmIp,
-      username: "root",
-      password: "root",
-    },
-    async (ssh) => {
-      const logfilePath = `/tmp/${args.instanceId}-buildfs-ssh.log`;
-      const logFile = fs.openSync(logfilePath, "w");
-      try {
-        await ssh.exec("poweroff", [], {
-          onStdout: (chunk) => fs.writeSync(logFile, chunk),
-          onStderr: (chunk) => fs.writeSync(logFile, chunk),
-        });
-      } finally {
-        fs.closeSync(logFile);
-      }
-      logger.info(`ssh finished`);
-      await watchFileUntilLineMatches(
-        /reboot: System halted/,
-        `/tmp/${args.instanceId}.log`,
-        10000,
-      );
-      logger.info(`vm shutdown finished`);
-    },
-  );
+  try {
+    await withSsh(
+      {
+        host: vmIp,
+        username: "root",
+        password: "root",
+      },
+      async (ssh) => {
+        const workdir = "/tmp/workdir";
+        const outputDir = "/tmp/output";
+        const buildfsScriptPath = `${workdir}/bin/buildfs.sh`;
+        await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
+        await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
+        await execSshCmd({ ssh }, ["mkdir", "-p", outputDir]);
+        await execSshCmd({ ssh }, ["mount", "/dev/vdb", outputDir]);
+        await ssh.putDirectory(args.resourcesDir, workdir);
+        await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
+        await execSshCmd({ ssh, logFilePath: "/tmp/hocus-buildfs.log", opts: { cwd: workdir } }, [
+          buildfsScriptPath,
+          `${workdir}/docker/buildfs.Dockerfile`,
+          outputDir,
+          workdir,
+          "2500",
+        ]);
+
+        await execSshCmd({ ssh, allowNonZeroExitCode: true }, ["poweroff"]);
+        logger.info(`ssh finished`);
+        await watchFileUntilLineMatches(
+          /reboot: System halted/,
+          `/tmp/${args.instanceId}.log`,
+          10000,
+        );
+        logger.info(`vm shutdown finished`);
+      },
+    );
+  } finally {
+    process.kill(fcPid);
+  }
 };
