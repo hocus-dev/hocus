@@ -7,7 +7,7 @@ import { execCmd } from "../utils";
 import { RemoteInfoTupleValidator } from "./validator";
 
 export interface GitRemoteInfo {
-  /** The name of the remote, e.g. `/refs/heads/master` */
+  /** The name of the remote, e.g. `refs/heads/master` */
   name: string;
   /** The hash of the object the remote is pointing to, in other words
    * commit hash. E.g. `8e5423e991e8cd0988d0c4a3f4ac4ca1af7d148a` */
