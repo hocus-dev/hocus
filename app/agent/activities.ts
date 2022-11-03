@@ -215,6 +215,7 @@ export const fetchRepository = async (args: {
           await execSshCmd({ ssh, logFilePath }, [
             "git",
             "clone",
+            "--no-checkout",
             args.repositoryUrl,
             repositoryDir,
           ]);
