@@ -39,7 +39,8 @@ export class GitService {
         const words = line.split(/\s/);
         const result = RemoteInfoTupleValidator.SafeParse(words);
         if (result.success) {
-          remotes.push({ hash: words[0], name: words[1] });
+          const value = result.value;
+          remotes.push({ hash: value[0], name: value[1] });
         } else {
           errors.push({ error: result.error, value: line });
         }
