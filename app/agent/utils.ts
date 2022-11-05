@@ -2,7 +2,7 @@ import type { SpawnSyncReturns } from "child_process";
 import { spawnSync } from "child_process";
 import fs from "fs";
 
-import type { SSHExecCommandResponse, SSHExecOptions } from "node-ssh";
+import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from "node-ssh";
 import { NodeSSH } from "node-ssh";
 import { Tail } from "tail";
 import { unwrap } from "~/utils.shared";
@@ -76,7 +76,7 @@ export const createExt4Image = (
 };
 
 export const withSsh = async <T>(
-  connectionOptions: Parameters<NodeSSH["connect"]>[0],
+  connectionOptions: SSHConfig,
   fn: (ssh: NodeSSH) => Promise<T>,
 ): Promise<T> => {
   const ssh = await new NodeSSH().connect(connectionOptions);
@@ -132,4 +132,20 @@ export const watchFileUntilLineMatches = (
     );
     tail.watch();
   });
+};
+
+export const withVM = async <
+  Cfg extends { ssh?: SSHConfig },
+  Args extends Cfg extends { ssh: SSHConfig } ? { ssh: NodeSSH } : { ssh: undefined },
+>(
+  config: Cfg,
+  fn: (args: Args) => Promise<void>,
+): Promise<void> => {
+  if (config.ssh != null) {
+    await withSsh(config.ssh, async (ssh) => {
+      await fn({ ssh } as Args);
+    });
+  } else {
+    await fn({ ssh: void 0 } as Args);
+  }
 };
