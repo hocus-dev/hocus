@@ -133,19 +133,3 @@ export const watchFileUntilLineMatches = (
     tail.watch();
   });
 };
-
-export const withVM = async <
-  Cfg extends { ssh?: SSHConfig },
-  Args extends Cfg extends { ssh: SSHConfig } ? { ssh: NodeSSH } : { ssh: undefined },
->(
-  config: Cfg,
-  fn: (args: Args) => Promise<void>,
-): Promise<void> => {
-  if (config.ssh != null) {
-    await withSsh(config.ssh, async (ssh) => {
-      await fn({ ssh } as Args);
-    });
-  } else {
-    await fn({ ssh: void 0 } as Args);
-  }
-};
