@@ -9,10 +9,11 @@ async function run() {
     kernelPath: "/hocus-resources/vmlinux-5.6-x86_64.bin",
     rootFsPath: "/hocus-resources/buildfs.ext4",
     outputDrive: {
-      pathOnHost: "/hocus-resources/buildfs-extra.ext4",
+      pathOnHost: "/hocus-resources/fetchrepo.ext4",
       maxSizeMiB: 10000,
     },
     resourcesDir: "/app/resources",
+    pathToDockerfile: "docker/fetchrepo.Dockerfile",
   });
 }
 

@@ -16,5 +16,8 @@ COPY ./docker/dnssetup /etc/init.d/dnssetup
 RUN chmod 755 /etc/init.d/dnssetup && \
     chown root:root /etc/init.d/dnssetup && \
     update-rc.d dnssetup defaults
-RUN echo 'root:root' | chpasswd
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
+RUN useradd hocus -m -s /bin/bash && \
+    usermod -aG sudo hocus && \
+    echo "hocus ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    chown -R hocus:hocus /home/hocus && \
+    echo 'hocus:hocus' | chpasswd

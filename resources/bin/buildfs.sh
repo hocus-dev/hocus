@@ -5,8 +5,8 @@ set -o errexit
 set -o pipefail
 set -o xtrace
 
-if [ -z "${1}" ] || [ -z "${2}" ] || [ -z "${3}" ] || [ -z "${4}" ]; then
-    echo "Usage: ${0} DOCKERFILE_PATH OUTPUT_PATH CONTEXT_DIR FS_MAX_SIZE_MIB"
+if [ -z "${1}" ] || [ -z "${2}" ] || [ -z "${3}" ]; then
+    echo "Usage: ${0} DOCKERFILE_PATH OUTPUT_PATH CONTEXT_DIR"
     exit 1
 fi
 
@@ -15,7 +15,6 @@ set -o nounset
 DOCKERFILE_PATH="$(realpath ${1})"
 OUTPUT_PATH="$(realpath ${2})"
 CONTEXT_DIR="$(realpath ${3})"
-FS_MAX_SIZE_MIB="${4}"
 
 # Generate 8 random characters.
 IMAGE_TAG="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 8 || true)"
