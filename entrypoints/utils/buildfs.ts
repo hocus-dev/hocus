@@ -1,14 +1,16 @@
 /* eslint-disable no-console */
-import * as activities from "~/agent/activities";
+import { createActivities } from "~/agent/activities";
 
 async function run() {
+  const activities = await createActivities();
+
   await activities.buildfs({
     instanceId: "buildfs",
     kernelPath: "/hocus-resources/vmlinux-5.6-x86_64.bin",
     rootFsPath: "/hocus-resources/buildfs.ext4",
     outputDrive: {
       pathOnHost: "/hocus-resources/buildfs-extra.ext4",
-      sizeMiB: 1000,
+      maxSizeMiB: 10000,
     },
     resourcesDir: "/app/resources",
   });
