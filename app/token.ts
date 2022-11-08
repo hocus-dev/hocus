@@ -16,4 +16,5 @@ export const Token = {
   FirecrackerService: "FirecrackerServiceT",
   StorageService: "StorageServiceT",
   LowLevelStorageService: "LowLevelStorageServiceT",
+  ProjectConfigService: "ProjectConfigServiceT",
 } as const;

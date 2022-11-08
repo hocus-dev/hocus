@@ -1,14 +1,9 @@
-/* eslint-disable filename-rules/match */
-import * as dotenv from "dotenv";
-dotenv.config();
-
-// eslint-disable-next-line import/first
 import { makeConfig, get, getEnv } from "./utils.server";
 
 export type Config = typeof config;
 export const config = makeConfig()({
   env: getEnv,
-  logLevel: () => process.env.LOG_LEVEL ?? "info",
+  logLevel: () => get("LOG_LEVEL", "info"),
   oidc: () => ({
     issuerBaseURL: get("OIDC_ISSUER_BASE_URL", "http://localhost:4200/realms/hocus"),
     baseURL: get("OIDC_BASE_URL", "http://localhost:3000/app"),
@@ -29,5 +24,12 @@ export const config = makeConfig()({
     measurementId: get("GOOGLE_ANALYTICS_MEASUREMENT_ID", "G-XXXXXXXXXX"),
     apiSecret: get("GOOGLE_ANALYTICS_API_SECRET", "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"),
     url: get("GOOGLE_ANALYTICS_URL", "https://www.google-analytics.com/debug"),
+  }),
+  agent: () => ({
+    defaultKernel: get("AGENT_KERNEL_PATH", "/hocus-resources/vmlinux-5.6-x86_64.bin"),
+    checkoutAndInspectRootFs: get(
+      "AGENT_CHECKOUT_AND_INSPECT_ROOTFS_PATH",
+      "/hocus-resources/checkout-and-inspect.ext4",
+    ),
   }),
 });

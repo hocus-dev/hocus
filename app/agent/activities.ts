@@ -1,12 +1,16 @@
-import fs from "fs";
+import fsSync from "fs";
+import fs from "fs/promises";
 
+import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 
 import { createAgentInjector } from "./agent-injector";
+import type { ProjectConfig } from "./project-config/validator";
 import { createExt4Image, execSshCmd } from "./utils";
 
 export const createActivities = async () => {
   const injector = createAgentInjector();
+  const agentConfig = injector.resolve(Token.Config).agent();
 
   const fetchRepository = async (args: {
     instanceId: string;
@@ -21,8 +25,7 @@ export const createActivities = async () => {
   }): Promise<void> => {
     const logger = injector.resolve(Token.Logger);
     const firecrackerService = injector.resolve(Token.FirecrackerService)(args.instanceId);
-
-    const outputDriveExists = fs.existsSync(args.outputDrive.pathOnHost);
+    const outputDriveExists = fsSync.existsSync(args.outputDrive.pathOnHost);
     if (!outputDriveExists) {
       createExt4Image(args.outputDrive.pathOnHost, args.outputDrive.maxSizeMiB);
       logger.info(`empty output image created at ${args.outputDrive.pathOnHost}`);
@@ -120,9 +123,71 @@ export const createActivities = async () => {
     );
   };
 
+  /**
+   * Copies the contents of `repositoryDrivePath` into `outputDrivePath`, and checks
+   * out the given branch there.
+   *
+   * Returns `ProjectConfig` if a hocus config file is present in the repository.
+   * Otherwise, returns `null`.
+   */
+  const checkoutAndInspect = async (args: {
+    /**
+     * Should point to the output of `fetchRepository`
+     */
+    repositoryDrivePath: string;
+    /**
+     * The repository will be checked out to this branch.
+     */
+    targetBranch: string;
+    /**
+     * A new drive will be created at this path.
+     */
+    outputDrivePath: string;
+  }): Promise<ProjectConfig | null> => {
+    const instanceId = `checkout-and-inspect-${uuidv4()}`;
+    const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
+    const logger = injector.resolve(Token.Logger);
+    const projectConfigService = injector.resolve(Token.ProjectConfigService);
+    if (fsSync.existsSync(args.outputDrivePath)) {
+      logger.warn(
+        `output drive already exists at "${args.outputDrivePath}", it will be overwritten`,
+      );
+    }
+    await fs.copyFile(args.repositoryDrivePath, args.outputDrivePath);
+    try {
+      return await firecrackerService.withVM(
+        {
+          ssh: {
+            username: "hocus",
+            password: "hocus",
+          },
+          kernelPath: agentConfig.defaultKernel,
+          rootFsPath: agentConfig.checkoutAndInspectRootFs,
+          extraDrives: [args.outputDrivePath],
+        },
+        async ({ ssh }) => {
+          const workdir = "/tmp/workdir";
+          const repoPath = `${workdir}/repo`;
+          await execSshCmd({ ssh }, ["sudo", "mkdir", "-p", workdir]);
+          await execSshCmd({ ssh }, ["sudo", "mount", "/dev/vdb", workdir]);
+          await execSshCmd({ ssh, opts: { cwd: repoPath } }, [
+            "git",
+            "checkout",
+            args.targetBranch,
+          ]);
+          return await projectConfigService.getConfig(ssh, repoPath);
+        },
+      );
+    } catch (err) {
+      await fs.unlink(args.outputDrivePath);
+      throw err;
+    }
+  };
+
   return {
     fetchRepository,
     buildfs,
+    checkoutAndInspect,
   };
 };
 

@@ -259,7 +259,7 @@ export class FirecrackerService {
     return vmConfig;
   }
 
-  async withVM(
+  async withVM<T>(
     config: {
       ssh: Omit<SSHConfig, "host">;
       /**
@@ -277,8 +277,8 @@ export class FirecrackerService {
        */
       shouldPoweroff?: boolean;
     },
-    fn: (args: { ssh: NodeSSH }) => Promise<void>,
-  ): Promise<void> {
+    fn: (args: { ssh: NodeSSH }) => Promise<T>,
+  ): Promise<T> {
     const kernelPath = config.kernelPath ?? "/hocus-resources/vmlinux-5.6-x86_64.bin";
     const shouldPoweroff = config.shouldPoweroff ?? true;
     const fcPid = this.startFirecrackerInstance();
@@ -306,13 +306,14 @@ export class FirecrackerService {
           isRootDevice: false,
         })),
       });
-      await withSsh({ ...config.ssh, host: vmIpAddress }, async (ssh) => {
-        await fn({ ssh });
+      return await withSsh({ ...config.ssh, host: vmIpAddress }, async (ssh) => {
+        const output = await fn({ ssh });
         if (shouldPoweroff) {
           const poweroffCmd = config.ssh.username === "root" ? ["poweroff"] : ["sudo", "poweroff"];
           await execSshCmd({ ssh, allowNonZeroExitCode: true }, poweroffCmd);
           await watchFileUntilLineMatches(/reboot: System halted/, this.getVMLogsPath(), 10000);
         }
+        return output;
       });
     } finally {
       process.kill(fcPid);

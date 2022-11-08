@@ -1,4 +1,8 @@
+import * as dotenv from "dotenv";
+
 import type { valueof } from "~/types/utils";
+
+dotenv.config();
 
 const env = process.env.NODE_ENV;
 
