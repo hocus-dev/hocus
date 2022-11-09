@@ -3,6 +3,7 @@ import { createInjector, Scope } from "typed-inject";
 import { config } from "~/config";
 import { Token } from "~/token";
 
+import { AgentUtilService } from "./agent-util.service";
 import { factoryFirecrackerService } from "./firecracker.service";
 import { ProjectConfigService } from "./project-config/project-config.service";
 import { LowLevelStorageService, StorageService } from "./storage/storage.service";
@@ -13,6 +14,7 @@ export const createAgentInjector = () =>
     .provideClass(Token.Logger, DefaultLogger, Scope.Transient)
     .provideClass(Token.LowLevelStorageService, LowLevelStorageService)
     .provideClass(Token.StorageService, StorageService)
+    .provideClass(Token.AgentUtilService, AgentUtilService)
     .provideFactory(Token.FirecrackerService, factoryFirecrackerService)
     .provideClass(Token.ProjectConfigService, ProjectConfigService);
 export type AgentInjector = ReturnType<typeof createAgentInjector>;

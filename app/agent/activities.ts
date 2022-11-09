@@ -6,7 +6,7 @@ import { Token } from "~/token";
 
 import { createAgentInjector } from "./agent-injector";
 import type { ProjectConfig } from "./project-config/validator";
-import { createExt4Image, execSshCmd } from "./utils";
+import { execSshCmd } from "./utils";
 
 export const createActivities = async () => {
   const injector = createAgentInjector();
@@ -25,11 +25,13 @@ export const createActivities = async () => {
   }): Promise<void> => {
     const logger = injector.resolve(Token.Logger);
     const firecrackerService = injector.resolve(Token.FirecrackerService)(args.instanceId);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
     const outputDriveExists = fsSync.existsSync(args.outputDrive.pathOnHost);
     if (!outputDriveExists) {
-      createExt4Image(args.outputDrive.pathOnHost, args.outputDrive.maxSizeMiB);
+      agentUtilService.createExt4Image(args.outputDrive.pathOnHost, args.outputDrive.maxSizeMiB);
       logger.info(`empty output image created at ${args.outputDrive.pathOnHost}`);
     }
+    const outputDir = "/tmp/output";
     await firecrackerService.withVM(
       {
         ssh: {
@@ -38,14 +40,16 @@ export const createActivities = async () => {
         },
         kernelPath: args.kernelPath,
         rootFsPath: args.rootFsPath,
-        extraDrives: [args.outputDrive.pathOnHost],
+        extraDrives: [
+          {
+            pathOnHost: args.outputDrive.pathOnHost,
+            guestMountPath: outputDir,
+          },
+        ],
       },
       async ({ ssh }) => {
-        const outputDir = "/tmp/output";
-        const repositoryDir = "/tmp/output/repo";
+        const repositoryDir = `${outputDir}/repo`;
         const logFilePath = "/tmp/ssh-fetchrepo.log";
-        await execSshCmd({ ssh }, ["sudo", "mkdir", "-p", outputDir]);
-        await execSshCmd({ ssh }, ["sudo", "mount", "/dev/vdb", outputDir]);
         if (!outputDriveExists) {
           await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
         }
@@ -78,45 +82,50 @@ export const createActivities = async () => {
   };
 
   const buildfs = async (args: {
-    instanceId: string;
-    rootFsPath: string;
-    kernelPath: string;
     outputDrive: {
       pathOnHost: string;
       maxSizeMiB: number;
+      mountPath: string;
     };
-    resourcesDir: string;
     /**
      * The relative path to the Dockerfile in the resources directory.
      */
     pathToDockerfile: string;
+    /**
+     * The relative path to the build context in the resources directory.
+     */
+    contextPath: string;
   }): Promise<void> => {
-    const firecrackerService = injector.resolve(Token.FirecrackerService)(args.instanceId);
+    const instanceId = `buildfs-${uuidv4()}`;
+    const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
 
-    createExt4Image(args.outputDrive.pathOnHost, args.outputDrive.maxSizeMiB, true);
+    agentUtilService.createExt4Image(
+      args.outputDrive.pathOnHost,
+      args.outputDrive.maxSizeMiB,
+      true,
+    );
 
+    const outputDir = "/tmp/output";
     await firecrackerService.withVM(
       {
         ssh: {
           username: "root",
           password: "root",
         },
-        kernelPath: args.kernelPath,
-        rootFsPath: args.rootFsPath,
-        extraDrives: [args.outputDrive.pathOnHost],
+        kernelPath: agentConfig.defaultKernel,
+        rootFsPath: agentConfig.buildfsRootFs,
+        extraDrives: [{ pathOnHost: args.outputDrive.pathOnHost, guestMountPath: outputDir }],
       },
       async ({ ssh }) => {
         const workdir = "/tmp/workdir";
-        const outputDir = "/tmp/output";
         const buildfsScriptPath = `${workdir}/bin/buildfs.sh`;
         await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
         await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
-        await execSshCmd({ ssh }, ["mkdir", "-p", outputDir]);
-        await execSshCmd({ ssh }, ["mount", "/dev/vdb", outputDir]);
-        await ssh.putDirectory(args.resourcesDir, workdir);
+        await ssh.putDirectory(agentConfig.hostBuildfsResourcesDir, workdir);
         await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
         await execSshCmd(
-          { ssh, logFilePath: `/tmp/buildfs-${args.instanceId}.log`, opts: { cwd: workdir } },
+          { ssh, logFilePath: `/tmp/buildfs-${instanceId}.log`, opts: { cwd: workdir } },
           [buildfsScriptPath, `${workdir}/${args.pathToDockerfile}`, outputDir, workdir],
         );
       },
@@ -154,6 +163,7 @@ export const createActivities = async () => {
       );
     }
     await fs.copyFile(args.repositoryDrivePath, args.outputDrivePath);
+    const workdir = "/tmp/workdir";
     try {
       return await firecrackerService.withVM(
         {
@@ -163,13 +173,10 @@ export const createActivities = async () => {
           },
           kernelPath: agentConfig.defaultKernel,
           rootFsPath: agentConfig.checkoutAndInspectRootFs,
-          extraDrives: [args.outputDrivePath],
+          extraDrives: [{ pathOnHost: args.outputDrivePath, guestMountPath: workdir }],
         },
         async ({ ssh }) => {
-          const workdir = "/tmp/workdir";
           const repoPath = `${workdir}/repo`;
-          await execSshCmd({ ssh }, ["sudo", "mkdir", "-p", workdir]);
-          await execSshCmd({ ssh }, ["sudo", "mount", "/dev/vdb", workdir]);
           await execSshCmd({ ssh, opts: { cwd: repoPath } }, [
             "git",
             "checkout",

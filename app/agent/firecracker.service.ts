@@ -10,6 +10,7 @@ import { fetch, Agent } from "undici";
 import { Token } from "~/token";
 import { unwrap } from "~/utils.shared";
 
+import type { AgentUtilService } from "./agent-util.service";
 import { FifoFlags } from "./fifo-flags";
 import type { StorageService } from "./storage/storage.service";
 import { execCmd, execSshCmd, watchFileUntilLineMatches, withSsh } from "./utils";
@@ -18,11 +19,17 @@ const ipPrefix = "10.231.";
 
 export function factoryFirecrackerService(
   storageService: StorageService,
+  agentUtilService: AgentUtilService,
   logger: DefaultLogger,
 ): (pathToSocket: string) => FirecrackerService {
-  return (pathToSocket: string) => new FirecrackerService(storageService, logger, pathToSocket);
+  return (pathToSocket: string) =>
+    new FirecrackerService(storageService, agentUtilService, logger, pathToSocket);
 }
-factoryFirecrackerService.inject = [Token.StorageService, Token.Logger] as const;
+factoryFirecrackerService.inject = [
+  Token.StorageService,
+  Token.AgentUtilService,
+  Token.Logger,
+] as const;
 
 export class FirecrackerService {
   private api: DefaultApi;
@@ -33,6 +40,7 @@ export class FirecrackerService {
 
   constructor(
     private readonly storageService: StorageService,
+    private readonly agentUtilService: AgentUtilService,
     private readonly logger: DefaultLogger,
     public readonly instanceId: string,
   ) {
@@ -271,7 +279,7 @@ export class FirecrackerService {
       /**
        * Paths to extra drives to attach to the VM.
        */
-      extraDrives?: string[];
+      extraDrives?: { pathOnHost: string; guestMountPath: string }[];
       /**
        * Defaults to true.
        */
@@ -281,6 +289,7 @@ export class FirecrackerService {
   ): Promise<T> {
     const kernelPath = config.kernelPath ?? "/hocus-resources/vmlinux-5.6-x86_64.bin";
     const shouldPoweroff = config.shouldPoweroff ?? true;
+    const extraDrives = config.extraDrives ?? [];
     const fcPid = this.startFirecrackerInstance();
     let vmIpAddress: null | string = null;
     try {
@@ -299,17 +308,26 @@ export class FirecrackerService {
         tapDeviceIp: this.tapDeviceIp,
         tapDeviceName: this.tapDeviceName,
         tapDeviceCidr: this.tapDeviceCidr,
-        extraDrives: (config.extraDrives ?? []).map((drivePath, idx) => ({
+        extraDrives: extraDrives.map(({ pathOnHost }, idx) => ({
           driveId: `drive${idx}`,
-          pathOnHost: drivePath,
+          pathOnHost: pathOnHost,
           isReadOnly: false,
           isRootDevice: false,
         })),
       });
       return await withSsh({ ...config.ssh, host: vmIpAddress }, async (ssh) => {
+        const useSudo = config.ssh.username !== "root";
+        for (const drive of extraDrives) {
+          await this.agentUtilService.mountDriveAtPath(
+            ssh,
+            drive.pathOnHost,
+            drive.guestMountPath,
+            useSudo,
+          );
+        }
         const output = await fn({ ssh });
         if (shouldPoweroff) {
-          const poweroffCmd = config.ssh.username === "root" ? ["poweroff"] : ["sudo", "poweroff"];
+          const poweroffCmd = useSudo ? ["sudo", "poweroff"] : ["poweroff"];
           await execSshCmd({ ssh, allowNonZeroExitCode: true }, poweroffCmd);
           await watchFileUntilLineMatches(/reboot: System halted/, this.getVMLogsPath(), 10000);
         }

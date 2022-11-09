@@ -31,5 +31,7 @@ export const config = makeConfig()({
       "AGENT_CHECKOUT_AND_INSPECT_ROOTFS_PATH",
       "/hocus-resources/checkout-and-inspect.ext4",
     ),
+    hostBuildfsResourcesDir: get("AGENT_HOST_BUILDFS_RESOURCES_DIR", "/app/resources"),
+    buildfsRootFs: get("AGENT_BUILDFS_ROOTFS", "/hocus-resources/buildfs.ext4"),
   }),
 });

@@ -17,4 +17,5 @@ export const Token = {
   StorageService: "StorageServiceT",
   LowLevelStorageService: "LowLevelStorageServiceT",
   ProjectConfigService: "ProjectConfigServiceT",
+  AgentUtilService: "AgentUtilServiceT",
 } as const;

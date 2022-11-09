@@ -59,22 +59,6 @@ export const execSshCmd = async (
   }
 };
 
-export const createExt4Image = (
-  imagePath: string,
-  sizeMiB: number,
-  overwrite: boolean = false,
-): void => {
-  if (overwrite) {
-    execCmd("rm", "-f", imagePath);
-  } else {
-    if (fs.existsSync(imagePath)) {
-      throw new Error(`Image file "${imagePath}" already exists`);
-    }
-  }
-  execCmd("dd", "if=/dev/zero", `of=${imagePath}`, "bs=1M", "count=0", `seek=${sizeMiB}`);
-  execCmd("mkfs.ext4", imagePath);
-};
-
 export const withSsh = async <T>(
   connectionOptions: SSHConfig,
   fn: (ssh: NodeSSH) => Promise<T>,
