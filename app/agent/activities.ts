@@ -141,7 +141,7 @@ export const createActivities = async () => {
     /**
      * The relative path to the Dockerfile in the `project` directory of the input drive.
      */
-    pathToDockerfile: string;
+    dockerfilePath: string;
     /**
      * The relative path to the build context in the `project` directory of the input drive.
      */
@@ -183,7 +183,7 @@ export const createActivities = async () => {
           { ssh, logFilePath: `/tmp/buildfs-${instanceId}.log`, opts: { cwd: workdir } },
           [
             buildfsScriptPath,
-            `${inputDir}/project/${args.pathToDockerfile}`,
+            `${inputDir}/project/${args.dockerfilePath}`,
             outputDir,
             `${inputDir}/project/${args.contextPath}`,
           ],
