@@ -21,3 +21,5 @@ RUN useradd hocus -m -s /bin/bash && \
     echo "hocus ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     chown -R hocus:hocus /home/hocus && \
     echo 'hocus:hocus' | chpasswd
+RUN sed -i 's/#PermitUserEnvironment no/PermitUserEnvironment yes/g' /etc/ssh/sshd_config
+RUN sed -i 's/AcceptEnv .*/AcceptEnv */g' /etc/ssh/sshd_config

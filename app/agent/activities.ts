@@ -1,5 +1,6 @@
 import fsSync from "fs";
 import fs from "fs/promises";
+import { promisify } from "util";
 
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
@@ -13,18 +14,35 @@ export const createActivities = async () => {
   const agentConfig = injector.resolve(Token.Config).agent();
 
   const fetchRepository = async (args: {
-    instanceId: string;
-    kernelPath: string;
+    /**
+     * Every project should have a separate root fs,
+     * because repository credentials are stored in the root fs.
+     */
     rootFsPath: string;
     outputDrive: {
       pathOnHost: string;
       maxSizeMiB: number;
     };
-    resourcesDir: string;
-    repositoryUrl: string;
+    repository: {
+      url: string;
+      credentials?: {
+        /**
+         * The contents of the private SSH key, e.g.:
+         * ```
+         * -----BEGIN OPENSSH PRIVATE KEY-----
+         * b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+         * ...
+         * -----END OPENSSH PRIVATE KEY-----
+         * ```
+         * Keep in mind that a newline at the end of the key is required.
+         */
+        privateSshKey: string;
+      };
+    };
   }): Promise<void> => {
+    const instanceId = `fetchrepo-${uuidv4()}`;
     const logger = injector.resolve(Token.Logger);
-    const firecrackerService = injector.resolve(Token.FirecrackerService)(args.instanceId);
+    const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const outputDriveExists = fsSync.existsSync(args.outputDrive.pathOnHost);
     if (!outputDriveExists) {
@@ -38,7 +56,7 @@ export const createActivities = async () => {
           username: "hocus",
           password: "hocus",
         },
-        kernelPath: args.kernelPath,
+        kernelPath: agentConfig.defaultKernel,
         rootFsPath: args.rootFsPath,
         extraDrives: [
           {
@@ -52,6 +70,24 @@ export const createActivities = async () => {
         const logFilePath = "/tmp/ssh-fetchrepo.log";
         if (!outputDriveExists) {
           await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
+        }
+
+        const sshKey = args.repository.credentials?.privateSshKey;
+        const sshDir = "/home/hocus/.ssh";
+        if (sshKey != null) {
+          // The name is misleading, since the user may not be
+          // using RSA, but git automatically looks for this file and
+          // it will work no matter the actual ssh key format.
+          const sshKeyPath = `${sshDir}/id_rsa`;
+          await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
+          await execSshCmd({ ssh }, ["sudo", "mount", "-t", "tmpfs", "ssh", sshDir]);
+          await execSshCmd({ ssh }, ["sudo", "chown", "hocus:hocus", sshDir]);
+          await execSshCmd({ ssh }, ["chmod", "700", sshDir]);
+          await ssh.withSFTP(async (sftp) => {
+            const writeFile = promisify(sftp.writeFile.bind(sftp));
+            await writeFile(sshKeyPath, sshKey);
+          });
+          await execSshCmd({ ssh }, ["chmod", "400", sshKeyPath]);
         }
 
         const repositoryExists =
@@ -69,13 +105,24 @@ export const createActivities = async () => {
             "--all",
           ]);
         } else {
-          await execSshCmd({ ssh, logFilePath }, [
-            "git",
-            "clone",
-            "--no-checkout",
-            args.repositoryUrl,
-            repositoryDir,
-          ]);
+          await execSshCmd(
+            {
+              ssh,
+              logFilePath,
+              opts: {
+                execOptions: {
+                  env: {
+                    // Without this, git will ask for user input and the command will fail.
+                    // This is obviously not secure, the correct method would be to
+                    // TODO: allow the user to specify a known_hosts file.
+                    GIT_SSH_COMMAND:
+                      "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no",
+                  } as any,
+                },
+              },
+            },
+            ["git", "clone", "--no-checkout", args.repository.url, repositoryDir],
+          );
         }
       },
     );
