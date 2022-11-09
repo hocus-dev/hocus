@@ -19,6 +19,20 @@ export const execCmd = (...args: string[]): SpawnSyncReturns<Buffer> => {
   return output;
 };
 
+/**
+ * Note to readers: in order for `options.opts.execOptions.env` to be respected,
+ * the SSH server on the remote machine must be configured to allow the user to
+ * set environment variables. For example, this can be done by adding the
+ * following lines to `/etc/ssh/sshd_config`:
+ *
+ * ```
+ * PermitUserEnvironment yes
+ * AcceptEnv *
+ * ```
+ *
+ * See https://github.com/hugodutka/rooms/blob/3fad5769181f9117896d53885afa9b18af3146d0/resources/docker/fetchrepo.Dockerfile#L24-L25
+ * for an example in a Dockerfile.
+ */
 export const execSshCmd = async (
   options: {
     ssh: NodeSSH;
