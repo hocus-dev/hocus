@@ -48,7 +48,7 @@ export const createActivities = async () => {
         ],
       },
       async ({ ssh }) => {
-        const repositoryDir = `${outputDir}/repo`;
+        const repositoryDir = `${outputDir}/project`;
         const logFilePath = "/tmp/ssh-fetchrepo.log";
         if (!outputDriveExists) {
           await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
@@ -82,17 +82,21 @@ export const createActivities = async () => {
   };
 
   const buildfs = async (args: {
+    /**
+     * Path to a drive with a Dockerfile.
+     */
+    inputDrivePath: string;
     outputDrive: {
       pathOnHost: string;
       maxSizeMiB: number;
       mountPath: string;
     };
     /**
-     * The relative path to the Dockerfile in the resources directory.
+     * The relative path to the Dockerfile in the `project` directory of the input drive.
      */
     pathToDockerfile: string;
     /**
-     * The relative path to the build context in the resources directory.
+     * The relative path to the build context in the `project` directory of the input drive.
      */
     contextPath: string;
   }): Promise<void> => {
@@ -106,6 +110,7 @@ export const createActivities = async () => {
       true,
     );
 
+    const inputDir = "/tmp/input";
     const outputDir = "/tmp/output";
     await firecrackerService.withVM(
       {
@@ -115,7 +120,10 @@ export const createActivities = async () => {
         },
         kernelPath: agentConfig.defaultKernel,
         rootFsPath: agentConfig.buildfsRootFs,
-        extraDrives: [{ pathOnHost: args.outputDrive.pathOnHost, guestMountPath: outputDir }],
+        extraDrives: [
+          { pathOnHost: args.outputDrive.pathOnHost, guestMountPath: outputDir },
+          { pathOnHost: args.inputDrivePath, guestMountPath: inputDir },
+        ],
       },
       async ({ ssh }) => {
         const workdir = "/tmp/workdir";
@@ -126,7 +134,12 @@ export const createActivities = async () => {
         await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
         await execSshCmd(
           { ssh, logFilePath: `/tmp/buildfs-${instanceId}.log`, opts: { cwd: workdir } },
-          [buildfsScriptPath, `${workdir}/${args.pathToDockerfile}`, outputDir, workdir],
+          [
+            buildfsScriptPath,
+            `${inputDir}/project/${args.pathToDockerfile}`,
+            outputDir,
+            `${inputDir}/project/${args.contextPath}`,
+          ],
         );
       },
     );
