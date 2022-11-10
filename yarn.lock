@@ -2238,67 +2238,80 @@
   dependencies:
     defer-to-connect "^2.0.0"
 
-"@temporalio/activity@~1.4.3":
-  version "1.4.3"
-  resolved "https://registry.yarnpkg.com/@temporalio/activity/-/activity-1.4.3.tgz#68589cdd53ac660bf286656db4410c04e5a119ef"
-  integrity sha512-bA/QwyxQ7w45u4thH6CMRn9NVncOxUwJXm+sqMiDvR8+NASLYfxnOxePwFThcVHUOoU+WE7S3ixOZX5BGezfDw==
+"@temporalio/activity@~1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/activity/-/activity-1.4.4.tgz#f987569d1c57e5278f3b1d1d35c9e2b314a31b34"
+  integrity sha512-+nuyzP3d5WPDeIgk5ngPpMWq8mL0C/r+N+XjYWJ3uL1XkbjddgMlnSN5oaNJzNsxKp8TF83IgwWYkUnlqr52Gg==
   dependencies:
-    "@temporalio/common" "~1.4.3"
+    "@temporalio/common" "~1.4.4"
     abort-controller "^3.0.0"
 
-"@temporalio/client@^1.4.3":
-  version "1.4.3"
-  resolved "https://registry.yarnpkg.com/@temporalio/client/-/client-1.4.3.tgz#8f2f1a561a8502324db3e2f0689229a7905f2d6e"
-  integrity sha512-Pl0bFDcXSOiuTvM4gC6bKE6QUEcGNBH0dYU26n74GLUXE4t2eWjowlSneTkMbo/maofSuUMyjLwNNUIzEuQ/kQ==
+"@temporalio/client@^1.4.4", "@temporalio/client@~1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/client/-/client-1.4.4.tgz#9d2a417e3ab684ba641e57dcc6a54cde6d9cd616"
+  integrity sha512-E22PTokwt0FzO0DdcHxMWnxVoJPG6Hdp8se5copv3vtSSTfewy+z8GvXDp96JYpiS8YYvuDjw1+62kSLUt5TjA==
   dependencies:
     "@grpc/grpc-js" "^1.6.7"
-    "@temporalio/common" "~1.4.3"
-    "@temporalio/proto" "~1.4.3"
+    "@temporalio/common" "~1.4.4"
+    "@temporalio/proto" "~1.4.4"
     ms "^2.1.3"
     uuid "^8.3.2"
 
-"@temporalio/common@~1.4.3":
-  version "1.4.3"
-  resolved "https://registry.yarnpkg.com/@temporalio/common/-/common-1.4.3.tgz#b1f1d853b2c3a3c89791bf52aa05b35cbcecb186"
-  integrity sha512-mnxCEstgLSI/w9qDoemuM6oPRvZkWDCGVxvX/LTVupFlF8B9pp+M1/po3MFm0Iy/5/gCjOFFTJmC+6jdhwg70Q==
+"@temporalio/common@~1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/common/-/common-1.4.4.tgz#c9618d66902c33f86f81ed78852407125bb415d8"
+  integrity sha512-1DoTlhs9C9beTpOH1LtSlqS9DIj5Sy/aUbpV8dpN+afcsvFUwQu1Q5l/GgtA48qT5ccrwkxwHHbflOU4+/ldjA==
   dependencies:
     "@opentelemetry/api" "^1.0.3"
-    "@temporalio/proto" "~1.4.3"
+    "@temporalio/proto" "~1.4.4"
     long "^5.2.0"
     ms "^2.1.3"
     proto3-json-serializer "^1.0.3"
     protobufjs "^7.0.0"
 
-"@temporalio/core-bridge@~1.4.3":
-  version "1.4.3"
-  resolved "https://registry.yarnpkg.com/@temporalio/core-bridge/-/core-bridge-1.4.3.tgz#6519b848f1688bbd7c481e5639fc8d01ca359408"
-  integrity sha512-Fy4L86blOO7OIcSdQk0YKrJjLeNnd1AcPcD0EHCkOtwRs/RDfBxI+YNeBhqdyyD/TG1Gs7xHA/aHmTtFhbXeeg==
+"@temporalio/core-bridge@~1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/core-bridge/-/core-bridge-1.4.4.tgz#1625f2ed9de61021d22400daf76e7718bb08b2c1"
+  integrity sha512-mXzMLH3ijl+6Mk1emEkFyl9t0ry5LO3mSTU2E45mrOIm9Qj5kABXCbaox9/XSTGXkcrUt7nlQukp4RVuVT+1/Q==
   dependencies:
     "@opentelemetry/api" "^1.1.0"
     arg "^5.0.2"
     cargo-cp-artifact "^0.1.6"
     which "^2.0.2"
 
-"@temporalio/proto@~1.4.3":
-  version "1.4.3"
-  resolved "https://registry.yarnpkg.com/@temporalio/proto/-/proto-1.4.3.tgz#e12600d607e84a264e94111079df105a1e7d1df2"
-  integrity sha512-jE1QLfN4PqYKxywTHIqu+vMTUGUdHB4yOyz5ssiutAowoJXJZuvhPdJRafzvQ0Nyb9eKHJQBSWsbm7R3yIhRyA==
+"@temporalio/proto@~1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/proto/-/proto-1.4.4.tgz#4e951663ace367cbccb14180ac045a0069e060cf"
+  integrity sha512-0pFpwQi0E5ehaiSXmonLYU/SpBw1lUN1irQ8p1/F5a5WjcIguEwo7iLXc98NoOypnlzRoLUaIybOB4Ci+k+kkA==
   dependencies:
     long "^5.2.0"
     protobufjs "^7.0.0"
 
-"@temporalio/worker@^1.4.3":
-  version "1.4.3"
-  resolved "https://registry.yarnpkg.com/@temporalio/worker/-/worker-1.4.3.tgz#2af949a50a065e85b203754100f1dc910eb747d1"
-  integrity sha512-d3+ESBbpP9b6ERTEbPrRVbMfi533D7XnVZIGdbnIfxPIXu06bgI+wCR4IZ50AamKjo3XiP9EEj+EXZaoenTG9A==
+"@temporalio/testing@1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/testing/-/testing-1.4.4.tgz#d76b87632ee832178bba708a8744d2bb4b2595a0"
+  integrity sha512-rFVtkp9nr7HEi92igaHV2o1E4RV8OajXC254P0WpSOfntktsTwnme/Exmn8ccSQDvycq0mPFblNM+M/Xi5EmOQ==
+  dependencies:
+    "@grpc/grpc-js" "^1.6.7"
+    "@temporalio/activity" "~1.4.4"
+    "@temporalio/client" "~1.4.4"
+    "@temporalio/common" "~1.4.4"
+    "@temporalio/worker" "~1.4.4"
+    abort-controller "^3.0.0"
+    ms "^2.1.3"
+
+"@temporalio/worker@^1.4.4", "@temporalio/worker@~1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/worker/-/worker-1.4.4.tgz#db6de3fe5d801a6b4037e7d9c139c6762481fb62"
+  integrity sha512-M/COf2K+ltfqyoHrIyABzzn27O+vKzrjsafyzS6E931r85VsRak5KeewTPlU/NUGL9OGS+pqvTTA8CxFEm7kDg==
   dependencies:
     "@opentelemetry/api" "^1.1.0"
     "@swc/core" "^1.2.204"
-    "@temporalio/activity" "~1.4.3"
-    "@temporalio/common" "~1.4.3"
-    "@temporalio/core-bridge" "~1.4.3"
-    "@temporalio/proto" "~1.4.3"
-    "@temporalio/workflow" "~1.4.3"
+    "@temporalio/activity" "~1.4.4"
+    "@temporalio/common" "~1.4.4"
+    "@temporalio/core-bridge" "~1.4.4"
+    "@temporalio/proto" "~1.4.4"
+    "@temporalio/workflow" "~1.4.4"
     abort-controller "^3.0.0"
     cargo-cp-artifact "^0.1.6"
     heap-js "^2.2.0"
@@ -2313,13 +2326,13 @@
     unionfs "^4.4.0"
     webpack "^5.73.0"
 
-"@temporalio/workflow@~1.4.3":
-  version "1.4.3"
-  resolved "https://registry.yarnpkg.com/@temporalio/workflow/-/workflow-1.4.3.tgz#e28d5f097a639e2006235c0e56a4569a267cb9c2"
-  integrity sha512-TOSOVQEt/MpAJYAvhkTXpkhyamC+nl4jHW7vBC5sKOK0XS6Zanls1z9nx6zpdCQ5RapuffxoYDbO86M/KiJlBA==
+"@temporalio/workflow@~1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/workflow/-/workflow-1.4.4.tgz#ff1e53a6bfdecb6cdb0a07d1be956c77e1dc6dc3"
+  integrity sha512-HY/YTUT+lGwBK4WqL96X2V2kUx6b+/AnpcvIDZchETKlf29mw3LgS3f26BFHObZKM5pmbXNpEA4vjbULGk784A==
   dependencies:
-    "@temporalio/common" "~1.4.3"
-    "@temporalio/proto" "~1.4.3"
+    "@temporalio/common" "~1.4.4"
+    "@temporalio/proto" "~1.4.4"
 
 "@testing-library/dom@^8.11.1":
   version "8.17.1"

@@ -99,6 +99,11 @@ export class FirecrackerService {
       detached: true,
     });
     child.unref();
+    child.on("error", (err) => {
+      // Without this block the error is handled by the nodejs process itself and makes it
+      // exit with code 1 crashing everything
+      this.logger.error(`firecracker process errored: ${err}`);
+    });
 
     if (child.pid == null) {
       throw new Error("Failed to start firecracker");

@@ -24,6 +24,17 @@ docker run --network=host -it -e PGPASSWORD=pass postgres:alpine pg_dump -h loca
 sed -i "s/$GITHUB_APP_HOCUS_DEV_CLIENT_SECRET/github_client_secret_goes_here/g" ops/docker/resources/keycloak-db-dump.sql
 ```
 
+## Tests
+
+Temporal is buggy and does not clean up properly after itself in tests. That's why tests are best run with the `--forceExit` flag for now.
+There is a Github issue that tracks this bug: https://github.com/temporalio/sdk-typescript/issues/928
+
+How to test activities:
+
+```bash
+yarn jest --testTimeout 50000 --forceExit app/agent/activities.test.ts
+```
+
 ## Deployment
 
 First, build your app for production:

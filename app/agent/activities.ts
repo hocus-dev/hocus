@@ -5,12 +5,11 @@ import { promisify } from "util";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 
-import { createAgentInjector } from "./agent-injector";
+import type { createAgentInjector } from "./agent-injector";
 import type { ProjectConfig } from "./project-config/validator";
 import { execSshCmd } from "./utils";
 
-export const createActivities = async () => {
-  const injector = createAgentInjector();
+export const createActivities = async (injector: ReturnType<typeof createAgentInjector>) => {
   const agentConfig = injector.resolve(Token.Config).agent();
 
   const fetchRepository = async (args: {
@@ -236,7 +235,7 @@ export const createActivities = async () => {
           extraDrives: [{ pathOnHost: args.outputDrivePath, guestMountPath: workdir }],
         },
         async ({ ssh }) => {
-          const repoPath = `${workdir}/repo`;
+          const repoPath = `${workdir}/project`;
           await execSshCmd({ ssh, opts: { cwd: repoPath } }, [
             "git",
             "checkout",
