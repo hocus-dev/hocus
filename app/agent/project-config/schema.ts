@@ -16,6 +16,11 @@ export const ProjectConfigSchema = t.Object({
       description:
         "Path to a Dockerfile which will be used to build the filesystem for the project",
     }),
+    buildContext: t.String({
+      minLength: 1,
+      description:
+        "Path to the directory used as Docker build context, relative to repository root",
+    }),
   }),
   tasks: t.Array(TaskSchema),
 });

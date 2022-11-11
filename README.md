@@ -32,7 +32,7 @@ There is a Github issue that tracks this bug: https://github.com/temporalio/sdk-
 How to test activities:
 
 ```bash
-yarn jest --testTimeout 50000 --forceExit app/agent/activities.test.ts
+yarn jest --testTimeout 600000 --forceExit app/agent/activities.test.ts
 ```
 
 ## Deployment
