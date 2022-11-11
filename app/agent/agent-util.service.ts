@@ -1,9 +1,11 @@
 import fsSync from "fs";
+import { promisify } from "util";
 
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH } from "node-ssh";
 import { Token } from "~/token";
 
+import { PREBUILD_SCRIPT_TEMPLATE } from "./constants";
 import { execCmd, execSshCmd } from "./utils";
 
 export class AgentUtilService {
@@ -42,5 +44,16 @@ export class AgentUtilService {
     const driveUuid = this.getDriveUuid(hostDrivePath);
     await execSshCmd({ ssh }, [...cmdPrefix, "mkdir", "-p", guestMountPath]);
     await execSshCmd({ ssh }, [...cmdPrefix, "mount", `UUID=${driveUuid}`, guestMountPath]);
+  }
+
+  async writeFile(ssh: NodeSSH, path: string, content: string): Promise<void> {
+    await ssh.withSFTP(async (sftp) => {
+      const writeFile = promisify(sftp.writeFile.bind(sftp));
+      await writeFile(path, content);
+    });
+  }
+
+  generatePrebuildScript(task: string): string {
+    return `${PREBUILD_SCRIPT_TEMPLATE}${task}\n`;
   }
 }

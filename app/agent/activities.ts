@@ -253,10 +253,49 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
     }
   };
 
+  const prebuild = async (args: {
+    runId?: string;
+    projectDrivePath: string;
+    filesystemDrivePath: string;
+    tasks: string[];
+  }): Promise<void> => {
+    const runId = args.runId ?? uuidv4();
+    const instanceId = `prebuild-${runId}`;
+    const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const devDir = "/home/hocus/dev";
+    const repositoryDir = `${devDir}/project`;
+    const prebuildScriptsDir = `${devDir}/.hocus/init`;
+
+    await firecrackerService.withVM(
+      {
+        ssh: {
+          username: "hocus",
+          password: "hocus",
+        },
+        kernelPath: agentConfig.defaultKernel,
+        rootFsPath: args.filesystemDrivePath,
+        extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: devDir }],
+      },
+      async ({ ssh }) => {
+        const tasks = args.tasks.map(async (task, idx) => {
+          const script = agentUtilService.generatePrebuildScript(task);
+          const scriptPath = `${prebuildScriptsDir}/task-${idx}.sh`;
+          await execSshCmd({ ssh }, ["mkdir", "-p", prebuildScriptsDir]);
+          await agentUtilService.writeFile(ssh, scriptPath, script);
+
+          await execSshCmd({ ssh, opts: { cwd: repositoryDir } }, ["bash", scriptPath]);
+        });
+        await Promise.all(tasks);
+      },
+    );
+  };
+
   return {
     fetchRepository,
     buildfs,
     checkoutAndInspect,
+    prebuild,
   };
 };
 

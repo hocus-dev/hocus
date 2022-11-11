@@ -35,7 +35,7 @@ const provideActivities = (
 test.concurrent(
   "fetchRepository, checkoutAndInspect",
   provideActivities(
-    async ({ activities: { fetchRepository, checkoutAndInspect, buildfs }, runId }) => {
+    async ({ activities: { fetchRepository, checkoutAndInspect, buildfs, prebuild }, runId }) => {
       const repositoryDrivePath = `/tmp/repo-test-${runId}.ext4`;
       await fetchRepository({
         rootFsPath: "/hocus-resources/fetchrepo.ext4",
@@ -58,6 +58,7 @@ test.concurrent(
       });
       expect(projectConfigResult).not.toBe(null);
       const projectConfig = unwrap(projectConfigResult);
+      const filesystemDrivePath = `/tmp/buildfs-test-${runId}.ext4`;
       await buildfs({
         runId,
         inputDrivePath: checkedOutRepositoryDrivePath,
@@ -67,6 +68,12 @@ test.concurrent(
         },
         dockerfilePath: projectConfig.image.file,
         contextPath: projectConfig.image.buildContext,
+      });
+      await prebuild({
+        runId,
+        projectDrivePath: checkedOutRepositoryDrivePath,
+        filesystemDrivePath,
+        tasks: projectConfig.tasks.map((task) => task.init),
       });
     },
   ),

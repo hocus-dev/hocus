@@ -298,13 +298,11 @@ export class FirecrackerService {
     const fcPid = this.startFirecrackerInstance();
     let vmIpAddress: null | string = null;
     try {
-      if (!this.doesTapDeviceExist(this.tapDeviceName)) {
-        this.setupNetworking({
-          tapDeviceName: this.tapDeviceName,
-          tapDeviceIp: this.tapDeviceIp,
-          tapDeviceCidr: this.tapDeviceCidr,
-        });
-      }
+      this.setupNetworking({
+        tapDeviceName: this.tapDeviceName,
+        tapDeviceIp: this.tapDeviceIp,
+        tapDeviceCidr: this.tapDeviceCidr,
+      });
       vmIpAddress = await this.getFreeIpAddress();
       await this.createVM({
         kernelPath: kernelPath,
