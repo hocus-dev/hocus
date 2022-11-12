@@ -3,12 +3,13 @@ import fs from "fs/promises";
 import path from "path";
 import { promisify } from "util";
 
+import type { NodeSSH } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 
 import type { createAgentInjector } from "./agent-injector";
 import type { ProjectConfig } from "./project-config/validator";
-import { execSshCmd } from "./utils";
+import { execSshCmd, withSsh } from "./utils";
 
 export const createActivities = async (injector: ReturnType<typeof createAgentInjector>) => {
   const agentConfig = injector.resolve(Token.Config).agent();
@@ -253,12 +254,15 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
     }
   };
 
+  /**
+   * Returns the result for every task.
+   */
   const prebuild = async (args: {
     runId?: string;
     projectDrivePath: string;
     filesystemDrivePath: string;
     tasks: string[];
-  }): Promise<void> => {
+  }): Promise<(Error | "ok")[]> => {
     const runId = args.runId ?? uuidv4();
     const instanceId = `prebuild-${runId}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
@@ -267,7 +271,7 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
     const repositoryDir = `${devDir}/project`;
     const prebuildScriptsDir = `${devDir}/.hocus/init`;
 
-    await firecrackerService.withVM(
+    return await firecrackerService.withVM(
       {
         ssh: {
           username: "hocus",
@@ -277,16 +281,50 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
         rootFsPath: args.filesystemDrivePath,
         extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: devDir }],
       },
-      async ({ ssh }) => {
+      async ({ ssh, sshConfig }) => {
+        let cleanupStarted = false;
+        const taskSshHandles: NodeSSH[] = [];
         const tasks = args.tasks.map(async (task, idx) => {
-          const script = agentUtilService.generatePrebuildScript(task);
-          const scriptPath = `${prebuildScriptsDir}/task-${idx}.sh`;
-          await execSshCmd({ ssh }, ["mkdir", "-p", prebuildScriptsDir]);
-          await agentUtilService.writeFile(ssh, scriptPath, script);
+          try {
+            const script = agentUtilService.generatePrebuildScript(task);
+            const scriptPath = `${prebuildScriptsDir}/task-${idx}.sh`;
+            await execSshCmd({ ssh }, ["mkdir", "-p", prebuildScriptsDir]);
+            await agentUtilService.writeFile(ssh, scriptPath, script);
 
-          await execSshCmd({ ssh, opts: { cwd: repositoryDir } }, ["bash", scriptPath]);
+            await withSsh(sshConfig, async (taskSsh) => {
+              if (cleanupStarted) {
+                throw new Error("cleanup already started");
+              }
+              taskSshHandles.push(taskSsh);
+
+              await execSshCmd({ ssh: taskSsh, opts: { cwd: repositoryDir } }, [
+                "bash",
+                scriptPath,
+              ]);
+            });
+          } catch (err) {
+            if (!cleanupStarted) {
+              cleanupStarted = true;
+              // this is done to interrupt the other tasks, withSsh will dispose the
+              // ssh handles anyway
+              await Promise.all(taskSshHandles.map((sshHandle) => sshHandle.dispose()));
+            }
+            throw err;
+          }
         });
-        await Promise.all(tasks);
+        const results = await Promise.allSettled(tasks);
+        const parsedResults = results.map((result) => {
+          if (result.status === "rejected") {
+            if (result.reason instanceof Error) {
+              return result.reason;
+            } else {
+              return new Error(String(result.reason));
+            }
+          } else {
+            return "ok";
+          }
+        });
+        return parsedResults;
       },
     );
   };

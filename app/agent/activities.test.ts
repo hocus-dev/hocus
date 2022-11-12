@@ -75,6 +75,24 @@ test.concurrent(
         filesystemDrivePath,
         tasks: projectConfig.tasks.map((task) => task.init),
       });
+
+      // here we check that when a task fails, other tasks are interrupted
+      // and the prebuild is aborted
+      const results = await prebuild({
+        runId,
+        projectDrivePath: checkedOutRepositoryDrivePath,
+        filesystemDrivePath,
+        tasks: [
+          `echo "alright!"`,
+          "sleep 15",
+          "sleep 15",
+          `sleep 1 && test -z "this task will fail"`,
+        ],
+      });
+      expect(results[0]).toEqual("ok");
+      for (const result of results.slice(1)) {
+        expect(result instanceof Error).toBe(true);
+      }
     },
   ),
 );
