@@ -288,6 +288,7 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
           try {
             const script = agentUtilService.generatePrebuildScript(task);
             const scriptPath = `${prebuildScriptsDir}/task-${idx}.sh`;
+            const logPath = `${prebuildScriptsDir}/task-${idx}.log`;
             await execSshCmd({ ssh }, ["mkdir", "-p", prebuildScriptsDir]);
             await agentUtilService.writeFile(ssh, scriptPath, script);
 
@@ -299,7 +300,12 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
 
               await execSshCmd({ ssh: taskSsh, opts: { cwd: repositoryDir } }, [
                 "bash",
-                scriptPath,
+                "-o",
+                "pipefail",
+                "-o",
+                "errexit",
+                "-c",
+                `bash "${scriptPath}" 2>&1 | tee "${logPath}"`,
               ]);
             });
           } catch (err) {
