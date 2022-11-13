@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 
 import type { createAgentInjector } from "./agent-injector";
+import { PrebuildTaskStatus } from "./constants";
 import type { ProjectConfig } from "./project-config/validator";
 import { execSshCmd, withSsh } from "./utils";
 
@@ -254,6 +255,18 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
     }
   };
 
+  type PrebuildTaskOutput =
+    | {
+        status: typeof PrebuildTaskStatus["Ok"];
+      }
+    | {
+        status: typeof PrebuildTaskStatus["Error"];
+        error: Error;
+      }
+    | {
+        status: typeof PrebuildTaskStatus["Cancelled"];
+      };
+
   /**
    * Returns the result for every task.
    */
@@ -262,7 +275,7 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
     projectDrivePath: string;
     filesystemDrivePath: string;
     tasks: string[];
-  }): Promise<(Error | "ok")[]> => {
+  }): Promise<PrebuildTaskOutput[]> => {
     const runId = args.runId ?? uuidv4();
     const instanceId = `prebuild-${runId}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
@@ -284,33 +297,45 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
       async ({ ssh, sshConfig }) => {
         let cleanupStarted = false;
         const taskSshHandles: NodeSSH[] = [];
-        const tasks = args.tasks.map(async (task, idx) => {
+        const taskFn = async (task: string, taskIdx: number) => {
+          const script = agentUtilService.generatePrebuildScript(task);
+          const scriptPath = `${prebuildScriptsDir}/task-${taskIdx}.sh`;
+          const logPath = `${prebuildScriptsDir}/task-${taskIdx}.log`;
+          await execSshCmd({ ssh }, ["mkdir", "-p", prebuildScriptsDir]);
+          await agentUtilService.writeFile(ssh, scriptPath, script);
+
+          await withSsh(sshConfig, async (taskSsh) => {
+            if (cleanupStarted) {
+              throw new Error("cleanup already started");
+            }
+            taskSshHandles.push(taskSsh);
+
+            await execSshCmd({ ssh: taskSsh, opts: { cwd: repositoryDir } }, [
+              "bash",
+              "-o",
+              "pipefail",
+              "-o",
+              "errexit",
+              "-c",
+              `bash "${scriptPath}" 2>&1 | tee "${logPath}"`,
+            ]);
+          });
+        };
+        const taskFinished = args.tasks.map((_) => false);
+        const taskCancelled = args.tasks.map((_) => false);
+        const tasks = args.tasks.map(async (task, taskIdx) => {
           try {
-            const script = agentUtilService.generatePrebuildScript(task);
-            const scriptPath = `${prebuildScriptsDir}/task-${idx}.sh`;
-            const logPath = `${prebuildScriptsDir}/task-${idx}.log`;
-            await execSshCmd({ ssh }, ["mkdir", "-p", prebuildScriptsDir]);
-            await agentUtilService.writeFile(ssh, scriptPath, script);
-
-            await withSsh(sshConfig, async (taskSsh) => {
-              if (cleanupStarted) {
-                throw new Error("cleanup already started");
-              }
-              taskSshHandles.push(taskSsh);
-
-              await execSshCmd({ ssh: taskSsh, opts: { cwd: repositoryDir } }, [
-                "bash",
-                "-o",
-                "pipefail",
-                "-o",
-                "errexit",
-                "-c",
-                `bash "${scriptPath}" 2>&1 | tee "${logPath}"`,
-              ]);
-            });
+            try {
+              await taskFn(task, taskIdx);
+            } finally {
+              taskFinished[taskIdx] = true;
+            }
           } catch (err) {
             if (!cleanupStarted) {
               cleanupStarted = true;
+              for (const [idx, isFinished] of taskFinished.entries()) {
+                taskCancelled[idx] = !isFinished;
+              }
               // this is done to interrupt the other tasks, withSsh will dispose the
               // ssh handles anyway
               await Promise.all(taskSshHandles.map((sshHandle) => sshHandle.dispose()));
@@ -319,15 +344,20 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
           }
         });
         const results = await Promise.allSettled(tasks);
-        const parsedResults = results.map((result) => {
+        const parsedResults = results.map((result, idx) => {
           if (result.status === "rejected") {
-            if (result.reason instanceof Error) {
-              return result.reason;
-            } else {
-              return new Error(String(result.reason));
+            if (taskCancelled[idx]) {
+              return {
+                status: PrebuildTaskStatus.Cancelled,
+              };
             }
+            return {
+              status: PrebuildTaskStatus.Error,
+              error:
+                result.reason instanceof Error ? result.reason : new Error(String(result.reason)),
+            };
           } else {
-            return "ok";
+            return { status: PrebuildTaskStatus.Ok };
           }
         });
         return parsedResults;

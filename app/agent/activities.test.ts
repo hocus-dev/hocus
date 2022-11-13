@@ -5,6 +5,7 @@ import { unwrap } from "~/utils.shared";
 
 import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
+import { PrebuildTaskStatus } from "./constants";
 import { PRIVATE_SSH_KEY } from "./test-constants";
 
 const provideActivities = (
@@ -89,10 +90,11 @@ test.concurrent(
           `sleep 1 && test -z "this task will fail"`,
         ],
       });
-      expect(results[0]).toEqual("ok");
-      for (const result of results.slice(1)) {
-        expect(result instanceof Error).toBe(true);
+      expect(results[0].status).toEqual(PrebuildTaskStatus.Ok);
+      for (const idx of [1, 2]) {
+        expect(results[idx].status).toEqual(PrebuildTaskStatus.Cancelled);
       }
+      expect(results[3].status).toEqual(PrebuildTaskStatus.Error);
     },
   ),
 );
