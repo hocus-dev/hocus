@@ -108,7 +108,7 @@ test.concurrent(
           runId,
           projectDrivePath: checkedOutRepositoryDrivePath,
           filesystemDrivePath,
-          tasks: [`test -z "this task will fail"`, `echo -n '${secondTaskOutput}'`],
+          tasks: [`test -z "this task will fail"`, secondTask],
           authorizedKeys: PUBLIC_SSH_KEY,
         });
         fcPid = workspaceStartResult.firecrackerProcessPid;
