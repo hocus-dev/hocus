@@ -338,7 +338,9 @@ export class FirecrackerService {
         return output;
       });
     } finally {
-      process.kill(fcPid);
+      if (shouldPoweroff) {
+        process.kill(fcPid);
+      }
       if (vmIpAddress != null) {
         await this.releaseIpAddress(vmIpAddress);
       }

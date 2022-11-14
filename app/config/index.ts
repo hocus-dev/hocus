@@ -1,3 +1,5 @@
+import { PREBUILD_SSH_KEY_PRIVATE, PREBUILD_SSH_KEY_PUBLIC } from "~/agent/constants";
+
 import { makeConfig, get, getEnv } from "./utils.server";
 
 export type Config = typeof config;
@@ -33,5 +35,9 @@ export const config = makeConfig()({
     ),
     hostBuildfsResourcesDir: get("AGENT_HOST_BUILDFS_RESOURCES_DIR", "/app/resources"),
     buildfsRootFs: get("AGENT_BUILDFS_ROOTFS", "/hocus-resources/buildfs.ext4"),
+    // `get` is not used here because users usually will not want to set these manually
+    // in production. `get` would throw an error if the env var was not set.
+    prebuildSshPublicKey: process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? PREBUILD_SSH_KEY_PUBLIC,
+    prebuildSshPrivateKey: process.env.AGENT_PREBUILD_SSH_PRIVATE_KEY ?? PREBUILD_SSH_KEY_PRIVATE,
   }),
 });

@@ -288,7 +288,7 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
       {
         ssh: {
           username: "hocus",
-          password: "hocus",
+          privateKey: agentConfig.prebuildSshPrivateKey,
         },
         kernelPath: agentConfig.defaultKernel,
         rootFsPath: args.filesystemDrivePath,
