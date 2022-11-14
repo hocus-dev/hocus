@@ -290,7 +290,12 @@ export class FirecrackerService {
        */
       shouldPoweroff?: boolean;
     },
-    fn: (args: { ssh: NodeSSH; sshConfig: SSHConfig }) => Promise<T>,
+    fn: (args: {
+      ssh: NodeSSH;
+      sshConfig: SSHConfig;
+      firecrackerPid: number;
+      vmIp: string;
+    }) => Promise<T>,
   ): Promise<T> {
     const kernelPath = config.kernelPath ?? "/hocus-resources/vmlinux-5.6-x86_64.bin";
     const shouldPoweroff = config.shouldPoweroff ?? true;
@@ -319,6 +324,7 @@ export class FirecrackerService {
         })),
       });
       const sshConfig = { ...config.ssh, host: vmIpAddress };
+      const vmIp = vmIpAddress;
       return await withSsh(sshConfig, async (ssh) => {
         const useSudo = config.ssh.username !== "root";
         for (const drive of extraDrives) {
@@ -329,7 +335,7 @@ export class FirecrackerService {
             useSudo,
           );
         }
-        const output = await fn({ ssh, sshConfig });
+        const output = await fn({ ssh, sshConfig, firecrackerPid: fcPid, vmIp });
         if (shouldPoweroff) {
           const poweroffCmd = useSudo ? ["sudo", "poweroff"] : ["poweroff"];
           await execSshCmd({ ssh, allowNonZeroExitCode: true }, poweroffCmd);

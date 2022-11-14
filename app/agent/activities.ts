@@ -9,6 +9,7 @@ import { Token } from "~/token";
 
 import type { createAgentInjector } from "./agent-injector";
 import { PrebuildTaskStatus } from "./constants";
+import { PidValidator } from "./pid.validator";
 import type { ProjectConfig } from "./project-config/validator";
 import { execSshCmd, withSsh } from "./utils";
 
@@ -365,49 +366,73 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
     );
   };
 
+  type StartWorkspaceReturnValue = {
+    firecrackerProcessPid: number;
+    vmIp: string;
+    taskPids: number[];
+  };
+
+  const startWorkspace = async (args: {
+    runId?: string;
+    filesystemDrivePath: string;
+    projectDrivePath: string;
+    authorizedKeys: string;
+    tasks: string[];
+  }): Promise<StartWorkspaceReturnValue> => {
+    const runId = args.runId ?? uuidv4();
+    const instanceId = `startvm-${runId}`;
+    const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const devDir = "/home/hocus/dev";
+    const repositoryDir = `${devDir}/project`;
+    const scriptsDir = `${devDir}/.hocus/command`;
+
+    return await firecrackerService.withVM(
+      {
+        ssh: {
+          username: "hocus",
+          privateKey: agentConfig.prebuildSshPrivateKey,
+        },
+        kernelPath: agentConfig.defaultKernel,
+        rootFsPath: args.filesystemDrivePath,
+        extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: devDir }],
+        shouldPoweroff: false,
+      },
+      async ({ ssh, vmIp, firecrackerPid }) => {
+        const taskFn = async (task: string, taskIdx: number): Promise<number> => {
+          const script = agentUtilService.generatePrebuildScript(task);
+          const scriptPath = `${scriptsDir}/task-${taskIdx}.sh`;
+          const logPath = `${scriptsDir}/task-${taskIdx}.log`;
+          await execSshCmd({ ssh }, ["mkdir", "-p", scriptsDir]);
+          await agentUtilService.writeFile(ssh, scriptPath, script);
+
+          const result = await execSshCmd({ ssh, opts: { cwd: repositoryDir } }, [
+            "bash",
+            "-o",
+            "pipefail",
+            "-o",
+            "errexit",
+            "-c",
+            `bash "${scriptPath}" > "${logPath}" 2>&1 & echo "$!"`,
+          ]);
+          return Number(PidValidator.Parse(result.stdout));
+        };
+        await agentUtilService.writeFile(
+          ssh,
+          "/home/hocus/.ssh/authorized_keys",
+          args.authorizedKeys,
+        );
+        const taskPids = await Promise.all(args.tasks.map(taskFn));
+        return { firecrackerProcessPid: firecrackerPid, vmIp, taskPids };
+      },
+    );
+  };
+
   return {
     fetchRepository,
     buildfs,
     checkoutAndInspect,
     prebuild,
+    startWorkspace,
   };
 };
-
-// /**
-//  * Returns the pid of the firecracker process.
-//  */
-// export const startVM = async (args: {
-//   instanceId: string;
-//   kernelPath: string;
-//   rootFsPath: string;
-//   drives: Parameters<FirecrackerService["createVM"]>[0]["extraDrives"];
-// }): Promise<void> => {
-//   const logger = new DefaultLogger();
-//   const socketPath = `/tmp/${args.instanceId}.sock`;
-//   const fc = new FirecrackerService(socketPath);
-
-//   await fc.startFirecrackerInstance(`/tmp/${args.instanceId}`);
-//   logger.info("firecracker process started");
-
-//   const vmIp = "168.254.0.21";
-//   const tapDeviceIp = "168.254.0.22";
-//   const tapDeviceCidr = 24;
-//   const tapDeviceName = "hocus-tap-0";
-//   fc.setupNetworking({
-//     tapDeviceName,
-//     tapDeviceIp,
-//     tapDeviceCidr,
-//   });
-//   logger.info("networking set up");
-
-//   await fc.createVM({
-//     kernelPath: args.kernelPath,
-//     rootFsPath: args.rootFsPath,
-//     vmIp,
-//     tapDeviceIp,
-//     tapDeviceName,
-//     tapDeviceCidr,
-//     extraDrives: args.drives,
-//   });
-//   logger.info("vm created");
-// };

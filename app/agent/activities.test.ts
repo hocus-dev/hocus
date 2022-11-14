@@ -6,7 +6,7 @@ import { unwrap } from "~/utils.shared";
 import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
 import { PrebuildTaskStatus } from "./constants";
-import { PRIVATE_SSH_KEY } from "./test-constants";
+import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY } from "./test-constants";
 
 const provideActivities = (
   testFn: (args: {
@@ -34,9 +34,12 @@ const provideActivities = (
 };
 
 test.concurrent(
-  "fetchRepository, checkoutAndInspect",
+  "fetchRepository, checkoutAndInspect, prebuild, startWorkspace",
   provideActivities(
-    async ({ activities: { fetchRepository, checkoutAndInspect, buildfs, prebuild }, runId }) => {
+    async ({
+      activities: { fetchRepository, checkoutAndInspect, buildfs, prebuild, startWorkspace },
+      runId,
+    }) => {
       const repositoryDrivePath = `/tmp/repo-test-${runId}.ext4`;
       await fetchRepository({
         rootFsPath: "/hocus-resources/fetchrepo.ext4",
@@ -95,6 +98,14 @@ test.concurrent(
         expect(results[idx].status).toEqual(PrebuildTaskStatus.Cancelled);
       }
       expect(results[3].status).toEqual(PrebuildTaskStatus.Error);
+
+      const _workspaceStartResult = await startWorkspace({
+        runId,
+        projectDrivePath: checkedOutRepositoryDrivePath,
+        filesystemDrivePath,
+        tasks: ["echo 'hello world from a command!'", "echo 'hello world from a second command!'"],
+        authorizedKeys: PUBLIC_SSH_KEY,
+      });
     },
   ),
 );
