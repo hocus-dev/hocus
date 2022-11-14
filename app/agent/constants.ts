@@ -10,7 +10,7 @@ set -o xtrace
 
 export type PrebuildTaskStatus = valueof<typeof PrebuildTaskStatus>;
 export const PrebuildTaskStatus = {
-  Ok: "ok",
-  Error: "error",
-  Cancelled: "cancelled",
+  Ok: "PREBUILD_TASK_STATUS_OK",
+  Error: "PREBUILD_TASK_STATUS_ERROR",
+  Cancelled: "PREBUILD_TASK_STATUS_CANCELLED",
 } as const;
