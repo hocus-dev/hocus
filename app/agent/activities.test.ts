@@ -7,6 +7,7 @@ import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
 import { PrebuildTaskStatus } from "./constants";
 import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY } from "./test-constants";
+import { execSshCmd, withSsh } from "./utils";
 
 const provideActivities = (
   testFn: (args: {
@@ -99,13 +100,38 @@ test.concurrent(
       }
       expect(results[3].status).toEqual(PrebuildTaskStatus.Error);
 
-      const _workspaceStartResult = await startWorkspace({
-        runId,
-        projectDrivePath: checkedOutRepositoryDrivePath,
-        filesystemDrivePath,
-        tasks: ["echo 'hello world from a command!'", "echo 'hello world from a second command!'"],
-        authorizedKeys: PUBLIC_SSH_KEY,
-      });
+      let fcPid: number | null = null;
+      try {
+        const secondTaskOutput = "hello world from the second command!";
+        const secondTask = `echo -n '${secondTaskOutput}'`;
+        const workspaceStartResult = await startWorkspace({
+          runId,
+          projectDrivePath: checkedOutRepositoryDrivePath,
+          filesystemDrivePath,
+          tasks: [`test -z "this task will fail"`, `echo -n '${secondTaskOutput}'`],
+          authorizedKeys: PUBLIC_SSH_KEY,
+        });
+        fcPid = workspaceStartResult.firecrackerProcessPid;
+
+        await withSsh(
+          {
+            username: "hocus",
+            privateKey: PRIVATE_SSH_KEY,
+            host: workspaceStartResult.vmIp,
+          },
+          async (ssh) => {
+            const { stdout } = await execSshCmd({ ssh }, [
+              "cat",
+              "/home/hocus/dev/.hocus/command/task-1.log",
+            ]);
+            expect(stdout).toEqual(`+ ${secondTask}\n${secondTaskOutput}`);
+          },
+        );
+      } finally {
+        if (fcPid != null) {
+          process.kill(fcPid);
+        }
+      }
     },
   ),
 );
