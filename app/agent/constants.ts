@@ -15,9 +15,9 @@ export const PrebuildTaskStatus = {
   Cancelled: "PREBUILD_TASK_STATUS_CANCELLED",
 } as const;
 
-export const PREBUILD_SSH_KEY_PUBLIC = `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKk+DZs+E2GlmqUNqTCU9/R0kT/zzBjwBqbPaBtGv3MA hocus@prebuild`;
+export const DEFAULT_PREBUILD_SSH_KEY_PUBLIC = `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKk+DZs+E2GlmqUNqTCU9/R0kT/zzBjwBqbPaBtGv3MA hocus@prebuild`;
 /** Newline at the end is required */
-export const PREBUILD_SSH_KEY_PRIVATE = `-----BEGIN OPENSSH PRIVATE KEY-----
+export const DEFAULT_PREBUILD_SSH_KEY_PRIVATE = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACCpPg2bPhNhpZqlDakwlPf0dJE/88wY8Aamz2gbRr9zAAAAAKhNjl2LTY5d
 iwAAAAtzc2gtZWQyNTUxOQAAACCpPg2bPhNhpZqlDakwlPf0dJE/88wY8Aamz2gbRr9zAA
