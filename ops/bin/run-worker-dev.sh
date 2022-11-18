@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export DOCKER_BUILDKIT=1
+
 SCRIPT_DIR="$(dirname "$0")"
 REPO_DIR="$(realpath "${SCRIPT_DIR}/../..")"
 HOCUS_RESOURCES_DIR="$(realpath ${REPO_DIR}/../hocus-resources)"

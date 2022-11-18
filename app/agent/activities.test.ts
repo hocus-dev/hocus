@@ -46,7 +46,7 @@ test.concurrent(
         rootFsPath: "/hocus-resources/fetchrepo.ext4",
         outputDrive: {
           pathOnHost: repositoryDrivePath,
-          maxSizeMiB: 100,
+          maxSizeMiB: 10000,
         },
         repository: {
           url: "git@github.com:hocus-dev/tests.git",

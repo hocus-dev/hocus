@@ -12,6 +12,7 @@ import { unwrap } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
 import { FifoFlags } from "./fifo-flags";
+import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import type { StorageService } from "./storage/storage.service";
 import { execCmd, execSshCmd, watchFileUntilLineMatches, withSsh } from "./utils";
 
@@ -140,14 +141,14 @@ export class FirecrackerService {
       const container = await storage.readStorage();
       const busyIpIds = container.busyIpIds;
       busyIpIds.sort();
-      let nextFreeIpId = 3;
+      let nextFreeIpId = MINIMUM_IP_ID;
       for (const i of busyIpIds.keys()) {
         if (busyIpIds[i] !== nextFreeIpId) {
           break;
         }
         nextFreeIpId++;
       }
-      if (nextFreeIpId > 65534) {
+      if (nextFreeIpId > MAXIMUM_IP_ID) {
         throw new Error("No free IP addresses");
       }
       busyIpIds.push(nextFreeIpId);

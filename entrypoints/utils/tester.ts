@@ -1,19 +1,17 @@
 /* eslint-disable no-console */
-import * as activities from "~/agent/activities";
+import { createActivities } from "~/agent/activities";
+import { createAgentInjector } from "~/agent/agent-injector";
+import { DEFAULT_PREBUILD_SSH_KEY_PUBLIC } from "~/agent/constants";
 
 async function run() {
-  await activities.startVM({
-    instanceId: "tester",
-    kernelPath: "/hocus-resources/vmlinux-5.6-x86_64.bin",
-    rootFsPath: "/hocus-resources/buildfs.ext4",
-    drives: [
-      {
-        driveId: "extra1",
-        pathOnHost: "/hocus-resources/extra.ext4",
-        isReadOnly: false,
-        isRootDevice: false,
-      },
-    ],
+  const injector = createAgentInjector();
+  const activities = await createActivities(injector);
+  await activities.startWorkspace({
+    runId: "tester",
+    filesystemDrivePath: "/hocus-resources/buildfs.ext4",
+    projectDrivePath: "/hocus-resources/checked-out-typebox.ext4",
+    authorizedKeys: DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
+    tasks: [],
   });
 }
 

@@ -270,6 +270,11 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
 
   /**
    * Returns the result for every task.
+   *
+   * Assumes that there is a `hocus` user with passwordless sudo on the
+   * filesystem drive, sshd is configured to start running automatically after VM boot,
+   * and the corresponding public key to the private key used to connect to the VM
+   * (`agentConfig.prebuildSshPrivateKey`) is added to the `hocus` user's authorized_keys.
    */
   const prebuild = async (args: {
     runId?: string;
