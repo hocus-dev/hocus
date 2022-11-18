@@ -178,7 +178,7 @@ export class FirecrackerService {
     tapDeviceIp: string;
     tapDeviceCidr: number;
   }): void {
-    const defaultInterace = this.getDefaultInterface();
+    const defaultInterface = this.getDefaultInterface();
 
     try {
       execCmd("ip", "link", "del", args.tapDeviceName);
@@ -201,9 +201,9 @@ export class FirecrackerService {
     execCmd("ip", "link", "set", "dev", args.tapDeviceName, "up");
 
     const targetIptablesRules = [
-      `FORWARD -i ${args.tapDeviceName} -o ${defaultInterace} -j ACCEPT`,
+      `FORWARD -i ${args.tapDeviceName} -o ${defaultInterface} -j ACCEPT`,
       "FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
-      `POSTROUTING -o ${defaultInterace} -j MASQUERADE -t nat`,
+      `POSTROUTING -o ${defaultInterface} -j MASQUERADE -t nat`,
     ];
     for (const rule of targetIptablesRules) {
       const result = spawnSync("iptables", ["-C", ...rule.split(" ")]);
