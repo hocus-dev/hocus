@@ -33,3 +33,6 @@ sysctl -w net.ipv6.conf.veth-ssh.disable_ipv6=1
 iptables -A FORWARD -i veth-ssh -o veth-python -j ACCEPT
 iptables -A FORWARD -i veth-python -o veth-ssh -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -t nat -A POSTROUTING -o veth-python -j MASQUERADE
+
+iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 443 -j DNAT --to-destination 10.231.0.3:8000
+iptables -t nat -A POSTROUTING -o veth-python -j MASQUERADE
