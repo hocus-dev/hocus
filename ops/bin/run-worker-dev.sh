@@ -22,4 +22,4 @@ docker run \
   --name agent \
   worker-dev \
   /bin/bash -c \
-  "ops/docker/resources/worker-dev-entrypoint.sh && yarn && ops/bin/link.sh && source ops/resources/gitpod-ip.sh && TEMPORAL_ADDRESS=\$GITPOD_IP:7233 /bin/bash"
+  "ops/docker/resources/worker-dev-entrypoint.sh && TEMPORAL_ADDRESS=\$GITPOD_IP:7233 /bin/bash"
