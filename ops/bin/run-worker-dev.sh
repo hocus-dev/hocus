@@ -19,7 +19,7 @@ docker run \
   -v "$REPO_DIR:/app" \
   -v "$HOCUS_RESOURCES_DIR:/hocus-resources" \
   -v /dev/kvm:/dev/kvm \
-  -p 8000:443 \
+  -p 2222:22 \
   --name agent \
   worker-dev \
   /bin/bash -c \
