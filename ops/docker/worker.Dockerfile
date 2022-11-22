@@ -7,6 +7,7 @@ RUN wget -q https://github.com/firecracker-microvm/firecracker/releases/download
 RUN yarn config set cache-folder /app/.yarn-cache
 RUN apt-get update && apt-get install -y net-tools iproute2 iptables psmisc
 RUN apt-get update && apt-get install -y socat openssh-server
+RUN apt-get update && apt-get install -y iputils-ping
 RUN test -f /usr/sbin/nologin && useradd -ms /usr/sbin/nologin sshgateway
 COPY --chown=root:root --chmod=0644 resources/sshd_config /etc/ssh/sshd_config
 
