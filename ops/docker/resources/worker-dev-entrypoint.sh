@@ -8,18 +8,18 @@ set -o pipefail
 ip netns add vms
 ip link add veth-vms type veth peer name vpeer-vms
 ip link set vpeer-vms netns vms
-ip netns exec vms ip addr add 10.231.0.1/31 dev vpeer-vms
-ip addr add 10.231.0.0/16 dev veth-vms
+ip netns exec vms ip addr add 10.231.0.2/30 dev vpeer-vms
+ip addr add 10.231.0.1/16 dev veth-vms
 ip link set veth-vms up
 ip netns exec vms ip link set dev vpeer-vms up
-ip netns exec vms ip route add default via 10.231.0.1
+ip netns exec vms ip route add default via 10.231.0.2
 
 # Setup the ssh network namespace
 ip netns add ssh
 ip link add veth-ssh type veth peer name vpeer-ssh
 ip link set vpeer-ssh netns ssh
-ip netns exec ssh ip addr add 10.10.0.1/16 dev vpeer-ssh
-ip addr add 10.10.0.0/31 dev veth-ssh
+ip netns exec ssh ip addr add 10.10.0.2/16 dev vpeer-ssh
+ip addr add 10.10.0.1/30 dev veth-ssh
 ip link set veth-ssh up
 ip netns exec ssh ip link set dev vpeer-ssh up
 
@@ -27,15 +27,15 @@ ip netns exec ssh ip link set dev vpeer-ssh up
 ip link add veth-ssh-vms type veth peer name vpeer-ssh-vms
 ip link set veth-ssh-vms netns ssh
 ip link set vpeer-ssh-vms netns vms
-ip netns exec ssh ip addr add 10.231.0.2/16 dev veth-ssh-vms
-ip netns exec vms ip addr add 10.231.0.3/31 dev vpeer-ssh-vms
+ip netns exec ssh ip addr add 10.231.0.5/16 dev veth-ssh-vms
+ip netns exec vms ip addr add 10.231.0.6/30 dev vpeer-ssh-vms
 ip netns exec ssh ip link set dev veth-ssh-vms up
 ip netns exec vms ip link set dev vpeer-ssh-vms up
 
 ip netns exec ssh service ssh start
 
 # Forward traffic from interface eth0 port 22 to the ssh service in the ssh ns
-iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 22 -j DNAT --to-destination 10.10.0.1:22
+iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 22 -j DNAT --to-destination 10.10.0.2:22
 iptables -t nat -A POSTROUTING -o veth-ssh -j MASQUERADE
 
 # Disable outgoing connections to the parent ns from the ssh ns, but enable incoming

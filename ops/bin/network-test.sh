@@ -30,24 +30,23 @@ ip netns exec ns-hocusvm0 ip link delete vpeer-hocusvm0 || true
 ip link add hocusvm-tap0 type veth peer name vpeer-hocusvm0
 ip link set hocusvm-tap0 netns vms
 ip link set vpeer-hocusvm0 netns ns-hocusvm0
-ip netns exec vms ip addr add 10.231.0.4/31 dev hocusvm-tap0
-ip netns exec ns-hocusvm0 ip addr add 10.231.0.5/16 dev vpeer-hocusvm0
+ip netns exec vms ip addr add 10.231.0.10/30 dev hocusvm-tap0
+ip netns exec ns-hocusvm0 ip addr add 10.231.0.11/16 dev vpeer-hocusvm0
 ip netns exec vms ip link set hocusvm-tap0 up
 ip netns exec ns-hocusvm0 ip link set vpeer-hocusvm0 up
-ip netns exec ns-hocusvm0 ip route add default via 10.231.0.5
+# ip netns exec ns-hocusvm0 ip route add default via 10.231.0.11
 
-ip netns exec vms sysctl -w net.ipv4.conf.hocusvm-tap0.proxy_arp=1
-ip netns exec vms sysctl -w net.ipv6.conf.hocusvm-tap0.disable_ipv6=1
+# ip netns exec vms sysctl -w net.ipv4.conf.hocusvm-tap0.proxy_arp=1
+# ip netns exec vms sysctl -w net.ipv6.conf.hocusvm-tap0.disable_ipv6=1
 
 
-reach 10.10.0.1
-reach 10.231.0.1
+reach 10.10.0.2
+reach 10.231.0.2
 reach 127.0.0.1
 reach 172.17.0.3 vms
-reach 10.231.0.0 vms
 reach 10.231.0.1 ns-hocusvm0
-reach 10.231.0.0 ns-hocusvm0
+reach 10.231.0.2 ns-hocusvm0
 reach 172.17.0.3 ns-hocusvm0
 
-expect_fail reach 10.10.0.0 ssh
-expect_fail reach 10.231.0.5 ssh
+expect_fail reach 10.10.0.1 ssh
+expect_fail reach 10.231.0.10 ssh

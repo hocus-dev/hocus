@@ -14,7 +14,7 @@ Include /etc/ssh/sshd_config.d/*.conf
 
 #Port 22
 #AddressFamily any
-ListenAddress 10.10.0.1
+ListenAddress 10.10.0.2
 #ListenAddress ::
 
 #HostKey /etc/ssh/ssh_host_rsa_key
