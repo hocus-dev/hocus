@@ -8,10 +8,11 @@ set -o pipefail
 ip netns add vms
 ip link add veth-vms type veth peer name vpeer-vms
 ip link set vpeer-vms netns vms
-ip netns exec vms ip addr add 10.231.0.1/16 dev vpeer-vms
-ip addr add 10.231.0.0/31 dev veth-vms
+ip netns exec vms ip addr add 10.231.0.1/31 dev vpeer-vms
+ip addr add 10.231.0.0/16 dev veth-vms
 ip link set veth-vms up
 ip netns exec vms ip link set dev vpeer-vms up
+ip netns exec vms ip route add default via 10.231.0.1
 
 # Setup the ssh network namespace
 ip netns add ssh
@@ -41,10 +42,12 @@ iptables -t nat -A POSTROUTING -o veth-ssh -j MASQUERADE
 ip netns exec ssh iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 ip netns exec ssh iptables -A OUTPUT -j DROP -d 10.10.0.0/16
 
+sysctl -w net.ipv4.conf.veth-vms.proxy_arp=1
+sysctl -w net.ipv6.conf.veth-vms.disable_ipv6=1
+# iptables -A FORWARD -i veth-vms -o eth0 -j ACCEPT
+# iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap0" -m state --state ESTABLISHED,RELATED -j ACCEPT
+# iptables -t nat -A POSTROUTING -o vpeer-vms -j MASQUERADE
 
-# sysctl -w net.ipv4.conf.veth-ssh.proxy_arp=1
-# sysctl -w net.ipv6.conf.veth-ssh.disable_ipv6=1
-
-# iptables -A FORWARD -i veth-ssh -o veth-python -j ACCEPT
-# iptables -A FORWARD -i veth-python -o veth-ssh -m state --state ESTABLISHED,RELATED -j ACCEPT
-# iptables -t nat -A POSTROUTING -o veth-python -j MASQUERADE
+# ip netns exec vms iptables -A FORWARD -i "hocusvm-tap0" -o vpeer-vms -j ACCEPT
+# ip netns exec vms iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap0" -m state --state ESTABLISHED,RELATED -j ACCEPT
+# ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-vms -j MASQUERADE
