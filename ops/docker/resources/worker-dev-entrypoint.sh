@@ -42,12 +42,24 @@ iptables -t nat -A POSTROUTING -o veth-ssh -j MASQUERADE
 ip netns exec ssh iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 ip netns exec ssh iptables -A OUTPUT -j DROP -d 10.10.0.0/16
 
+ip netns add ns-hocusvm0
+ip link add hocusvm-tap0 type veth peer name vpeer-hocusvm0
+ip link set hocusvm-tap0 netns vms
+ip link set vpeer-hocusvm0 netns ns-hocusvm0
+ip netns exec vms ip addr add 10.231.0.9/30 dev hocusvm-tap0
+ip netns exec ns-hocusvm0 ip addr add 10.231.0.10/16 dev vpeer-hocusvm0
+ip netns exec vms ip link set hocusvm-tap0 up
+ip netns exec ns-hocusvm0 ip link set vpeer-hocusvm0 up
+ip netns exec ns-hocusvm0 ip route add default via 10.231.0.10
+
+ip netns exec vms sysctl -w net.ipv4.conf.hocusvm-tap0.proxy_arp=1
+ip netns exec vms sysctl -w net.ipv6.conf.hocusvm-tap0.disable_ipv6=1
+ip netns exec vms iptables -A FORWARD -i "hocusvm-tap0" -o vpeer-vms -j ACCEPT
+ip netns exec vms iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap0" -m state --state ESTABLISHED,RELATED -j ACCEPT
+ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-vms -j MASQUERADE
+
 sysctl -w net.ipv4.conf.veth-vms.proxy_arp=1
 sysctl -w net.ipv6.conf.veth-vms.disable_ipv6=1
-# iptables -A FORWARD -i veth-vms -o eth0 -j ACCEPT
-# iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap0" -m state --state ESTABLISHED,RELATED -j ACCEPT
-# iptables -t nat -A POSTROUTING -o vpeer-vms -j MASQUERADE
-
-# ip netns exec vms iptables -A FORWARD -i "hocusvm-tap0" -o vpeer-vms -j ACCEPT
-# ip netns exec vms iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap0" -m state --state ESTABLISHED,RELATED -j ACCEPT
-# ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-vms -j MASQUERADE
+iptables -A FORWARD -i veth-vms -o eth0 -j ACCEPT
+iptables -A FORWARD -i eth0 -o veth-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
