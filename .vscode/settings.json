@@ -39,5 +39,6 @@
         "cmd": "ops/bin/rsync.sh"
       },
     ]
-  }
+  },
+  "excalidraw.theme": "dark"
 }
