@@ -3610,8 +3610,8 @@
     },
     {
       "type": "arrow",
-      "version": 587,
-      "versionNonce": 2074348696,
+      "version": 588,
+      "versionNonce": 2008719256,
       "isDeleted": false,
       "id": "kkkR7mCLmxvtCwKNSvbaJ",
       "fillStyle": "hachure",
@@ -3630,14 +3630,14 @@
       "groupIds": [],
       "strokeSharpness": "round",
       "boundElements": [],
-      "updated": 1669221366138,
+      "updated": 1669221725202,
       "link": null,
       "locked": false,
       "startBinding": null,
       "endBinding": null,
       "lastCommittedPoint": null,
       "startArrowhead": null,
-      "endArrowhead": null,
+      "endArrowhead": "arrow",
       "points": [
         [
           0,
