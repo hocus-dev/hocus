@@ -52,7 +52,7 @@ iptables -t nat -A POSTROUTING -o veth-ssh -j MASQUERADE
 
 # Disable outgoing connections to the parent ns from the ssh ns, but enable incoming
 ip netns exec ssh iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-ip netns exec ssh iptables -A OUTPUT -j DROP -d "$HOST_NS_SSH_IF_IP"/16
+ip netns exec ssh iptables -A OUTPUT -j REJECT -d "$HOST_NS_SSH_IF_IP"/16
 
 ip netns add ns-hocusvm0
 ip link add hocusvm-tap0 type veth peer name vpeer-hocusvm0
@@ -69,9 +69,15 @@ ip netns exec vms sysctl -w net.ipv6.conf.hocusvm-tap0.disable_ipv6=1
 ip netns exec vms iptables -A FORWARD -i "hocusvm-tap+" -o vpeer-vms -j ACCEPT
 ip netns exec vms iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap+" -m state --state ESTABLISHED,RELATED -j ACCEPT
 ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-vms -j MASQUERADE
+ip netns exec vms iptables -A FORWARD -j REJECT
 
 sysctl -w net.ipv4.conf.veth-vms.proxy_arp=1
 sysctl -w net.ipv6.conf.veth-vms.disable_ipv6=1
 iptables -A FORWARD -i veth-vms -o eth0 -j ACCEPT
 iptables -A FORWARD -i eth0 -o veth-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+iptables -A FORWARD -j REJECT
+
+ip netns exec vms iptables -A INPUT -j REJECT
+iptables -A INPUT -i veth-ssh -j REJECT
+iptables -A INPUT -i veth-vms -j REJECT
