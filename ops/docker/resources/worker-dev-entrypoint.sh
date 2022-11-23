@@ -76,6 +76,10 @@ sysctl -w net.ipv6.conf.veth-vms.disable_ipv6=1
 iptables -A FORWARD -i veth-vms -o eth0 -j ACCEPT
 iptables -A FORWARD -i eth0 -o veth-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+iptables -A FORWARD -i eth0 -o veth-ssh -j ACCEPT
+iptables -A FORWARD -i veth-ssh -o eth0 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
 iptables -A FORWARD -j REJECT
 
 ip netns exec vms iptables -A INPUT -j REJECT
