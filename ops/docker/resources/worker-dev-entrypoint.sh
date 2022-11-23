@@ -69,7 +69,7 @@ ip netns exec vms sysctl -w net.ipv6.conf.hocusvm-tap0.disable_ipv6=1
 ip netns exec vms iptables -A FORWARD -i "hocusvm-tap+" -o vpeer-vms -j ACCEPT
 ip netns exec vms iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap+" -m state --state ESTABLISHED,RELATED -j ACCEPT
 ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-vms -j MASQUERADE
-ip netns exec vms iptables -A FORWARD -j REJECT
+ip netns exec vms iptables -P FORWARD DROP
 
 sysctl -w net.ipv4.conf.veth-vms.proxy_arp=1
 sysctl -w net.ipv6.conf.veth-vms.disable_ipv6=1
@@ -80,8 +80,6 @@ iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 iptables -A FORWARD -i eth0 -o veth-ssh -j ACCEPT
 iptables -A FORWARD -i veth-ssh -o eth0 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
-iptables -A FORWARD -j REJECT
-
-ip netns exec vms iptables -A INPUT -j REJECT
-iptables -A INPUT -i veth-ssh -j REJECT
-iptables -A INPUT -i veth-vms -j REJECT
+iptables -P FORWARD DROP
+iptables -P INPUT DROP
+iptables -A INPUT -i eth0 -j ACCEPT
