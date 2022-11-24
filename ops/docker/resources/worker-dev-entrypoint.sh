@@ -54,6 +54,9 @@ iptables -t nat -A POSTROUTING -o veth-ssh -j MASQUERADE
 ip netns exec ssh iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 ip netns exec ssh iptables -A OUTPUT -j REJECT -d "$HOST_NS_SSH_IF_IP"/16
 
+# Enable making connections from the ssh ns
+ip netns exec ssh ip link set dev lo up
+
 ip netns add ns-hocusvm0
 ip link add hocusvm-tap0 type veth peer name vpeer-hocusvm0
 ip link set hocusvm-tap0 netns vms
@@ -64,12 +67,26 @@ ip netns exec vms ip link set hocusvm-tap0 up
 ip netns exec ns-hocusvm0 ip link set vpeer-hocusvm0 up
 ip netns exec ns-hocusvm0 ip route add default via "$VM0_NS_VMS_IF_IP"
 
+# Enable communication between the host ns and the vms
+ip netns exec vms sysctl -w net.ipv4.conf.vpeer-vms.proxy_arp=1
+ip netns exec vms sysctl -w net.ipv6.conf.vpeer-vms.disable_ipv6=1
 ip netns exec vms sysctl -w net.ipv4.conf.hocusvm-tap0.proxy_arp=1
 ip netns exec vms sysctl -w net.ipv6.conf.hocusvm-tap0.disable_ipv6=1
 ip netns exec vms iptables -A FORWARD -i "hocusvm-tap+" -o vpeer-vms -j ACCEPT
-ip netns exec vms iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap+" -m state --state ESTABLISHED,RELATED -j ACCEPT
+ip netns exec vms iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap+" -j ACCEPT
 ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-vms -j MASQUERADE
+ip netns exec vms iptables -t nat -A POSTROUTING -o "hocusvm-tap+" -j MASQUERADE
 ip netns exec vms iptables -P FORWARD DROP
+ip netns exec vms iptables -P INPUT DROP
+
+ip netns exec vms sysctl -w net.ipv4.conf.vpeer-ssh-vms.proxy_arp=1
+ip netns exec vms sysctl -w net.ipv6.conf.vpeer-ssh-vms.disable_ipv6=1
+
+# This snippet should be executed by the agent when a vm becomes public
+# and removed from this file once the logic in the agent is implemented
+ip netns exec vms iptables -A FORWARD -i vpeer-ssh-vms -o hocusvm-tap0 -j ACCEPT
+ip netns exec vms iptables -A FORWARD -i hocusvm-tap0 -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
+ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-ssh-vms -j MASQUERADE
 
 sysctl -w net.ipv4.conf.veth-vms.proxy_arp=1
 sysctl -w net.ipv6.conf.veth-vms.disable_ipv6=1
@@ -83,3 +100,4 @@ iptables -A FORWARD -i veth-ssh -o eth0 -m state --state ESTABLISHED,RELATED -j 
 iptables -P FORWARD DROP
 iptables -P INPUT DROP
 iptables -A INPUT -i eth0 -j ACCEPT
+iptables -A INPUT -i veth-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
