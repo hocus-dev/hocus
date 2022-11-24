@@ -99,5 +99,6 @@ iptables -A FORWARD -i veth-ssh -o eth0 -m state --state ESTABLISHED,RELATED -j 
 
 iptables -P FORWARD DROP
 iptables -P INPUT DROP
+iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -i eth0 -j ACCEPT
 iptables -A INPUT -i veth-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
