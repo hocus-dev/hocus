@@ -21,15 +21,23 @@ reach() {
 
 SSH_NS_HOST_IF_IP="10.10.0.2"
 SSH_NS_VMS_IF_IP="10.231.0.5"
+
 VMS_NS_HOST_IF_IP="10.231.0.2"
+
 HOST_IP="$(ip addr show eth0 | grep -Po 'inet \K[\d.]+')"
 HOST_NS_VMS_IF_IP="10.231.0.1"
 HOST_NS_SSH_IF_IP="10.10.0.1"
+
+VMS_NS_VM0_IF_IP="10.231.0.9"
 VM0_NS_VMS_IF_IP="10.231.0.10"
+
+VMS_NS_VM1_IF_IP="10.231.0.13"
+VM1_NS_VMS_IF_IP="10.231.0.14"
 
 COMMANDS=$(cat << EOM
 reach 127.0.0.1
 reach "$VM0_NS_VMS_IF_IP" "" 2
+reach "$VM1_NS_VMS_IF_IP" "" 2
 expect_fail reach "$VMS_NS_HOST_IF_IP" "" 2
 
 reach google.com ns-hocusvm0 5
@@ -38,7 +46,14 @@ expect_fail reach "$HOST_NS_VMS_IF_IP" ns-hocusvm0 2
 expect_fail reach "$SSH_NS_VMS_IF_IP" ns-hocusvm0 2
 expect_fail reach "$SSH_NS_HOST_IF_IP" ns-hocusvm0 2
 
+reach google.com ns-hocusvm1 5
+expect_fail reach "$HOST_IP" ns-hocusvm1 2
+expect_fail reach "$HOST_NS_VMS_IF_IP" ns-hocusvm1 2
+expect_fail reach "$SSH_NS_VMS_IF_IP" ns-hocusvm1 2
+expect_fail reach "$SSH_NS_HOST_IF_IP" ns-hocusvm1 2
+
 reach "$VM0_NS_VMS_IF_IP" ssh 2
+expect_fail reach "$VM1_NS_VMS_IF_IP" ssh 2
 expect_fail reach "$HOST_NS_SSH_IF_IP" ssh 2
 expect_fail reach "$HOST_IP" ssh 2
 EOM
