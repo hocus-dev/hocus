@@ -1,4 +1,5 @@
 import { DefaultLogger } from "@temporalio/worker";
+import { ResponseError } from "firecracker-client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 import { unwrap } from "~/utils.shared";
@@ -25,8 +26,14 @@ const provideActivities = (
     try {
       await testFn({ activities: await createActivities(injector), runId });
     } catch (err) {
-      // eslint-disable-next-line no-console
+      /* eslint-disable no-console */
       console.error(`Failed run id: ${runId}`);
+      if (err instanceof ResponseError) {
+        console.error(
+          `Status: ${err.response.status} ${err.response.statusText}\n${await err.response.text()}`,
+        );
+      }
+      /* eslint-enable no-console */
       throw err;
     } finally {
       await injector.dispose();
@@ -43,7 +50,7 @@ test.concurrent(
     }) => {
       const repositoryDrivePath = `/tmp/repo-test-${runId}.ext4`;
       await fetchRepository({
-        rootFsPath: "/hocus-resources/fetchrepo.ext4",
+        rootFsPath: "/srv/jailer/resources/fetchrepo.ext4",
         outputDrive: {
           pathOnHost: repositoryDrivePath,
           maxSizeMiB: 10000,

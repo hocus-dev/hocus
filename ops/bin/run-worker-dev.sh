@@ -17,7 +17,7 @@ docker run \
   --rm \
   --privileged \
   -v "$REPO_DIR:/app" \
-  -v "$HOCUS_RESOURCES_DIR:/hocus-resources" \
+  -v "$HOCUS_RESOURCES_DIR:/srv/jailer" \
   -v /dev/kvm:/dev/kvm \
   -p 2222:22 \
   --name agent \

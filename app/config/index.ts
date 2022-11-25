@@ -31,13 +31,13 @@ export const config = makeConfig()({
     url: get("GOOGLE_ANALYTICS_URL", "https://www.google-analytics.com/debug"),
   }),
   agent: () => ({
-    defaultKernel: get("AGENT_KERNEL_PATH", "/hocus-resources/vmlinux-5.6-x86_64.bin"),
+    defaultKernel: get("AGENT_KERNEL_PATH", "/srv/jailer/resources/vmlinux-5.6-x86_64.bin"),
     checkoutAndInspectRootFs: get(
       "AGENT_CHECKOUT_AND_INSPECT_ROOTFS_PATH",
-      "/hocus-resources/checkout-and-inspect.ext4",
+      "/srv/jailer/resources/checkout-and-inspect.ext4",
     ),
     hostBuildfsResourcesDir: get("AGENT_HOST_BUILDFS_RESOURCES_DIR", "/app/resources"),
-    buildfsRootFs: get("AGENT_BUILDFS_ROOTFS", "/hocus-resources/buildfs.ext4"),
+    buildfsRootFs: get("AGENT_BUILDFS_ROOTFS", "/srv/jailer/resources/buildfs.ext4"),
     // `get` is not used here because users usually will not want to set these manually
     // in production. `get` would throw an error if the env var was not set.
     prebuildSshPublicKey:

@@ -7,6 +7,7 @@ import { Configuration, DefaultApi } from "firecracker-client";
 import { Netmask } from "netmask";
 import type { Config as SSHConfig, NodeSSH } from "node-ssh";
 import { fetch, Agent } from "undici";
+import type { Config } from "~/config";
 import { Token } from "~/token";
 
 import type { AgentUtilService } from "./agent-util.service";
@@ -24,27 +25,34 @@ export function factoryFirecrackerService(
   storageService: StorageService,
   agentUtilService: AgentUtilService,
   logger: DefaultLogger,
+  config: Config,
 ): (instanceId: string) => FirecrackerService {
   return (instanceId: string) =>
-    new FirecrackerService(storageService, agentUtilService, logger, instanceId);
+    new FirecrackerService(storageService, agentUtilService, logger, config, instanceId);
 }
 factoryFirecrackerService.inject = [
   Token.StorageService,
   Token.AgentUtilService,
   Token.Logger,
+  Token.Config,
 ] as const;
 
 export class FirecrackerService {
   private api: DefaultApi;
   private readonly pathToSocket: string;
+  private readonly instanceDir: string;
+  private readonly agentConfig: ReturnType<Config["agent"]>;
 
   constructor(
     private readonly storageService: StorageService,
     private readonly agentUtilService: AgentUtilService,
     private readonly logger: DefaultLogger,
+    private readonly config: Config,
     public readonly instanceId: string,
   ) {
-    this.pathToSocket = `/srv/jailer/firecracker/${instanceId}/root/run/firecracker.socket`;
+    this.agentConfig = config.agent();
+    this.instanceDir = `/srv/jailer/firecracker/${instanceId}/root`;
+    this.pathToSocket = `${this.instanceDir}/run/firecracker.socket`;
     const customFetch: typeof fetch = (input, init) => {
       return fetch(input, {
         ...init,
@@ -128,15 +136,6 @@ export class FirecrackerService {
     }
     this.logger.info(`firecracker instance pid: ${child.pid}`);
     return child.pid;
-  }
-
-  doesTapDeviceExist(tapName: string): boolean {
-    const { stdout } = execCmd("ip", "tuntap", "list");
-    const tapRegex = new RegExp(`^${tapName}:`);
-    return stdout
-      .toString()
-      .split("\n")
-      .some((line) => tapRegex.test(line));
   }
 
   private async getFreeIpBlockId(): Promise<number> {
@@ -229,9 +228,15 @@ export class FirecrackerService {
   }): Promise<FullVmConfiguration> {
     const mask = new Netmask(`255.255.255.255/${cfg.tapDeviceCidr}`).mask;
     const ipArg = `ip=${cfg.vmIp}::${cfg.tapDeviceIp}:${mask}::eth0:off`;
+
+    // this is an ugly hack, remove it in the next commit
+    execCmd("ln", cfg.kernelPath, `${this.instanceDir}/kernel.bin`);
+    execCmd("chown", "162137:162137", cfg.kernelPath);
+    execCmd("chown", "162137:162137", `${this.instanceDir}/kernel.bin`);
+
     await this.api.putGuestBootSource({
       body: {
-        kernelImagePath: cfg.kernelPath,
+        kernelImagePath: "/kernel.bin",
         bootArgs: `ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on ${ipArg}`,
       },
     });
@@ -274,10 +279,6 @@ export class FirecrackerService {
   async withVM<T>(
     config: {
       ssh: Omit<SSHConfig, "host">;
-      /**
-       * Defaults to `/hocus-resources/vmlinux-5.6-x86_64.bin`
-       * if not specified.
-       */
       kernelPath?: string;
       rootFsPath: string;
       /**
@@ -296,7 +297,7 @@ export class FirecrackerService {
       vmIp: string;
     }) => Promise<T>,
   ): Promise<T> {
-    const kernelPath = config.kernelPath ?? "/hocus-resources/vmlinux-5.6-x86_64.bin";
+    const kernelPath = config.kernelPath ?? this.agentConfig.defaultKernel;
     const shouldPoweroff = config.shouldPoweroff ?? true;
     const extraDrives = config.extraDrives ?? [];
     const fcPid = this.startFirecrackerInstance();
