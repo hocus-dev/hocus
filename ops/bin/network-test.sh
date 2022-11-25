@@ -19,6 +19,17 @@ reach() {
   fi
 }
 
+reach_http() {
+  local address="$1"
+  local netns="${2:-""}"
+  local timeout_secs="${3:-"0.2"}"
+  if [ -z "$netns" ]; then
+    timeout "$timeout_secs" curl -s "$address" >> /dev/null 2>&1
+  else
+    ip netns exec "$netns" timeout "$timeout_secs" curl -s "$address" >> /dev/null 2>&1
+  fi
+}
+
 SSH_NS_HOST_IF_IP="10.10.0.2"
 SSH_NS_VMS_IF_IP="10.231.0.5"
 
@@ -52,7 +63,9 @@ expect_fail reach "$HOST_NS_VMS_IF_IP" ns-hocusvm1 2
 expect_fail reach "$SSH_NS_VMS_IF_IP" ns-hocusvm1 2
 expect_fail reach "$SSH_NS_HOST_IF_IP" ns-hocusvm1 2
 
-reach "$VM0_NS_VMS_IF_IP" ssh 2
+reach_http "$VM0_NS_VMS_IF_IP":22 ssh 2
+expect_fail reach_http "$VM1_NS_VMS_IF_IP":22 ssh 2
+expect_fail reach "$VM0_NS_VMS_IF_IP" ssh 2
 expect_fail reach "$VM1_NS_VMS_IF_IP" ssh 2
 expect_fail reach "$HOST_NS_SSH_IF_IP" ssh 2
 expect_fail reach "$HOST_IP" ssh 2
@@ -66,6 +79,7 @@ COMMANDS="$(echo "$COMMANDS" | sed '/^\s*$/d')"
 readarray -t COMMANDS <<<"$COMMANDS"
 
 export -f reach
+export -f reach_http
 export -f expect_fail
 
 PIDS=()

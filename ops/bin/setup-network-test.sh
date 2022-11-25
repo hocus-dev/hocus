@@ -27,7 +27,7 @@ setup_fake_vm() {
     return
   fi
 
-  ip netns exec vms iptables -A FORWARD -i vpeer-ssh-vms -o hocusvm-tap"$VM_ID" -j ACCEPT
+  ip netns exec vms iptables -A FORWARD -i vpeer-ssh-vms -o hocusvm-tap"$VM_ID" -p tcp --dport 22 -j ACCEPT
   ip netns exec vms iptables -A FORWARD -i hocusvm-tap"$VM_ID" -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
   ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-ssh-vms -j MASQUERADE
 }
@@ -40,3 +40,6 @@ VM1_NS_VMS_IF_IP="10.231.0.14"
 
 setup_fake_vm 0 "$VMS_NS_VM0_IF_IP" "$VM0_NS_VMS_IF_IP" true
 setup_fake_vm 1 "$VMS_NS_VM1_IF_IP" "$VM1_NS_VMS_IF_IP" false
+
+ip netns exec ns-hocusvm0 python3 -m http.server 22 -b "$VM0_NS_VMS_IF_IP" > /dev/null 2>&1 &
+ip netns exec ns-hocusvm1 python3 -m http.server 22 -b "$VM1_NS_VMS_IF_IP" > /dev/null 2>&1 &
