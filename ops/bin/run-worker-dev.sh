@@ -23,4 +23,4 @@ docker run \
   --name agent \
   worker-dev \
   /bin/bash -c \
-  "ops/docker/resources/worker-dev-entrypoint.sh && TEMPORAL_ADDRESS=\$GITPOD_IP:7233 /bin/bash"
+  "ops/docker/resources/setup-network.sh && TEMPORAL_ADDRESS=\$GITPOD_IP:7233 /bin/bash"
