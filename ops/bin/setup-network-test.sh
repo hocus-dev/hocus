@@ -11,24 +11,24 @@ setup_fake_vm() {
   local ENABLE_SSH="$4"
 
   ip netns add ns-hocusvm"$VM_ID"
-  ip link add hocusvm-tap"$VM_ID" type veth peer name vpeer-hocusvm"$VM_ID"
-  ip link set hocusvm-tap"$VM_ID" netns vms
+  ip link add vm"$VM_ID" type veth peer name vpeer-hocusvm"$VM_ID"
+  ip link set vm"$VM_ID" netns vms
   ip link set vpeer-hocusvm"$VM_ID" netns ns-hocusvm"$VM_ID"
-  ip netns exec vms ip addr add "$VMS_NS_VM_IF_IP"/30 dev hocusvm-tap"$VM_ID"
+  ip netns exec vms ip addr add "$VMS_NS_VM_IF_IP"/30 dev vm"$VM_ID"
   ip netns exec ns-hocusvm"$VM_ID" ip addr add "$VM_NS_VMS_IF_IP"/16 dev vpeer-hocusvm"$VM_ID"
-  ip netns exec vms ip link set hocusvm-tap"$VM_ID" up
+  ip netns exec vms ip link set vm"$VM_ID" up
   ip netns exec ns-hocusvm"$VM_ID" ip link set vpeer-hocusvm"$VM_ID" up
   ip netns exec ns-hocusvm"$VM_ID" ip route add default via "$VM_NS_VMS_IF_IP"
 
-  ip netns exec vms sysctl -w net.ipv4.conf.hocusvm-tap"$VM_ID".proxy_arp=1
-  ip netns exec vms sysctl -w net.ipv6.conf.hocusvm-tap"$VM_ID".disable_ipv6=1
+  ip netns exec vms sysctl -w net.ipv4.conf.vm"$VM_ID".proxy_arp=1
+  ip netns exec vms sysctl -w net.ipv6.conf.vm"$VM_ID".disable_ipv6=1
 
   if [ ! "$ENABLE_SSH" = "true" ]; then
     return
   fi
 
-  ip netns exec vms iptables -A FORWARD -i vpeer-ssh-vms -o hocusvm-tap"$VM_ID" -p tcp --dport 22 -j ACCEPT
-  ip netns exec vms iptables -A FORWARD -i hocusvm-tap"$VM_ID" -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
+  ip netns exec vms iptables -A FORWARD -i vpeer-ssh-vms -o vm"$VM_ID" -p tcp --dport 22 -j ACCEPT
+  ip netns exec vms iptables -A FORWARD -i vm"$VM_ID" -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
   ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-ssh-vms -j MASQUERADE
 }
 

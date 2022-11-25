@@ -10,5 +10,7 @@ RUN apt-get update && apt-get install -y socat openssh-server
 RUN apt-get update && apt-get install -y iputils-ping
 RUN test -f /usr/sbin/nologin && useradd -ms /usr/sbin/nologin sshgateway
 COPY --chown=root:root --chmod=0644 resources/sshd_config /etc/ssh/sshd_config
+# Reguired for jailer to start
+RUN mkdir -p /srv/jailer
 
 WORKDIR /app

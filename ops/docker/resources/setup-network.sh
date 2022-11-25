@@ -60,10 +60,10 @@ ip netns exec ssh ip link set dev lo up
 # Enable communication between the host ns and the vms
 ip netns exec vms sysctl -w net.ipv4.conf.vpeer-vms.proxy_arp=1
 ip netns exec vms sysctl -w net.ipv6.conf.vpeer-vms.disable_ipv6=1
-ip netns exec vms iptables -A FORWARD -i "hocusvm-tap+" -o vpeer-vms -j ACCEPT
-ip netns exec vms iptables -A FORWARD -i vpeer-vms -o "hocusvm-tap+" -j ACCEPT
+ip netns exec vms iptables -A FORWARD -i "vm+" -o vpeer-vms -j ACCEPT
+ip netns exec vms iptables -A FORWARD -i vpeer-vms -o "vm+" -j ACCEPT
 ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-vms -j MASQUERADE
-ip netns exec vms iptables -t nat -A POSTROUTING -o "hocusvm-tap+" -j MASQUERADE
+ip netns exec vms iptables -t nat -A POSTROUTING -o "vm+" -j MASQUERADE
 ip netns exec vms iptables -P FORWARD DROP
 ip netns exec vms iptables -P INPUT DROP
 

@@ -39,7 +39,7 @@ export class LowLevelStorageService {
     const raw = await fs.readFile(this.getPathToStorage(), "utf8");
     if (raw === "") {
       return {
-        busyIpIds: [],
+        busyIpBlockIds: [],
       };
     }
     return AgentStorageValidator.Parse(yaml.parse(raw));
