@@ -26,3 +26,7 @@ kT/zzBjwBqbPaBtGv3MAAAAAImdpdHBvZEBodWdvZHV0a2Etcm9vbXMtb2xhZXA1enZidm
 oBAgM=
 -----END OPENSSH PRIVATE KEY-----
 `;
+
+export const JAILER_USER_ID = "162137";
+export const JAILER_GROUP_ID = "162137";
+export const MAX_UNIX_SOCKET_PATH_LENGTH = 108;

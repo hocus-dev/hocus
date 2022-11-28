@@ -77,7 +77,7 @@ export const withSsh = async <T>(
   connectionOptions: SSHConfig,
   fn: (ssh: NodeSSH) => Promise<T>,
 ): Promise<T> => {
-  const ssh = await new NodeSSH().connect(connectionOptions);
+  const ssh = await retry(async () => await new NodeSSH().connect(connectionOptions), 10, 250);
   try {
     return await fn(ssh);
   } finally {
@@ -134,4 +134,27 @@ export const watchFileUntilLineMatches = (
 
 export const sleep = (ms: number): Promise<void> => {
   return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+export const randomString = (length: number): string => {
+  return [...Array(length)].map(() => Math.random().toString(36)[2]).join("");
+};
+
+export const retry = async <T>(
+  fn: () => Promise<T>,
+  maxRetries: number,
+  retryDelayMs: number,
+): Promise<T> => {
+  let lastError: unknown = void 0;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (i < maxRetries - 1) {
+        await sleep(retryDelayMs);
+      }
+    }
+  }
+  throw lastError;
 };

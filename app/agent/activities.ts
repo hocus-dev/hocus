@@ -11,7 +11,7 @@ import type { createAgentInjector } from "./agent-injector";
 import { PrebuildTaskStatus } from "./constants";
 import { PidValidator } from "./pid.validator";
 import type { ProjectConfig } from "./project-config/validator";
-import { execSshCmd, withSsh } from "./utils";
+import { execSshCmd, randomString, withSsh } from "./utils";
 
 export const createActivities = async (injector: ReturnType<typeof createAgentInjector>) => {
   const agentConfig = injector.resolve(Token.Config).agent();
@@ -218,7 +218,7 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
      */
     outputDrivePath: string;
   }): Promise<ProjectConfig | null> => {
-    const instanceId = `checkout-and-inspect-${uuidv4()}`;
+    const instanceId = `checkout-and-inspect-${randomString(8)}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const logger = injector.resolve(Token.Logger);
     const projectConfigService = injector.resolve(Token.ProjectConfigService);

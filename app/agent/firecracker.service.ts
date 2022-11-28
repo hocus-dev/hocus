@@ -1,5 +1,7 @@
 import { spawn } from "child_process";
 import fs from "fs";
+import fsAsync from "fs/promises";
+import path from "path";
 
 import type { DefaultLogger } from "@temporalio/worker";
 import type { FullVmConfiguration, PutGuestDriveByIDRequest } from "firecracker-client";
@@ -11,15 +13,17 @@ import type { Config } from "~/config";
 import { Token } from "~/token";
 
 import type { AgentUtilService } from "./agent-util.service";
+import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "./constants";
 import { FifoFlags } from "./fifo-flags";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import type { StorageService } from "./storage/storage.service";
-import { execCmd, execSshCmd, watchFileUntilLineMatches, withSsh } from "./utils";
+import { execCmd, execSshCmd, retry, watchFileUntilLineMatches, withSsh } from "./utils";
 
 const IP_PREFIX = "10.231.";
 const NS_PREFIX = ["ip", "netns", "exec", "vms"] as const;
 const TAP_DEVICE_NAME_PREFIX = "vm";
 const TAP_DEVICE_CIDR = 30;
+const CHROOT_PATH_TO_SOCK = "/run/sock";
 
 export function factoryFirecrackerService(
   storageService: StorageService,
@@ -52,7 +56,13 @@ export class FirecrackerService {
   ) {
     this.agentConfig = config.agent();
     this.instanceDir = `/srv/jailer/firecracker/${instanceId}/root`;
-    this.pathToSocket = `${this.instanceDir}/run/firecracker.socket`;
+    this.pathToSocket = path.join(this.instanceDir, CHROOT_PATH_TO_SOCK);
+    if (this.pathToSocket.length > MAX_UNIX_SOCKET_PATH_LENGTH) {
+      // https://blog.8-p.info/en/2020/06/11/unix-domain-socket-length/
+      throw new Error(
+        "Instance ID is too long. Length of the path to the socket exceeds the maximum on Linux.",
+      );
+    }
     const customFetch: typeof fetch = (input, init) => {
       return fetch(input, {
         ...init,
@@ -75,7 +85,7 @@ export class FirecrackerService {
     return `/tmp/${this.instanceId}.stdin`;
   }
 
-  startFirecrackerInstance(): number {
+  async startFirecrackerInstance(): Promise<number> {
     this.logger.info(`starting firecracker instance with socket at ${this.pathToSocket}`);
 
     const stdinPath = this.getStdinPath();
@@ -108,13 +118,16 @@ export class FirecrackerService {
         "--id",
         this.instanceId,
         "--uid",
-        "162137",
+        JAILER_USER_ID,
         "--gid",
-        "162137",
+        JAILER_GROUP_ID,
         "--netns",
         "/var/run/netns/vms",
         "--exec-file",
         "/usr/local/bin/firecracker",
+        "--",
+        "--api-sock",
+        CHROOT_PATH_TO_SOCK,
       ],
       {
         stdio: [childStdin, childStdout, childStderr],
@@ -134,6 +147,19 @@ export class FirecrackerService {
     if (child.pid == null) {
       throw new Error("Failed to start firecracker");
     }
+
+    this.logger.info(`firecracker process started with pid ${child.pid}`);
+
+    // Wait for the socket to be created
+    try {
+      await retry(async () => await fsAsync.stat(this.pathToSocket), 1000, 5);
+    } catch (err) {
+      this.logger.error(
+        `Timeout waiting for firecracker to create a socket at ${this.pathToSocket}`,
+      );
+      throw err;
+    }
+
     this.logger.info(`firecracker instance pid: ${child.pid}`);
     return child.pid;
   }
@@ -217,6 +243,16 @@ export class FirecrackerService {
     return;
   }
 
+  private linkToJailerChroot(filePath: string, relativePathInChroot: string): void {
+    const chrootPath = path.join(this.instanceDir, relativePathInChroot);
+    execCmd("ln", filePath, chrootPath);
+    execCmd("chown", `${JAILER_USER_ID}:${JAILER_GROUP_ID}`, chrootPath);
+  }
+
+  /**
+   * Paths to kernel and drives should be absolute. They will be hardlinked to the jailer's
+   * chroot directory and paths supplied to firecracker will be properly modified.
+   */
   async createVM(cfg: {
     kernelPath: string;
     rootFsPath: string;
@@ -229,14 +265,18 @@ export class FirecrackerService {
     const mask = new Netmask(`255.255.255.255/${cfg.tapDeviceCidr}`).mask;
     const ipArg = `ip=${cfg.vmIp}::${cfg.tapDeviceIp}:${mask}::eth0:off`;
 
-    // this is an ugly hack, remove it in the next commit
-    execCmd("ln", cfg.kernelPath, `${this.instanceDir}/kernel.bin`);
-    execCmd("chown", "162137:162137", cfg.kernelPath);
-    execCmd("chown", "162137:162137", `${this.instanceDir}/kernel.bin`);
+    const chrootKernelPath = "/kernel.bin";
+    const chrootRootFsPath = "/rootfs.ext4";
+
+    this.linkToJailerChroot(cfg.kernelPath, chrootKernelPath);
+    this.linkToJailerChroot(cfg.rootFsPath, chrootRootFsPath);
+    for (const [idx, drive] of cfg.extraDrives.entries()) {
+      this.linkToJailerChroot(drive.pathOnHost, `/drive${idx}`);
+    }
 
     await this.api.putGuestBootSource({
       body: {
-        kernelImagePath: "/kernel.bin",
+        kernelImagePath: chrootKernelPath,
         bootArgs: `ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on ${ipArg}`,
       },
     });
@@ -244,15 +284,15 @@ export class FirecrackerService {
       driveId: "rootfs",
       body: {
         driveId: "rootfs",
-        pathOnHost: cfg.rootFsPath,
+        pathOnHost: chrootRootFsPath,
         isReadOnly: false,
         isRootDevice: true,
       },
     });
-    for (const drive of cfg.extraDrives) {
+    for (const [idx, drive] of cfg.extraDrives.entries()) {
       await this.api.putGuestDriveByID({
         driveId: drive.driveId,
-        body: drive,
+        body: { ...drive, pathOnHost: `/drive${idx}` },
       });
     }
     await this.api.putGuestNetworkInterfaceByID({
@@ -300,7 +340,7 @@ export class FirecrackerService {
     const kernelPath = config.kernelPath ?? this.agentConfig.defaultKernel;
     const shouldPoweroff = config.shouldPoweroff ?? true;
     const extraDrives = config.extraDrives ?? [];
-    const fcPid = this.startFirecrackerInstance();
+    const fcPid = await this.startFirecrackerInstance();
     let ipBlockId: null | number = null;
     try {
       ipBlockId = await this.getFreeIpBlockId();

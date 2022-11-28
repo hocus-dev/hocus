@@ -1,5 +1,7 @@
+import path from "path";
+
 import { DefaultLogger } from "@temporalio/worker";
-import { ResponseError } from "firecracker-client";
+import { FetchError, ResponseError } from "firecracker-client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 import { unwrap } from "~/utils.shared";
@@ -8,7 +10,7 @@ import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
 import { PrebuildTaskStatus } from "./constants";
 import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY } from "./test-constants";
-import { execSshCmd, withSsh } from "./utils";
+import { execCmd, execSshCmd, withSsh } from "./utils";
 
 const provideActivities = (
   testFn: (args: {
@@ -32,6 +34,10 @@ const provideActivities = (
         console.error(
           `Status: ${err.response.status} ${err.response.statusText}\n${await err.response.text()}`,
         );
+      } else if (err instanceof FetchError) {
+        console.error(err.cause);
+      } else {
+        console.error(err);
       }
       /* eslint-enable no-console */
       throw err;
@@ -48,7 +54,9 @@ test.concurrent(
       activities: { fetchRepository, checkoutAndInspect, buildfs, prebuild, startWorkspace },
       runId,
     }) => {
-      const repositoryDrivePath = `/tmp/repo-test-${runId}.ext4`;
+      const tmpPath = "/srv/jailer/resources/tmp/";
+      execCmd("mkdir", "-p", tmpPath);
+      const repositoryDrivePath = path.join(tmpPath, `repo-test-${runId}.ext4`);
       await fetchRepository({
         rootFsPath: "/srv/jailer/resources/fetchrepo.ext4",
         outputDrive: {
@@ -62,7 +70,7 @@ test.concurrent(
           },
         },
       });
-      const checkedOutRepositoryDrivePath = `/tmp/checkout-test-${runId}.ext4`;
+      const checkedOutRepositoryDrivePath = path.join(tmpPath, `checkout-test-${runId}.ext4`);
       const projectConfigResult = await checkoutAndInspect({
         repositoryDrivePath,
         targetBranch: "main",
@@ -70,12 +78,12 @@ test.concurrent(
       });
       expect(projectConfigResult).not.toBe(null);
       const projectConfig = unwrap(projectConfigResult);
-      const filesystemDrivePath = `/tmp/buildfs-test-${runId}.ext4`;
+      const filesystemDrivePath = path.join(tmpPath, `buildfs-test-${runId}.ext4`);
       await buildfs({
         runId,
         inputDrivePath: checkedOutRepositoryDrivePath,
         outputDrive: {
-          pathOnHost: `/tmp/buildfs-test-${runId}.ext4`,
+          pathOnHost: path.join(tmpPath, `buildfs-test-${runId}.ext4`),
           maxSizeMiB: 2000,
         },
         dockerfilePath: projectConfig.image.file,
@@ -91,7 +99,7 @@ test.concurrent(
       // here we check that when a task fails, other tasks are interrupted
       // and the prebuild is aborted
       const results = await prebuild({
-        runId,
+        runId: runId + `-2`,
         projectDrivePath: checkedOutRepositoryDrivePath,
         filesystemDrivePath,
         tasks: [
