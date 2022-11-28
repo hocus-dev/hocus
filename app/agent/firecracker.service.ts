@@ -347,9 +347,9 @@ export class FirecrackerService {
     } finally {
       if (shouldPoweroff) {
         process.kill(fcPid);
-      }
-      if (ipBlockId != null) {
-        await this.releaseIpBlockId(ipBlockId);
+        if (ipBlockId != null) {
+          await this.releaseIpBlockId(ipBlockId);
+        }
       }
     }
   }
