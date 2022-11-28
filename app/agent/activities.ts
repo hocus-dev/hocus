@@ -403,7 +403,7 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
         extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: devDir }],
         shouldPoweroff: false,
       },
-      async ({ ssh, vmIp, firecrackerPid }) => {
+      async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
         const taskFn = async (task: string, taskIdx: number): Promise<number> => {
           const script = agentUtilService.generatePrebuildScript(task);
           const scriptPath = `${scriptsDir}/task-${taskIdx}.sh`;
@@ -428,6 +428,7 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
           args.authorizedKeys,
         );
         const taskPids = await Promise.all(args.tasks.map(taskFn));
+        await firecrackerService.makeVmSshPubliclyAccessible(ipBlockId);
         return { firecrackerProcessPid: firecrackerPid, vmIp, taskPids };
       },
     );

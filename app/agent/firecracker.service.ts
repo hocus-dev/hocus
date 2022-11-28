@@ -11,6 +11,7 @@ import type { Config as SSHConfig, NodeSSH } from "node-ssh";
 import { fetch, Agent } from "undici";
 import type { Config } from "~/config";
 import { Token } from "~/token";
+import { unwrap } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
 import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "./constants";
@@ -335,6 +336,7 @@ export class FirecrackerService {
       sshConfig: SSHConfig;
       firecrackerPid: number;
       vmIp: string;
+      ipBlockId: number;
     }) => Promise<T>,
   ): Promise<T> {
     const kernelPath = config.kernelPath ?? this.agentConfig.defaultKernel;
@@ -376,7 +378,13 @@ export class FirecrackerService {
             useSudo,
           );
         }
-        const output = await fn({ ssh, sshConfig, firecrackerPid: fcPid, vmIp });
+        const output = await fn({
+          ssh,
+          sshConfig,
+          firecrackerPid: fcPid,
+          vmIp,
+          ipBlockId: unwrap(ipBlockId),
+        });
         if (shouldPoweroff) {
           const poweroffCmd = useSudo ? ["sudo", "poweroff"] : ["poweroff"];
           await execSshCmd({ ssh, allowNonZeroExitCode: true }, poweroffCmd);
@@ -391,6 +399,16 @@ export class FirecrackerService {
           await this.releaseIpBlockId(ipBlockId);
         }
       }
+    }
+  }
+
+  makeVmSshPubliclyAccessible(ipBlockId: number): void {
+    for (const cmd of [
+      `iptables -A FORWARD -i vpeer-ssh-vms -o vm${ipBlockId} -p tcp --dport 22 -j ACCEPT`,
+      `iptables -A FORWARD -i vm${ipBlockId} -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT`,
+      `iptables -A POSTROUTING -t nat -o vpeer-ssh-vms -j MASQUERADE`,
+    ]) {
+      execCmd(...NS_PREFIX, ...cmd.split(" "));
     }
   }
 }
