@@ -406,7 +406,6 @@ export class FirecrackerService {
     for (const cmd of [
       `iptables -A FORWARD -i vpeer-ssh-vms -o vm${ipBlockId} -p tcp --dport 22 -j ACCEPT`,
       `iptables -A FORWARD -i vm${ipBlockId} -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT`,
-      `iptables -A POSTROUTING -t nat -o vpeer-ssh-vms -j MASQUERADE`,
     ]) {
       execCmd(...NS_PREFIX, ...cmd.split(" "));
     }

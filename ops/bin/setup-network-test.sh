@@ -29,7 +29,6 @@ setup_fake_vm() {
 
   ip netns exec vms iptables -A FORWARD -i vpeer-ssh-vms -o vm"$VM_ID" -p tcp --dport 22 -j ACCEPT
   ip netns exec vms iptables -A FORWARD -i vm"$VM_ID" -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT
-  ip netns exec vms iptables -t nat -A POSTROUTING -o vpeer-ssh-vms -j MASQUERADE
 }
 
 VMS_NS_VM0_IF_IP="10.231.0.9"

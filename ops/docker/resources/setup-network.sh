@@ -79,6 +79,10 @@ iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 iptables -A FORWARD -i eth0 -o veth-ssh -j ACCEPT
 iptables -A FORWARD -i veth-ssh -o eth0 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
+# Part of enabling communication between outside world and the vms
+# The rest is added dynamically by the agent when a vm is made public
+iptables -A POSTROUTING -t nat -o vpeer-ssh-vms -j MASQUERADE
+
 iptables -P FORWARD DROP
 iptables -P INPUT DROP
 iptables -A INPUT -i lo -j ACCEPT
