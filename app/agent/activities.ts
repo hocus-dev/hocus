@@ -381,13 +381,14 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
     runId?: string;
     filesystemDrivePath: string;
     projectDrivePath: string;
-    authorizedKeys: string;
+    authorizedKeys: string[];
     tasks: string[];
   }): Promise<StartWorkspaceReturnValue> => {
     const runId = args.runId ?? uuidv4();
     const instanceId = `startvm-${runId}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const sshGatewayService = injector.resolve(Token.SSHGatewayService);
     const devDir = "/home/hocus/dev";
     const repositoryDir = `${devDir}/project`;
     const scriptsDir = `${devDir}/.hocus/command`;
@@ -422,13 +423,15 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
           ]);
           return Number(PidValidator.Parse(result.stdout));
         };
+        const authorizedKeys = args.authorizedKeys.map((key) => key.trim());
         await agentUtilService.writeFile(
           ssh,
           "/home/hocus/.ssh/authorized_keys",
-          args.authorizedKeys,
+          authorizedKeys.join("\n") + "\n",
         );
         const taskPids = await Promise.all(args.tasks.map(taskFn));
         await firecrackerService.makeVmSshPubliclyAccessible(ipBlockId);
+        await sshGatewayService.addPublicKeysToAuthorizedKeys(authorizedKeys);
         return { firecrackerProcessPid: firecrackerPid, vmIp, taskPids };
       },
     );

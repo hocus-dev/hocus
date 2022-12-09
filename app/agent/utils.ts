@@ -158,3 +158,15 @@ export const retry = async <T>(
   }
   throw lastError;
 };
+
+export const doesFileExist = async (filePath: string): Promise<boolean> => {
+  try {
+    await fs.promises.access(filePath);
+    return true;
+  } catch (err: any) {
+    if (err?.code === "ENOENT") {
+      return false;
+    }
+    throw err;
+  }
+};

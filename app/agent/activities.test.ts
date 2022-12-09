@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import path from "path";
 
 import { DefaultLogger } from "@temporalio/worker";
@@ -9,7 +10,7 @@ import { unwrap } from "~/utils.shared";
 import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
 import { PrebuildTaskStatus } from "./constants";
-import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY } from "./test-constants";
+import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY, SSH_PROXY_IP } from "./test-constants";
 import { execCmd, execSshCmd, withSsh } from "./utils";
 
 const provideActivities = (
@@ -116,6 +117,7 @@ test.concurrent(
       expect(results[3].status).toEqual(PrebuildTaskStatus.Error);
 
       let fcPid: number | null = null;
+      const pathToKey = "/tmp/testkey";
       try {
         const secondTaskOutput = "hello world from the second command!";
         const secondTask = `echo -n '${secondTaskOutput}'`;
@@ -124,10 +126,9 @@ test.concurrent(
           projectDrivePath: checkedOutRepositoryDrivePath,
           filesystemDrivePath,
           tasks: [`test -z "this task will fail"`, secondTask],
-          authorizedKeys: PUBLIC_SSH_KEY,
+          authorizedKeys: [PUBLIC_SSH_KEY],
         });
         fcPid = workspaceStartResult.firecrackerProcessPid;
-
         await withSsh(
           {
             username: "hocus",
@@ -142,7 +143,29 @@ test.concurrent(
             expect(stdout).toEqual(`+ ${secondTask}\n${secondTaskOutput}`);
           },
         );
+        await fs.writeFile(pathToKey, PRIVATE_SSH_KEY);
+        execCmd("chmod", "600", pathToKey);
+        const echoOutput = "I was executed via ssh";
+        const proxySshCmdOutput = execCmd(
+          "ip",
+          "netns",
+          "exec",
+          "tst",
+          "ssh",
+          "-o",
+          `ProxyCommand=ssh -W %h:%p -i ${pathToKey} sshgateway@${SSH_PROXY_IP}`,
+          "-o",
+          "StrictHostKeyChecking=no",
+          "-i",
+          pathToKey,
+          `hocus@${workspaceStartResult.vmIp}`,
+          "echo",
+          "-n",
+          echoOutput,
+        );
+        expect(proxySshCmdOutput.output.toString().includes(echoOutput)).toBe(true);
       } finally {
+        await fs.rm(pathToKey, { force: true });
         if (fcPid != null) {
           process.kill(fcPid);
         }

@@ -16,6 +16,9 @@ VMS_NS_SSH_IF_IP="10.231.0.6"
 VMS_NS_VM0_IF_IP="10.231.0.9"
 VM0_NS_VMS_IF_IP="10.231.0.10"
 
+SSH_NS_TST_IF_IP="10.11.0.1"
+TST_NS_SSH_IF_IP="10.11.0.2"
+
 # Setup the vms network namespace
 ip netns add vms
 ip link add veth-vms type veth peer name vpeer-vms
@@ -34,6 +37,19 @@ ip netns exec ssh ip addr add "$SSH_NS_HOST_IF_IP"/16 dev vpeer-ssh
 ip addr add "$HOST_NS_SSH_IF_IP"/30 dev veth-ssh
 ip link set veth-ssh up
 ip netns exec ssh ip link set dev vpeer-ssh up
+
+# Setup the tst network namespace. Used for testing connectivity to the ssh service
+# in agent tests.
+ip netns add tst
+ip link add veth-ssh-tst type veth peer name vpeer-ssh-tst
+ip link set veth-ssh-tst netns ssh
+ip link set vpeer-ssh-tst netns tst
+ip netns exec ssh ip addr add "$SSH_NS_TST_IF_IP"/16 dev veth-ssh-tst
+ip netns exec tst ip addr add "$TST_NS_SSH_IF_IP"/16 dev vpeer-ssh-tst
+ip netns exec ssh ip link set dev veth-ssh-tst up
+ip netns exec tst ip link set dev vpeer-ssh-tst up
+ip netns exec tst ip link set dev lo up
+ip netns exec tst ip route add default via "$TST_NS_SSH_IF_IP"
 
 # Connect the vms network namespace to the ssh network namespace
 ip link add veth-ssh-vms type veth peer name vpeer-ssh-vms
