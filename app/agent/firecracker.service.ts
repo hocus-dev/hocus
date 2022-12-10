@@ -413,14 +413,22 @@ export class FirecrackerService {
   async shutdownVMAndReleaseResources(ipBlockId: number | null): Promise<void> {
     await this.shutdownVM();
     if (ipBlockId != null) {
+      try {
+        await this.changeVMNetworkVisibility(ipBlockId, "private");
+      } catch (err) {
+        if (!(err instanceof Error && err.message.includes("Bad rule"))) {
+          throw err;
+        }
+      }
       await this.releaseIpBlockId(ipBlockId);
     }
   }
 
-  makeVmSshPubliclyAccessible(ipBlockId: number): void {
+  changeVMNetworkVisibility(ipBlockId: number, changeTo: "public" | "private"): void {
+    const action = changeTo === "public" ? "-A" : "-D";
     for (const cmd of [
-      `iptables -A FORWARD -i vpeer-ssh-vms -o vm${ipBlockId} -p tcp --dport 22 -j ACCEPT`,
-      `iptables -A FORWARD -i vm${ipBlockId} -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT`,
+      `iptables ${action} FORWARD -i vpeer-ssh-vms -o vm${ipBlockId} -p tcp --dport 22 -j ACCEPT`,
+      `iptables ${action} FORWARD -i vm${ipBlockId} -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT`,
     ]) {
       execCmd(...NS_PREFIX, ...cmd.split(" "));
     }

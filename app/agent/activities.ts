@@ -432,7 +432,7 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
           authorizedKeys.join("\n") + "\n",
         );
         const taskPids = await Promise.all(args.tasks.map(taskFn));
-        await firecrackerService.makeVmSshPubliclyAccessible(ipBlockId);
+        await firecrackerService.changeVMNetworkVisibility(ipBlockId, "public");
         await sshGatewayService.addPublicKeysToAuthorizedKeys(authorizedKeys);
         return {
           firecrackerProcessPid: firecrackerPid,
