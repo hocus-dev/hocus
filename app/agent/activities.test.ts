@@ -49,10 +49,17 @@ const provideActivities = (
 };
 
 test.concurrent(
-  "fetchRepository, checkoutAndInspect, prebuild, startWorkspace",
+  "fetchRepository, checkoutAndInspect, prebuild, startWorkspace, stopWorkspace",
   provideActivities(
     async ({
-      activities: { fetchRepository, checkoutAndInspect, buildfs, prebuild, startWorkspace },
+      activities: {
+        fetchRepository,
+        checkoutAndInspect,
+        buildfs,
+        prebuild,
+        startWorkspace,
+        stopWorkspace,
+      },
       runId,
     }) => {
       const tmpPath = "/srv/jailer/resources/tmp/";
@@ -153,7 +160,7 @@ test.concurrent(
           "tst",
           "ssh",
           "-o",
-          `ProxyCommand=ssh -W %h:%p -i ${pathToKey} sshgateway@${SSH_PROXY_IP}`,
+          `ProxyCommand=ssh -W %h:%p -o StrictHostKeyChecking=no -i ${pathToKey} sshgateway@${SSH_PROXY_IP}`,
           "-o",
           "StrictHostKeyChecking=no",
           "-i",
@@ -164,10 +171,18 @@ test.concurrent(
           echoOutput,
         );
         expect(proxySshCmdOutput.output.toString().includes(echoOutput)).toBe(true);
+        await stopWorkspace({
+          instanceId: workspaceStartResult.vmInstanceId,
+          ipBlockId: workspaceStartResult.ipBlockId,
+        });
       } finally {
         await fs.rm(pathToKey, { force: true });
         if (fcPid != null) {
-          process.kill(fcPid);
+          try {
+            process.kill(fcPid);
+          } catch {
+            // ignore
+          }
         }
       }
     },

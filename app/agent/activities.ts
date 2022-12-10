@@ -374,6 +374,8 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
   type StartWorkspaceReturnValue = {
     firecrackerProcessPid: number;
     vmIp: string;
+    vmInstanceId: string;
+    ipBlockId: number;
     taskPids: number[];
   };
 
@@ -432,9 +434,20 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
         const taskPids = await Promise.all(args.tasks.map(taskFn));
         await firecrackerService.makeVmSshPubliclyAccessible(ipBlockId);
         await sshGatewayService.addPublicKeysToAuthorizedKeys(authorizedKeys);
-        return { firecrackerProcessPid: firecrackerPid, vmIp, taskPids };
+        return {
+          firecrackerProcessPid: firecrackerPid,
+          vmIp,
+          taskPids,
+          ipBlockId,
+          vmInstanceId: instanceId,
+        };
       },
     );
+  };
+
+  const stopWorkspace = async (args: { instanceId: string; ipBlockId: number }): Promise<void> => {
+    const firecrackerService = injector.resolve(Token.FirecrackerService)(args.instanceId);
+    await firecrackerService.shutdownVMAndReleaseResources(args.ipBlockId);
   };
 
   return {
@@ -443,5 +456,6 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
     checkoutAndInspect,
     prebuild,
     startWorkspace,
+    stopWorkspace,
   };
 };

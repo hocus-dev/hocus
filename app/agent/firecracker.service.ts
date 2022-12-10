@@ -5,6 +5,7 @@ import path from "path";
 
 import type { DefaultLogger } from "@temporalio/worker";
 import type { FullVmConfiguration, PutGuestDriveByIDRequest } from "firecracker-client";
+import { InstanceActionInfoActionTypeEnum } from "firecracker-client";
 import { Configuration, DefaultApi } from "firecracker-client";
 import { Netmask } from "netmask";
 import type { Config as SSHConfig, NodeSSH } from "node-ssh";
@@ -18,7 +19,7 @@ import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "./
 import { FifoFlags } from "./fifo-flags";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import type { StorageService } from "./storage/storage.service";
-import { execCmd, execSshCmd, retry, watchFileUntilLineMatches, withSsh } from "./utils";
+import { execCmd, retry, watchFileUntilLineMatches, withSsh } from "./utils";
 
 const IP_PREFIX = "10.231.";
 const NS_PREFIX = ["ip", "netns", "exec", "vms"] as const;
@@ -378,27 +379,41 @@ export class FirecrackerService {
             useSudo,
           );
         }
-        const output = await fn({
+        return await fn({
           ssh,
           sshConfig,
           firecrackerPid: fcPid,
           vmIp,
           ipBlockId: unwrap(ipBlockId),
         });
-        if (shouldPoweroff) {
-          const poweroffCmd = useSudo ? ["sudo", "poweroff"] : ["poweroff"];
-          await execSshCmd({ ssh, allowNonZeroExitCode: true }, poweroffCmd);
-          await watchFileUntilLineMatches(/reboot: System halted/, this.getVMLogsPath(), 10000);
-        }
-        return output;
       });
     } finally {
       if (shouldPoweroff) {
-        process.kill(fcPid);
-        if (ipBlockId != null) {
-          await this.releaseIpBlockId(ipBlockId);
-        }
+        await this.shutdownVMAndReleaseResources(ipBlockId);
       }
+    }
+  }
+
+  /**
+   * Only works if the VM kernel is compiled with support for
+   * `CONFIG_SERIO_I8042` and `CONFIG_KEYBOARD_ATKBD` as per
+   * https://github.com/firecracker-microvm/firecracker/blob/2b8ad83629af511f918d616aa1c0d441e52c397a/docs/api_requests/actions.md#intel-and-amd-only-sendctrlaltdel
+   *
+   * Waits for the VM to shutdown.
+   */
+  async shutdownVM(): Promise<void> {
+    await this.api.createSyncAction({
+      info: {
+        actionType: InstanceActionInfoActionTypeEnum.SendCtrlAltDel,
+      },
+    });
+    await watchFileUntilLineMatches(/reboot: Restarting system/, this.getVMLogsPath(), 10000);
+  }
+
+  async shutdownVMAndReleaseResources(ipBlockId: number | null): Promise<void> {
+    await this.shutdownVM();
+    if (ipBlockId != null) {
+      await this.releaseIpBlockId(ipBlockId);
     }
   }
 
