@@ -112,19 +112,35 @@ test.concurrent(
         ),
       );
 
+      const getTasks = (eventId: bigint) =>
+        db.prebuildTask.findMany({ where: { prebuildEventId: eventId } });
+
+      let firstEventTasks = await getTasks(firstPrebuildEvent.id);
+      firstEventTasks.sort((a, b) => a.idx - b.idx);
+      expect(firstEventTasks.map((t) => t.command)).toMatchObject(
+        projectConfig.tasks.map((t) => t.init),
+      );
+      for (const task of firstEventTasks) {
+        expect(task.status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_PENDING);
+      }
+
       await prebuild({
         runId,
         projectDrivePath: checkedOutRepositoryDrivePath,
         filesystemDrivePath,
         prebuildEventId: firstPrebuildEvent.id,
       });
+      firstEventTasks = await getTasks(firstPrebuildEvent.id);
+      for (const task of firstEventTasks) {
+        expect(task.status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_SUCCESS);
+      }
 
       const secondPrebuildEvent = await db.$transaction((tdb) =>
         agentUtilService.createPrebuildEvent(tdb, [
-          `echo "alright!"`,
+          `echo "one€" && sleep 1 && echo "two😄"`,
           "sleep 15",
           "sleep 15",
-          `sleep 1 && test -z "this task will fail"`,
+          `sleep 2 && test -z "this task will fail"`,
         ]),
       );
 
@@ -136,11 +152,27 @@ test.concurrent(
         filesystemDrivePath,
         prebuildEventId: secondPrebuildEvent.id,
       });
-      expect(results[0].status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_SUCCESS);
-      for (const idx of [1, 2]) {
-        expect(results[idx].status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_CANCELLED);
-      }
-      expect(results[3].status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_ERROR);
+      const assertTaskStatuses = (taskResults: { status: PrebuildTaskStatus }[]) => {
+        expect(taskResults[0].status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_SUCCESS);
+        for (const idx of [1, 2]) {
+          expect(taskResults[idx].status).toEqual(
+            PrebuildTaskStatus.PREBUILD_TASK_STATUS_CANCELLED,
+          );
+        }
+        expect(taskResults[3].status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_ERROR);
+      };
+      assertTaskStatuses(results);
+
+      const secondEventTasks = await getTasks(secondPrebuildEvent.id);
+      secondEventTasks.sort((a, b) => a.idx - b.idx);
+      assertTaskStatuses(secondEventTasks);
+
+      const logs = await db.log.findMany({ where: { logGroupId: secondEventTasks[0].logGroupId } });
+      logs.sort((a, b) => a.idx - b.idx);
+      const logContents = Buffer.concat(logs.map((l) => l.content)).toString();
+      expect(logContents).toEqual(
+        `+ echo $'one\\342\\202\\254'\none€\n+ sleep 1\n+ echo $'two\\360\\237\\230\\204'\ntwo😄\n`,
+      );
 
       let fcPid: number | null = null;
       const pathToKey = "/tmp/testkey";

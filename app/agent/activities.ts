@@ -8,6 +8,7 @@ import type { PrebuildTask, Prisma } from "@prisma/client";
 import { PrebuildTaskStatus } from "@prisma/client";
 import type { NodeSSH } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
+import { GroupError } from "~/group-error";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
@@ -387,9 +388,17 @@ export const createActivities = async (
         const taskFinished = tasks.map((_) => false);
         const taskCancelled = tasks.map((_) => false);
         const taskPromises = tasks.map(async (task, taskIdx) => {
+          const updateStatus = (status: PrebuildTaskStatus) =>
+            db.prebuildTask.update({
+              where: { id: task.id },
+              data: { status },
+            });
+
           try {
             try {
+              await updateStatus(PrebuildTaskStatus.PREBUILD_TASK_STATUS_RUNNING);
               await taskFn(task);
+              await updateStatus(PrebuildTaskStatus.PREBUILD_TASK_STATUS_SUCCESS);
             } finally {
               taskFinished[taskIdx] = true;
             }
@@ -403,6 +412,17 @@ export const createActivities = async (
               // ssh handles anyway
               await Promise.all(taskSshHandles.map((sshHandle) => sshHandle.dispose()));
             }
+
+            try {
+              await updateStatus(
+                taskCancelled[taskIdx]
+                  ? PrebuildTaskStatus.PREBUILD_TASK_STATUS_CANCELLED
+                  : PrebuildTaskStatus.PREBUILD_TASK_STATUS_ERROR,
+              );
+            } catch (updateErr) {
+              throw new GroupError([err, updateErr]);
+            }
+
             throw err;
           }
         });
