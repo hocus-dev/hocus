@@ -39,6 +39,7 @@ export class LowLevelStorageService {
     const raw = await fs.readFile(this.getPathToStorage(), "utf8");
     if (raw === "") {
       return {
+        agentId: "solo-agent",
         busyIpBlockIds: [],
       };
     }

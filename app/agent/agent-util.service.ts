@@ -1,16 +1,23 @@
 import fsSync from "fs";
 import { promisify } from "util";
 
+import type { AgentInstance, PrebuildEvent, Prisma } from "@prisma/client";
+import { PrebuildTaskStatus } from "@prisma/client";
+import { LogGroupType } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH } from "node-ssh";
 import { Token } from "~/token";
 
 import { PREBUILD_SCRIPT_TEMPLATE } from "./constants";
+import type { StorageService } from "./storage/storage.service";
 import { execCmd, execSshCmd } from "./utils";
 
 export class AgentUtilService {
-  static inject = [Token.Logger] as const;
-  constructor(private readonly logger: DefaultLogger) {}
+  static inject = [Token.Logger, Token.StorageService] as const;
+  constructor(
+    private readonly logger: DefaultLogger,
+    private readonly storageService: StorageService,
+  ) {}
 
   createExt4Image(imagePath: string, sizeMiB: number, overwrite: boolean = false): void {
     if (overwrite) {
@@ -55,5 +62,51 @@ export class AgentUtilService {
 
   generatePrebuildScript(task: string): string {
     return `${PREBUILD_SCRIPT_TEMPLATE}${task}\n`;
+  }
+
+  private getAgentId = async (): Promise<string> => {
+    const agentId = await this.storageService.withStorage((svc) =>
+      svc.readStorage().then((storage) => storage.agentId),
+    );
+    return agentId;
+  };
+
+  async getAgentInstance(db: Prisma.Client): Promise<AgentInstance> {
+    const agentId = await this.getAgentId();
+    const agentInstance = await db.agentInstance.upsert({
+      create: { externalId: agentId },
+      update: {},
+      where: { externalId: agentId },
+    });
+    return agentInstance;
+  }
+
+  async createPrebuildEvent(db: Prisma.TransactionClient, tasks: string[]): Promise<PrebuildEvent> {
+    const agentInstance = await this.getAgentInstance(db);
+
+    const prebuildEvent = await db.prebuildEvent.create({
+      data: {
+        agentInstanceId: agentInstance.id,
+      },
+    });
+    await Promise.all(
+      tasks.map(async (task, idx) => {
+        const logGroup = await db.logGroup.create({
+          data: {
+            type: LogGroupType.PrebuildTask,
+          },
+        });
+        await db.prebuildTask.create({
+          data: {
+            command: task,
+            prebuildEventId: prebuildEvent.id,
+            logGroupId: logGroup.id,
+            idx,
+            status: PrebuildTaskStatus.PREBUILD_TASK_STATUS_PENDING,
+          },
+        });
+      }),
+    );
+    return prebuildEvent;
   }
 }

@@ -16,3 +16,56 @@ model User {
   externalId String @unique
   gaUserId   String @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
 }
+
+enum LogGroupType {
+  PrebuildTask
+}
+
+model LogGroup {
+  id            BigInt         @id @default(autoincrement())
+  type          LogGroupType
+  logs          Log[]
+  prebuildTasks PrebuildTask[]
+}
+
+model Log {
+  id         BigInt   @id @default(autoincrement())
+  logGroup   LogGroup @relation(fields: [logGroupId], references: [id])
+  logGroupId BigInt
+  idx        Int
+  content    Bytes
+
+  @@unique([logGroupId, idx], name: "log_log_event_id_idx_unique")
+}
+
+model AgentInstance {
+  id             BigInt          @id @default(autoincrement())
+  externalId     String          @unique
+  prebuildEvents PrebuildEvent[]
+}
+
+model PrebuildEvent {
+  id              BigInt         @id @default(autoincrement())
+  agentInstance   AgentInstance  @relation(fields: [agentInstanceId], references: [id])
+  agentInstanceId BigInt
+  prebuildTasks   PrebuildTask[]
+}
+
+enum PrebuildTaskStatus {
+  PREBUILD_TASK_STATUS_PENDING
+  PREBUILD_TASK_STATUS_RUNNING
+  PREBUILD_TASK_STATUS_SUCCESS
+  PREBUILD_TASK_STATUS_ERROR
+  PREBUILD_TASK_STATUS_CANCELLED
+}
+
+model PrebuildTask {
+  id              BigInt             @id @default(autoincrement())
+  command         String
+  idx             Int
+  status          PrebuildTaskStatus
+  prebuildEvent   PrebuildEvent      @relation(fields: [prebuildEventId], references: [id])
+  prebuildEventId BigInt
+  logGroup        LogGroup           @relation(fields: [logGroupId], references: [id])
+  logGroupId      BigInt
+}

@@ -3,17 +3,23 @@ import fs from "fs/promises";
 import path from "path";
 import { promisify } from "util";
 
+import type { PrebuildTask, Prisma } from "@prisma/client";
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports
+import { PrebuildTaskStatus } from "@prisma/client";
 import type { NodeSSH } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
 import type { createAgentInjector } from "./agent-injector";
-import { PrebuildTaskStatus } from "./constants";
 import { PidValidator } from "./pid.validator";
 import type { ProjectConfig } from "./project-config/validator";
-import { execSshCmd, randomString, withSsh } from "./utils";
+import { execSshCmd, randomString, sleep, withSsh } from "./utils";
 
-export const createActivities = async (injector: ReturnType<typeof createAgentInjector>) => {
+export const createActivities = async (
+  injector: ReturnType<typeof createAgentInjector>,
+  db: Prisma.NonTransactionClient,
+) => {
   const agentConfig = injector.resolve(Token.Config).agent();
 
   const fetchRepository = async (args: {
@@ -258,14 +264,14 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
 
   type PrebuildTaskOutput =
     | {
-        status: typeof PrebuildTaskStatus["Ok"];
+        status: typeof PrebuildTaskStatus["PREBUILD_TASK_STATUS_SUCCESS"];
       }
     | {
-        status: typeof PrebuildTaskStatus["Error"];
+        status: typeof PrebuildTaskStatus["PREBUILD_TASK_STATUS_ERROR"];
         error: Error;
       }
     | {
-        status: typeof PrebuildTaskStatus["Cancelled"];
+        status: typeof PrebuildTaskStatus["PREBUILD_TASK_STATUS_CANCELLED"];
       };
 
   /**
@@ -274,13 +280,13 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
    * Assumes that there is a `hocus` user with passwordless sudo on the
    * filesystem drive, sshd is configured to start running automatically after VM boot,
    * and the corresponding public key to the private key used to connect to the VM
-   * (`agentConfig.prebuildSshPrivateKey`) is added to the `hocus` user's authorized_keys.
+   * (`agentConfig.prebuildSshPrivateKey`) is already present in the `hocus` user's authorized_keys.
    */
   const prebuild = async (args: {
     runId?: string;
     projectDrivePath: string;
     filesystemDrivePath: string;
-    tasks: string[];
+    prebuildEventId: bigint;
   }): Promise<PrebuildTaskOutput[]> => {
     const runId = args.runId ?? uuidv4();
     const instanceId = `prebuild-${runId}`;
@@ -290,6 +296,11 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
     const repositoryDir = `${devDir}/project`;
     const prebuildScriptsDir = `${devDir}/.hocus/init`;
 
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: args.prebuildEventId },
+      include: { prebuildTasks: true },
+    });
+    const tasks = prebuildEvent.prebuildTasks;
     return await firecrackerService.withVM(
       {
         ssh: {
@@ -302,11 +313,12 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
       },
       async ({ ssh, sshConfig }) => {
         let cleanupStarted = false;
+
         const taskSshHandles: NodeSSH[] = [];
-        const taskFn = async (task: string, taskIdx: number) => {
-          const script = agentUtilService.generatePrebuildScript(task);
-          const scriptPath = `${prebuildScriptsDir}/task-${taskIdx}.sh`;
-          const logPath = `${prebuildScriptsDir}/task-${taskIdx}.log`;
+        const taskFn = async (task: PrebuildTask) => {
+          const script = agentUtilService.generatePrebuildScript(task.command);
+          const scriptPath = `${prebuildScriptsDir}/task-${task.idx}.sh`;
+          const logPath = `${prebuildScriptsDir}/task-${task.idx}.log`;
           await execSshCmd({ ssh }, ["mkdir", "-p", prebuildScriptsDir]);
           await agentUtilService.writeFile(ssh, scriptPath, script);
 
@@ -316,23 +328,68 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
             }
             taskSshHandles.push(taskSsh);
 
-            await execSshCmd({ ssh: taskSsh, opts: { cwd: repositoryDir } }, [
-              "bash",
-              "-o",
-              "pipefail",
-              "-o",
-              "errexit",
-              "-c",
-              `bash "${scriptPath}" 2>&1 | tee "${logPath}"`,
+            let finished = false;
+            let syncCounter = 0;
+            let logBuffer: Buffer[] = [];
+            const syncLogs = async () => {
+              let lastSync = 0;
+              while (!finished) {
+                await sleep(Math.max(0, lastSync + 1000 - Date.now()));
+                lastSync = Date.now();
+                if (cleanupStarted) {
+                  throw new Error("cleanup started");
+                }
+                if (logBuffer.length === 0) {
+                  continue;
+                }
+                const currentSyncIdx = syncCounter;
+                syncCounter += 1;
+
+                const content = Buffer.concat(logBuffer);
+                logBuffer = [];
+                await db.log.create({
+                  data: {
+                    idx: currentSyncIdx,
+                    logGroupId: task.logGroupId,
+                    content,
+                  },
+                });
+              }
+            };
+
+            await waitForPromises([
+              execSshCmd(
+                {
+                  ssh: taskSsh,
+                  opts: {
+                    cwd: repositoryDir,
+                    onStdout: (chunk) => logBuffer.push(chunk),
+                    onStderr: (chunk) => logBuffer.push(chunk),
+                  },
+                },
+                [
+                  "bash",
+                  "-o",
+                  "pipefail",
+                  "-o",
+                  "errexit",
+                  "-c",
+                  `bash "${scriptPath}" 2>&1 | tee "${logPath}"`,
+                ],
+              ).finally(() => (finished = true)),
+              syncLogs().catch((err) => {
+                taskSsh.dispose();
+                throw err;
+              }),
             ]);
           });
         };
-        const taskFinished = args.tasks.map((_) => false);
-        const taskCancelled = args.tasks.map((_) => false);
-        const tasks = args.tasks.map(async (task, taskIdx) => {
+        const taskFinished = tasks.map((_) => false);
+        const taskCancelled = tasks.map((_) => false);
+        const taskPromises = tasks.map(async (task, taskIdx) => {
           try {
             try {
-              await taskFn(task, taskIdx);
+              await taskFn(task);
             } finally {
               taskFinished[taskIdx] = true;
             }
@@ -349,21 +406,21 @@ export const createActivities = async (injector: ReturnType<typeof createAgentIn
             throw err;
           }
         });
-        const results = await Promise.allSettled(tasks);
+        const results = await Promise.allSettled(taskPromises);
         const parsedResults = results.map((result, idx) => {
           if (result.status === "rejected") {
             if (taskCancelled[idx]) {
               return {
-                status: PrebuildTaskStatus.Cancelled,
+                status: PrebuildTaskStatus.PREBUILD_TASK_STATUS_CANCELLED,
               };
             }
             return {
-              status: PrebuildTaskStatus.Error,
+              status: PrebuildTaskStatus.PREBUILD_TASK_STATUS_ERROR,
               error:
                 result.reason instanceof Error ? result.reason : new Error(String(result.reason)),
             };
           } else {
-            return { status: PrebuildTaskStatus.Ok };
+            return { status: PrebuildTaskStatus.PREBUILD_TASK_STATUS_SUCCESS };
           }
         });
         return parsedResults;

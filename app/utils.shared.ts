@@ -1,3 +1,5 @@
+import { GroupError } from "./group-error";
+
 export const unwrap = <T>(value: T | undefined | null): T => {
   if (value === undefined || value === null) {
     throw new Error(`Value is ${value}`);
@@ -18,4 +20,28 @@ export const removeTrailingSlash = (url: string): string => {
     return url.slice(0, -1);
   }
   return url;
+};
+
+/**
+ * Works like `Promise.allSettled` but throws an error if any of the promises fail.
+ */
+export const waitForPromises = async <T>(promises: Iterable<T>): Promise<Awaited<T>[]> => {
+  const results = await Promise.allSettled(promises);
+  const errors = results
+    .filter((result) => result.status === "rejected")
+    .map((result) => {
+      const reason = (result as PromiseRejectedResult).reason;
+      if (reason instanceof Error) {
+        return reason;
+      }
+      if (typeof reason === "string") {
+        return new Error(reason);
+      }
+      return new Error("unknown error");
+    });
+  if (errors.length > 0) {
+    throw new GroupError(errors);
+  }
+
+  return results.map((result) => (result as PromiseFulfilledResult<Awaited<T>>).value);
 };

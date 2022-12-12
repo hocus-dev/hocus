@@ -11,10 +11,12 @@ import * as build from "prisma/build";
 import { v4 as uuidv4 } from "uuid";
 import "process";
 
+const DB_HOST = process.env.DB_HOST ?? "localhost";
+
 export const provideDb = (testFn: (db: PrismaClient) => Promise<void>): (() => Promise<void>) => {
   return async () => {
     const dbName = uuidv4();
-    const dbUrl = `postgresql://postgres:pass@localhost:5432/${dbName}`;
+    const dbUrl = `postgresql://postgres:pass@${DB_HOST}:5432/${dbName}`;
     const db = new PrismaClient({
       datasources: {
         db: { url: dbUrl },
@@ -50,7 +52,7 @@ export const provideDb = (testFn: (db: PrismaClient) => Promise<void>): (() => P
     const pgClient = new PgClient({
       user: "postgres",
       password: "pass",
-      host: "localhost",
+      host: DB_HOST,
       port: 5432,
     });
     const query = `DROP DATABASE "${dbName}";`;

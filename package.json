@@ -15,7 +15,8 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "postinstall": "ops/bin/override-prisma-types.sh"
+    "postinstall": "ops/bin/override-prisma-types.sh",
+    "new-migration": "wrap () { set -o nounset; prisma migrate dev --name \"$1\" && yarn run postinstall; }; wrap"
   },
   "dependencies": {
     "@prisma/client": "4.2.1",

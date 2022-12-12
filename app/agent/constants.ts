@@ -1,5 +1,3 @@
-import type { valueof } from "~/types/utils";
-
 export const PREBUILD_SCRIPT_TEMPLATE = `#!/bin/bash
 set -o errexit
 set -o pipefail
@@ -7,13 +5,6 @@ set -o nounset
 set -o xtrace
 
 `;
-
-export type PrebuildTaskStatus = valueof<typeof PrebuildTaskStatus>;
-export const PrebuildTaskStatus = {
-  Ok: "PREBUILD_TASK_STATUS_OK",
-  Error: "PREBUILD_TASK_STATUS_ERROR",
-  Cancelled: "PREBUILD_TASK_STATUS_CANCELLED",
-} as const;
 
 export const DEFAULT_PREBUILD_SSH_KEY_PUBLIC = `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKk+DZs+E2GlmqUNqTCU9/R0kT/zzBjwBqbPaBtGv3MA hocus@prebuild`;
 /** Newline at the end is required */
