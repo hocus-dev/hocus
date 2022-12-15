@@ -68,7 +68,7 @@ test.concurrent(
       db,
       injector,
     }) => {
-      const agentUtilService = injector.resolve(Token.AgentUtilService);
+      const prebuildService = injector.resolve(Token.PrebuildService);
       const tmpPath = "/srv/jailer/resources/tmp/";
       execCmd("mkdir", "-p", tmpPath);
       const repositoryDrivePath = path.join(tmpPath, `repo-test-${runId}.ext4`);
@@ -106,22 +106,25 @@ test.concurrent(
       });
 
       const firstPrebuildEvent = await db.$transaction((tdb) =>
-        agentUtilService.createPrebuildEvent(
+        prebuildService.createPrebuildEvent(
           tdb,
           projectConfig.tasks.map((task) => task.init),
         ),
       );
 
       const getTasks = (eventId: bigint) =>
-        db.vmTask.findMany({ where: { prebuildEventId: eventId } });
+        db.prebuildEventTask.findMany({
+          where: { prebuildEventId: eventId },
+          include: { vmTask: true },
+        });
 
       let firstEventTasks = await getTasks(firstPrebuildEvent.id);
       firstEventTasks.sort((a, b) => a.idx - b.idx);
-      expect(firstEventTasks.map((t) => t.command)).toMatchObject(
+      expect(firstEventTasks.map((t) => t.originalCommand)).toMatchObject(
         projectConfig.tasks.map((t) => t.init),
       );
-      for (const task of firstEventTasks) {
-        expect(task.status).toEqual(VmTaskStatus.VM_TASK_STATUS_PENDING);
+      for (const prebuildTask of firstEventTasks) {
+        expect(prebuildTask.vmTask.status).toEqual(VmTaskStatus.VM_TASK_STATUS_PENDING);
       }
 
       await prebuild({
@@ -132,11 +135,11 @@ test.concurrent(
       });
       firstEventTasks = await getTasks(firstPrebuildEvent.id);
       for (const task of firstEventTasks) {
-        expect(task.status).toEqual(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
+        expect(task.vmTask.status).toEqual(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
       }
 
       const secondPrebuildEvent = await db.$transaction((tdb) =>
-        agentUtilService.createPrebuildEvent(tdb, [
+        prebuildService.createPrebuildEvent(tdb, [
           `echo "one€" && sleep 1 && echo "two😄"`,
           "sleep 15",
           "sleep 15",
@@ -163,9 +166,11 @@ test.concurrent(
 
       const secondEventTasks = await getTasks(secondPrebuildEvent.id);
       secondEventTasks.sort((a, b) => a.idx - b.idx);
-      assertTaskStatuses(secondEventTasks);
+      assertTaskStatuses(secondEventTasks.map((t) => t.vmTask));
 
-      const logs = await db.log.findMany({ where: { logGroupId: secondEventTasks[0].logGroupId } });
+      const logs = await db.log.findMany({
+        where: { logGroupId: secondEventTasks[0].vmTask.logGroupId },
+      });
       logs.sort((a, b) => a.idx - b.idx);
       const logContents = Buffer.concat(logs.map((l) => l.content)).toString();
       expect(logContents).toEqual(

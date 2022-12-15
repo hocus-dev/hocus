@@ -38,17 +38,19 @@ model Log {
   @@unique([logGroupId, idx], name: "log_log_event_id_idx_unique")
 }
 
-model AgentInstance {
-  id             BigInt          @id @default(autoincrement())
-  externalId     String          @unique
-  prebuildEvents PrebuildEvent[]
+model PrebuildEvent {
+  id    BigInt              @id @default(autoincrement())
+  tasks PrebuildEventTask[]
 }
 
-model PrebuildEvent {
+model PrebuildEventTask {
   id              BigInt        @id @default(autoincrement())
-  agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
-  agentInstanceId BigInt
-  prebuildTasks   VmTask[]
+  idx             Int
+  prebuildEvent   PrebuildEvent @relation(fields: [prebuildEventId], references: [id])
+  prebuildEventId BigInt
+  vmTask          VmTask        @relation(fields: [vmTaskId], references: [id])
+  vmTaskId        BigInt
+  originalCommand String
 }
 
 enum VmTaskStatus {
@@ -60,12 +62,11 @@ enum VmTaskStatus {
 }
 
 model VmTask {
-  id              BigInt        @id @default(autoincrement())
-  command         String
-  idx             Int
-  status          VmTaskStatus
-  prebuildEvent   PrebuildEvent @relation(fields: [prebuildEventId], references: [id])
-  prebuildEventId BigInt
-  logGroup        LogGroup      @relation(fields: [logGroupId], references: [id])
-  logGroupId      BigInt
+  id                 BigInt              @id @default(autoincrement())
+  command            String[]
+  cwd                String?
+  status             VmTaskStatus
+  logGroup           LogGroup            @relation(fields: [logGroupId], references: [id])
+  logGroupId         BigInt
+  prebuildEventTasks PrebuildEventTask[]
 }

@@ -3,19 +3,15 @@ import fs from "fs/promises";
 import path from "path";
 import { promisify } from "util";
 
-import type { VmTask, Prisma } from "@prisma/client";
-// eslint-disable-next-line @typescript-eslint/no-restricted-imports
-import { VmTaskStatus } from "@prisma/client";
-import type { NodeSSH } from "node-ssh";
+import type { Prisma } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
-import { GroupError } from "~/group-error";
 import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
 
 import type { createAgentInjector } from "./agent-injector";
+import type { VMTaskOutput } from "./agent-util.types";
 import { PidValidator } from "./pid.validator";
 import type { ProjectConfig } from "./project-config/validator";
-import { execSshCmd, randomString, sleep, withSsh } from "./utils";
+import { execSshCmd, randomString } from "./utils";
 
 export const createActivities = async (
   injector: ReturnType<typeof createAgentInjector>,
@@ -263,18 +259,6 @@ export const createActivities = async (
     }
   };
 
-  type PrebuildTaskOutput =
-    | {
-        status: typeof VmTaskStatus["VM_TASK_STATUS_SUCCESS"];
-      }
-    | {
-        status: typeof VmTaskStatus["VM_TASK_STATUS_ERROR"];
-        error: Error;
-      }
-    | {
-        status: typeof VmTaskStatus["VM_TASK_STATUS_CANCELLED"];
-      };
-
   /**
    * Returns the result for every task.
    *
@@ -288,20 +272,18 @@ export const createActivities = async (
     projectDrivePath: string;
     filesystemDrivePath: string;
     prebuildEventId: bigint;
-  }): Promise<PrebuildTaskOutput[]> => {
+  }): Promise<VMTaskOutput[]> => {
     const runId = args.runId ?? uuidv4();
     const instanceId = `prebuild-${runId}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
-    const devDir = "/home/hocus/dev";
-    const repositoryDir = `${devDir}/project`;
-    const prebuildScriptsDir = `${devDir}/.hocus/init`;
+    const prebuildService = injector.resolve(Token.PrebuildService);
 
     const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
       where: { id: args.prebuildEventId },
-      include: { prebuildTasks: true },
+      include: { tasks: { include: { vmTask: true } } },
     });
-    const tasks = prebuildEvent.prebuildTasks;
+    const tasks = prebuildEvent.tasks;
     return await firecrackerService.withVM(
       {
         ssh: {
@@ -310,140 +292,25 @@ export const createActivities = async (
         },
         kernelPath: agentConfig.defaultKernel,
         rootFsPath: args.filesystemDrivePath,
-        extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: devDir }],
+        extraDrives: [
+          { pathOnHost: args.projectDrivePath, guestMountPath: prebuildService.devDir },
+        ],
       },
       async ({ ssh, sshConfig }) => {
-        let cleanupStarted = false;
+        await Promise.all(
+          tasks.map(async (task) => {
+            const script = agentUtilService.generateTaskScript(task.originalCommand);
+            const paths = prebuildService.getPrebuildTaskPaths(task.idx);
+            await execSshCmd({ ssh }, ["mkdir", "-p", prebuildService.prebuildScriptsDir]);
+            await agentUtilService.writeFile(ssh, paths.scriptPath, script);
+          }),
+        );
 
-        const taskSshHandles: NodeSSH[] = [];
-        const taskFn = async (task: VmTask) => {
-          const script = agentUtilService.generatePrebuildScript(task.command);
-          const scriptPath = `${prebuildScriptsDir}/task-${task.idx}.sh`;
-          const logPath = `${prebuildScriptsDir}/task-${task.idx}.log`;
-          await execSshCmd({ ssh }, ["mkdir", "-p", prebuildScriptsDir]);
-          await agentUtilService.writeFile(ssh, scriptPath, script);
-
-          await withSsh(sshConfig, async (taskSsh) => {
-            if (cleanupStarted) {
-              throw new Error("cleanup already started");
-            }
-            taskSshHandles.push(taskSsh);
-
-            let finished = false;
-            let syncCounter = 0;
-            let logBuffer: Buffer[] = [];
-            const syncLogs = async () => {
-              let lastSync = 0;
-              while (!finished) {
-                await sleep(Math.max(0, lastSync + 1000 - Date.now()));
-                lastSync = Date.now();
-                if (cleanupStarted) {
-                  throw new Error("cleanup started");
-                }
-                if (logBuffer.length === 0) {
-                  continue;
-                }
-                const currentSyncIdx = syncCounter;
-                syncCounter += 1;
-
-                const content = Buffer.concat(logBuffer);
-                logBuffer = [];
-                await db.log.create({
-                  data: {
-                    idx: currentSyncIdx,
-                    logGroupId: task.logGroupId,
-                    content,
-                  },
-                });
-              }
-            };
-
-            await waitForPromises([
-              execSshCmd(
-                {
-                  ssh: taskSsh,
-                  opts: {
-                    cwd: repositoryDir,
-                    onStdout: (chunk) => logBuffer.push(chunk),
-                    onStderr: (chunk) => logBuffer.push(chunk),
-                  },
-                },
-                [
-                  "bash",
-                  "-o",
-                  "pipefail",
-                  "-o",
-                  "errexit",
-                  "-c",
-                  `bash "${scriptPath}" 2>&1 | tee "${logPath}"`,
-                ],
-              ).finally(() => (finished = true)),
-              syncLogs().catch((err) => {
-                taskSsh.dispose();
-                throw err;
-              }),
-            ]);
-          });
-        };
-        const taskFinished = tasks.map((_) => false);
-        const taskCancelled = tasks.map((_) => false);
-        const taskPromises = tasks.map(async (task, taskIdx) => {
-          const updateStatus = (status: VmTaskStatus) =>
-            db.vmTask.update({
-              where: { id: task.id },
-              data: { status },
-            });
-
-          try {
-            try {
-              await updateStatus(VmTaskStatus.VM_TASK_STATUS_RUNNING);
-              await taskFn(task);
-              await updateStatus(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
-            } finally {
-              taskFinished[taskIdx] = true;
-            }
-          } catch (err) {
-            if (!cleanupStarted) {
-              cleanupStarted = true;
-              for (const [idx, isFinished] of taskFinished.entries()) {
-                taskCancelled[idx] = !isFinished;
-              }
-              // this is done to interrupt the other tasks, withSsh will dispose the
-              // ssh handles anyway
-              await Promise.all(taskSshHandles.map((sshHandle) => sshHandle.dispose()));
-            }
-
-            try {
-              await updateStatus(
-                taskCancelled[taskIdx]
-                  ? VmTaskStatus.VM_TASK_STATUS_CANCELLED
-                  : VmTaskStatus.VM_TASK_STATUS_ERROR,
-              );
-            } catch (updateErr) {
-              throw new GroupError([err, updateErr]);
-            }
-
-            throw err;
-          }
-        });
-        const results = await Promise.allSettled(taskPromises);
-        const parsedResults = results.map((result, idx) => {
-          if (result.status === "rejected") {
-            if (taskCancelled[idx]) {
-              return {
-                status: VmTaskStatus.VM_TASK_STATUS_CANCELLED,
-              };
-            }
-            return {
-              status: VmTaskStatus.VM_TASK_STATUS_ERROR,
-              error:
-                result.reason instanceof Error ? result.reason : new Error(String(result.reason)),
-            };
-          } else {
-            return { status: VmTaskStatus.VM_TASK_STATUS_SUCCESS };
-          }
-        });
-        return parsedResults;
+        return await agentUtilService.execVmTasks(
+          sshConfig,
+          db,
+          tasks.map((t) => t.vmTask.id),
+        );
       },
     );
   };
@@ -485,7 +352,7 @@ export const createActivities = async (
       },
       async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
         const taskFn = async (task: string, taskIdx: number): Promise<number> => {
-          const script = agentUtilService.generatePrebuildScript(task);
+          const script = agentUtilService.generateTaskScript(task);
           const scriptPath = `${scriptsDir}/task-${taskIdx}.sh`;
           const logPath = `${scriptsDir}/task-${taskIdx}.log`;
           await execSshCmd({ ssh }, ["mkdir", "-p", scriptsDir]);

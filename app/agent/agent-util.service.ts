@@ -1,23 +1,21 @@
 import fsSync from "fs";
 import { promisify } from "util";
 
-import type { AgentInstance, PrebuildEvent, Prisma } from "@prisma/client";
+import type { Prisma, VmTask } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
-import { LogGroupType } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
-import type { NodeSSH } from "node-ssh";
+import type { NodeSSH, Config as SSHConfig } from "node-ssh";
+import { GroupError } from "~/group-error";
 import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
-import { PREBUILD_SCRIPT_TEMPLATE } from "./constants";
-import type { StorageService } from "./storage/storage.service";
-import { execCmd, execSshCmd } from "./utils";
+import type { VMTaskOutput } from "./agent-util.types";
+import { TASK_SCRIPT_TEMPLATE } from "./constants";
+import { execCmd, execSshCmd, sleep, withSsh } from "./utils";
 
 export class AgentUtilService {
   static inject = [Token.Logger, Token.StorageService] as const;
-  constructor(
-    private readonly logger: DefaultLogger,
-    private readonly storageService: StorageService,
-  ) {}
+  constructor(private readonly logger: DefaultLogger) {}
 
   createExt4Image(imagePath: string, sizeMiB: number, overwrite: boolean = false): void {
     if (overwrite) {
@@ -60,53 +58,139 @@ export class AgentUtilService {
     });
   }
 
-  generatePrebuildScript(task: string): string {
-    return `${PREBUILD_SCRIPT_TEMPLATE}${task}\n`;
+  generateTaskScript(task: string): string {
+    return `${TASK_SCRIPT_TEMPLATE}${task}\n`;
   }
 
-  private getAgentId = async (): Promise<string> => {
-    const agentId = await this.storageService.withStorage((svc) =>
-      svc.readStorage().then((storage) => storage.agentId),
-    );
-    return agentId;
+  execVmTasks = async (
+    sshConfig: SSHConfig,
+    db: Prisma.Client,
+    vmTaskIds: bigint[],
+  ): Promise<VMTaskOutput[]> => {
+    const tasks = await db.vmTask.findMany({
+      where: { id: { in: vmTaskIds } },
+      include: { logGroup: true },
+    });
+    for (const vmTask of tasks) {
+      if (vmTask.status !== VmTaskStatus.VM_TASK_STATUS_PENDING) {
+        throw new Error(`VM task ${vmTask.id} is not in pending state`);
+      }
+    }
+
+    let cleanupStarted = false;
+    const taskSshHandles: NodeSSH[] = [];
+    const taskFn = async (task: VmTask) => {
+      await withSsh(sshConfig, async (taskSsh) => {
+        if (cleanupStarted) {
+          throw new Error("cleanup already started");
+        }
+        taskSshHandles.push(taskSsh);
+
+        let finished = false;
+        let syncCounter = 0;
+        let logBuffer: Buffer[] = [];
+        const syncLogs = async () => {
+          let lastSync = 0;
+          while (!finished) {
+            await sleep(Math.max(0, lastSync + 1000 - Date.now()));
+            lastSync = Date.now();
+            if (cleanupStarted) {
+              throw new Error("cleanup started");
+            }
+            if (logBuffer.length === 0) {
+              continue;
+            }
+            const currentSyncIdx = syncCounter;
+            syncCounter += 1;
+
+            const content = Buffer.concat(logBuffer);
+            logBuffer = [];
+            await db.log.create({
+              data: {
+                idx: currentSyncIdx,
+                logGroupId: task.logGroupId,
+                content,
+              },
+            });
+          }
+        };
+
+        await waitForPromises([
+          execSshCmd(
+            {
+              ssh: taskSsh,
+              opts: {
+                cwd: task.cwd ?? void 0,
+                onStdout: (chunk) => logBuffer.push(chunk),
+                onStderr: (chunk) => logBuffer.push(chunk),
+              },
+            },
+            task.command,
+          ).finally(() => (finished = true)),
+          syncLogs().catch((err) => {
+            taskSsh.dispose();
+            throw err;
+          }),
+        ]);
+      });
+    };
+    const taskFinished = tasks.map((_) => false);
+    const taskCancelled = tasks.map((_) => false);
+    const taskPromises = tasks.map(async (task, taskIdx) => {
+      const updateStatus = (status: VmTaskStatus) =>
+        db.vmTask.update({
+          where: { id: task.id },
+          data: { status },
+        });
+
+      try {
+        try {
+          await updateStatus(VmTaskStatus.VM_TASK_STATUS_RUNNING);
+          await taskFn(task);
+          await updateStatus(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
+        } finally {
+          taskFinished[taskIdx] = true;
+        }
+      } catch (err) {
+        if (!cleanupStarted) {
+          cleanupStarted = true;
+          for (const [idx, isFinished] of taskFinished.entries()) {
+            taskCancelled[idx] = !isFinished;
+          }
+          // this is done to interrupt the other tasks, withSsh will dispose the
+          // ssh handles anyway
+          await Promise.all(taskSshHandles.map((sshHandle) => sshHandle.dispose()));
+        }
+
+        try {
+          await updateStatus(
+            taskCancelled[taskIdx]
+              ? VmTaskStatus.VM_TASK_STATUS_CANCELLED
+              : VmTaskStatus.VM_TASK_STATUS_ERROR,
+          );
+        } catch (updateErr) {
+          throw new GroupError([err, updateErr]);
+        }
+
+        throw err;
+      }
+    });
+    const results = await Promise.allSettled(taskPromises);
+    const statuses = results.map((result, idx) => {
+      if (result.status === "rejected") {
+        if (taskCancelled[idx]) {
+          return {
+            status: VmTaskStatus.VM_TASK_STATUS_CANCELLED,
+          };
+        }
+        return {
+          status: VmTaskStatus.VM_TASK_STATUS_ERROR,
+          error: result.reason instanceof Error ? result.reason : new Error(String(result.reason)),
+        };
+      } else {
+        return { status: VmTaskStatus.VM_TASK_STATUS_SUCCESS };
+      }
+    });
+    return tasks.map((task, idx) => ({ vmTaskId: task.id, ...statuses[idx] }));
   };
-
-  async getAgentInstance(db: Prisma.Client): Promise<AgentInstance> {
-    const agentId = await this.getAgentId();
-    const agentInstance = await db.agentInstance.upsert({
-      create: { externalId: agentId },
-      update: {},
-      where: { externalId: agentId },
-    });
-    return agentInstance;
-  }
-
-  async createPrebuildEvent(db: Prisma.TransactionClient, tasks: string[]): Promise<PrebuildEvent> {
-    const agentInstance = await this.getAgentInstance(db);
-
-    const prebuildEvent = await db.prebuildEvent.create({
-      data: {
-        agentInstanceId: agentInstance.id,
-      },
-    });
-    await Promise.all(
-      tasks.map(async (task, idx) => {
-        const logGroup = await db.logGroup.create({
-          data: {
-            type: LogGroupType.LOG_GROUP_TYPE_VM_TASK,
-          },
-        });
-        await db.vmTask.create({
-          data: {
-            command: task,
-            prebuildEventId: prebuildEvent.id,
-            logGroupId: logGroup.id,
-            idx,
-            status: VmTaskStatus.VM_TASK_STATUS_PENDING,
-          },
-        });
-      }),
-    );
-    return prebuildEvent;
-  }
 }

@@ -19,4 +19,5 @@ export const Token = {
   ProjectConfigService: "ProjectConfigServiceT",
   AgentUtilService: "AgentUtilServiceT",
   SSHGatewayService: "SSHGatewayServiceT",
+  PrebuildService: "PrebuildServiceT",
 } as const;
