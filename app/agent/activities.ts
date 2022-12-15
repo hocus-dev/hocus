@@ -1,9 +1,9 @@
 import fsSync from "fs";
 import fs from "fs/promises";
-import path from "path";
 import { promisify } from "util";
 
 import type { Prisma } from "@prisma/client";
+import { VmTaskStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 
@@ -148,19 +148,14 @@ export const createActivities = async (
       pathOnHost: string;
       maxSizeMiB: number;
     };
-    /**
-     * The relative path to the Dockerfile in the `project` directory of the input drive.
-     */
-    dockerfilePath: string;
-    /**
-     * The relative path to the build context in the `project` directory of the input drive.
-     */
-    contextPath: string;
-  }): Promise<void> => {
+    buildfsEventId: bigint;
+    db: Prisma.NonTransactionClient;
+  }): Promise<{ buildSuccessful: boolean }> => {
     const runId = args.runId ?? uuidv4();
     const instanceId = `buildfs-${runId}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const buildfsService = injector.resolve(Token.BuildfsService);
 
     agentUtilService.createExt4Image(
       args.outputDrive.pathOnHost,
@@ -168,9 +163,11 @@ export const createActivities = async (
       true,
     );
 
-    const inputDir = "/tmp/input";
-    const outputDir = "/tmp/output";
-    await firecrackerService.withVM(
+    const buildfsEvent = await db.buildfsEvent.findUniqueOrThrow({
+      where: { id: args.buildfsEventId },
+    });
+
+    const result = await firecrackerService.withVM(
       {
         ssh: {
           username: "root",
@@ -179,25 +176,26 @@ export const createActivities = async (
         kernelPath: agentConfig.defaultKernel,
         rootFsPath: agentConfig.buildfsRootFs,
         extraDrives: [
-          { pathOnHost: args.outputDrive.pathOnHost, guestMountPath: outputDir },
-          { pathOnHost: args.inputDrivePath, guestMountPath: inputDir },
+          { pathOnHost: args.outputDrive.pathOnHost, guestMountPath: buildfsService.outputDir },
+          { pathOnHost: args.inputDrivePath, guestMountPath: buildfsService.inputDir },
         ],
       },
-      async ({ ssh }) => {
+      async ({ ssh, sshConfig }) => {
         const workdir = "/tmp/workdir";
         const buildfsScriptPath = `${workdir}/bin/buildfs.sh`;
         await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
         await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
         await ssh.putDirectory(agentConfig.hostBuildfsResourcesDir, workdir);
         await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
-        await execSshCmd({ ssh, logFilePath: `/tmp/buildfs-${runId}-ssh.log` }, [
-          buildfsScriptPath,
-          path.join(inputDir, "project", args.dockerfilePath),
-          outputDir,
-          path.join(inputDir, "project", args.contextPath),
+
+        const taskResults = await agentUtilService.execVmTasks(sshConfig, db, [
+          buildfsEvent.vmTaskId,
         ]);
+        return taskResults[0];
       },
     );
+
+    return { buildSuccessful: result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS };
   };
 
   /**

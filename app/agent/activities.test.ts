@@ -69,6 +69,7 @@ test.concurrent(
       injector,
     }) => {
       const prebuildService = injector.resolve(Token.PrebuildService);
+      const buildfsService = injector.resolve(Token.BuildfsService);
       const tmpPath = "/srv/jailer/resources/tmp/";
       execCmd("mkdir", "-p", tmpPath);
       const repositoryDrivePath = path.join(tmpPath, `repo-test-${runId}.ext4`);
@@ -94,6 +95,11 @@ test.concurrent(
       expect(projectConfigResult).not.toBe(null);
       const projectConfig = unwrap(projectConfigResult);
       const filesystemDrivePath = path.join(tmpPath, `buildfs-test-${runId}.ext4`);
+
+      const buildfsEvent = await buildfsService.createBuildfsEvent(db, {
+        contextPath: projectConfig.image.buildContext,
+        dockerfilePath: projectConfig.image.file,
+      });
       await buildfs({
         runId,
         inputDrivePath: checkedOutRepositoryDrivePath,
@@ -101,8 +107,8 @@ test.concurrent(
           pathOnHost: path.join(tmpPath, `buildfs-test-${runId}.ext4`),
           maxSizeMiB: 2000,
         },
-        dockerfilePath: projectConfig.image.file,
-        contextPath: projectConfig.image.buildContext,
+        buildfsEventId: buildfsEvent.id,
+        db,
       });
 
       const firstPrebuildEvent = await db.$transaction((tdb) =>

@@ -2,6 +2,7 @@ import fsSync from "fs";
 import { promisify } from "util";
 
 import type { Prisma, VmTask } from "@prisma/client";
+import { LogGroupType } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, Config as SSHConfig } from "node-ssh";
@@ -14,7 +15,7 @@ import { TASK_SCRIPT_TEMPLATE } from "./constants";
 import { execCmd, execSshCmd, sleep, withSsh } from "./utils";
 
 export class AgentUtilService {
-  static inject = [Token.Logger, Token.StorageService] as const;
+  static inject = [Token.Logger] as const;
   constructor(private readonly logger: DefaultLogger) {}
 
   createExt4Image(imagePath: string, sizeMiB: number, overwrite: boolean = false): void {
@@ -62,11 +63,22 @@ export class AgentUtilService {
     return `${TASK_SCRIPT_TEMPLATE}${task}\n`;
   }
 
-  execVmTasks = async (
+  async createVmTask(db: Prisma.TransactionClient, task: string[]): Promise<VmTask> {
+    return await db.vmTask.create({
+      data: {
+        status: VmTaskStatus.VM_TASK_STATUS_PENDING,
+        command: task,
+        logGroup: { create: { type: LogGroupType.LOG_GROUP_TYPE_VM_TASK } },
+      },
+      include: { logGroup: true },
+    });
+  }
+
+  async execVmTasks(
     sshConfig: SSHConfig,
     db: Prisma.Client,
     vmTaskIds: bigint[],
-  ): Promise<VMTaskOutput[]> => {
+  ): Promise<VMTaskOutput[]> {
     const tasks = await db.vmTask.findMany({
       where: { id: { in: vmTaskIds } },
       include: { logGroup: true },
@@ -192,5 +204,5 @@ export class AgentUtilService {
       }
     });
     return tasks.map((task, idx) => ({ vmTaskId: task.id, ...statuses[idx] }));
-  };
+  }
 }

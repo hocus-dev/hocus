@@ -20,4 +20,5 @@ export const Token = {
   AgentUtilService: "AgentUtilServiceT",
   SSHGatewayService: "SSHGatewayServiceT",
   PrebuildService: "PrebuildServiceT",
+  BuildfsService: "BuildfsServiceT",
 } as const;

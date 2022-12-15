@@ -69,4 +69,15 @@ model VmTask {
   logGroup           LogGroup            @relation(fields: [logGroupId], references: [id])
   logGroupId         BigInt
   prebuildEventTasks PrebuildEventTask[]
+  buildfsEvents      BuildfsEvent[]
+}
+
+model BuildfsEvent {
+  id             BigInt @id @default(autoincrement())
+  vmTask         VmTask @relation(fields: [vmTaskId], references: [id])
+  vmTaskId       BigInt
+  /// Relative path to the Dockerfile in the `project` directory of the input drive.
+  dockerfilePath String
+  /// Relative path to the build context in the `project` directory of the input drive.
+  contextPath    String
 }

@@ -51,6 +51,16 @@ CREATE TABLE "VmTask" (
     CONSTRAINT "VmTask_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "BuildfsEvent" (
+    "id" BIGSERIAL NOT NULL,
+    "vmTaskId" BIGINT NOT NULL,
+    "dockerfilePath" TEXT NOT NULL,
+    "contextPath" TEXT NOT NULL,
+
+    CONSTRAINT "BuildfsEvent_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Log_logGroupId_idx_key" ON "Log"("logGroupId", "idx");
 
@@ -65,3 +75,6 @@ ALTER TABLE "PrebuildEventTask" ADD CONSTRAINT "PrebuildEventTask_vmTaskId_fkey"
 
 -- AddForeignKey
 ALTER TABLE "VmTask" ADD CONSTRAINT "VmTask_logGroupId_fkey" FOREIGN KEY ("logGroupId") REFERENCES "LogGroup"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BuildfsEvent" ADD CONSTRAINT "BuildfsEvent_vmTaskId_fkey" FOREIGN KEY ("vmTaskId") REFERENCES "VmTask"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

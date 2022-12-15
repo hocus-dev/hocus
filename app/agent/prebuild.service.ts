@@ -1,7 +1,13 @@
 import type { PrebuildEvent, Prisma } from "@prisma/client";
-import { LogGroupType, VmTaskStatus } from "@prisma/client";
+import { Token } from "~/token";
+
+import type { AgentUtilService } from "./agent-util.service";
 
 export class PrebuildService {
+  static inject = [Token.AgentUtilService] as const;
+
+  constructor(private readonly agentUtilService: AgentUtilService) {}
+
   devDir = "/home/hocus/dev" as const;
   repositoryDir = `${this.devDir}/project` as const;
   prebuildScriptsDir = `${this.devDir}/.hocus/init` as const;
@@ -19,27 +25,16 @@ export class PrebuildService {
     const prebuildEvent = await db.prebuildEvent.create({ data: {} });
     await Promise.all(
       tasks.map(async (task, idx) => {
-        const logGroup = await db.logGroup.create({
-          data: {
-            type: LogGroupType.LOG_GROUP_TYPE_VM_TASK,
-          },
-        });
         const paths = this.getPrebuildTaskPaths(idx);
-        const vmTask = await db.vmTask.create({
-          data: {
-            command: [
-              "bash",
-              "-o",
-              "pipefail",
-              "-o",
-              "errexit",
-              "-c",
-              `bash "${paths.scriptPath}" 2>&1 | tee "${paths.logPath}"`,
-            ],
-            logGroupId: logGroup.id,
-            status: VmTaskStatus.VM_TASK_STATUS_PENDING,
-          },
-        });
+        const vmTask = await this.agentUtilService.createVmTask(db, [
+          "bash",
+          "-o",
+          "pipefail",
+          "-o",
+          "errexit",
+          "-c",
+          `bash "${paths.scriptPath}" 2>&1 | tee "${paths.logPath}"`,
+        ]);
         await db.prebuildEventTask.create({
           data: {
             prebuildEventId: prebuildEvent.id,
