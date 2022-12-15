@@ -2,7 +2,7 @@ import fsSync from "fs";
 import { promisify } from "util";
 
 import type { AgentInstance, PrebuildEvent, Prisma } from "@prisma/client";
-import { PrebuildTaskStatus } from "@prisma/client";
+import { VmTaskStatus } from "@prisma/client";
 import { LogGroupType } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH } from "node-ssh";
@@ -93,16 +93,16 @@ export class AgentUtilService {
       tasks.map(async (task, idx) => {
         const logGroup = await db.logGroup.create({
           data: {
-            type: LogGroupType.PrebuildTask,
+            type: LogGroupType.LOG_GROUP_TYPE_VM_TASK,
           },
         });
-        await db.prebuildTask.create({
+        await db.vmTask.create({
           data: {
             command: task,
             prebuildEventId: prebuildEvent.id,
             logGroupId: logGroup.id,
             idx,
-            status: PrebuildTaskStatus.PREBUILD_TASK_STATUS_PENDING,
+            status: VmTaskStatus.VM_TASK_STATUS_PENDING,
           },
         });
       }),

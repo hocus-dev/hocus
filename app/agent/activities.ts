@@ -3,9 +3,9 @@ import fs from "fs/promises";
 import path from "path";
 import { promisify } from "util";
 
-import type { PrebuildTask, Prisma } from "@prisma/client";
+import type { VmTask, Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
-import { PrebuildTaskStatus } from "@prisma/client";
+import { VmTaskStatus } from "@prisma/client";
 import type { NodeSSH } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
 import { GroupError } from "~/group-error";
@@ -265,14 +265,14 @@ export const createActivities = async (
 
   type PrebuildTaskOutput =
     | {
-        status: typeof PrebuildTaskStatus["PREBUILD_TASK_STATUS_SUCCESS"];
+        status: typeof VmTaskStatus["VM_TASK_STATUS_SUCCESS"];
       }
     | {
-        status: typeof PrebuildTaskStatus["PREBUILD_TASK_STATUS_ERROR"];
+        status: typeof VmTaskStatus["VM_TASK_STATUS_ERROR"];
         error: Error;
       }
     | {
-        status: typeof PrebuildTaskStatus["PREBUILD_TASK_STATUS_CANCELLED"];
+        status: typeof VmTaskStatus["VM_TASK_STATUS_CANCELLED"];
       };
 
   /**
@@ -316,7 +316,7 @@ export const createActivities = async (
         let cleanupStarted = false;
 
         const taskSshHandles: NodeSSH[] = [];
-        const taskFn = async (task: PrebuildTask) => {
+        const taskFn = async (task: VmTask) => {
           const script = agentUtilService.generatePrebuildScript(task.command);
           const scriptPath = `${prebuildScriptsDir}/task-${task.idx}.sh`;
           const logPath = `${prebuildScriptsDir}/task-${task.idx}.log`;
@@ -388,17 +388,17 @@ export const createActivities = async (
         const taskFinished = tasks.map((_) => false);
         const taskCancelled = tasks.map((_) => false);
         const taskPromises = tasks.map(async (task, taskIdx) => {
-          const updateStatus = (status: PrebuildTaskStatus) =>
-            db.prebuildTask.update({
+          const updateStatus = (status: VmTaskStatus) =>
+            db.vmTask.update({
               where: { id: task.id },
               data: { status },
             });
 
           try {
             try {
-              await updateStatus(PrebuildTaskStatus.PREBUILD_TASK_STATUS_RUNNING);
+              await updateStatus(VmTaskStatus.VM_TASK_STATUS_RUNNING);
               await taskFn(task);
-              await updateStatus(PrebuildTaskStatus.PREBUILD_TASK_STATUS_SUCCESS);
+              await updateStatus(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
             } finally {
               taskFinished[taskIdx] = true;
             }
@@ -416,8 +416,8 @@ export const createActivities = async (
             try {
               await updateStatus(
                 taskCancelled[taskIdx]
-                  ? PrebuildTaskStatus.PREBUILD_TASK_STATUS_CANCELLED
-                  : PrebuildTaskStatus.PREBUILD_TASK_STATUS_ERROR,
+                  ? VmTaskStatus.VM_TASK_STATUS_CANCELLED
+                  : VmTaskStatus.VM_TASK_STATUS_ERROR,
               );
             } catch (updateErr) {
               throw new GroupError([err, updateErr]);
@@ -431,16 +431,16 @@ export const createActivities = async (
           if (result.status === "rejected") {
             if (taskCancelled[idx]) {
               return {
-                status: PrebuildTaskStatus.PREBUILD_TASK_STATUS_CANCELLED,
+                status: VmTaskStatus.VM_TASK_STATUS_CANCELLED,
               };
             }
             return {
-              status: PrebuildTaskStatus.PREBUILD_TASK_STATUS_ERROR,
+              status: VmTaskStatus.VM_TASK_STATUS_ERROR,
               error:
                 result.reason instanceof Error ? result.reason : new Error(String(result.reason)),
             };
           } else {
-            return { status: PrebuildTaskStatus.PREBUILD_TASK_STATUS_SUCCESS };
+            return { status: VmTaskStatus.VM_TASK_STATUS_SUCCESS };
           }
         });
         return parsedResults;

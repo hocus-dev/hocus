@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 
 import type { Prisma } from "@prisma/client";
-import { PrebuildTaskStatus } from "@prisma/client";
+import { VmTaskStatus } from "@prisma/client";
 import { DefaultLogger } from "@temporalio/worker";
 import { FetchError, ResponseError } from "firecracker-client";
 import { v4 as uuidv4 } from "uuid";
@@ -113,7 +113,7 @@ test.concurrent(
       );
 
       const getTasks = (eventId: bigint) =>
-        db.prebuildTask.findMany({ where: { prebuildEventId: eventId } });
+        db.vmTask.findMany({ where: { prebuildEventId: eventId } });
 
       let firstEventTasks = await getTasks(firstPrebuildEvent.id);
       firstEventTasks.sort((a, b) => a.idx - b.idx);
@@ -121,7 +121,7 @@ test.concurrent(
         projectConfig.tasks.map((t) => t.init),
       );
       for (const task of firstEventTasks) {
-        expect(task.status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_PENDING);
+        expect(task.status).toEqual(VmTaskStatus.VM_TASK_STATUS_PENDING);
       }
 
       await prebuild({
@@ -132,7 +132,7 @@ test.concurrent(
       });
       firstEventTasks = await getTasks(firstPrebuildEvent.id);
       for (const task of firstEventTasks) {
-        expect(task.status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_SUCCESS);
+        expect(task.status).toEqual(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
       }
 
       const secondPrebuildEvent = await db.$transaction((tdb) =>
@@ -152,14 +152,12 @@ test.concurrent(
         filesystemDrivePath,
         prebuildEventId: secondPrebuildEvent.id,
       });
-      const assertTaskStatuses = (taskResults: { status: PrebuildTaskStatus }[]) => {
-        expect(taskResults[0].status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_SUCCESS);
+      const assertTaskStatuses = (taskResults: { status: VmTaskStatus }[]) => {
+        expect(taskResults[0].status).toEqual(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
         for (const idx of [1, 2]) {
-          expect(taskResults[idx].status).toEqual(
-            PrebuildTaskStatus.PREBUILD_TASK_STATUS_CANCELLED,
-          );
+          expect(taskResults[idx].status).toEqual(VmTaskStatus.VM_TASK_STATUS_CANCELLED);
         }
-        expect(taskResults[3].status).toEqual(PrebuildTaskStatus.PREBUILD_TASK_STATUS_ERROR);
+        expect(taskResults[3].status).toEqual(VmTaskStatus.VM_TASK_STATUS_ERROR);
       };
       assertTaskStatuses(results);
 

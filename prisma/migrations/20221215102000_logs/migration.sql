@@ -1,8 +1,8 @@
 -- CreateEnum
-CREATE TYPE "LogGroupType" AS ENUM ('PrebuildTask');
+CREATE TYPE "LogGroupType" AS ENUM ('LOG_GROUP_TYPE_VM_TASK');
 
 -- CreateEnum
-CREATE TYPE "PrebuildTaskStatus" AS ENUM ('PREBUILD_TASK_STATUS_PENDING', 'PREBUILD_TASK_STATUS_RUNNING', 'PREBUILD_TASK_STATUS_SUCCESS', 'PREBUILD_TASK_STATUS_ERROR', 'PREBUILD_TASK_STATUS_CANCELLED');
+CREATE TYPE "VmTaskStatus" AS ENUM ('VM_TASK_STATUS_PENDING', 'VM_TASK_STATUS_RUNNING', 'VM_TASK_STATUS_SUCCESS', 'VM_TASK_STATUS_ERROR', 'VM_TASK_STATUS_CANCELLED');
 
 -- CreateTable
 CREATE TABLE "LogGroup" (
@@ -39,15 +39,15 @@ CREATE TABLE "PrebuildEvent" (
 );
 
 -- CreateTable
-CREATE TABLE "PrebuildTask" (
+CREATE TABLE "VmTask" (
     "id" BIGSERIAL NOT NULL,
     "command" TEXT NOT NULL,
     "idx" INTEGER NOT NULL,
-    "status" "PrebuildTaskStatus" NOT NULL,
+    "status" "VmTaskStatus" NOT NULL,
     "prebuildEventId" BIGINT NOT NULL,
     "logGroupId" BIGINT NOT NULL,
 
-    CONSTRAINT "PrebuildTask_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "VmTask_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -63,7 +63,7 @@ ALTER TABLE "Log" ADD CONSTRAINT "Log_logGroupId_fkey" FOREIGN KEY ("logGroupId"
 ALTER TABLE "PrebuildEvent" ADD CONSTRAINT "PrebuildEvent_agentInstanceId_fkey" FOREIGN KEY ("agentInstanceId") REFERENCES "AgentInstance"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "PrebuildTask" ADD CONSTRAINT "PrebuildTask_prebuildEventId_fkey" FOREIGN KEY ("prebuildEventId") REFERENCES "PrebuildEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "VmTask" ADD CONSTRAINT "VmTask_prebuildEventId_fkey" FOREIGN KEY ("prebuildEventId") REFERENCES "PrebuildEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "PrebuildTask" ADD CONSTRAINT "PrebuildTask_logGroupId_fkey" FOREIGN KEY ("logGroupId") REFERENCES "LogGroup"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "VmTask" ADD CONSTRAINT "VmTask_logGroupId_fkey" FOREIGN KEY ("logGroupId") REFERENCES "LogGroup"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
