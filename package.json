@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "postinstall": "ops/bin/override-prisma-types.sh",
-    "new-migration": "wrap () { set -o nounset; prisma migrate dev --name \"$1\" && yarn run postinstall; }; wrap"
+    "new-migration": "wrap () { set -o nounset; prisma migrate dev --name \"$1\" && yarn run postinstall; }; wrap",
+    "prisma-generate": "yarn run prisma generate && ops/bin/override-prisma-types.sh"
   },
   "dependencies": {
     "@prisma/client": "4.2.1",

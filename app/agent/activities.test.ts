@@ -96,10 +96,12 @@ test.concurrent(
       const projectConfig = unwrap(projectConfigResult);
       const filesystemDrivePath = path.join(tmpPath, `buildfs-test-${runId}.ext4`);
 
-      const buildfsEvent = await buildfsService.createBuildfsEvent(db, {
-        contextPath: projectConfig.image.buildContext,
-        dockerfilePath: projectConfig.image.file,
-      });
+      const buildfsEvent = await db.$transaction((tdb) =>
+        buildfsService.createBuildfsEvent(tdb, {
+          contextPath: projectConfig.image.buildContext,
+          dockerfilePath: projectConfig.image.file,
+        }),
+      );
       await buildfs({
         runId,
         inputDrivePath: checkedOutRepositoryDrivePath,
