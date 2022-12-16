@@ -8,7 +8,7 @@ import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, Config as SSHConfig } from "node-ssh";
 import { GroupError } from "~/group-error";
 import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { VMTaskOutput } from "./agent-util.types";
 import { TASK_SCRIPT_TEMPLATE } from "./constants";
@@ -77,10 +77,10 @@ export class AgentUtilService {
   async execVmTasks(
     sshConfig: SSHConfig,
     db: Prisma.Client,
-    vmTaskIds: bigint[],
+    vmTasks: { vmTaskId: bigint; env?: { [name: string]: string } }[],
   ): Promise<VMTaskOutput[]> {
     const tasks = await db.vmTask.findMany({
-      where: { id: { in: vmTaskIds } },
+      where: { id: { in: vmTasks.map((t) => t.vmTaskId) } },
       include: { logGroup: true },
     });
     for (const vmTask of tasks) {
@@ -88,10 +88,15 @@ export class AgentUtilService {
         throw new Error(`VM task ${vmTask.id} is not in pending state`);
       }
     }
+    const idsToVmTasks = new Map(vmTasks.map((t) => [t.vmTaskId, t]));
+    const taskDefinitions = tasks.map((t) => ({
+      task: t,
+      env: unwrap(idsToVmTasks.get(t.id)).env,
+    }));
 
     let cleanupStarted = false;
     const taskSshHandles: NodeSSH[] = [];
-    const taskFn = async (task: VmTask) => {
+    const taskFn = async (args: typeof taskDefinitions[0]) => {
       await withSsh(sshConfig, async (taskSsh) => {
         if (cleanupStarted) {
           throw new Error("cleanup already started");
@@ -120,7 +125,7 @@ export class AgentUtilService {
             await db.log.create({
               data: {
                 idx: currentSyncIdx,
-                logGroupId: task.logGroupId,
+                logGroupId: args.task.logGroupId,
                 content,
               },
             });
@@ -132,12 +137,15 @@ export class AgentUtilService {
             {
               ssh: taskSsh,
               opts: {
-                cwd: task.cwd ?? void 0,
+                cwd: args.task.cwd ?? void 0,
+                execOptions: {
+                  env: args.env as any,
+                },
                 onStdout: (chunk) => logBuffer.push(chunk),
                 onStderr: (chunk) => logBuffer.push(chunk),
               },
             },
-            task.command,
+            args.task.command,
           ).finally(() => (finished = true)),
           syncLogs().catch((err) => {
             taskSsh.dispose();
@@ -148,17 +156,17 @@ export class AgentUtilService {
     };
     const taskFinished = tasks.map((_) => false);
     const taskCancelled = tasks.map((_) => false);
-    const taskPromises = tasks.map(async (task, taskIdx) => {
+    const taskPromises = taskDefinitions.map(async (args, taskIdx) => {
       const updateStatus = (status: VmTaskStatus) =>
         db.vmTask.update({
-          where: { id: task.id },
+          where: { id: args.task.id },
           data: { status },
         });
 
       try {
         try {
           await updateStatus(VmTaskStatus.VM_TASK_STATUS_RUNNING);
-          await taskFn(task);
+          await taskFn(args);
           await updateStatus(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
         } finally {
           taskFinished[taskIdx] = true;

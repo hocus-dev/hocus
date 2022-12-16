@@ -148,7 +148,7 @@ test.concurrent(
 
       const secondPrebuildEvent = await db.$transaction((tdb) =>
         prebuildService.createPrebuildEvent(tdb, [
-          `echo "one€" && sleep 1 && echo "two😄"`,
+          `echo "one€" && sleep 1 && echo "$TWO"`,
           "sleep 15",
           "sleep 15",
           `sleep 2 && test -z "this task will fail"`,
@@ -162,6 +162,9 @@ test.concurrent(
         projectDrivePath: checkedOutRepositoryDrivePath,
         filesystemDrivePath,
         prebuildEventId: secondPrebuildEvent.id,
+        env: {
+          TWO: "two😄",
+        },
       });
       const assertTaskStatuses = (taskResults: { status: VmTaskStatus }[]) => {
         expect(taskResults[0].status).toEqual(VmTaskStatus.VM_TASK_STATUS_SUCCESS);

@@ -20,10 +20,7 @@ RUN useradd hocus -m -s /bin/bash && \
     passwd -d hocus && \
     echo "hocus ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     chown -R hocus:hocus /home/hocus
-RUN sed -i 's|#PasswordAuthentication yes|PasswordAuthentication no|g' /etc/ssh/sshd_config && \
-    # the following line will fail if ChallengeResponseAuthentication is present in the file
-    $(! cat /etc/ssh/sshd_config | grep -q "ChallengeResponseAuthentication") && \
-    echo "ChallengeResponseAuthentication no" >> /etc/ssh/sshd_config
+COPY ./docker/ssh/sshd_config /etc/ssh/sshd_config
 RUN mkdir -p /home/hocus/.ssh && \
     # this public key is automatically removed when a workspace starts
     echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKk+DZs+E2GlmqUNqTCU9/R0kT/zzBjwBqbPaBtGv3MA hocus@prebuild" >> /home/hocus/.ssh/authorized_keys && \

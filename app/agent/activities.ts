@@ -189,7 +189,7 @@ export const createActivities = async (
         await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
 
         const taskResults = await agentUtilService.execVmTasks(sshConfig, db, [
-          buildfsEvent.vmTaskId,
+          { vmTaskId: buildfsEvent.vmTaskId },
         ]);
         return taskResults[0];
       },
@@ -269,6 +269,7 @@ export const createActivities = async (
     runId?: string;
     projectDrivePath: string;
     filesystemDrivePath: string;
+    env?: { [key: string]: string };
     prebuildEventId: bigint;
   }): Promise<VMTaskOutput[]> => {
     const runId = args.runId ?? uuidv4();
@@ -307,7 +308,7 @@ export const createActivities = async (
         return await agentUtilService.execVmTasks(
           sshConfig,
           db,
-          tasks.map((t) => t.vmTask.id),
+          tasks.map((t) => ({ vmTaskId: t.vmTask.id, env: args.env })),
         );
       },
     );

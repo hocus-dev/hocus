@@ -32,6 +32,8 @@ export class PrebuildService {
           "pipefail",
           "-o",
           "errexit",
+          "-o",
+          "allexport",
           "-c",
           `bash "${paths.scriptPath}" 2>&1 | tee "${paths.logPath}"`,
         ]);
