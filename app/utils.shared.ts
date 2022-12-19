@@ -45,3 +45,10 @@ export const waitForPromises = async <T>(promises: Iterable<T>): Promise<Awaited
 
   return results.map((result) => (result as PromiseFulfilledResult<Awaited<T>>).value);
 };
+
+export const displayError = (err: unknown): string => {
+  if (err instanceof Error) {
+    return `${err.message}\nStack: ${err.stack}`;
+  }
+  return String(err);
+};

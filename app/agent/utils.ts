@@ -1,14 +1,25 @@
-import type { SpawnSyncReturns } from "child_process";
+import type { SpawnSyncOptionsWithBufferEncoding, SpawnSyncReturns } from "child_process";
 import { spawnSync } from "child_process";
 import fs from "fs";
 
 import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from "node-ssh";
 import { NodeSSH } from "node-ssh";
 import { Tail } from "tail";
+import type { Object } from "ts-toolbelt";
 import { unwrap } from "~/utils.shared";
 
 export const execCmd = (...args: string[]): SpawnSyncReturns<Buffer> => {
-  const output = args.length > 1 ? spawnSync(args[0], args.slice(1)) : spawnSync(args[0]);
+  return execCmdWithOpts(args, {});
+};
+
+export const execCmdWithOpts = (
+  args: string[],
+  options: Object.Modify<
+    SpawnSyncOptionsWithBufferEncoding,
+    { env?: Record<string, string | undefined> }
+  >,
+): SpawnSyncReturns<Buffer> => {
+  const output = spawnSync(args[0], args.slice(1), options as SpawnSyncOptionsWithBufferEncoding);
   if (output.status !== 0) {
     throw new Error(
       `Command "${args.join(" ")}" failed with status ${output.status}, error name: "${

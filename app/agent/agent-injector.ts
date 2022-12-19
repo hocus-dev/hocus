@@ -6,6 +6,7 @@ import { Token } from "~/token";
 import { AgentUtilService } from "./agent-util.service";
 import { BuildfsService } from "./buildfs.service";
 import { factoryFirecrackerService } from "./firecracker.service";
+import { GitService } from "./git/git.service";
 import { PrebuildService } from "./prebuild.service";
 import { ProjectConfigService } from "./project-config/project-config.service";
 import { SSHGatewayService } from "./ssh-gateway.service";
@@ -23,6 +24,7 @@ export const createAgentInjector = (
     [Token.ProjectConfigService]?: typeof ProjectConfigService;
     [Token.SSHGatewayService]?: typeof SSHGatewayService;
     [Token.BuildfsService]?: typeof BuildfsService;
+    [Token.GitService]?: typeof GitService;
   } = {},
 ) =>
   createInjector()
@@ -32,6 +34,7 @@ export const createAgentInjector = (
       Token.LowLevelStorageService,
       overrides[Token.LowLevelStorageService] ?? LowLevelStorageService,
     )
+    .provideClass(Token.GitService, overrides[Token.GitService] ?? GitService)
     .provideClass(Token.StorageService, overrides[Token.StorageService] ?? StorageService)
     .provideClass(Token.AgentUtilService, overrides[Token.AgentUtilService] ?? AgentUtilService)
     .provideClass(Token.PrebuildService, overrides[Token.PrebuildService] ?? PrebuildService)

@@ -12,7 +12,7 @@ import { unwrap } from "~/utils.shared";
 
 import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
-import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY, SSH_PROXY_IP } from "./test-constants";
+import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY, SSH_PROXY_IP, TESTS_REPO_URL } from "./test-constants";
 import { execCmd, execSshCmd, withSsh } from "./utils";
 
 const provideActivities = (
@@ -80,7 +80,7 @@ test.concurrent(
           maxSizeMiB: 10000,
         },
         repository: {
-          url: "git@github.com:hocus-dev/tests.git",
+          url: TESTS_REPO_URL,
           credentials: {
             privateSshKey: PRIVATE_SSH_KEY,
           },
