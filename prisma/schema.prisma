@@ -81,3 +81,23 @@ model BuildfsEvent {
   /// Relative path to the build context in the `project` directory of the input drive.
   contextPath    String
 }
+
+enum SshKeyPairType {
+  SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED
+  SSH_KEY_PAIR_TYPE_USER_SUPPLIED
+}
+
+model SshKeyPair {
+  id              BigInt          @id @default(autoincrement())
+  type            SshKeyPairType
+  privateKey      String
+  publicKey       String
+  gitRepositories GitRepository[]
+}
+
+model GitRepository {
+  id           BigInt     @id @default(autoincrement())
+  url          String     @unique
+  sshKeyPair   SshKeyPair @relation(fields: [sshKeyPairId], references: [id])
+  sshKeyPairId BigInt
+}

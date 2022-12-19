@@ -1,6 +1,9 @@
 import fs from "fs/promises";
 
+import type { GitRepository, Prisma, SshKeyPair } from "@prisma/client";
+import { SshKeyPairType } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
+import sshpk from "sshpk";
 import { v4 as uuidv4 } from "uuid";
 import type { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
@@ -8,6 +11,7 @@ import { displayError } from "~/utils.shared";
 
 import { execCmdWithOpts } from "../utils";
 
+import { GitUrlError } from "./error";
 import { RemoteInfoTupleValidator } from "./validator";
 
 export interface GitRemoteInfo {
@@ -30,6 +34,11 @@ interface RemoteUpdate {
 
 export class GitService {
   static inject = [Token.Logger] as const;
+  /**
+   * Original source: https://github.com/jonschlinkert/is-git-url/blob/396965ffabf2f46656c8af4c47bef1d69f09292e/index.js#LL9C3-L9C88
+   * Modified to disallow the `https` protocol.
+   */
+  private gitUrlRegex = /(?:git|ssh|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|#[-\d\w._]+?)$/;
 
   constructor(private readonly logger: Logger) {}
 
@@ -117,5 +126,56 @@ export class GitService {
       }
     }
     return updatedRemotes;
+  }
+
+  async isGitSshUrl(url: string): Promise<boolean> {
+    return this.gitUrlRegex.test(url);
+  }
+
+  async generateSshKeyPair(db: Prisma.Client, type: SshKeyPairType): Promise<SshKeyPair> {
+    const privateKey = await sshpk.generatePrivateKey("ed25519");
+    const sshPrivateKey = privateKey.toString("ssh");
+    return await this.createSshKeyPair(db, sshPrivateKey, type);
+  }
+
+  async createSshKeyPair(
+    db: Prisma.Client,
+    privateKey: string,
+    type: SshKeyPairType,
+  ): Promise<SshKeyPair> {
+    const parsedPrivateKey = sshpk.parsePrivateKey(privateKey);
+    const sshPrivateKey = parsedPrivateKey.toString("ssh");
+    const sshPublicKey = parsedPrivateKey.toPublic().toString("ssh");
+
+    return await db.sshKeyPair.create({
+      data: {
+        publicKey: sshPublicKey,
+        privateKey: sshPrivateKey,
+        type,
+      },
+    });
+  }
+
+  async addGitRepository(
+    db: Prisma.Client,
+    repositoryUrl: string,
+    sshKeyPairId: bigint,
+  ): Promise<GitRepository> {
+    if (!this.isGitSshUrl(repositoryUrl)) {
+      throw new GitUrlError(`Invalid git repository URL: ${repositoryUrl}`);
+    }
+    const keyPair = await db.sshKeyPair.findUniqueOrThrow({ where: { id: sshKeyPairId } });
+    if (keyPair.type !== SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED) {
+      throw new Error(
+        `Cannot add git repository with SSH key pair of type ${keyPair.type}. Expected ${SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED}`,
+      );
+    }
+
+    return await db.gitRepository.create({
+      data: {
+        url: repositoryUrl,
+        sshKeyPairId,
+      },
+    });
   }
 }

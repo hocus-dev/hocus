@@ -1,8 +1,11 @@
+import type { Prisma } from "@prisma/client";
+import { SshKeyPairType } from "@prisma/client";
 import { DefaultLogger } from "@temporalio/worker";
+import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 
 import { createAgentInjector } from "../agent-injector";
-import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "../test-constants";
+import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY, TESTS_REPO_URL } from "../test-constants";
 
 import type { GitRemoteInfo } from "./git.service";
 
@@ -15,6 +18,15 @@ const provideInjector = (
     } as unknown as any,
   });
   return async () => await testFn({ injector });
+};
+
+const provideInjectorAndDb = (
+  testFn: (args: {
+    injector: ReturnType<typeof createAgentInjector>;
+    db: Prisma.NonTransactionClient;
+  }) => Promise<void>,
+): (() => Promise<void>) => {
+  return provideInjector(({ injector }) => provideDb((db) => testFn({ injector, db }))());
 };
 
 test.concurrent(
@@ -80,5 +92,30 @@ test.concurrent(
     ];
     result.sort((a, b) => a.remoteInfo.name.localeCompare(b.remoteInfo.name));
     expect(result).toMatchObject(expectedResult);
+  }),
+);
+
+test.concurrent(
+  "createSshKeyPair, generateSshKeyPair, addGitRepository",
+  provideInjectorAndDb(async ({ injector, db }) => {
+    const gitService = injector.resolve(Token.GitService);
+    const pair = await gitService.createSshKeyPair(
+      db,
+      PRIVATE_SSH_KEY,
+      SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
+    );
+    expect(pair.publicKey).toEqual(PUBLIC_SSH_KEY);
+    expect(pair.type).toEqual(SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED);
+    const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
+    expect(repo.url).toEqual(TESTS_REPO_URL);
+    expect(repo.sshKeyPairId).toEqual(pair.id);
+
+    const pair2 = await gitService.generateSshKeyPair(
+      db,
+      SshKeyPairType.SSH_KEY_PAIR_TYPE_USER_SUPPLIED,
+    );
+    expect(pair2.publicKey).toBeDefined();
+    expect(pair2.privateKey).toBeDefined();
+    expect(pair2.type).toEqual(SshKeyPairType.SSH_KEY_PAIR_TYPE_USER_SUPPLIED);
   }),
 );
