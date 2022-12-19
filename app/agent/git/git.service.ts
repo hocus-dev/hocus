@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 
-import type { GitRepository, Prisma, SshKeyPair } from "@prisma/client";
+import type { GitRepository, SshKeyPair } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import sshpk from "sshpk";
@@ -154,6 +155,34 @@ export class GitService {
         type,
       },
     });
+  }
+
+  /**
+   * If the server has a server-controlled SSH key pair, return it.
+   * Otherwise, generate one and return it.
+   * Note: this method will lock the SshKeyPair table if a key pair does not exist
+   * until the transaction is complete.
+   * No updates will be allowed to the table until the transaction is complete. You should
+   * finish the transaction as soon as possible.
+   */
+  async getOrCreateServerControlledSshKeyPair(db: Prisma.TransactionClient): Promise<SshKeyPair> {
+    const getKeyPair = () =>
+      db.sshKeyPair.findFirst({
+        where: { type: SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED },
+      });
+    let keyPair = await getKeyPair();
+    if (keyPair) {
+      return keyPair;
+    }
+    await db.$executeRawUnsafe(
+      `LOCK TABLE "${Prisma.ModelName.SshKeyPair}" IN SHARE UPDATE EXCLUSIVE MODE`,
+    );
+    keyPair = await getKeyPair();
+    if (keyPair) {
+      return keyPair;
+    }
+
+    return await this.generateSshKeyPair(db, SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED);
   }
 
   async addGitRepository(

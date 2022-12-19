@@ -119,3 +119,16 @@ test.concurrent(
     expect(pair2.type).toEqual(SshKeyPairType.SSH_KEY_PAIR_TYPE_USER_SUPPLIED);
   }),
 );
+
+test.concurrent(
+  "getOrCreateServerControlledSshKeyPair",
+  provideInjectorAndDb(async ({ injector, db }) => {
+    const gitService = injector.resolve(Token.GitService);
+    const tasks = new Array(25)
+      .fill(0)
+      .map(() => db.$transaction((tdb) => gitService.getOrCreateServerControlledSshKeyPair(tdb)));
+    const keyPairs = await Promise.all(tasks);
+    const keyPairId = keyPairs[0].id;
+    expect(keyPairs.every((kp) => kp.id === keyPairId)).toBe(true);
+  }),
+);
