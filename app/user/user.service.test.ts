@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { createAppInjector } from "~/app-injector.server";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
@@ -6,7 +6,7 @@ import { Token } from "~/token";
 import type { UserService } from "./user.service.server";
 
 type Args = {
-  db: PrismaClient;
+  db: Prisma.NonTransactionClient;
   userService: UserService;
 };
 

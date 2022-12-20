@@ -48,8 +48,9 @@ module.exports = {
               {
                 name: "@prisma/client",
                 importNames: ["PrismaClient"],
-                message: "Please use the client from the request context instead.",
-                allowTypeImports: true,
+                message:
+                  "Please use the client from the request context instead, or if just importing for types, use Prisma.NonTransactionClient",
+                allowTypeImports: false,
               },
             ],
           },

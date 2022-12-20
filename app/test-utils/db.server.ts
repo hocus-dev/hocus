@@ -3,6 +3,7 @@ import "./prisma-export-patch.server";
 
 import fs from "fs";
 
+import type { Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import { runMigrations } from "graphile-worker";
@@ -13,7 +14,9 @@ import "process";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
 
-export const provideDb = (testFn: (db: PrismaClient) => Promise<void>): (() => Promise<void>) => {
+export const provideDb = (
+  testFn: (db: Prisma.NonTransactionClient) => Promise<void>,
+): (() => Promise<void>) => {
   return async () => {
     const dbName = uuidv4();
     const dbUrl = `postgresql://postgres:pass@${DB_HOST}:5432/${dbName}`;
