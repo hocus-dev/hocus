@@ -132,3 +132,51 @@ test.concurrent(
     expect(keyPairs.every((kp) => kp.id === keyPairId)).toBe(true);
   }),
 );
+
+test.concurrent(
+  "updateBranches",
+  provideInjectorAndDb(async ({ injector, db }) => {
+    const gitService = injector.resolve(Token.GitService);
+    const pair = await gitService.createSshKeyPair(
+      db,
+      PRIVATE_SSH_KEY,
+      SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
+    );
+    const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
+
+    const { newGitBranches, updatedGitBranches } = await db.$transaction((tdb) =>
+      gitService.updateBranches(tdb, repo.id),
+    );
+    expect(updatedGitBranches.length).toEqual(0);
+    expect(newGitBranches.length).not.toEqual(0);
+    const repo2 = await db.gitRepository.findUniqueOrThrow({
+      where: { id: repo.id },
+    });
+    expect(repo2.lastBranchUpdateAt.getTime() > repo.lastBranchUpdateAt.getTime()).toBe(true);
+
+    const mockRemotes = newGitBranches.map((b) => ({
+      name: b.name,
+      hash: b.gitObject.hash,
+    }));
+    const mockHash = "abc";
+    mockRemotes[0].hash = mockHash;
+    gitService.getRemotes = jest.fn().mockResolvedValue(mockRemotes);
+
+    const { newGitBranches: newGitBranches2, updatedGitBranches: updatedGitBranches2 } =
+      await db.$transaction((tdb) => gitService.updateBranches(tdb, repo.id));
+
+    expect(updatedGitBranches2.length).toEqual(1);
+    expect(newGitBranches2.length).toEqual(0);
+    expect(updatedGitBranches2[0].gitObject.hash).toEqual(mockHash);
+
+    const updatedGitBranch = await db.gitBranch.findUniqueOrThrow({
+      where: {
+        id: updatedGitBranches2[0].id,
+      },
+      include: {
+        gitObject: true,
+      },
+    });
+    expect(updatedGitBranch.gitObject.hash).toEqual(mockHash);
+  }),
+);

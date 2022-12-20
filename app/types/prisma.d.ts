@@ -1,6 +1,7 @@
 import type prisma from "@prisma/client";
 
-declare const msg = "Don't assign a regular PrismaClient to a Prisma.TransactionClient!";
+declare const TRANSACTION_CLIENT_REQUIRED =
+  "Don't assign a regular PrismaClient to a Prisma.TransactionClient!";
 
 declare module "@prisma/client" {
   export namespace Prisma {
@@ -9,11 +10,11 @@ declare module "@prisma/client" {
        * this is a hack to make the typescript compiler not allow assigning
        * a PrismaClient to a Prisma.TransactionClient
        * */
-      [msg]: null;
+      [TRANSACTION_CLIENT_REQUIRED]: null;
     }
 
     export interface NonTransactionClient extends prisma.PrismaClient {}
 
-    export interface Client extends Omit<TransactionClient, typeof msg> {}
+    export interface Client extends Omit<TransactionClient, typeof TRANSACTION_CLIENT_REQUIRED> {}
   }
 }

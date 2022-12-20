@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 
-import type { GitRepository, SshKeyPair } from "@prisma/client";
+import type { GitBranch, GitObject, GitRepository, SshKeyPair } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
@@ -8,7 +8,7 @@ import sshpk from "sshpk";
 import { v4 as uuidv4 } from "uuid";
 import type { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
-import { displayError } from "~/utils.shared";
+import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
 import { execCmdWithOpts } from "../utils";
 
@@ -206,5 +206,98 @@ export class GitService {
         sshKeyPairId,
       },
     });
+  }
+
+  async updateBranches(
+    db: Prisma.TransactionClient,
+    gitRepositoryId: bigint,
+  ): Promise<{
+    newGitBranches: (GitBranch & {
+      gitObject: GitObject;
+    })[];
+    updatedGitBranches: (GitBranch & {
+      gitObject: GitObject;
+    })[];
+  }> {
+    const gitRepository = await db.gitRepository.findUniqueOrThrow({
+      where: { id: gitRepositoryId },
+      include: {
+        sshKeyPair: true,
+        gitBranches: {
+          include: {
+            gitObject: true,
+          },
+        },
+      },
+    });
+    const newRemotes = await this.getRemotes(
+      gitRepository.url,
+      gitRepository.sshKeyPair.privateKey,
+    );
+    await db.$executeRaw`SELECT id FROM "GitRepository" WHERE id = ${gitRepositoryId} FOR UPDATE`;
+    const currentRemotes: GitRemoteInfo[] = gitRepository.gitBranches.map((b) => ({
+      name: b.name,
+      hash: b.gitObject.hash,
+    }));
+    const remoteUpdates = await this.findRemoteUpdates(currentRemotes, newRemotes);
+    const newBranches = remoteUpdates.filter((u) => u.state === "new");
+    const updatedBranches = remoteUpdates.filter((u) => u.state === "updated");
+    const hashes = Array.from(
+      new Set([
+        ...newBranches.map((b) => b.remoteInfo.hash),
+        ...updatedBranches.map((b) => b.remoteInfo.hash),
+      ]),
+    );
+    const gitObjects = await waitForPromises(
+      hashes.map((hash) =>
+        db.gitObject.upsert({
+          create: {
+            hash,
+          },
+          update: {},
+          where: {
+            hash,
+          },
+        }),
+      ),
+    );
+    const gitObjectMap = new Map(gitObjects.map((o) => [o.hash, o]));
+    const newGitBranches = await waitForPromises(
+      newBranches.map((b) =>
+        db.gitBranch.create({
+          data: {
+            name: b.remoteInfo.name,
+            gitRepositoryId,
+            gitObjectId: unwrap(gitObjectMap.get(b.remoteInfo.hash)).id,
+          },
+          include: {
+            gitObject: true,
+          },
+        }),
+      ),
+    );
+    const updatedGitBranches = await waitForPromises(
+      updatedBranches.map((b) =>
+        db.gitBranch.update({
+          // eslint-disable-next-line camelcase
+          where: { gitRepositoryId_name: { gitRepositoryId, name: b.remoteInfo.name } },
+          data: {
+            gitObjectId: unwrap(gitObjectMap.get(b.remoteInfo.hash)).id,
+          },
+          include: {
+            gitObject: true,
+          },
+        }),
+      ),
+    );
+    if (newGitBranches.length + updatedGitBranches.length > 0) {
+      await db.gitRepository.update({
+        where: { id: gitRepositoryId },
+        data: {
+          lastBranchUpdateAt: new Date(),
+        },
+      });
+    }
+    return { newGitBranches, updatedGitBranches };
   }
 }

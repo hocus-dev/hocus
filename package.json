@@ -20,7 +20,7 @@
     "prisma-generate": "yarn run prisma generate && ops/bin/override-prisma-types.sh"
   },
   "dependencies": {
-    "@prisma/client": "4.2.1",
+    "@prisma/client": "4.7.1",
     "@remix-run/node": "^1.7.2",
     "@remix-run/react": "^1.7.2",
     "@remix-run/serve": "^1.7.2",
@@ -40,7 +40,7 @@
     "http-status-codes": "^2.2.0",
     "netmask": "^2.0.2",
     "node-ssh": "^13.0.0",
-    "prisma": "4.2.1",
+    "prisma": "4.7.1",
     "proper-lockfile": "^4.1.2",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",

@@ -2,8 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["interactiveTransactions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -93,11 +92,39 @@ model SshKeyPair {
   privateKey      String
   publicKey       String
   gitRepositories GitRepository[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model GitRepository {
-  id           BigInt     @id @default(autoincrement())
-  url          String     @unique
-  sshKeyPair   SshKeyPair @relation(fields: [sshKeyPairId], references: [id])
+  id           BigInt      @id @default(autoincrement())
+  url          String      @unique
+  sshKeyPair   SshKeyPair  @relation(fields: [sshKeyPairId], references: [id])
   sshKeyPairId BigInt
+  gitBranches  GitBranch[]
+
+  lastBranchUpdateAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model GitBranch {
+  id              BigInt        @id @default(autoincrement())
+  name            String
+  gitRepository   GitRepository @relation(fields: [gitRepositoryId], references: [id])
+  gitRepositoryId BigInt
+  gitObjectId     BigInt
+  gitObject       GitObject     @relation(fields: [gitObjectId], references: [id])
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([gitRepositoryId, name])
+}
+
+model GitObject {
+  id   BigInt @id @default(autoincrement())
+  hash String @unique
+
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  gitBranches GitBranch[]
 }
