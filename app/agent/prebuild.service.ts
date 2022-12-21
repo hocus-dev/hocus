@@ -21,8 +21,13 @@ export class PrebuildService {
     return { scriptPath, logPath };
   }
 
-  async createPrebuildEvent(db: Prisma.TransactionClient, tasks: string[]): Promise<PrebuildEvent> {
-    const prebuildEvent = await db.prebuildEvent.create({ data: {} });
+  async createPrebuildEvent(
+    db: Prisma.TransactionClient,
+    projectId: bigint,
+    gitObjectId: bigint,
+    tasks: string[],
+  ): Promise<PrebuildEvent> {
+    const prebuildEvent = await db.prebuildEvent.create({ data: { projectId, gitObjectId } });
     await Promise.all(
       tasks.map(async (task, idx) => {
         const paths = this.getPrebuildTaskPaths(idx);
@@ -47,6 +52,35 @@ export class PrebuildService {
         });
       }),
     );
+    return prebuildEvent;
+  }
+
+  async linkGitBranchesToPrebuildEvent(db: Prisma.TransactionClient, prebuildEventId: bigint) {
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: prebuildEventId },
+    });
+    const gitBranches = await db.gitBranch.findMany({
+      where: { gitObjectId: prebuildEvent.gitObjectId },
+    });
+    await db.prebuildEventToGitBranch.createMany({
+      data: gitBranches.map((gitBranch) => ({
+        prebuildEventId,
+        gitBranchId: gitBranch.id,
+      })),
+    });
+  }
+
+  /**
+   * Creates a prebuild event and links all git branches that point to the given git object id to it.
+   */
+  async preparePrebuild(
+    db: Prisma.TransactionClient,
+    projectId: bigint,
+    gitObjectId: bigint,
+    tasks: string[],
+  ): Promise<PrebuildEvent> {
+    const prebuildEvent = await this.createPrebuildEvent(db, projectId, gitObjectId, tasks);
+    await this.linkGitBranchesToPrebuildEvent(db, prebuildEvent.id);
     return prebuildEvent;
   }
 }

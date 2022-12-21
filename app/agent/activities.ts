@@ -2,10 +2,11 @@ import fsSync from "fs";
 import fs from "fs/promises";
 import { promisify } from "util";
 
-import type { Prisma } from "@prisma/client";
+import type { GitObject, PrebuildEvent, Prisma, Project } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
 import type { createAgentInjector } from "./agent-injector";
 import type { VMTaskOutput } from "./agent-util.types";
@@ -202,8 +203,9 @@ export const createActivities = async (
    * Copies the contents of `repositoryDrivePath` into `outputDrivePath`, and checks
    * out the given branch there.
    *
-   * Returns `ProjectConfig` if a hocus config file is present in the repository.
-   * Otherwise, returns `null`.
+   * Returns an array of `ProjectConfig`s or `null`s corresponding to the
+   * `projectConfigPaths` argument. If a hocus config file is not present in a directory,
+   * `null` is returned.
    */
   const checkoutAndInspect = async (args: {
     /**
@@ -218,7 +220,11 @@ export const createActivities = async (
      * A new drive will be created at this path.
      */
     outputDrivePath: string;
-  }): Promise<ProjectConfig | null> => {
+    /**
+     * Relative paths to directories where `hocus.yml` files are located.
+     */
+    projectConfigPaths: string[];
+  }): Promise<(ProjectConfig | null)[]> => {
     const instanceId = `checkout-and-inspect-${randomString(8)}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const logger = injector.resolve(Token.Logger);
@@ -243,12 +249,15 @@ export const createActivities = async (
         },
         async ({ ssh }) => {
           const repoPath = `${workdir}/project`;
+
           await execSshCmd({ ssh, opts: { cwd: repoPath } }, [
             "git",
             "checkout",
             args.targetBranch,
           ]);
-          return await projectConfigService.getConfig(ssh, repoPath);
+          return await waitForPromises(
+            args.projectConfigPaths.map((p) => projectConfigService.getConfig(ssh, repoPath, p)),
+          );
         },
       );
     } catch (err) {
@@ -393,6 +402,26 @@ export const createActivities = async (
     await firecrackerService.shutdownVMAndReleaseResources(args.ipBlockId);
   };
 
+  const preparePrebuild = async (args: {
+    projectId: bigint;
+    gitObjectId: bigint;
+    prebuildTasks: string[];
+  }): Promise<
+    PrebuildEvent & {
+      gitObject: GitObject;
+      project: Project;
+    }
+  > => {
+    const prebuildService = injector.resolve(Token.PrebuildService);
+    const prebuildEvent = await db.$transaction(async (tdb) =>
+      prebuildService.preparePrebuild(tdb, args.projectId, args.gitObjectId, args.prebuildTasks),
+    );
+    return await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: prebuildEvent.id },
+      include: { gitObject: true, project: true },
+    });
+  };
+
   return {
     fetchRepository,
     buildfs,
@@ -400,5 +429,6 @@ export const createActivities = async (
     prebuild,
     startWorkspace,
     stopWorkspace,
+    preparePrebuild,
   };
 };

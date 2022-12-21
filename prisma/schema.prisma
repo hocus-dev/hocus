@@ -38,8 +38,23 @@ model Log {
 }
 
 model PrebuildEvent {
-  id    BigInt              @id @default(autoincrement())
-  tasks PrebuildEventTask[]
+  id             BigInt                     @id @default(autoincrement())
+  tasks          PrebuildEventTask[]
+  project        Project                    @relation(fields: [projectId], references: [id])
+  projectId      BigInt
+  gitObject      GitObject                  @relation(fields: [gitObjectId], references: [id])
+  gitObjectId    BigInt
+  gitBranchLinks PrebuildEventToGitBranch[]
+}
+
+model PrebuildEventToGitBranch {
+  id              BigInt        @id @default(autoincrement())
+  prebuildEvent   PrebuildEvent @relation(fields: [prebuildEventId], references: [id])
+  prebuildEventId BigInt
+  gitBranch       GitBranch     @relation(fields: [gitBranchId], references: [id])
+  gitBranchId     BigInt
+
+  @@unique([prebuildEventId, gitBranchId])
 }
 
 model PrebuildEventTask {
@@ -103,8 +118,9 @@ model GitRepository {
   sshKeyPairId BigInt
   gitBranches  GitBranch[]
 
-  lastBranchUpdateAt DateTime @default(now()) @db.Timestamptz(3)
-  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  lastBranchUpdateAt DateTime  @default(now()) @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  Project            Project[]
 }
 
 model GitBranch {
@@ -115,8 +131,9 @@ model GitBranch {
   gitObjectId     BigInt
   gitObject       GitObject     @relation(fields: [gitObjectId], references: [id])
 
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime                   @updatedAt @db.Timestamptz(3)
+  createdAt                DateTime                   @default(now()) @db.Timestamptz(3)
+  PrebuildEventToGitBranch PrebuildEventToGitBranch[]
 
   @@unique([gitRepositoryId, name])
 }
@@ -125,6 +142,34 @@ model GitObject {
   id   BigInt @id @default(autoincrement())
   hash String @unique
 
-  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
-  gitBranches GitBranch[]
+  createdAt     DateTime        @default(now()) @db.Timestamptz(3)
+  gitBranches   GitBranch[]
+  PrebuildEvent PrebuildEvent[]
+}
+
+model Project {
+  id                BigInt        @id @default(autoincrement())
+  gitRepository     GitRepository @relation(fields: [gitRepositoryId], references: [id])
+  gitRepositoryId   BigInt
+  /// relative path to the directory where the `hocus.yml` file is located
+  rootDirectoryPath String
+
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  prebuildEvents PrebuildEvent[]
+}
+
+model AgentInstance {
+  id         BigInt @id @default(autoincrement())
+  externalId String @unique
+  File       File[]
+}
+
+model File {
+  id              BigInt        @id @default(autoincrement())
+  agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
+  agentInstanceId BigInt
+  /// Should be absolute.
+  path            String
+
+  @@unique([agentInstanceId, path])
 }

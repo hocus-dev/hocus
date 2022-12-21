@@ -1,3 +1,5 @@
+import path from "path";
+
 import type { NodeSSH } from "node-ssh";
 import yaml from "yaml";
 
@@ -12,11 +14,16 @@ export class ProjectConfigService {
    * Returns `ProjectConfig` for the given repository if a hocus config file is present.
    * Otherwise, returns `null`.
    */
-  async getConfig(ssh: NodeSSH, repositoryPath: string): Promise<ProjectConfig | null> {
+  async getConfig(
+    ssh: NodeSSH,
+    repositoryPath: string,
+    rootDirectoryPath: string,
+  ): Promise<ProjectConfig | null> {
+    const configDir = path.join(repositoryPath, rootDirectoryPath);
     let configString: string | null = null;
     for (const fileName of HOCUS_CONFIG_FILE_NAMES) {
       const catOutput = await execSshCmd(
-        { ssh, allowNonZeroExitCode: true, opts: { cwd: repositoryPath } },
+        { ssh, allowNonZeroExitCode: true, opts: { cwd: configDir } },
         ["cat", fileName],
       );
       if (catOutput.code === 0) {

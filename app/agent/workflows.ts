@@ -1,14 +1,14 @@
 import { proxyActivities } from "@temporalio/workflow";
 
-import type * as activities from "./activities";
+import type { createActivities } from "./activities";
 
-const { startFirecrackerInstance } = proxyActivities<typeof activities>({
+const { checkoutAndInspect } = proxyActivities<Awaited<ReturnType<typeof createActivities>>>({
   startToCloseTimeout: "1 minute",
   retry: {
     maximumAttempts: 1,
   },
 });
 
-export async function startVM(vmId: string): Promise<void> {
-  await startFirecrackerInstance(vmId);
+export async function spawnPrebuild(projectId: bigint, gitObjectId: bigint): Promise<void> {
+  // todo
 }
