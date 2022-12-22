@@ -37,6 +37,15 @@ model Log {
   @@unique([logGroupId, idx], name: "log_log_event_id_idx_unique")
 }
 
+enum PrebuildEventStatus {
+  PREBUILD_EVENT_STATUS_PENDING
+  PREBUILD_EVENT_STATUS_RUNNING
+  PREBUILD_EVENT_STATUS_SUCCESS
+  PREBUILD_EVENT_STATUS_ERROR
+  PREBUILD_EVENT_STATUS_CANCELLED
+  PREBUILD_EVENT_STATUS_SKIPPED
+}
+
 model PrebuildEvent {
   id             BigInt                     @id @default(autoincrement())
   tasks          PrebuildEventTask[]
@@ -44,6 +53,9 @@ model PrebuildEvent {
   projectId      BigInt
   gitObject      GitObject                  @relation(fields: [gitObjectId], references: [id])
   gitObjectId    BigInt
+  fsFile         File                       @relation(fields: [fsFileId], references: [id])
+  fsFileId       BigInt
+  status         PrebuildEventStatus
   gitBranchLinks PrebuildEventToGitBranch[]
 }
 
@@ -165,11 +177,12 @@ model AgentInstance {
 }
 
 model File {
-  id              BigInt        @id @default(autoincrement())
-  agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
+  id              BigInt          @id @default(autoincrement())
+  agentInstance   AgentInstance   @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
   /// Should be absolute.
   path            String
+  PrebuildEvent   PrebuildEvent[]
 
   @@unique([agentInstanceId, path])
 }

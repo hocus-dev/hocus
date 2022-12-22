@@ -1,12 +1,10 @@
 import fsSync from "fs";
-import fs from "fs/promises";
 import { promisify } from "util";
 
-import type { GitObject, PrebuildEvent, Prisma, Project } from "@prisma/client";
+import type { GitObject, Prisma, Project } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
 
 import type { createAgentInjector } from "./agent-injector";
 import type { VMTaskOutput } from "./agent-util.types";
@@ -226,44 +224,9 @@ export const createActivities = async (
     projectConfigPaths: string[];
   }): Promise<(ProjectConfig | null)[]> => {
     const instanceId = `checkout-and-inspect-${randomString(8)}`;
-    const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
-    const logger = injector.resolve(Token.Logger);
-    const projectConfigService = injector.resolve(Token.ProjectConfigService);
-    if (fsSync.existsSync(args.outputDrivePath)) {
-      logger.warn(
-        `output drive already exists at "${args.outputDrivePath}", it will be overwritten`,
-      );
-    }
-    await fs.copyFile(args.repositoryDrivePath, args.outputDrivePath);
-    const workdir = "/tmp/workdir";
-    try {
-      return await firecrackerService.withVM(
-        {
-          ssh: {
-            username: "hocus",
-            password: "hocus",
-          },
-          kernelPath: agentConfig.defaultKernel,
-          rootFsPath: agentConfig.checkoutAndInspectRootFs,
-          extraDrives: [{ pathOnHost: args.outputDrivePath, guestMountPath: workdir }],
-        },
-        async ({ ssh }) => {
-          const repoPath = `${workdir}/project`;
-
-          await execSshCmd({ ssh, opts: { cwd: repoPath } }, [
-            "git",
-            "checkout",
-            args.targetBranch,
-          ]);
-          return await waitForPromises(
-            args.projectConfigPaths.map((p) => projectConfigService.getConfig(ssh, repoPath, p)),
-          );
-        },
-      );
-    } catch (err) {
-      await fs.unlink(args.outputDrivePath);
-      throw err;
-    }
+    const fcService = injector.resolve(Token.FirecrackerService)(instanceId);
+    const prebuildService = injector.resolve(Token.PrebuildService);
+    return await prebuildService.checkoutAndInspect({ ...args, fcService });
   };
 
   /**
@@ -402,24 +365,20 @@ export const createActivities = async (
     await firecrackerService.shutdownVMAndReleaseResources(args.ipBlockId);
   };
 
-  const preparePrebuild = async (args: {
-    projectId: bigint;
-    gitObjectId: bigint;
-    prebuildTasks: string[];
-  }): Promise<
-    PrebuildEvent & {
-      gitObject: GitObject;
-      project: Project;
-    }
-  > => {
-    const prebuildService = injector.resolve(Token.PrebuildService);
-    const prebuildEvent = await db.$transaction(async (tdb) =>
-      prebuildService.preparePrebuild(tdb, args.projectId, args.gitObjectId, args.prebuildTasks),
-    );
-    return await db.prebuildEvent.findUniqueOrThrow({
-      where: { id: prebuildEvent.id },
-      include: { gitObject: true, project: true },
+  const getProjectsAndGitObjects = async (
+    gitRepositoryId: bigint,
+    gitObjectIds: bigint[],
+  ): Promise<{ projects: Project[]; gitObjects: GitObject[] }> => {
+    const projects = await db.project.findMany({
+      where: { gitRepositoryId: gitRepositoryId },
     });
+    const gitObjects = await db.gitObject.findMany({
+      where: { id: { in: gitObjectIds } },
+    });
+    if (gitObjects.length !== gitObjectIds.length) {
+      throw new Error("Some git objects were not found");
+    }
+    return { projects, gitObjects };
   };
 
   return {
@@ -429,6 +388,6 @@ export const createActivities = async (
     prebuild,
     startWorkspace,
     stopWorkspace,
-    preparePrebuild,
+    getProjectsAndGitObjects,
   };
 };

@@ -22,3 +22,6 @@ oBAgM=
 export const JAILER_USER_ID = "162137";
 export const JAILER_GROUP_ID = "162137";
 export const MAX_UNIX_SOCKET_PATH_LENGTH = 108;
+
+export const SOLO_AGENT_INSTANCE_ID = "solo";
+export const HOST_PERSISTENT_DIR = "/srv/jailer/resources";

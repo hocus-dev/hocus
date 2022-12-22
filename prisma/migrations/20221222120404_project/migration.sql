@@ -1,13 +1,20 @@
 /*
   Warnings:
 
+  - Added the required column `fsFileId` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
   - Added the required column `gitObjectId` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
   - Added the required column `projectId` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
+  - Added the required column `status` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
 
 */
+-- CreateEnum
+CREATE TYPE "PrebuildEventStatus" AS ENUM ('PREBUILD_EVENT_STATUS_PENDING', 'PREBUILD_EVENT_STATUS_RUNNING', 'PREBUILD_EVENT_STATUS_SUCCESS', 'PREBUILD_EVENT_STATUS_ERROR', 'PREBUILD_EVENT_STATUS_CANCELLED', 'PREBUILD_EVENT_STATUS_SKIPPED');
+
 -- AlterTable
-ALTER TABLE "PrebuildEvent" ADD COLUMN     "gitObjectId" BIGINT NOT NULL,
-ADD COLUMN     "projectId" BIGINT NOT NULL;
+ALTER TABLE "PrebuildEvent" ADD COLUMN     "fsFileId" BIGINT NOT NULL,
+ADD COLUMN     "gitObjectId" BIGINT NOT NULL,
+ADD COLUMN     "projectId" BIGINT NOT NULL,
+ADD COLUMN     "status" "PrebuildEventStatus" NOT NULL;
 
 -- CreateTable
 CREATE TABLE "PrebuildEventToGitBranch" (
@@ -59,6 +66,9 @@ ALTER TABLE "PrebuildEvent" ADD CONSTRAINT "PrebuildEvent_projectId_fkey" FOREIG
 
 -- AddForeignKey
 ALTER TABLE "PrebuildEvent" ADD CONSTRAINT "PrebuildEvent_gitObjectId_fkey" FOREIGN KEY ("gitObjectId") REFERENCES "GitObject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PrebuildEvent" ADD CONSTRAINT "PrebuildEvent_fsFileId_fkey" FOREIGN KEY ("fsFileId") REFERENCES "File"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PrebuildEventToGitBranch" ADD CONSTRAINT "PrebuildEventToGitBranch_prebuildEventId_fkey" FOREIGN KEY ("prebuildEventId") REFERENCES "PrebuildEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

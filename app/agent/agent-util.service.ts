@@ -1,7 +1,7 @@
 import fsSync from "fs";
 import { promisify } from "util";
 
-import type { Prisma, VmTask } from "@prisma/client";
+import type { AgentInstance, Prisma, VmTask } from "@prisma/client";
 import { LogGroupType } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
@@ -11,7 +11,7 @@ import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { VMTaskOutput } from "./agent-util.types";
-import { TASK_SCRIPT_TEMPLATE } from "./constants";
+import { SOLO_AGENT_INSTANCE_ID, TASK_SCRIPT_TEMPLATE } from "./constants";
 import { execCmd, execSshCmd, sleep, withSsh } from "./utils";
 
 export class AgentUtilService {
@@ -212,5 +212,15 @@ export class AgentUtilService {
       }
     });
     return tasks.map((task, idx) => ({ vmTaskId: task.id, ...statuses[idx] }));
+  }
+
+  async getOrCreateSoloAgentInstance(db: Prisma.TransactionClient): Promise<AgentInstance> {
+    return await db.agentInstance.upsert({
+      where: { externalId: SOLO_AGENT_INSTANCE_ID },
+      update: {},
+      create: {
+        externalId: SOLO_AGENT_INSTANCE_ID,
+      },
+    });
   }
 }

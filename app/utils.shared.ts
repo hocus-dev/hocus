@@ -52,3 +52,13 @@ export const displayError = (err: unknown): string => {
   }
   return String(err);
 };
+
+export const bigintSort = (a: bigint, b: bigint): number => {
+  if (a < b) {
+    return -1;
+  }
+  if (a > b) {
+    return 1;
+  }
+  return 0;
+};
