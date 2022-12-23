@@ -342,6 +342,7 @@ export class FirecrackerService {
   ): Promise<T> {
     const kernelPath = config.kernelPath ?? this.agentConfig.defaultKernel;
     const shouldPoweroff = config.shouldPoweroff ?? true;
+    let vmStarted = false;
     const extraDrives = config.extraDrives ?? [];
     const fcPid = await this.startFirecrackerInstance();
     let ipBlockId: null | number = null;
@@ -368,6 +369,7 @@ export class FirecrackerService {
           isRootDevice: false,
         })),
       });
+      vmStarted = true;
       const sshConfig = { ...config.ssh, host: vmIp };
       return await withSsh(sshConfig, async (ssh) => {
         const useSudo = config.ssh.username !== "root";
@@ -388,8 +390,11 @@ export class FirecrackerService {
         });
       });
     } finally {
-      if (shouldPoweroff) {
-        await this.shutdownVMAndReleaseResources(ipBlockId);
+      if (shouldPoweroff && vmStarted) {
+        await this.shutdownVM();
+      }
+      if (shouldPoweroff && ipBlockId !== null) {
+        await this.releaseVmResources(ipBlockId);
       }
     }
   }
@@ -410,18 +415,15 @@ export class FirecrackerService {
     await watchFileUntilLineMatches(/reboot: Restarting system/, this.getVMLogsPath(), 10000);
   }
 
-  async shutdownVMAndReleaseResources(ipBlockId: number | null): Promise<void> {
-    await this.shutdownVM();
-    if (ipBlockId != null) {
-      try {
-        await this.changeVMNetworkVisibility(ipBlockId, "private");
-      } catch (err) {
-        if (!(err instanceof Error && err.message.includes("Bad rule"))) {
-          throw err;
-        }
+  async releaseVmResources(ipBlockId: number): Promise<void> {
+    try {
+      await this.changeVMNetworkVisibility(ipBlockId, "private");
+    } catch (err) {
+      if (!(err instanceof Error && err.message.includes("Bad rule"))) {
+        throw err;
       }
-      await this.releaseIpBlockId(ipBlockId);
     }
+    await this.releaseIpBlockId(ipBlockId);
   }
 
   changeVMNetworkVisibility(ipBlockId: number, changeTo: "public" | "private"): void {

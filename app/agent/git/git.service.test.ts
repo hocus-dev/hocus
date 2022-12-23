@@ -1,23 +1,39 @@
+import fs from "fs/promises";
+import path from "path";
+
 import type { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
 import { DefaultLogger } from "@temporalio/worker";
+import { printErrors, provideRunId } from "~/test-utils";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 
 import { createAgentInjector } from "../agent-injector";
-import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY, TESTS_REPO_URL } from "../test-constants";
+import { PROJECT_DIR } from "../constants";
+import type { FirecrackerService } from "../firecracker.service";
+import {
+  PERSISTENT_TEST_DIR,
+  PRIVATE_SSH_KEY,
+  PUBLIC_SSH_KEY,
+  TESTS_REPO_URL,
+} from "../test-constants";
+import { withTestMount } from "../test-utils";
+import { execSshCmd } from "../utils";
 
 import type { GitRemoteInfo } from "./git.service";
 
 const provideInjector = (
-  testFn: (args: { injector: ReturnType<typeof createAgentInjector> }) => Promise<void>,
+  testFn: (args: {
+    injector: ReturnType<typeof createAgentInjector>;
+    runId: string;
+  }) => Promise<void>,
 ): (() => Promise<void>) => {
   const injector = createAgentInjector({
     [Token.Logger]: function () {
       return new DefaultLogger("ERROR");
     } as unknown as any,
   });
-  return async () => await testFn({ injector });
+  return printErrors(provideRunId(async ({ runId }) => await testFn({ injector, runId })));
 };
 
 const provideInjectorAndDb = (
@@ -178,5 +194,54 @@ test.concurrent(
       },
     });
     expect(updatedGitBranch.gitObject.hash).toEqual(mockHash);
+  }),
+);
+
+test.concurrent(
+  "fetchRepository",
+  provideInjector(async ({ injector, runId }) => {
+    const gitService = injector.resolve(Token.GitService);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const agentConfig = injector.resolve(Token.Config).agent();
+    await fs.mkdir(PERSISTENT_TEST_DIR, { recursive: true });
+    const pathOnHost = path.join(PERSISTENT_TEST_DIR, `fetch-repository-test-${runId}`);
+    await fs.unlink(pathOnHost).catch(() => {});
+
+    const fetchRepo = (fcService: FirecrackerService) =>
+      gitService.fetchRepository(
+        fcService,
+        {
+          pathOnHost,
+          maxSizeMiB: 100,
+        },
+        {
+          credentials: { privateSshKey: PRIVATE_SSH_KEY },
+          url: TESTS_REPO_URL,
+        },
+      );
+    let fcId = 0;
+    const getFc = () => {
+      fcId += 1;
+      return injector.resolve(Token.FirecrackerService)(`fetch-repository-test-${runId}-${fcId}`);
+    };
+
+    await fetchRepo(getFc());
+
+    const txtFilePath = "test.txt";
+    const txtFileContent = "test";
+    await withTestMount(getFc(), pathOnHost, agentConfig, async (ssh, mountPath) => {
+      const out = await execSshCmd({ ssh, opts: { cwd: path.join(mountPath, PROJECT_DIR) } }, [
+        "ls",
+        "-lah",
+      ]);
+      expect(out.stdout).toContain(".git");
+      await agentUtilService.writeFile(ssh, path.join(mountPath, txtFilePath), txtFileContent);
+    });
+    await fetchRepo(getFc());
+    await withTestMount(getFc(), pathOnHost, agentConfig, async (ssh, mountPath) => {
+      expect(
+        (await agentUtilService.readFile(ssh, path.join(mountPath, txtFilePath))).toString(),
+      ).toEqual(txtFileContent);
+    });
   }),
 );

@@ -55,8 +55,21 @@ export class AgentUtilService {
   async writeFile(ssh: NodeSSH, path: string, content: string): Promise<void> {
     await ssh.withSFTP(async (sftp) => {
       const writeFile = promisify(sftp.writeFile.bind(sftp));
-      await writeFile(path, content);
+      await writeFile(path, content).catch((err) => {
+        throw new Error(`Failed to write file "${path}": ${err?.message}`);
+      });
     });
+  }
+
+  async readFile(ssh: NodeSSH, path: string): Promise<Buffer> {
+    let contents: Buffer | null = null;
+    await ssh.withSFTP(async (sftp) => {
+      const readFile = promisify(sftp.readFile.bind(sftp));
+      contents = await readFile(path).catch((err) => {
+        throw new Error(`Failed to read file "${path}": ${err?.message}`);
+      });;
+    });
+    return contents as unknown as Buffer;
   }
 
   generateTaskScript(task: string): string {

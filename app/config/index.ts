@@ -32,14 +32,15 @@ export const config = makeConfig()({
   }),
   agent: () => ({
     defaultKernel: get("AGENT_KERNEL_PATH", "/srv/jailer/resources/vmlinux-5.6-x86_64.bin"),
-    checkoutAndInspectRootFs: get(
-      "AGENT_CHECKOUT_AND_INSPECT_ROOTFS_PATH",
-      "/srv/jailer/resources/checkout-and-inspect.ext4",
-    ),
     hostBuildfsResourcesDir: get("AGENT_HOST_BUILDFS_RESOURCES_DIR", "/app/resources"),
     buildfsRootFs: get("AGENT_BUILDFS_ROOTFS", "/srv/jailer/resources/buildfs.ext4"),
     // `get` is not used here because users usually will not want to set these manually
     // in production. `get` would throw an error if the env var was not set.
+    fetchRepositoryRootFs:
+      process.env.AGENT_FETCH_REPOSITORY_ROOTFS_PATH ?? "/srv/jailer/resources/fetchrepo.ext4",
+    checkoutAndInspectRootFs:
+      process.env.AGENT_CHECKOUT_AND_INSPECT_ROOTFS_PATH ??
+      "/srv/jailer/resources/checkout-and-inspect.ext4",
     prebuildSshPublicKey:
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:

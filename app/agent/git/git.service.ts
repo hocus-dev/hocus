@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import path from "path";
 
 import type { GitBranch, GitObject, GitRepository, SshKeyPair } from "@prisma/client";
 import { Prisma } from "@prisma/client";
@@ -6,11 +7,15 @@ import { SshKeyPairType } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import sshpk from "sshpk";
 import { v4 as uuidv4 } from "uuid";
+import type { Config } from "~/config";
 import type { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
 import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
-import { execCmdWithOpts } from "../utils";
+import type { AgentUtilService } from "../agent-util.service";
+import { PROJECT_DIR } from "../constants";
+import type { FirecrackerService } from "../firecracker.service";
+import { doesFileExist, execCmdWithOpts, execSshCmd } from "../utils";
 
 import { GitUrlError } from "./error";
 import { RemoteInfoTupleValidator } from "./validator";
@@ -34,14 +39,21 @@ interface RemoteUpdate {
 }
 
 export class GitService {
-  static inject = [Token.Logger] as const;
+  static inject = [Token.Logger, Token.AgentUtilService, Token.Config] as const;
+  private readonly agentConfig: ReturnType<Config["agent"]>;
   /**
    * Original source: https://github.com/jonschlinkert/is-git-url/blob/396965ffabf2f46656c8af4c47bef1d69f09292e/index.js#LL9C3-L9C88
    * Modified to disallow the `https` protocol.
    */
   private gitUrlRegex = /(?:git|ssh|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|#[-\d\w._]+?)$/;
 
-  constructor(private readonly logger: Logger) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly agentUtilService: AgentUtilService,
+    config: Config,
+  ) {
+    this.agentConfig = config.agent();
+  }
 
   private parseLsRemoteOutput(output: string): {
     remotes: GitRemoteInfo[];
@@ -89,6 +101,7 @@ export class GitService {
     try {
       await this.writeKey(pathToPrivateKey, privateKey);
       const output = await execCmdWithOpts(["git", "ls-remote", repositoryUrl], {
+        // TODO: allow the user to specify a known_hosts file.
         env: { GIT_SSH_COMMAND: `ssh -i "${pathToPrivateKey}" -o StrictHostKeyChecking=no` },
       });
       const result = this.parseLsRemoteOutput(output.stdout.toString());
@@ -299,5 +312,105 @@ export class GitService {
       });
     }
     return { newGitBranches, updatedGitBranches };
+  }
+
+  async fetchRepository(
+    firecrackerService: FirecrackerService,
+    outputDrive: {
+      pathOnHost: string;
+      maxSizeMiB: number;
+    },
+    repository: {
+      url: string;
+      credentials: {
+        /**
+         * The contents of the private SSH key, e.g.:
+         * ```
+         * -----BEGIN OPENSSH PRIVATE KEY-----
+         * b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+         * ...
+         * -----END OPENSSH PRIVATE KEY-----
+         * ```
+         * Keep in mind that a newline at the end of the key is required.
+         */
+        privateSshKey: string;
+      };
+    },
+  ): Promise<void> {
+    const outputDriveExists = await doesFileExist(outputDrive.pathOnHost);
+    if (!outputDriveExists) {
+      this.agentUtilService.createExt4Image(outputDrive.pathOnHost, outputDrive.maxSizeMiB);
+      this.logger.info(`empty output image created at ${outputDrive.pathOnHost}`);
+    }
+    const outputDir = "/tmp/output";
+    await firecrackerService.withVM(
+      {
+        ssh: {
+          username: "hocus",
+          password: "hocus",
+        },
+        kernelPath: this.agentConfig.defaultKernel,
+        rootFsPath: this.agentConfig.fetchRepositoryRootFs,
+        extraDrives: [
+          {
+            pathOnHost: outputDrive.pathOnHost,
+            guestMountPath: outputDir,
+          },
+        ],
+      },
+      async ({ ssh }) => {
+        const repositoryDir = path.join(outputDir, PROJECT_DIR);
+        const logFilePath = "/tmp/ssh-fetchrepo.log";
+        if (!outputDriveExists) {
+          await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
+        }
+
+        const sshKey = repository.credentials.privateSshKey;
+        const sshDir = "/home/hocus/.ssh";
+        const sshKeyPath = path.join(sshDir, `${uuidv4()}.key`);
+        await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
+        await execSshCmd({ ssh }, ["sudo", "mount", "-t", "tmpfs", "ssh", sshDir]);
+        await execSshCmd({ ssh }, ["sudo", "chown", "hocus:hocus", sshDir]);
+        await execSshCmd({ ssh }, ["chmod", "700", sshDir]);
+        await this.agentUtilService.writeFile(ssh, sshKeyPath, sshKey);
+        await execSshCmd({ ssh }, ["chmod", "400", sshKeyPath]);
+
+        const sshOpts = {
+          execOptions: {
+            env: {
+              // Without this, git will ask for user input and the command will fail.
+              // This is obviously not secure, the correct method would be to
+              // TODO: allow the user to specify a known_hosts file.
+              GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o  UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no`,
+            } as any,
+          },
+        };
+
+        const repositoryExists =
+          (
+            await execSshCmd({ ssh, allowNonZeroExitCode: true }, [
+              "test",
+              "-d",
+              `${repositoryDir}/.git`,
+            ])
+          ).code === 0;
+        if (repositoryExists) {
+          await execSshCmd({ ssh, logFilePath, opts: { ...sshOpts, cwd: repositoryDir } }, [
+            "git",
+            "fetch",
+            "--all",
+          ]);
+        } else {
+          await execSshCmd(
+            {
+              ssh,
+              logFilePath,
+              opts: sshOpts,
+            },
+            ["git", "clone", "--no-checkout", repository.url, repositoryDir],
+          );
+        }
+      },
+    );
   }
 }

@@ -362,7 +362,8 @@ export const createActivities = async (
 
   const stopWorkspace = async (args: { instanceId: string; ipBlockId: number }): Promise<void> => {
     const firecrackerService = injector.resolve(Token.FirecrackerService)(args.instanceId);
-    await firecrackerService.shutdownVMAndReleaseResources(args.ipBlockId);
+    await firecrackerService.shutdownVM();
+    await firecrackerService.releaseVmResources(args.ipBlockId);
   };
 
   const getProjectsAndGitObjects = async (

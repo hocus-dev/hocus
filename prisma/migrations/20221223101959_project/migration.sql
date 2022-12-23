@@ -26,6 +26,17 @@ CREATE TABLE "PrebuildEventToGitBranch" (
 );
 
 -- CreateTable
+CREATE TABLE "GitRepositoryFile" (
+    "id" BIGSERIAL NOT NULL,
+    "gitRepositoryId" BIGINT NOT NULL,
+    "fileId" BIGINT NOT NULL,
+    "agentInstanceId" BIGINT NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "GitRepositoryFile_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Project" (
     "id" BIGSERIAL NOT NULL,
     "gitRepositoryId" BIGINT NOT NULL,
@@ -56,7 +67,16 @@ CREATE TABLE "File" (
 CREATE UNIQUE INDEX "PrebuildEventToGitBranch_prebuildEventId_gitBranchId_key" ON "PrebuildEventToGitBranch"("prebuildEventId", "gitBranchId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "GitRepositoryFile_gitRepositoryId_fileId_key" ON "GitRepositoryFile"("gitRepositoryId", "fileId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "GitRepositoryFile_gitRepositoryId_agentInstanceId_key" ON "GitRepositoryFile"("gitRepositoryId", "agentInstanceId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "AgentInstance_externalId_key" ON "AgentInstance"("externalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "File_id_agentInstanceId_key" ON "File"("id", "agentInstanceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "File_agentInstanceId_path_key" ON "File"("agentInstanceId", "path");
@@ -75,6 +95,18 @@ ALTER TABLE "PrebuildEventToGitBranch" ADD CONSTRAINT "PrebuildEventToGitBranch_
 
 -- AddForeignKey
 ALTER TABLE "PrebuildEventToGitBranch" ADD CONSTRAINT "PrebuildEventToGitBranch_gitBranchId_fkey" FOREIGN KEY ("gitBranchId") REFERENCES "GitBranch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GitRepositoryFile" ADD CONSTRAINT "GitRepositoryFile_gitRepositoryId_fkey" FOREIGN KEY ("gitRepositoryId") REFERENCES "GitRepository"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GitRepositoryFile" ADD CONSTRAINT "GitRepositoryFile_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "File"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GitRepositoryFile" ADD CONSTRAINT "GitRepositoryFile_agentInstanceId_fkey" FOREIGN KEY ("agentInstanceId") REFERENCES "AgentInstance"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GitRepositoryFile" ADD CONSTRAINT "GitRepositoryFile_fileId_agentInstanceId_fkey" FOREIGN KEY ("fileId", "agentInstanceId") REFERENCES "File"("id", "agentInstanceId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Project" ADD CONSTRAINT "Project_gitRepositoryId_fkey" FOREIGN KEY ("gitRepositoryId") REFERENCES "GitRepository"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

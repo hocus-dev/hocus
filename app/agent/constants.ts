@@ -21,7 +21,14 @@ oBAgM=
 
 export const JAILER_USER_ID = "162137";
 export const JAILER_GROUP_ID = "162137";
-export const MAX_UNIX_SOCKET_PATH_LENGTH = 108;
+/*
+ * Experience showed that paths longer than 102 don't work, even though
+ * https://blog.8-p.info/en/2020/06/11/unix-domain-socket-length/ states
+ * that the limit is 108.
+ */
+export const MAX_UNIX_SOCKET_PATH_LENGTH = 102;
 
 export const SOLO_AGENT_INSTANCE_ID = "solo";
 export const HOST_PERSISTENT_DIR = "/srv/jailer/resources";
+
+export const PROJECT_DIR = "project";

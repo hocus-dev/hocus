@@ -9,3 +9,4 @@ W71TsDKa/ovAG6nXpmidAAAAF2hvY3VzLXRlc3RzQGV4YW1wbGUuY29tAQIDBAUG
 `;
 export const TESTS_REPO_URL = "git@github.com:hocus-dev/tests.git";
 export const SSH_PROXY_IP = "10.10.0.2";
+export const PERSISTENT_TEST_DIR = `/srv/jailer/resources/tests`;

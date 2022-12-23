@@ -130,9 +130,28 @@ model GitRepository {
   sshKeyPairId BigInt
   gitBranches  GitBranch[]
 
-  lastBranchUpdateAt DateTime  @default(now()) @db.Timestamptz(3)
-  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  lastBranchUpdateAt DateTime            @default(now()) @db.Timestamptz(3)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
   Project            Project[]
+  GitRepositoryFile  GitRepositoryFile[]
+}
+
+model GitRepositoryFile {
+  id              BigInt        @id @default(autoincrement())
+  gitRepository   GitRepository @relation(fields: [gitRepositoryId], references: [id])
+  gitRepositoryId BigInt
+  file            File          @relation(fields: [fileId], references: [id])
+  fileId          BigInt
+  agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
+  agentInstanceId BigInt
+
+  /// Enforce that agentInstanceId and file.agentInstanceId are the same. 
+  fileAgentMatch File @relation("file_agent_match", fields: [fileId, agentInstanceId], references: [id, agentInstanceId])
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([gitRepositoryId, fileId])
+  @@unique([gitRepositoryId, agentInstanceId])
 }
 
 model GitBranch {
@@ -171,18 +190,22 @@ model Project {
 }
 
 model AgentInstance {
-  id         BigInt @id @default(autoincrement())
-  externalId String @unique
-  File       File[]
+  id                BigInt              @id @default(autoincrement())
+  externalId        String              @unique
+  File              File[]
+  GitRepositoryFile GitRepositoryFile[]
 }
 
 model File {
-  id              BigInt          @id @default(autoincrement())
-  agentInstance   AgentInstance   @relation(fields: [agentInstanceId], references: [id])
-  agentInstanceId BigInt
+  id                 BigInt              @id @default(autoincrement())
+  agentInstance      AgentInstance       @relation(fields: [agentInstanceId], references: [id])
+  agentInstanceId    BigInt
   /// Should be absolute.
-  path            String
-  PrebuildEvent   PrebuildEvent[]
+  path               String
+  prebuildEvents     PrebuildEvent[]
+  gitRepositoryFiles GitRepositoryFile[]
+  fileAgentMatch     GitRepositoryFile[] @relation("file_agent_match")
 
+  @@unique([id, agentInstanceId])
   @@unique([agentInstanceId, path])
 }
