@@ -25,8 +25,19 @@ export async function preparePrebuilds(
   const { projects, gitObjects } = await getProjectsAndGitObjects(gitRepositoryId, gitObjectIds);
   gitObjects.sort((a, b) => bigintSort(a.id, b.id));
   projects.sort((a, b) => bigintSort(a.id, b.id));
+  await fetchRepository(gitRepositoryId);
 
-  const outputPaths = gitObjects.map((o) =>
+  const checkedOutPaths = gitObjects.map((o) =>
     path.join(HOST_PERSISTENT_DIR, "checked-out", `${o.hash}.ext4`),
+  );
+  await waitForPromises(
+    checkedOutPaths.map((outputPath, idx) =>
+      checkoutAndInspect({
+        gitRepositoryId,
+        outputDrivePath: outputPath,
+        targetBranch: gitObjects[idx].hash,
+        projectConfigPaths: projects.map((project) => project.rootDirectoryPath),
+      }),
+    ),
   );
 }

@@ -106,6 +106,7 @@ model BuildfsEvent {
   dockerfilePath String
   /// Relative path to the build context in the `project` directory of the input drive.
   contextPath    String
+  imageFileHash  String
 }
 
 enum SshKeyPairType {
@@ -133,7 +134,7 @@ model GitRepository {
   lastBranchUpdateAt DateTime            @default(now()) @db.Timestamptz(3)
   createdAt          DateTime            @default(now()) @db.Timestamptz(3)
   Project            Project[]
-  GitRepositoryFile  GitRepositoryFile[]
+  gitRepositoryFiles GitRepositoryFile[]
 }
 
 model GitRepositoryFile {

@@ -6,13 +6,13 @@ import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import type { Config } from "~/config";
 import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { FirecrackerService } from "./firecracker.service";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
-import { doesFileExist, execSshCmd } from "./utils";
+import { doesFileExist, execSshCmd, sha256 } from "./utils";
 
 export class PrebuildService {
   static inject = [
@@ -49,10 +49,16 @@ export class PrebuildService {
     db: Prisma.TransactionClient,
     projectId: bigint,
     gitObjectId: bigint,
+    fsFileId: bigint,
     tasks: string[],
   ): Promise<PrebuildEvent> {
     const prebuildEvent = await db.prebuildEvent.create({
-      data: { projectId, gitObjectId, status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING },
+      data: {
+        projectId,
+        gitObjectId,
+        fsFileId,
+        status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING,
+      },
     });
     await Promise.all(
       tasks.map(async (task, idx) => {
@@ -103,9 +109,16 @@ export class PrebuildService {
     db: Prisma.TransactionClient,
     projectId: bigint,
     gitObjectId: bigint,
+    fsFileId: bigint,
     tasks: string[],
   ): Promise<PrebuildEvent> {
-    const prebuildEvent = await this.createPrebuildEvent(db, projectId, gitObjectId, tasks);
+    const prebuildEvent = await this.createPrebuildEvent(
+      db,
+      projectId,
+      gitObjectId,
+      fsFileId,
+      tasks,
+    );
     await this.linkGitBranchesToPrebuildEvent(db, prebuildEvent.id);
     return prebuildEvent;
   }
@@ -128,7 +141,7 @@ export class PrebuildService {
     outputDrivePath: string;
     /** Relative paths to directories where `hocus.yml` files are located in the repository. */
     projectConfigPaths: string[];
-  }): Promise<(ProjectConfig | null)[]> {
+  }): Promise<({ projectConfig: ProjectConfig; imageFileHash: string } | null)[]> {
     if (await doesFileExist(args.outputDrivePath)) {
       this.logger.warn(
         `output drive already exists at "${args.outputDrivePath}", it will be overwritten`,
@@ -156,11 +169,25 @@ export class PrebuildService {
             "checkout",
             args.targetBranch,
           ]);
-          return await waitForPromises(
+          const configs: (ProjectConfig | null)[] = await waitForPromises(
             args.projectConfigPaths.map((p) =>
               this.projectConfigService.getConfig(ssh, repoPath, p),
             ),
           );
+          const imageFileHashes = await waitForPromises(
+            configs.map((c) =>
+              c === null ? null : this.agentUtilService.readFile(ssh, c.image.file),
+            ),
+          );
+          return configs.map((c, idx) => {
+            if (c === null) {
+              return null;
+            }
+            return {
+              projectConfig: c,
+              imageFileHash: sha256(unwrap(imageFileHashes[idx])),
+            };
+          });
         },
       );
     } catch (err) {

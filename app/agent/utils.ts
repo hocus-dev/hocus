@@ -1,5 +1,6 @@
 import type { SpawnSyncOptionsWithBufferEncoding, SpawnSyncReturns } from "child_process";
 import { spawnSync } from "child_process";
+import { createHash } from "crypto";
 import fs from "fs";
 
 import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from "node-ssh";
@@ -180,4 +181,8 @@ export const doesFileExist = async (filePath: string): Promise<boolean> => {
     }
     throw err;
   }
+};
+
+export const sha256 = (str: Buffer | string): string => {
+  return createHash("sha256").update(str).digest("hex");
 };

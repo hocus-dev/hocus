@@ -1,15 +1,14 @@
-import fsSync from "fs";
-import { promisify } from "util";
-
 import type { GitObject, Prisma, Project } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
+import { unwrap } from "~/utils.shared";
 
 import type { createAgentInjector } from "./agent-injector";
 import type { VMTaskOutput } from "./agent-util.types";
+import { SOLO_AGENT_INSTANCE_ID } from "./constants";
 import { PidValidator } from "./pid.validator";
-import type { ProjectConfig } from "./project-config/validator";
+import type { PrebuildService } from "./prebuild.service";
 import { execSshCmd, randomString } from "./utils";
 
 export const createActivities = async (
@@ -18,117 +17,31 @@ export const createActivities = async (
 ) => {
   const agentConfig = injector.resolve(Token.Config).agent();
 
-  const fetchRepository = async (args: {
-    /**
-     * Every project should have a separate root fs,
-     * because repository credentials are stored in the root fs.
-     */
-    rootFsPath: string;
-    outputDrive: {
-      pathOnHost: string;
-      maxSizeMiB: number;
-    };
-    repository: {
-      url: string;
-      credentials?: {
-        /**
-         * The contents of the private SSH key, e.g.:
-         * ```
-         * -----BEGIN OPENSSH PRIVATE KEY-----
-         * b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-         * ...
-         * -----END OPENSSH PRIVATE KEY-----
-         * ```
-         * Keep in mind that a newline at the end of the key is required.
-         */
-        privateSshKey: string;
-      };
-    };
-  }): Promise<void> => {
+  const fetchRepository = async (gitRepositoryId: bigint): Promise<void> => {
     const instanceId = `fetchrepo-${uuidv4()}`;
-    const logger = injector.resolve(Token.Logger);
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
-    const agentUtilService = injector.resolve(Token.AgentUtilService);
-    const outputDriveExists = fsSync.existsSync(args.outputDrive.pathOnHost);
-    if (!outputDriveExists) {
-      agentUtilService.createExt4Image(args.outputDrive.pathOnHost, args.outputDrive.maxSizeMiB);
-      logger.info(`empty output image created at ${args.outputDrive.pathOnHost}`);
-    }
-    const outputDir = "/tmp/output";
-    await firecrackerService.withVM(
-      {
-        ssh: {
-          username: "hocus",
-          password: "hocus",
-        },
-        kernelPath: agentConfig.defaultKernel,
-        rootFsPath: args.rootFsPath,
-        extraDrives: [
-          {
-            pathOnHost: args.outputDrive.pathOnHost,
-            guestMountPath: outputDir,
-          },
-        ],
+    const gitService = injector.resolve(Token.GitService);
+    const repo = await db.gitRepository.findUniqueOrThrow({
+      where: { id: gitRepositoryId },
+      include: {
+        gitRepositoryFiles: { include: { agentInstance: true, file: true } },
+        sshKeyPair: true,
       },
-      async ({ ssh }) => {
-        const repositoryDir = `${outputDir}/project`;
-        const logFilePath = "/tmp/ssh-fetchrepo.log";
-        if (!outputDriveExists) {
-          await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
-        }
-
-        const sshKey = args.repository.credentials?.privateSshKey;
-        const sshDir = "/home/hocus/.ssh";
-        if (sshKey != null) {
-          // The name is misleading, since the user may not be
-          // using RSA, but git automatically looks for this file and
-          // it will work no matter the actual ssh key format.
-          const sshKeyPath = `${sshDir}/id_rsa`;
-          await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
-          await execSshCmd({ ssh }, ["sudo", "mount", "-t", "tmpfs", "ssh", sshDir]);
-          await execSshCmd({ ssh }, ["sudo", "chown", "hocus:hocus", sshDir]);
-          await execSshCmd({ ssh }, ["chmod", "700", sshDir]);
-          await ssh.withSFTP(async (sftp) => {
-            const writeFile = promisify(sftp.writeFile.bind(sftp));
-            await writeFile(sshKeyPath, sshKey);
-          });
-          await execSshCmd({ ssh }, ["chmod", "400", sshKeyPath]);
-        }
-
-        const repositoryExists =
-          (
-            await execSshCmd({ ssh, allowNonZeroExitCode: true }, [
-              "test",
-              "-d",
-              `${repositoryDir}/.git`,
-            ])
-          ).code === 0;
-        if (repositoryExists) {
-          await execSshCmd({ ssh, logFilePath, opts: { cwd: repositoryDir } }, [
-            "git",
-            "fetch",
-            "--all",
-          ]);
-        } else {
-          await execSshCmd(
-            {
-              ssh,
-              logFilePath,
-              opts: {
-                execOptions: {
-                  env: {
-                    // Without this, git will ask for user input and the command will fail.
-                    // This is obviously not secure, the correct method would be to
-                    // TODO: allow the user to specify a known_hosts file.
-                    GIT_SSH_COMMAND:
-                      "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no",
-                  } as any,
-                },
-              },
-            },
-            ["git", "clone", "--no-checkout", args.repository.url, repositoryDir],
-          );
-        }
+    });
+    const repoFile = unwrap(
+      repo.gitRepositoryFiles.find((f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID),
+    );
+    await gitService.fetchRepository(
+      firecrackerService,
+      {
+        pathOnHost: repoFile.file.path,
+        maxSizeMiB: 100000,
+      },
+      {
+        url: repo.url,
+        credentials: {
+          privateSshKey: repo.sshKeyPair.privateKey,
+        },
       },
     );
   };
@@ -206,10 +119,7 @@ export const createActivities = async (
    * `null` is returned.
    */
   const checkoutAndInspect = async (args: {
-    /**
-     * Should point to the output of `fetchRepository`
-     */
-    repositoryDrivePath: string;
+    gitRepositoryId: bigint;
     /**
      * The repository will be checked out to this branch.
      */
@@ -222,11 +132,28 @@ export const createActivities = async (
      * Relative paths to directories where `hocus.yml` files are located.
      */
     projectConfigPaths: string[];
-  }): Promise<(ProjectConfig | null)[]> => {
+  }): Promise<Awaited<ReturnType<PrebuildService["checkoutAndInspect"]>>> => {
     const instanceId = `checkout-and-inspect-${randomString(8)}`;
     const fcService = injector.resolve(Token.FirecrackerService)(instanceId);
     const prebuildService = injector.resolve(Token.PrebuildService);
-    return await prebuildService.checkoutAndInspect({ ...args, fcService });
+    const gitRepository = await db.gitRepository.findUniqueOrThrow({
+      where: { id: args.gitRepositoryId },
+      include: {
+        gitRepositoryFiles: { include: { agentInstance: true, file: true } },
+      },
+    });
+    const repoFile = unwrap(
+      gitRepository.gitRepositoryFiles.find(
+        (f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
+      ),
+    );
+    return await prebuildService.checkoutAndInspect({
+      fcService,
+      repositoryDrivePath: repoFile.file.path,
+      targetBranch: args.targetBranch,
+      outputDrivePath: args.outputDrivePath,
+      projectConfigPaths: args.projectConfigPaths,
+    });
   };
 
   /**
