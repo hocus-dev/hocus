@@ -1,7 +1,7 @@
 /*
   Warnings:
 
-  - Added the required column `imageFileHash` to the `BuildfsEvent` table without a default value. This is not possible if the table is not empty.
+  - Added the required column `cacheHash` to the `BuildfsEvent` table without a default value. This is not possible if the table is not empty.
   - Added the required column `fsFileId` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
   - Added the required column `gitObjectId` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
   - Added the required column `projectId` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
@@ -12,10 +12,11 @@
 CREATE TYPE "PrebuildEventStatus" AS ENUM ('PREBUILD_EVENT_STATUS_PENDING', 'PREBUILD_EVENT_STATUS_RUNNING', 'PREBUILD_EVENT_STATUS_SUCCESS', 'PREBUILD_EVENT_STATUS_ERROR', 'PREBUILD_EVENT_STATUS_CANCELLED', 'PREBUILD_EVENT_STATUS_SKIPPED');
 
 -- AlterTable
-ALTER TABLE "BuildfsEvent" ADD COLUMN     "imageFileHash" TEXT NOT NULL;
+ALTER TABLE "BuildfsEvent" ADD COLUMN     "cacheHash" TEXT NOT NULL;
 
 -- AlterTable
-ALTER TABLE "PrebuildEvent" ADD COLUMN     "fsFileId" BIGINT NOT NULL,
+ALTER TABLE "PrebuildEvent" ADD COLUMN     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "fsFileId" BIGINT NOT NULL,
 ADD COLUMN     "gitObjectId" BIGINT NOT NULL,
 ADD COLUMN     "projectId" BIGINT NOT NULL,
 ADD COLUMN     "status" "PrebuildEventStatus" NOT NULL;

@@ -57,6 +57,8 @@ model PrebuildEvent {
   fsFileId       BigInt
   status         PrebuildEventStatus
   gitBranchLinks PrebuildEventToGitBranch[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model PrebuildEventToGitBranch {
@@ -106,7 +108,7 @@ model BuildfsEvent {
   dockerfilePath String
   /// Relative path to the build context in the `project` directory of the input drive.
   contextPath    String
-  imageFileHash  String
+  cacheHash      String
 }
 
 enum SshKeyPairType {

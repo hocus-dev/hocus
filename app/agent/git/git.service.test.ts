@@ -1,14 +1,9 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
-import { DefaultLogger } from "@temporalio/worker";
-import { printErrors, provideRunId } from "~/test-utils";
-import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 
-import { createAgentInjector } from "../agent-injector";
 import { PROJECT_DIR } from "../constants";
 import type { FirecrackerService } from "../firecracker.service";
 import {
@@ -17,33 +12,10 @@ import {
   PUBLIC_SSH_KEY,
   TESTS_REPO_URL,
 } from "../test-constants";
-import { withTestMount } from "../test-utils";
+import { provideInjector, provideInjectorAndDb, withTestMount } from "../test-utils";
 import { execSshCmd } from "../utils";
 
 import type { GitRemoteInfo } from "./git.service";
-
-const provideInjector = (
-  testFn: (args: {
-    injector: ReturnType<typeof createAgentInjector>;
-    runId: string;
-  }) => Promise<void>,
-): (() => Promise<void>) => {
-  const injector = createAgentInjector({
-    [Token.Logger]: function () {
-      return new DefaultLogger("ERROR");
-    } as unknown as any,
-  });
-  return printErrors(provideRunId(async ({ runId }) => await testFn({ injector, runId })));
-};
-
-const provideInjectorAndDb = (
-  testFn: (args: {
-    injector: ReturnType<typeof createAgentInjector>;
-    db: Prisma.NonTransactionClient;
-  }) => Promise<void>,
-): (() => Promise<void>) => {
-  return provideInjector(({ injector }) => provideDb((db) => testFn({ injector, db }))());
-};
 
 test.concurrent(
   "getRemotes",

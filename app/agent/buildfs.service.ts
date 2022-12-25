@@ -1,6 +1,7 @@
 import path from "path";
 
 import type { BuildfsEvent, Prisma } from "@prisma/client";
+import { Add, Copy, DockerfileParser } from "dockerfile-ast";
 import { Token } from "~/token";
 
 import type { AgentUtilService } from "./agent-util.service";
@@ -10,13 +11,14 @@ export class BuildfsService {
   buildfsScriptPath = `${this.workdir}/bin/buildfs.sh` as const;
   inputDir = "/tmp/input" as const;
   outputDir = "/tmp/output" as const;
+  isUrlRegex = /^((git|ssh|https?):\/\/)|git@/;
 
   static inject = [Token.AgentUtilService] as const;
   constructor(private readonly agentUtilService: AgentUtilService) {}
 
   async createBuildfsEvent(
     db: Prisma.TransactionClient,
-    args: { contextPath: string; dockerfilePath: string },
+    args: { contextPath: string; dockerfilePath: string; cacheHash: string },
   ): Promise<BuildfsEvent> {
     const vmTask = await this.agentUtilService.createVmTask(db, [
       this.buildfsScriptPath,
@@ -29,7 +31,34 @@ export class BuildfsService {
         vmTaskId: vmTask.id,
         contextPath: args.contextPath,
         dockerfilePath: args.dockerfilePath,
+        cacheHash: args.cacheHash,
       },
     });
+  }
+
+  private isUrl(str: string): boolean {
+    return this.isUrlRegex.test(str);
+  }
+
+  getExternalFilePathsFromDockerfile(dockerfileContent: string): string[] {
+    const dockerfile = DockerfileParser.parse(dockerfileContent);
+    const instructions = dockerfile.getInstructions();
+    const filePaths: string[] = [];
+    for (const instruction of instructions) {
+      const isAdd = instruction instanceof Add;
+      const isCopy = !isAdd && instruction instanceof Copy;
+      if (isAdd || isCopy) {
+        const args = instruction.getArguments();
+        // the last item is the destination path
+        for (const arg of args.slice(0, args.length - 1)) {
+          const value = arg.getValue();
+          if (isAdd && this.isUrl(value)) {
+            continue;
+          }
+          filePaths.push(arg.getValue());
+        }
+      }
+    }
+    return filePaths;
   }
 }

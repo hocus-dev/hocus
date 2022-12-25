@@ -1,6 +1,12 @@
+import type { Prisma } from "@prisma/client";
+import { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH } from "node-ssh";
 import type { Config } from "~/config";
+import { printErrors, provideRunId } from "~/test-utils";
+import { provideDb } from "~/test-utils/db.server";
+import { Token } from "~/token";
 
+import { createAgentInjector } from "./agent-injector";
 import type { FirecrackerService } from "./firecracker.service";
 
 export const withTestMount = async <T>(
@@ -29,4 +35,27 @@ export const withTestMount = async <T>(
       return await fn(ssh, mountPath);
     },
   );
+};
+
+export const provideInjector = (
+  testFn: (args: {
+    injector: ReturnType<typeof createAgentInjector>;
+    runId: string;
+  }) => Promise<void>,
+): (() => Promise<void>) => {
+  const injector = createAgentInjector({
+    [Token.Logger]: function () {
+      return new DefaultLogger("ERROR");
+    } as unknown as any,
+  });
+  return printErrors(provideRunId(async ({ runId }) => await testFn({ injector, runId })));
+};
+
+export const provideInjectorAndDb = (
+  testFn: (args: {
+    injector: ReturnType<typeof createAgentInjector>;
+    db: Prisma.NonTransactionClient;
+  }) => Promise<void>,
+): (() => Promise<void>) => {
+  return provideInjector(({ injector }) => provideDb((db) => testFn({ injector, db }))());
 };
