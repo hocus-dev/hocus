@@ -1,5 +1,8 @@
 import { provideInjector } from "~/agent/test-utils";
 import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
+
+import { execSshCmd, sha256 } from "./utils";
 
 const DOCKERFILE_1 = `FROM ubuntu:latest
 COPY ./foo /foo`;
@@ -52,6 +55,45 @@ test.concurrent(
     expect(parse(DOCKERFILE_5)).toEqual([]);
     expect(parse(DOCKERFILE_6)).toEqual(
       ["./foo", "/hey", "ho", "../john/johnny", "./so/many/levels/", "heyo"].sort(),
+    );
+  }),
+);
+
+test.concurrent(
+  "getSha256FromFiles",
+  provideInjector(async ({ injector, runId }) => {
+    const buildfsService = injector.resolve(Token.BuildfsService);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const agentConfig = injector.resolve(Token.Config).agent();
+    const fcService = injector.resolve(Token.FirecrackerService)(runId);
+
+    const files = [
+      { path: "/tmp/foo/foo", content: "foo" },
+      { path: "/tmp/foo/bar", content: "foobar" },
+      { path: "/tmp/bar/hugo", content: "this is the\nauthor" },
+      { path: "/tmp/bar/author", content: "hugo" },
+    ] as const;
+
+    const expectedHash = sha256([0, 1, 2].map((i) => sha256(files[i].content)).join("\n") + "\n");
+
+    await fcService.withVM(
+      {
+        ssh: {
+          username: "hocus",
+          privateKey: agentConfig.prebuildSshPrivateKey,
+        },
+        kernelPath: agentConfig.defaultKernel,
+        rootFsPath: agentConfig.checkoutAndInspectRootFs,
+      },
+      async ({ ssh }) => {
+        await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/foo"]);
+        await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/bar"]);
+        await waitForPromises(
+          files.map(({ path, content }) => agentUtilService.writeFile(ssh, path, content)),
+        );
+        const hash = await buildfsService.getSha256FromFiles(ssh, "/tmp", ["foo", "bar/hugo"]);
+        expect(hash).toBe(expectedHash);
+      },
     );
   }),
 );

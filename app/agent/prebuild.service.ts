@@ -155,7 +155,7 @@ export class PrebuildService {
         {
           ssh: {
             username: "hocus",
-            password: "hocus",
+            privateKey: this.agentConfig.prebuildSshPrivateKey,
           },
           kernelPath: this.agentConfig.defaultKernel,
           rootFsPath: this.agentConfig.checkoutAndInspectRootFs,
