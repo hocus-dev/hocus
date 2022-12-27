@@ -85,7 +85,7 @@ export class BuildfsService {
       [
         "/bin/bash",
         "-c",
-        `echo "$FILES" | xargs -d '\\n' -I _ find _ -type f -exec sha256sum {} \\; | cut -d ' ' -f 1 | sha256sum | cut -d ' ' -f 1`,
+        `echo "$FILES" | xargs -d '\\n' -I _ find _ -type f -exec sha256sum {} \\; | cut -d ' ' -f 1 | sort | sha256sum | cut -d ' ' -f 1`,
       ],
     );
     if (out.stderr !== "") {

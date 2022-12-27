@@ -74,7 +74,12 @@ test.concurrent(
       { path: "/tmp/bar/author", content: "hugo" },
     ] as const;
 
-    const expectedHash = sha256([0, 1, 2].map((i) => sha256(files[i].content)).join("\n") + "\n");
+    const expectedHash = sha256(
+      [0, 1, 2]
+        .map((i) => sha256(files[i].content))
+        .sort()
+        .join("\n") + "\n",
+    );
 
     await fcService.withVM(
       {
