@@ -1,6 +1,6 @@
 import path from "path";
 
-import type { BuildfsEvent, Prisma } from "@prisma/client";
+import type { BuildfsEvent, BuildfsEventFile, Prisma } from "@prisma/client";
 import { Add, Copy, DockerfileParser } from "dockerfile-ast";
 import type { NodeSSH } from "node-ssh";
 import { Token } from "~/token";
@@ -34,6 +34,25 @@ export class BuildfsService {
         contextPath: args.contextPath,
         dockerfilePath: args.dockerfilePath,
         cacheHash: args.cacheHash,
+      },
+    });
+  }
+
+  async createBuildfsEventFile(
+    db: Prisma.TransactionClient,
+    args: { filePath: string; agentInstanceId: bigint; buildfsEventId: bigint },
+  ): Promise<BuildfsEventFile> {
+    const file = await db.file.create({
+      data: {
+        agentInstanceId: args.agentInstanceId,
+        path: args.filePath,
+      },
+    });
+    return await db.buildfsEventFile.create({
+      data: {
+        buildfsEventId: args.buildfsEventId,
+        fileId: file.id,
+        agentInstanceId: args.agentInstanceId,
       },
     });
   }
@@ -92,5 +111,51 @@ export class BuildfsService {
       throw new Error(out.stderr);
     }
     return out.stdout.trim();
+  }
+
+  async getExistingBuildfsEvent(
+    db: Prisma.Client,
+    cacheHash: string,
+    agentInstanceId: bigint,
+  ): Promise<BuildfsEvent | null> {
+    const buildfsFile = await db.buildfsEventFile.findFirst({
+      where: {
+        buildfsEvent: {
+          cacheHash,
+        },
+        file: {
+          agentInstanceId,
+        },
+      },
+      include: {
+        buildfsEvent: true,
+      },
+    });
+    if (buildfsFile != null) {
+      return buildfsFile.buildfsEvent;
+    }
+    return null;
+  }
+
+  async getOrCreateBuildfsEvent(
+    db: Prisma.TransactionClient,
+    args: {
+      agentInstanceId: bigint;
+      contextPath: string;
+      dockerfilePath: string;
+      cacheHash: string;
+      fsFilePath: string;
+    },
+  ): Promise<{ event: BuildfsEvent; status: "created" | "found" }> {
+    const existingEvent = await this.getExistingBuildfsEvent(
+      db,
+      args.cacheHash,
+      args.agentInstanceId,
+    );
+    if (existingEvent) {
+      return { event: existingEvent, status: "found" };
+    }
+    const event = await this.createBuildfsEvent(db, args);
+    return { event, status: "created" };
   }
 }

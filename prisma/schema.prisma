@@ -53,12 +53,26 @@ model PrebuildEvent {
   projectId      BigInt
   gitObject      GitObject                  @relation(fields: [gitObjectId], references: [id])
   gitObjectId    BigInt
-  fsFile         File                       @relation(fields: [fsFileId], references: [id])
-  fsFileId       BigInt
   status         PrebuildEventStatus
   gitBranchLinks PrebuildEventToGitBranch[]
+  fsFiles        PrebuildEventFile[]
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model PrebuildEventFile {
+  id              BigInt        @id @default(autoincrement())
+  prebuildEvent   PrebuildEvent @relation(fields: [prebuildEventId], references: [id])
+  prebuildEventId BigInt
+  file            File          @relation(fields: [fileId], references: [id])
+  fileId          BigInt
+  agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
+  agentInstanceId BigInt
+
+  /// Enforce that agentInstanceId and file.agentInstanceId are the same. 
+  fileAgentMatch File @relation("prebuild_event_file_agent_match", fields: [fileId, agentInstanceId], references: [id, agentInstanceId])
+
+  @@unique([prebuildEventId, agentInstanceId])
 }
 
 model PrebuildEventToGitBranch {
@@ -101,14 +115,32 @@ model VmTask {
 }
 
 model BuildfsEvent {
-  id             BigInt @id @default(autoincrement())
-  vmTask         VmTask @relation(fields: [vmTaskId], references: [id])
+  id             BigInt             @id @default(autoincrement())
+  vmTask         VmTask             @relation(fields: [vmTaskId], references: [id])
   vmTaskId       BigInt
   /// Relative path to the Dockerfile in the `project` directory of the input drive.
   dockerfilePath String
   /// Relative path to the build context in the `project` directory of the input drive.
   contextPath    String
   cacheHash      String
+  fsFiles        BuildfsEventFile[]
+
+  @@index([cacheHash])
+}
+
+model BuildfsEventFile {
+  id              BigInt        @id @default(autoincrement())
+  buildfsEvent    BuildfsEvent  @relation(fields: [buildfsEventId], references: [id])
+  buildfsEventId  BigInt
+  file            File          @relation(fields: [fileId], references: [id])
+  fileId          BigInt
+  agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
+  agentInstanceId BigInt
+
+  /// Enforce that agentInstanceId and file.agentInstanceId are the same. 
+  fileAgentMatch File @relation("buildfs_event_file_agent_match", fields: [fileId, agentInstanceId], references: [id, agentInstanceId])
+
+  @@unique([buildfsEventId, agentInstanceId])
 }
 
 enum SshKeyPairType {
@@ -149,7 +181,7 @@ model GitRepositoryFile {
   agentInstanceId BigInt
 
   /// Enforce that agentInstanceId and file.agentInstanceId are the same. 
-  fileAgentMatch File @relation("file_agent_match", fields: [fileId, agentInstanceId], references: [id, agentInstanceId])
+  fileAgentMatch File @relation("git_repository_file_agent_match", fields: [fileId, agentInstanceId], references: [id, agentInstanceId])
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
@@ -197,17 +229,22 @@ model AgentInstance {
   externalId        String              @unique
   File              File[]
   GitRepositoryFile GitRepositoryFile[]
+  BuildfsEventFile  BuildfsEventFile[]
+  PrebuildEventFile PrebuildEventFile[]
 }
 
 model File {
-  id                 BigInt              @id @default(autoincrement())
-  agentInstance      AgentInstance       @relation(fields: [agentInstanceId], references: [id])
-  agentInstanceId    BigInt
+  id                             BigInt              @id @default(autoincrement())
+  agentInstance                  AgentInstance       @relation(fields: [agentInstanceId], references: [id])
+  agentInstanceId                BigInt
   /// Should be absolute.
-  path               String
-  prebuildEvents     PrebuildEvent[]
-  gitRepositoryFiles GitRepositoryFile[]
-  fileAgentMatch     GitRepositoryFile[] @relation("file_agent_match")
+  path                           String
+  gitRepositoryFiles             GitRepositoryFile[]
+  gitRepositoryFileAgentMatch    GitRepositoryFile[] @relation("git_repository_file_agent_match")
+  prebuildEventFiles             PrebuildEventFile[]
+  prebuildEventFileAgentMatch    PrebuildEventFile[] @relation("prebuild_event_file_agent_match")
+  buildfsEventFiles              BuildfsEventFile[]
+  buildfsEventFileFileAgentMatch BuildfsEventFile[]  @relation("buildfs_event_file_agent_match")
 
   @@unique([id, agentInstanceId])
   @@unique([agentInstanceId, path])

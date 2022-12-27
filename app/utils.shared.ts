@@ -62,3 +62,10 @@ export const bigintSort = (a: bigint, b: bigint): number => {
   }
   return 0;
 };
+
+export const mapOverNull = <T, U>(
+  values: (T | null | undefined)[],
+  fn: (value: T, idx: number) => U,
+): (U | null)[] => {
+  return values.map((value, idx) => (value == null ? null : fn(value, idx)));
+};

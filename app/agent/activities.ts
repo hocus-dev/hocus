@@ -1,11 +1,13 @@
 import type { GitObject, Prisma, Project } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
+import type { Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
-import { unwrap } from "~/utils.shared";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { createAgentInjector } from "./agent-injector";
 import type { VMTaskOutput } from "./agent-util.types";
+import type { BuildfsService } from "./buildfs.service";
 import { SOLO_AGENT_INSTANCE_ID } from "./constants";
 import { PidValidator } from "./pid.validator";
 import type { PrebuildService } from "./prebuild.service";
@@ -309,6 +311,35 @@ export const createActivities = async (
     return { projects, gitObjects };
   };
 
+  type GetOrCreateBuildfsEventsReturnType = Any.Compute<
+    Awaited<ReturnType<BuildfsService["getOrCreateBuildfsEvent"]>>
+  >[];
+  const getOrCreateBuildfsEvents = async (
+    args: {
+      contextPath: string;
+      dockerfilePath: string;
+      cacheHash: string | null;
+      fsFilePath: string;
+    }[],
+  ): Promise<GetOrCreateBuildfsEventsReturnType> => {
+    const buildfsService = injector.resolve(Token.BuildfsService);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const agentInstance = await db.$transaction((tdb) =>
+      agentUtilService.getOrCreateSoloAgentInstance(tdb),
+    );
+    return await db.$transaction((tdb) =>
+      waitForPromises(
+        args.map((arg) =>
+          buildfsService.getOrCreateBuildfsEvent(tdb, {
+            ...arg,
+            cacheHash: arg.cacheHash ?? `CACHE_HASH_NULL_${uuidv4()}`,
+            agentInstanceId: agentInstance.id,
+          }),
+        ),
+      ),
+    );
+  };
+
   return {
     fetchRepository,
     buildfs,
@@ -317,5 +348,6 @@ export const createActivities = async (
     startWorkspace,
     stopWorkspace,
     getProjectsAndGitObjects,
+    getOrCreateBuildfsEvents,
   };
 };

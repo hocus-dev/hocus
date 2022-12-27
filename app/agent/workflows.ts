@@ -15,7 +15,7 @@ const { checkoutAndInspect, getProjectsAndGitObjects, fetchRepository } =
     },
   });
 
-export async function preparePrebuilds(
+export async function runBuildfsAndPrebuilds(
   gitRepositoryId: bigint,
   branches: { gitBranchId: bigint; gitObjectId: bigint }[],
 ): Promise<void> {
@@ -30,7 +30,7 @@ export async function preparePrebuilds(
   const checkedOutPaths = gitObjects.map((o) =>
     path.join(HOST_PERSISTENT_DIR, "checked-out", `${o.hash}.ext4`),
   );
-  await waitForPromises(
+  const checkedOutResults = await waitForPromises(
     checkedOutPaths.map((outputPath, idx) =>
       checkoutAndInspect({
         gitRepositoryId,
@@ -40,4 +40,5 @@ export async function preparePrebuilds(
       }),
     ),
   );
+  const buildfsEvents = checkedOutResults.map();
 }

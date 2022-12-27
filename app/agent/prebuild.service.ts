@@ -1,14 +1,16 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { PrebuildEvent, Prisma } from "@prisma/client";
+import type { PrebuildEvent, PrebuildEventFile, Prisma } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import type { Config } from "~/config";
+import { errToString } from "~/test-utils";
 import { Token } from "~/token";
-import { unwrap, waitForPromises } from "~/utils.shared";
+import { mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
+import type { BuildfsService } from "./buildfs.service";
 import type { FirecrackerService } from "./firecracker.service";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
@@ -19,6 +21,7 @@ export class PrebuildService {
     Token.Logger,
     Token.AgentUtilService,
     Token.ProjectConfigService,
+    Token.BuildfsService,
     Token.Config,
   ] as const;
   private readonly agentConfig: ReturnType<Config["agent"]>;
@@ -27,6 +30,7 @@ export class PrebuildService {
     private readonly logger: Logger,
     private readonly agentUtilService: AgentUtilService,
     private readonly projectConfigService: ProjectConfigService,
+    private readonly buildfsService: BuildfsService,
     config: Config,
   ) {
     this.agentConfig = config.agent();
@@ -49,14 +53,12 @@ export class PrebuildService {
     db: Prisma.TransactionClient,
     projectId: bigint,
     gitObjectId: bigint,
-    fsFileId: bigint,
     tasks: string[],
   ): Promise<PrebuildEvent> {
     const prebuildEvent = await db.prebuildEvent.create({
       data: {
         projectId,
         gitObjectId,
-        fsFileId,
         status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING,
       },
     });
@@ -102,23 +104,49 @@ export class PrebuildService {
     });
   }
 
+  async createPrebuildEventFile(
+    db: Prisma.TransactionClient,
+    args: { filePath: string; agentInstanceId: bigint; prebuildEventId: bigint },
+  ): Promise<PrebuildEventFile> {
+    const file = await db.file.create({
+      data: {
+        agentInstanceId: args.agentInstanceId,
+        path: args.filePath,
+      },
+    });
+    return await db.prebuildEventFile.create({
+      data: {
+        prebuildEventId: args.prebuildEventId,
+        fileId: file.id,
+        agentInstanceId: args.agentInstanceId,
+      },
+    });
+  }
+
   /**
    * Creates a prebuild event and links all git branches that point to the given git object id to it.
    */
   async preparePrebuild(
     db: Prisma.TransactionClient,
-    projectId: bigint,
-    gitObjectId: bigint,
-    fsFileId: bigint,
-    tasks: string[],
+    args: {
+      agentInstanceId: bigint;
+      projectId: bigint;
+      gitObjectId: bigint;
+      fsFilePath: string;
+      tasks: string[];
+    },
   ): Promise<PrebuildEvent> {
     const prebuildEvent = await this.createPrebuildEvent(
       db,
-      projectId,
-      gitObjectId,
-      fsFileId,
-      tasks,
+      args.projectId,
+      args.gitObjectId,
+      args.tasks,
     );
+    await this.createPrebuildEventFile(db, {
+      filePath: args.fsFilePath,
+      agentInstanceId: args.agentInstanceId,
+      prebuildEventId: prebuildEvent.id,
+    });
     await this.linkGitBranchesToPrebuildEvent(db, prebuildEvent.id);
     return prebuildEvent;
   }
@@ -141,7 +169,7 @@ export class PrebuildService {
     outputDrivePath: string;
     /** Relative paths to directories where `hocus.yml` files are located in the repository. */
     projectConfigPaths: string[];
-  }): Promise<({ projectConfig: ProjectConfig; imageFileHash: string } | null)[]> {
+  }): Promise<({ projectConfig: ProjectConfig; imageFileHash: string | null } | null)[]> {
     if (await doesFileExist(args.outputDrivePath)) {
       this.logger.warn(
         `output drive already exists at "${args.outputDrivePath}", it will be overwritten`,
@@ -174,18 +202,33 @@ export class PrebuildService {
               this.projectConfigService.getConfig(ssh, repoPath, p),
             ),
           );
-          const imageFileHashes = await waitForPromises(
-            configs.map((c) =>
-              c === null ? null : this.agentUtilService.readFile(ssh, c.image.file),
+          const imageFiles = await waitForPromises(
+            mapOverNull(configs, (c) =>
+              this.agentUtilService.readFile(ssh, c.image.file).toString(),
             ),
           );
-          return configs.map((c, idx) => {
-            if (c === null) {
-              return null;
-            }
+          const externalFilePaths = await waitForPromises(
+            mapOverNull(imageFiles, (fileContent) => {
+              try {
+                return this.buildfsService.getExternalFilePathsFromDockerfile(fileContent);
+              } catch (err) {
+                this.logger.error(errToString(err));
+                return null;
+              }
+            }),
+          );
+          const externalFilesHashes = await waitForPromises(
+            mapOverNull(externalFilePaths, (filePaths) => {
+              const absoluteFilePaths = filePaths.map((p) => path.join(repoPath, p));
+              return this.buildfsService.getSha256FromFiles(ssh, repoPath, absoluteFilePaths);
+            }),
+          );
+          return mapOverNull(configs, (c, idx) => {
+            const imageFileHash = sha256(unwrap(imageFiles[idx]));
+            const externalFilesHash = externalFilesHashes[idx];
             return {
               projectConfig: c,
-              imageFileHash: sha256(unwrap(imageFileHashes[idx])),
+              imageFileHash: externalFilesHash === null ? null : imageFileHash + externalFilesHash,
             };
           });
         },
@@ -194,25 +237,5 @@ export class PrebuildService {
       await fs.unlink(args.outputDrivePath);
       throw err;
     }
-  }
-
-  async createCheckoutAndInspectFile(
-    db: Prisma.TransactionClient,
-    prebuildEventId: bigint,
-    outputDrivePath: string,
-  ): Promise<void> {
-    const agentInstance = await this.agentUtilService.getOrCreateSoloAgentInstance(db);
-    const fsFile = await db.file.create({
-      data: {
-        path: outputDrivePath,
-        agentInstanceId: agentInstance.id,
-      },
-    });
-    await db.prebuildEvent.update({
-      where: { id: prebuildEventId },
-      data: {
-        fsFileId: fsFile.id,
-      },
-    });
   }
 }
