@@ -1,7 +1,5 @@
-import path from "path";
-
 import { proxyActivities, uuid4 } from "@temporalio/workflow";
-import { bigintSort, filterNull, mapOverNull, waitForPromises } from "~/utils.shared";
+import { bigintSort, filterNull, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
 import type { createActivities } from "./activities";
 import { HOST_PERSISTENT_DIR } from "./constants";
@@ -32,8 +30,8 @@ export async function runBuildfsAndPrebuilds(
   projects.sort((a, b) => bigintSort(a.id, b.id));
   await fetchRepository(gitRepositoryId);
 
-  const checkedOutPaths = gitObjects.map((o) =>
-    path.join(HOST_PERSISTENT_DIR, "checked-out", `${o.hash}.ext4`),
+  const checkedOutPaths = gitObjects.map(
+    (o) => `${HOST_PERSISTENT_DIR}/checked-out/${o.hash}.ext4` as const,
   );
   const checkedOutResults = await waitForPromises(
     checkedOutPaths.map((outputPath, idx) =>
@@ -55,12 +53,21 @@ export async function runBuildfsAndPrebuilds(
           cacheHash: imageFileHash,
           gitObjectIdx: idx,
           projectIdx,
-          fsFilePath: path.join(HOST_PERSISTENT_DIR, "buildfs", `${uuid4()}.ext4`),
+          fsFilePath: `${HOST_PERSISTENT_DIR}/buildfs/${uuid4()}.ext4` as const,
         };
       });
     }),
   );
   const buildfsEvents = await getOrCreateBuildfsEvents(buildfsEventsArgs);
+  const gitObjectIdsToBranches = new Map<bigint, bigint[]>();
+  for (const branch of branches) {
+    const branchesForGitObjectId = gitObjectIdsToBranches.get(branch.gitObjectId);
+    if (branchesForGitObjectId === undefined) {
+      gitObjectIdsToBranches.set(branch.gitObjectId, [branch.gitBranchId]);
+    } else {
+      branchesForGitObjectId.push(branch.gitBranchId);
+    }
+  }
   const prebuildEventsArgs = checkedOutResults.map((results, idx) => {
     return results.map((result, projectIdx) => {
       return {
@@ -68,6 +75,7 @@ export async function runBuildfsAndPrebuilds(
         gitObjectId: gitObjects[idx].id,
         buildfsEventId: null as bigint | null,
         fsFilePath: checkedOutPaths[idx],
+        gitBranchIds: unwrap(gitObjectIdsToBranches.get(gitObjects[idx].id)),
         tasks: result === null ? [] : result.projectConfig.tasks.map((task) => task.command),
       };
     });
@@ -77,5 +85,5 @@ export async function runBuildfsAndPrebuilds(
       buildfsEvents[idx].event.id;
   }
   const prebuildEventsArgsFlat = prebuildEventsArgs.flat();
-  const prebuildEvents = await createPrebuildEvents(prebuildEventsArgsFlat);
+  const _prebuildEvents = await createPrebuildEvents(prebuildEventsArgsFlat);
 }

@@ -91,17 +91,15 @@ export class PrebuildService {
     return prebuildEvent;
   }
 
-  async linkGitBranchesToPrebuildEvent(db: Prisma.TransactionClient, prebuildEventId: bigint) {
-    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
-      where: { id: prebuildEventId },
-    });
-    const gitBranches = await db.gitBranch.findMany({
-      where: { gitObjectId: prebuildEvent.gitObjectId },
-    });
+  async linkGitBranchesToPrebuildEvent(
+    db: Prisma.TransactionClient,
+    prebuildEventId: bigint,
+    gitBranchIds: bigint[],
+  ) {
     await db.prebuildEventToGitBranch.createMany({
-      data: gitBranches.map((gitBranch) => ({
+      data: gitBranchIds.map((gitBranchId) => ({
         prebuildEventId,
-        gitBranchId: gitBranch.id,
+        gitBranchId,
       })),
     });
   }
@@ -134,6 +132,7 @@ export class PrebuildService {
       agentInstanceId: bigint;
       projectId: bigint;
       gitObjectId: bigint;
+      gitBranchIds: bigint[];
       fsFilePath: string;
       buildfsEventId: bigint | null;
       tasks: string[];
@@ -151,7 +150,7 @@ export class PrebuildService {
       agentInstanceId: args.agentInstanceId,
       prebuildEventId: prebuildEvent.id,
     });
-    await this.linkGitBranchesToPrebuildEvent(db, prebuildEvent.id);
+    await this.linkGitBranchesToPrebuildEvent(db, prebuildEvent.id, args.gitBranchIds);
     return prebuildEvent;
   }
 

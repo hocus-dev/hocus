@@ -345,6 +345,7 @@ export const createActivities = async (
     args: {
       projectId: bigint;
       gitObjectId: bigint;
+      gitBranchIds: bigint[];
       buildfsEventId: bigint | null;
       fsFilePath: string;
       tasks: string[];
