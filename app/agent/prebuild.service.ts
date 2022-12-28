@@ -53,12 +53,14 @@ export class PrebuildService {
     db: Prisma.TransactionClient,
     projectId: bigint,
     gitObjectId: bigint,
+    buildfsEventId: bigint | null,
     tasks: string[],
   ): Promise<PrebuildEvent> {
     const prebuildEvent = await db.prebuildEvent.create({
       data: {
         projectId,
         gitObjectId,
+        buildfsEventId,
         status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING,
       },
     });
@@ -133,6 +135,7 @@ export class PrebuildService {
       projectId: bigint;
       gitObjectId: bigint;
       fsFilePath: string;
+      buildfsEventId: bigint | null;
       tasks: string[];
     },
   ): Promise<PrebuildEvent> {
@@ -140,6 +143,7 @@ export class PrebuildService {
       db,
       args.projectId,
       args.gitObjectId,
+      args.buildfsEventId,
       args.tasks,
     );
     await this.createPrebuildEventFile(db, {

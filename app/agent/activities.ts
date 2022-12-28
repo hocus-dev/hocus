@@ -1,4 +1,4 @@
-import type { GitObject, Prisma, Project } from "@prisma/client";
+import type { GitObject, PrebuildEvent, Prisma, Project } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import type { Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
@@ -341,6 +341,27 @@ export const createActivities = async (
     );
   };
 
+  const createPrebuildEvents = async (
+    args: {
+      projectId: bigint;
+      gitObjectId: bigint;
+      buildfsEventId: bigint | null;
+      fsFilePath: string;
+      tasks: string[];
+    }[],
+  ): Promise<PrebuildEvent[]> => {
+    const prebuildService = injector.resolve(Token.PrebuildService);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
+    return await db.$transaction(async (tdb) => {
+      const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(tdb);
+      return await waitForPromises(
+        args.map((arg) =>
+          prebuildService.preparePrebuild(tdb, { ...arg, agentInstanceId: agentInstance.id }),
+        ),
+      );
+    });
+  };
+
   return {
     fetchRepository,
     buildfs,
@@ -350,5 +371,6 @@ export const createActivities = async (
     stopWorkspace,
     getProjectsAndGitObjects,
     getOrCreateBuildfsEvents,
+    createPrebuildEvents,
   };
 };

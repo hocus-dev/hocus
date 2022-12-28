@@ -7,13 +7,18 @@ import type { createActivities } from "./activities";
 import { HOST_PERSISTENT_DIR } from "./constants";
 
 type Activites = Awaited<ReturnType<typeof createActivities>>;
-const { checkoutAndInspect, getProjectsAndGitObjects, fetchRepository, getOrCreateBuildfsEvents } =
-  proxyActivities<Activites>({
-    startToCloseTimeout: "1 minute",
-    retry: {
-      maximumAttempts: 1,
-    },
-  });
+const {
+  checkoutAndInspect,
+  getProjectsAndGitObjects,
+  fetchRepository,
+  getOrCreateBuildfsEvents,
+  createPrebuildEvents,
+} = proxyActivities<Activites>({
+  startToCloseTimeout: "1 minute",
+  retry: {
+    maximumAttempts: 1,
+  },
+});
 
 export async function runBuildfsAndPrebuilds(
   gitRepositoryId: bigint,
@@ -56,4 +61,21 @@ export async function runBuildfsAndPrebuilds(
     }),
   );
   const buildfsEvents = await getOrCreateBuildfsEvents(buildfsEventsArgs);
+  const prebuildEventsArgs = checkedOutResults.map((results, idx) => {
+    return results.map((result, projectIdx) => {
+      return {
+        projectId: projects[projectIdx].id,
+        gitObjectId: gitObjects[idx].id,
+        buildfsEventId: null as bigint | null,
+        fsFilePath: checkedOutPaths[idx],
+        tasks: result === null ? [] : result.projectConfig.tasks.map((task) => task.command),
+      };
+    });
+  });
+  for (const [idx, args] of buildfsEventsArgs.entries()) {
+    prebuildEventsArgs[args.gitObjectIdx][args.projectIdx].buildfsEventId =
+      buildfsEvents[idx].event.id;
+  }
+  const prebuildEventsArgsFlat = prebuildEventsArgs.flat();
+  const prebuildEvents = await createPrebuildEvents(prebuildEventsArgsFlat);
 }
