@@ -69,3 +69,7 @@ export const mapOverNull = <T, U>(
 ): (U | null)[] => {
   return values.map((value, idx) => (value == null ? null : fn(value, idx)));
 };
+
+export const filterNull = <T>(values: (T | null | undefined)[]): T[] => {
+  return values.filter((value) => value != null) as T[];
+};

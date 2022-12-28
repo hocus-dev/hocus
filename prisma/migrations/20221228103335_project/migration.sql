@@ -2,6 +2,7 @@
   Warnings:
 
   - Added the required column `cacheHash` to the `BuildfsEvent` table without a default value. This is not possible if the table is not empty.
+  - Added the required column `projectId` to the `BuildfsEvent` table without a default value. This is not possible if the table is not empty.
   - Added the required column `gitObjectId` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
   - Added the required column `projectId` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
   - Added the required column `status` to the `PrebuildEvent` table without a default value. This is not possible if the table is not empty.
@@ -11,10 +12,12 @@
 CREATE TYPE "PrebuildEventStatus" AS ENUM ('PREBUILD_EVENT_STATUS_PENDING', 'PREBUILD_EVENT_STATUS_RUNNING', 'PREBUILD_EVENT_STATUS_SUCCESS', 'PREBUILD_EVENT_STATUS_ERROR', 'PREBUILD_EVENT_STATUS_CANCELLED', 'PREBUILD_EVENT_STATUS_SKIPPED');
 
 -- AlterTable
-ALTER TABLE "BuildfsEvent" ADD COLUMN     "cacheHash" TEXT NOT NULL;
+ALTER TABLE "BuildfsEvent" ADD COLUMN     "cacheHash" TEXT NOT NULL,
+ADD COLUMN     "projectId" BIGINT NOT NULL;
 
 -- AlterTable
-ALTER TABLE "PrebuildEvent" ADD COLUMN     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ALTER TABLE "PrebuildEvent" ADD COLUMN     "buildfsEventId" BIGINT,
+ADD COLUMN     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 ADD COLUMN     "gitObjectId" BIGINT NOT NULL,
 ADD COLUMN     "projectId" BIGINT NOT NULL,
 ADD COLUMN     "status" "PrebuildEventStatus" NOT NULL;
@@ -120,6 +123,9 @@ ALTER TABLE "PrebuildEvent" ADD CONSTRAINT "PrebuildEvent_projectId_fkey" FOREIG
 ALTER TABLE "PrebuildEvent" ADD CONSTRAINT "PrebuildEvent_gitObjectId_fkey" FOREIGN KEY ("gitObjectId") REFERENCES "GitObject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "PrebuildEvent" ADD CONSTRAINT "PrebuildEvent_buildfsEventId_fkey" FOREIGN KEY ("buildfsEventId") REFERENCES "BuildfsEvent"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "PrebuildEventFile" ADD CONSTRAINT "PrebuildEventFile_prebuildEventId_fkey" FOREIGN KEY ("prebuildEventId") REFERENCES "PrebuildEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -136,6 +142,9 @@ ALTER TABLE "PrebuildEventToGitBranch" ADD CONSTRAINT "PrebuildEventToGitBranch_
 
 -- AddForeignKey
 ALTER TABLE "PrebuildEventToGitBranch" ADD CONSTRAINT "PrebuildEventToGitBranch_gitBranchId_fkey" FOREIGN KEY ("gitBranchId") REFERENCES "GitBranch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BuildfsEvent" ADD CONSTRAINT "BuildfsEvent_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "BuildfsEventFile" ADD CONSTRAINT "BuildfsEventFile_buildfsEventId_fkey" FOREIGN KEY ("buildfsEventId") REFERENCES "BuildfsEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

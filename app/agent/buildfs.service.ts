@@ -20,7 +20,7 @@ export class BuildfsService {
 
   async createBuildfsEvent(
     db: Prisma.TransactionClient,
-    args: { contextPath: string; dockerfilePath: string; cacheHash: string },
+    args: { contextPath: string; dockerfilePath: string; cacheHash: string; projectId: bigint },
   ): Promise<BuildfsEvent> {
     const vmTask = await this.agentUtilService.createVmTask(db, [
       this.buildfsScriptPath,
@@ -34,6 +34,7 @@ export class BuildfsService {
         contextPath: args.contextPath,
         dockerfilePath: args.dockerfilePath,
         cacheHash: args.cacheHash,
+        projectId: args.projectId,
       },
     });
   }
@@ -115,6 +116,7 @@ export class BuildfsService {
 
   async getExistingBuildfsEvent(
     db: Prisma.Client,
+    projectId: bigint,
     cacheHash: string,
     agentInstanceId: bigint,
   ): Promise<BuildfsEvent | null> {
@@ -122,6 +124,7 @@ export class BuildfsService {
       where: {
         buildfsEvent: {
           cacheHash,
+          projectId,
         },
         file: {
           agentInstanceId,
@@ -145,10 +148,12 @@ export class BuildfsService {
       dockerfilePath: string;
       cacheHash: string;
       fsFilePath: string;
+      projectId: bigint;
     },
   ): Promise<{ event: BuildfsEvent; status: "created" | "found" }> {
     const existingEvent = await this.getExistingBuildfsEvent(
       db,
+      args.projectId,
       args.cacheHash,
       args.agentInstanceId,
     );

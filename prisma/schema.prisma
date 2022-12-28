@@ -56,6 +56,8 @@ model PrebuildEvent {
   status         PrebuildEventStatus
   gitBranchLinks PrebuildEventToGitBranch[]
   fsFiles        PrebuildEventFile[]
+  buildfsEventId BigInt?
+  buildfsEvent   BuildfsEvent?              @relation(fields: [buildfsEventId], references: [id])
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
@@ -123,7 +125,10 @@ model BuildfsEvent {
   /// Relative path to the build context in the `project` directory of the input drive.
   contextPath    String
   cacheHash      String
+  projectId      BigInt
+  project        Project            @relation(fields: [projectId], references: [id])
   fsFiles        BuildfsEventFile[]
+  prebuildEvents PrebuildEvent[]
 
   @@index([cacheHash])
 }
@@ -222,6 +227,7 @@ model Project {
 
   createdAt      DateTime        @default(now()) @db.Timestamptz(3)
   prebuildEvents PrebuildEvent[]
+  buildfsEvents  BuildfsEvent[]
 }
 
 model AgentInstance {

@@ -320,6 +320,7 @@ export const createActivities = async (
       dockerfilePath: string;
       cacheHash: string | null;
       fsFilePath: string;
+      projectId: bigint;
     }[],
   ): Promise<GetOrCreateBuildfsEventsReturnType> => {
     const buildfsService = injector.resolve(Token.BuildfsService);

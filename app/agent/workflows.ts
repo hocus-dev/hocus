@@ -1,13 +1,13 @@
 import path from "path";
 
-import { proxyActivities } from "@temporalio/workflow";
-import { bigintSort, waitForPromises } from "~/utils.shared";
+import { proxyActivities, uuid4 } from "@temporalio/workflow";
+import { bigintSort, filterNull, mapOverNull, waitForPromises } from "~/utils.shared";
 
 import type { createActivities } from "./activities";
 import { HOST_PERSISTENT_DIR } from "./constants";
 
 type Activites = Awaited<ReturnType<typeof createActivities>>;
-const { checkoutAndInspect, getProjectsAndGitObjects, fetchRepository } =
+const { checkoutAndInspect, getProjectsAndGitObjects, fetchRepository, getOrCreateBuildfsEvents } =
   proxyActivities<Activites>({
     startToCloseTimeout: "1 minute",
     retry: {
@@ -40,5 +40,20 @@ export async function runBuildfsAndPrebuilds(
       }),
     ),
   );
-  const buildfsEvents = checkedOutResults.map();
+  const buildfsEventsArgs = filterNull(
+    checkedOutResults.flatMap((results, idx) => {
+      return mapOverNull(results, ({ projectConfig, imageFileHash }, projectIdx) => {
+        return {
+          projectId: projects[projectIdx].id,
+          contextPath: projectConfig.image.buildContext,
+          dockerfilePath: projectConfig.image.file,
+          cacheHash: imageFileHash,
+          gitObjectIdx: idx,
+          projectIdx,
+          fsFilePath: path.join(HOST_PERSISTENT_DIR, "buildfs", `${uuid4()}.ext4`),
+        };
+      });
+    }),
+  );
+  const buildfsEvents = await getOrCreateBuildfsEvents(buildfsEventsArgs);
 }
