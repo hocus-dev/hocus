@@ -41,8 +41,8 @@ export const createAgentInjector = (
       Token.ProjectConfigService,
       overrides[Token.ProjectConfigService] ?? ProjectConfigService,
     )
-    .provideClass(Token.PrebuildService, overrides[Token.PrebuildService] ?? PrebuildService)
     .provideClass(Token.BuildfsService, overrides[Token.BuildfsService] ?? BuildfsService)
+    .provideClass(Token.PrebuildService, overrides[Token.PrebuildService] ?? PrebuildService)
     .provideClass(Token.SSHGatewayService, overrides[Token.SSHGatewayService] ?? SSHGatewayService)
     .provideFactory(
       Token.FirecrackerService,

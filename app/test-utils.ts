@@ -3,6 +3,8 @@ import * as sinon from "ts-sinon";
 import type { Class } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
+import { GroupError } from "./group-error";
+
 export const constructorStub = <T extends Class.Class>(ctor: T) =>
   function () {
     return sinon.stubConstructor(ctor);
@@ -35,6 +37,10 @@ export const printErrors = <T>(testFn: () => Promise<T>): (() => Promise<T>) => 
         );
       } else if (err instanceof FetchError) {
         console.error(err.cause);
+      } else if (err instanceof GroupError) {
+        for (const innerError of err.errors) {
+          console.error(innerError);
+        }
       } else {
         console.error(err);
       }

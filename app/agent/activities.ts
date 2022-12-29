@@ -23,21 +23,22 @@ export const createActivities = async (
     const instanceId = `fetchrepo-${uuidv4()}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const gitService = injector.resolve(Token.GitService);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
     const repo = await db.gitRepository.findUniqueOrThrow({
       where: { id: gitRepositoryId },
       include: {
-        gitRepositoryFiles: { include: { agentInstance: true, file: true } },
         sshKeyPair: true,
       },
     });
-    const repoFile = unwrap(
-      repo.gitRepositoryFiles.find((f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID),
-    );
+    const repoFile = await db.$transaction(async (tdb) => {
+      const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(tdb);
+      return await gitService.getOrCreateGitRepositoryFile(tdb, agentInstance.id, repo.id);
+    });
     await gitService.fetchRepository(
       firecrackerService,
       {
         pathOnHost: repoFile.file.path,
-        maxSizeMiB: 100000,
+        maxSizeMiB: 5000,
       },
       {
         url: repo.url,

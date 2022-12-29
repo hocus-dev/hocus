@@ -23,10 +23,6 @@ export class CborXDataConverter implements PayloadConverterWithEncoding {
   encodingType = encodingTypes.METADATA_ENCODING_RAW;
 
   toPayload(data: unknown): Payload | undefined {
-    if (data === void 0) {
-      return void 0;
-    }
-
     return {
       metadata: { [METADATA_ENCODING_KEY]: encodingKeys.METADATA_ENCODING_RAW },
       data: encode(data),

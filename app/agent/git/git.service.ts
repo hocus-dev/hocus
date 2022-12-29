@@ -1,7 +1,14 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { GitBranch, GitObject, GitRepository, SshKeyPair } from "@prisma/client";
+import type {
+  GitBranch,
+  GitObject,
+  GitRepository,
+  GitRepositoryFile,
+  SshKeyPair,
+  File,
+} from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
@@ -13,7 +20,7 @@ import { Token } from "~/token";
 import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "../agent-util.service";
-import { PROJECT_DIR } from "../constants";
+import { HOST_PERSISTENT_DIR, PROJECT_DIR } from "../constants";
 import type { FirecrackerService } from "../firecracker.service";
 import { doesFileExist, execCmdWithOpts, execSshCmd } from "../utils";
 
@@ -339,6 +346,7 @@ export class GitService {
   ): Promise<void> {
     const outputDriveExists = await doesFileExist(outputDrive.pathOnHost);
     if (!outputDriveExists) {
+      await fs.mkdir(path.dirname(outputDrive.pathOnHost), { recursive: true });
       this.agentUtilService.createExt4Image(outputDrive.pathOnHost, outputDrive.maxSizeMiB);
       this.logger.info(`empty output image created at ${outputDrive.pathOnHost}`);
     }
@@ -412,5 +420,54 @@ export class GitService {
         }
       },
     );
+  }
+
+  async getOrCreateGitRepositoryFile(
+    db: Prisma.TransactionClient,
+    agentInstanceId: bigint,
+    gitRepositoryId: bigint,
+  ): Promise<
+    GitRepositoryFile & {
+      file: File;
+    }
+  > {
+    let gitRepositoryFile = await db.gitRepositoryFile.findUnique({
+      // eslint-disable-next-line camelcase
+      where: { gitRepositoryId_agentInstanceId: { gitRepositoryId, agentInstanceId } },
+      include: { file: true },
+    });
+    if (gitRepositoryFile != null) {
+      return gitRepositoryFile;
+    }
+
+    await db.$executeRawUnsafe(
+      `LOCK TABLE "${Prisma.ModelName.GitRepositoryFile}" IN SHARE UPDATE EXCLUSIVE MODE`,
+    );
+
+    gitRepositoryFile = await db.gitRepositoryFile.findUnique({
+      // eslint-disable-next-line camelcase
+      where: { gitRepositoryId_agentInstanceId: { gitRepositoryId, agentInstanceId } },
+      include: { file: true },
+    });
+    if (gitRepositoryFile != null) {
+      return gitRepositoryFile;
+    }
+
+    const file = await db.file.create({
+      data: {
+        agentInstanceId,
+        path: path.join(HOST_PERSISTENT_DIR, "repositories", `${uuidv4()}.ext4`),
+      },
+    });
+    return await db.gitRepositoryFile.create({
+      data: {
+        gitRepositoryId,
+        fileId: file.id,
+        agentInstanceId,
+      },
+      include: {
+        file: true,
+      },
+    });
   }
 }

@@ -3,6 +3,7 @@ import path from "path";
 
 import { SshKeyPairType } from "@prisma/client";
 import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
 import { PROJECT_DIR } from "../constants";
 import type { FirecrackerService } from "../firecracker.service";
@@ -215,5 +216,30 @@ test.concurrent(
         (await agentUtilService.readFile(ssh, path.join(mountPath, txtFilePath))).toString(),
       ).toEqual(txtFileContent);
     });
+  }),
+);
+
+test.concurrent(
+  "getOrCreateGitRepositoryFile",
+  provideInjectorAndDb(async ({ injector, db }) => {
+    const gitService = injector.resolve(Token.GitService);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
+
+    const pair = await gitService.createSshKeyPair(
+      db,
+      PRIVATE_SSH_KEY,
+      SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
+    );
+    const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
+
+    const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(db);
+    const files = await waitForPromises(
+      Array.from({ length: 25 }).map(() =>
+        db.$transaction((tdb) =>
+          gitService.getOrCreateGitRepositoryFile(tdb, agentInstance.id, repo.id),
+        ),
+      ),
+    );
+    expect(files.every((f) => f.id === files[0].id)).toBe(true);
   }),
 );
