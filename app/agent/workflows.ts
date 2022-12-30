@@ -1,5 +1,6 @@
 import { proxyActivities, uuid4 } from "@temporalio/workflow";
-import { bigintSort, filterNull, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
+import { waitForPromisesWorkflow } from "~/temporal/utils";
+import { bigintSort, filterNull, mapOverNull, unwrap } from "~/utils.shared";
 
 import type { createActivities } from "./activities";
 import { HOST_PERSISTENT_DIR } from "./constants";
@@ -33,7 +34,7 @@ export async function runBuildfsAndPrebuilds(
   const checkedOutPaths = gitObjects.map(
     (o) => `${HOST_PERSISTENT_DIR}/checked-out/${o.hash}.ext4` as const,
   );
-  const checkedOutResults = await waitForPromises(
+  const checkedOutResults = await waitForPromisesWorkflow(
     checkedOutPaths.map((outputPath, idx) =>
       checkoutAndInspect({
         gitRepositoryId,

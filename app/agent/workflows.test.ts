@@ -102,7 +102,7 @@ test.concurrent(
           ],
         ],
       });
-      expect(result).toEqual("The answer is 99");
+      expect(result).toBeUndefined();
     });
   }),
 );
