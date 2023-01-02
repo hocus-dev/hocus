@@ -48,6 +48,7 @@ enum PrebuildEventStatus {
 
 model PrebuildEvent {
   id             BigInt                     @id @default(autoincrement())
+  externalId     String                     @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   tasks          PrebuildEventTask[]
   project        Project                    @relation(fields: [projectId], references: [id])
   projectId      BigInt
@@ -55,25 +56,29 @@ model PrebuildEvent {
   gitObjectId    BigInt
   status         PrebuildEventStatus
   gitBranchLinks PrebuildEventToGitBranch[]
-  fsFiles        PrebuildEventFile[]
-  /// Null if project configuration was not found.
   buildfsEventId BigInt?
+  /// Null if project configuration was not found or did not include image config.
   buildfsEvent   BuildfsEvent?              @relation(fields: [buildfsEventId], references: [id])
 
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  prebuildEventFiles PrebuildEventFiles[]
 }
 
-model PrebuildEventFile {
+model PrebuildEventFiles {
   id              BigInt        @id @default(autoincrement())
   prebuildEvent   PrebuildEvent @relation(fields: [prebuildEventId], references: [id])
   prebuildEventId BigInt
-  file            File          @relation(fields: [fileId], references: [id])
-  fileId          BigInt
+  fsFile          File          @relation("prebuild_event_fs_file", fields: [fsFileId], references: [id])
+  fsFileId        BigInt
+  projectFile     File          @relation("prebuild_event_project_file", fields: [projectFileId], references: [id])
+  projectFileId   BigInt
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
 
-  /// Enforce that agentInstanceId and file.agentInstanceId are the same. 
-  fileAgentMatch File @relation("prebuild_event_file_agent_match", fields: [fileId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and fsFile.agentInstanceId are the same. 
+  fsFileAgentMatch      File @relation("prebuild_event_fs_file_agent_match", fields: [fsFileId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same. 
+  projectFileAgentMatch File @relation("prebuild_event_project_file_agent_match", fields: [projectFileId, agentInstanceId], references: [id, agentInstanceId])
 
   @@unique([prebuildEventId, agentInstanceId])
 }
@@ -109,7 +114,7 @@ enum VmTaskStatus {
 model VmTask {
   id                 BigInt              @id @default(autoincrement())
   command            String[]
-  cwd                String?
+  cwd                String
   status             VmTaskStatus
   logGroup           LogGroup            @relation(fields: [logGroupId], references: [id])
   logGroupId         BigInt
@@ -220,11 +225,13 @@ model GitObject {
 }
 
 model Project {
-  id                BigInt        @id @default(autoincrement())
-  gitRepository     GitRepository @relation(fields: [gitRepositoryId], references: [id])
-  gitRepositoryId   BigInt
+  id                       BigInt                 @id @default(autoincrement())
+  gitRepository            GitRepository          @relation(fields: [gitRepositoryId], references: [id])
+  gitRepositoryId          BigInt
   /// relative path to the directory where the `hocus.yml` file is located
-  rootDirectoryPath String
+  rootDirectoryPath        String
+  environmentVariableSetId BigInt
+  environmentVariableSet   EnvironmentVariableSet @relation(fields: [environmentVariableSetId], references: [id])
 
   createdAt      DateTime        @default(now()) @db.Timestamptz(3)
   prebuildEvents PrebuildEvent[]
@@ -232,27 +239,48 @@ model Project {
 }
 
 model AgentInstance {
-  id                BigInt              @id @default(autoincrement())
-  externalId        String              @unique
-  File              File[]
-  GitRepositoryFile GitRepositoryFile[]
-  BuildfsEventFile  BuildfsEventFile[]
-  PrebuildEventFile PrebuildEventFile[]
+  id                 BigInt               @id @default(autoincrement())
+  externalId         String               @unique
+  files              File[]
+  gitRepositoryFiles GitRepositoryFile[]
+  buildfsEventFiles  BuildfsEventFile[]
+  prebuildEventFiles PrebuildEventFiles[]
 }
 
 model File {
-  id                             BigInt              @id @default(autoincrement())
-  agentInstance                  AgentInstance       @relation(fields: [agentInstanceId], references: [id])
-  agentInstanceId                BigInt
+  id                                  BigInt               @id @default(autoincrement())
+  agentInstance                       AgentInstance        @relation(fields: [agentInstanceId], references: [id])
+  agentInstanceId                     BigInt
   /// Should be absolute.
-  path                           String
-  gitRepositoryFiles             GitRepositoryFile[]
-  gitRepositoryFileAgentMatch    GitRepositoryFile[] @relation("git_repository_file_agent_match")
-  prebuildEventFiles             PrebuildEventFile[]
-  prebuildEventFileAgentMatch    PrebuildEventFile[] @relation("prebuild_event_file_agent_match")
-  buildfsEventFiles              BuildfsEventFile[]
-  buildfsEventFileFileAgentMatch BuildfsEventFile[]  @relation("buildfs_event_file_agent_match")
+  path                                String
+  gitRepositoryFiles                  GitRepositoryFile[]
+  gitRepositoryFileAgentMatch         GitRepositoryFile[]  @relation("git_repository_file_agent_match")
+  buildfsEventFiles                   BuildfsEventFile[]
+  buildfsEventFileFileAgentMatch      BuildfsEventFile[]   @relation("buildfs_event_file_agent_match")
+  prebuildEventFsFiles                PrebuildEventFiles[] @relation("prebuild_event_fs_file")
+  prebuildEventProjectFiles           PrebuildEventFiles[] @relation("prebuild_event_project_file")
+  prebuildEventFsFilesAgentMatch      PrebuildEventFiles[] @relation("prebuild_event_fs_file_agent_match")
+  prebuildEventProjectFilesAgentMatch PrebuildEventFiles[] @relation("prebuild_event_project_file_agent_match")
 
   @@unique([id, agentInstanceId])
   @@unique([agentInstanceId, path])
+}
+
+model EnvironmentVariable {
+  id                       BigInt                 @id @default(autoincrement())
+  name                     String
+  value                    String
+  environmentVariableSetId BigInt
+  environmentVariableSet   EnvironmentVariableSet @relation(fields: [environmentVariableSetId], references: [id])
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([environmentVariableSetId, name])
+}
+
+model EnvironmentVariableSet {
+  id                   BigInt                @id @default(autoincrement())
+  environmentVariables EnvironmentVariable[]
+  projects             Project[]
+  createdAt            DateTime              @default(now()) @db.Timestamptz(3)
 }

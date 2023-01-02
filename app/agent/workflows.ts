@@ -1,9 +1,12 @@
 import { proxyActivities, uuid4 } from "@temporalio/workflow";
+// the native path module is a restricted import in workflows
+import path from "path-browserify";
 import { waitForPromisesWorkflow } from "~/temporal/utils";
 import { bigintSort, filterNull, mapOverNull, unwrap } from "~/utils.shared";
 
 import type { createActivities } from "./activities";
 import { HOST_PERSISTENT_DIR } from "./constants";
+import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
 
 type Activites = Awaited<ReturnType<typeof createActivities>>;
 const {
@@ -12,6 +15,8 @@ const {
   fetchRepository,
   getOrCreateBuildfsEvents,
   createPrebuildEvents,
+  buildfs,
+  prebuild,
 } = proxyActivities<Activites>({
   startToCloseTimeout: "1 minute",
   retry: {
@@ -75,9 +80,15 @@ export async function runBuildfsAndPrebuilds(
         projectId: projects[projectIdx].id,
         gitObjectId: gitObjects[idx].id,
         buildfsEventId: null as bigint | null,
-        fsFilePath: checkedOutPaths[idx],
+        sourceProjectDrivePath: checkedOutPaths[idx],
         gitBranchIds: unwrap(gitObjectIdsToBranches.get(gitObjects[idx].id)),
-        tasks: result === null ? [] : result.projectConfig.tasks.map((task) => task.command),
+        tasks:
+          result === null
+            ? []
+            : result.projectConfig.tasks.map((task) => ({
+                command: task.command,
+                cwd: path.join(PREBUILD_REPOSITORY_DIR, projects[projectIdx].rootDirectoryPath),
+              })),
       };
     });
   });
@@ -87,4 +98,15 @@ export async function runBuildfsAndPrebuilds(
   }
   const prebuildEventsArgsFlat = prebuildEventsArgs.flat();
   const _prebuildEvents = await createPrebuildEvents(prebuildEventsArgsFlat);
+}
+
+export async function runBuildfs(buildfsEventId: bigint, inputDrivePath: string): Promise<void> {
+  await buildfs({ buildfsEventId, inputDrivePath, outputDriveMaxSizeMiB: 10000 });
+}
+
+export async function runPrebuild(
+  prebuildEventId: bigint,
+  projectDrivePath: string,
+): Promise<void> {
+  await prebuild({ prebuildEventId, projectDrivePath });
 }

@@ -1,11 +1,15 @@
 import path from "path";
 
 import type { BuildfsEvent, BuildfsEventFile, Prisma } from "@prisma/client";
+import { VmTaskStatus } from "@prisma/client";
 import { Add, Copy, DockerfileParser } from "dockerfile-ast";
 import type { NodeSSH } from "node-ssh";
+import type { Config } from "~/config";
 import { Token } from "~/token";
+import { unwrap } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
+import type { FirecrackerService } from "./firecracker.service";
 import { execSshCmd } from "./utils";
 
 export class BuildfsService {
@@ -14,20 +18,26 @@ export class BuildfsService {
   inputDir = "/tmp/input" as const;
   outputDir = "/tmp/output" as const;
   isUrlRegex = /^((git|ssh|https?):\/\/)|git@/;
+  private readonly agentConfig: ReturnType<Config["agent"]>;
 
-  static inject = [Token.AgentUtilService] as const;
-  constructor(private readonly agentUtilService: AgentUtilService) {}
+  static inject = [Token.AgentUtilService, Token.Config] as const;
+  constructor(private readonly agentUtilService: AgentUtilService, config: Config) {
+    this.agentConfig = config.agent();
+  }
 
   async createBuildfsEvent(
     db: Prisma.TransactionClient,
     args: { contextPath: string; dockerfilePath: string; cacheHash: string; projectId: bigint },
   ): Promise<BuildfsEvent> {
-    const vmTask = await this.agentUtilService.createVmTask(db, [
-      this.buildfsScriptPath,
-      path.join(this.inputDir, "project", args.dockerfilePath),
-      this.outputDir,
-      path.join(this.inputDir, "project", args.contextPath),
-    ]);
+    const vmTask = await this.agentUtilService.createVmTask(db, {
+      command: [
+        this.buildfsScriptPath,
+        path.join(this.inputDir, "project", args.dockerfilePath),
+        this.outputDir,
+        path.join(this.inputDir, "project", args.contextPath),
+      ],
+      cwd: this.workdir,
+    });
     return await db.buildfsEvent.create({
       data: {
         vmTaskId: vmTask.id,
@@ -162,5 +172,63 @@ export class BuildfsService {
     }
     const event = await this.createBuildfsEvent(db, args);
     return { event, status: "created" };
+  }
+
+  async buildfs(args: {
+    db: Prisma.NonTransactionClient;
+    firecrackerService: FirecrackerService;
+    buildfsEventId: bigint;
+    /** Path to a drive with a Dockerfile. */
+    inputDrivePath: string;
+    outputDriveMaxSizeMiB: number;
+  }) {
+    const agentInstance = await args.db.$transaction((tdb) =>
+      this.agentUtilService.getOrCreateSoloAgentInstance(tdb),
+    );
+    const buildfsEvent = await args.db.buildfsEvent.findUniqueOrThrow({
+      where: { id: args.buildfsEventId },
+      include: {
+        fsFiles: {
+          include: {
+            file: true,
+          },
+        },
+      },
+    });
+    const outputFile = unwrap(
+      buildfsEvent.fsFiles.find((f) => f.file.agentInstanceId === agentInstance.id),
+    );
+
+    this.agentUtilService.createExt4Image(outputFile.file.path, args.outputDriveMaxSizeMiB, true);
+
+    const result = await args.firecrackerService.withVM(
+      {
+        ssh: {
+          username: "root",
+          password: "root",
+        },
+        kernelPath: this.agentConfig.defaultKernel,
+        rootFsPath: this.agentConfig.buildfsRootFs,
+        extraDrives: [
+          { pathOnHost: outputFile.file.path, guestMountPath: this.outputDir },
+          { pathOnHost: args.inputDrivePath, guestMountPath: this.inputDir },
+        ],
+      },
+      async ({ ssh, sshConfig }) => {
+        const workdir = "/tmp/workdir";
+        const buildfsScriptPath = `${workdir}/bin/buildfs.sh`;
+        await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
+        await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
+        await ssh.putDirectory(this.agentConfig.hostBuildfsResourcesDir, workdir);
+        await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
+
+        const taskResults = await this.agentUtilService.execVmTasks(sshConfig, args.db, [
+          { vmTaskId: buildfsEvent.vmTaskId },
+        ]);
+        return taskResults[0];
+      },
+    );
+
+    return { buildSuccessful: result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS };
   }
 }

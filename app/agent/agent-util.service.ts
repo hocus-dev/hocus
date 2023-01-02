@@ -67,7 +67,7 @@ export class AgentUtilService {
       const readFile = promisify(sftp.readFile.bind(sftp));
       contents = await readFile(path).catch((err) => {
         throw new Error(`Failed to read file "${path}": ${err?.message}`);
-      });;
+      });
     });
     return contents as unknown as Buffer;
   }
@@ -76,11 +76,15 @@ export class AgentUtilService {
     return `${TASK_SCRIPT_TEMPLATE}${task}\n`;
   }
 
-  async createVmTask(db: Prisma.TransactionClient, task: string[]): Promise<VmTask> {
+  async createVmTask(
+    db: Prisma.TransactionClient,
+    task: { command: string[]; cwd: string },
+  ): Promise<VmTask> {
     return await db.vmTask.create({
       data: {
         status: VmTaskStatus.VM_TASK_STATUS_PENDING,
-        command: task,
+        command: task.command,
+        cwd: task.cwd,
         logGroup: { create: { type: LogGroupType.LOG_GROUP_TYPE_VM_TASK } },
       },
       include: { logGroup: true },

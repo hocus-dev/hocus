@@ -41,6 +41,8 @@ export const config = makeConfig()({
     checkoutAndInspectRootFs:
       process.env.AGENT_CHECKOUT_AND_INSPECT_ROOTFS_PATH ??
       "/srv/jailer/resources/checkout-and-inspect.ext4",
+    defaultWorkspaceRootFs:
+      process.env.DEFAULT_WORKSPACE_ROOTFS_PATH ?? "/srv/jailer/resources/default-workspace.ext4",
     prebuildSshPublicKey:
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:

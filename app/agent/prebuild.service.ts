@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { PrebuildEvent, PrebuildEventFile, Prisma } from "@prisma/client";
+import type { PrebuildEvent, PrebuildEventFiles, Prisma } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import type { Config } from "~/config";
@@ -11,7 +11,13 @@ import { mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { BuildfsService } from "./buildfs.service";
+import { HOST_PERSISTENT_DIR } from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
+import {
+  PREBUILD_DEV_DIR,
+  PREBUILD_SCRIPTS_DIR,
+  PREBUILD_REPOSITORY_DIR,
+} from "./prebuild-constants";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
 import { doesFileExist, execSshCmd, sha256 } from "./utils";
@@ -36,9 +42,9 @@ export class PrebuildService {
     this.agentConfig = config.agent();
   }
 
-  devDir = "/home/hocus/dev" as const;
-  repositoryDir = `${this.devDir}/project` as const;
-  prebuildScriptsDir = `${this.devDir}/.hocus/init` as const;
+  devDir = PREBUILD_DEV_DIR;
+  repositoryDir = PREBUILD_REPOSITORY_DIR;
+  prebuildScriptsDir = PREBUILD_SCRIPTS_DIR;
 
   getPrebuildTaskPaths(taskIdx: number): {
     scriptPath: string;
@@ -54,7 +60,10 @@ export class PrebuildService {
     projectId: bigint,
     gitObjectId: bigint,
     buildfsEventId: bigint | null,
-    tasks: string[],
+    tasks: {
+      command: string;
+      cwd: string;
+    }[],
   ): Promise<PrebuildEvent> {
     const prebuildEvent = await db.prebuildEvent.create({
       data: {
@@ -65,25 +74,28 @@ export class PrebuildService {
       },
     });
     await Promise.all(
-      tasks.map(async (task, idx) => {
+      tasks.map(async ({ command, cwd }, idx) => {
         const paths = this.getPrebuildTaskPaths(idx);
-        const vmTask = await this.agentUtilService.createVmTask(db, [
-          "bash",
-          "-o",
-          "pipefail",
-          "-o",
-          "errexit",
-          "-o",
-          "allexport",
-          "-c",
-          `bash "${paths.scriptPath}" 2>&1 | tee "${paths.logPath}"`,
-        ]);
+        const vmTask = await this.agentUtilService.createVmTask(db, {
+          command: [
+            "bash",
+            "-o",
+            "pipefail",
+            "-o",
+            "errexit",
+            "-o",
+            "allexport",
+            "-c",
+            `bash "${paths.scriptPath}" 2>&1 | tee "${paths.logPath}"`,
+          ],
+          cwd,
+        });
         await db.prebuildEventTask.create({
           data: {
             prebuildEventId: prebuildEvent.id,
             vmTaskId: vmTask.id,
             idx,
-            originalCommand: task,
+            originalCommand: command,
           },
         });
       }),
@@ -104,20 +116,44 @@ export class PrebuildService {
     });
   }
 
-  async createPrebuildEventFile(
+  async createLocalPrebuildEventFiles(args: {
+    sourceProjectDrivePath: string;
+    outputProjectDrivePath: string;
+    sourceFsDrivePath: string;
+    outputFsDrivePath: string;
+  }): Promise<void> {
+    await waitForPromises([
+      fs.copyFile(args.sourceProjectDrivePath, args.outputProjectDrivePath),
+      fs.copyFile(args.sourceFsDrivePath, args.outputFsDrivePath),
+    ]);
+  }
+
+  async createDbPrebuildEventFiles(
     db: Prisma.TransactionClient,
-    args: { filePath: string; agentInstanceId: bigint; prebuildEventId: bigint },
-  ): Promise<PrebuildEventFile> {
-    const file = await db.file.create({
+    args: {
+      outputProjectDrivePath: string;
+      outputFsDrivePath: string;
+      agentInstanceId: bigint;
+      prebuildEventId: bigint;
+    },
+  ): Promise<PrebuildEventFiles> {
+    const fsFile = await db.file.create({
       data: {
         agentInstanceId: args.agentInstanceId,
-        path: args.filePath,
+        path: args.outputFsDrivePath,
       },
     });
-    return await db.prebuildEventFile.create({
+    const projectFile = await db.file.create({
+      data: {
+        agentInstanceId: args.agentInstanceId,
+        path: args.outputProjectDrivePath,
+      },
+    });
+    return await db.prebuildEventFiles.create({
       data: {
         prebuildEventId: args.prebuildEventId,
-        fileId: file.id,
+        fsFileId: fsFile.id,
+        projectFileId: projectFile.id,
         agentInstanceId: args.agentInstanceId,
       },
     });
@@ -133,9 +169,10 @@ export class PrebuildService {
       projectId: bigint;
       gitObjectId: bigint;
       gitBranchIds: bigint[];
-      fsFilePath: string;
+      sourceProjectDrivePath: string;
+      /** Null if project configuration was not found or did not include image config. */
       buildfsEventId: bigint | null;
-      tasks: string[];
+      tasks: { command: string; cwd: string }[];
     },
   ): Promise<PrebuildEvent> {
     const prebuildEvent = await this.createPrebuildEvent(
@@ -145,8 +182,38 @@ export class PrebuildService {
       args.buildfsEventId,
       args.tasks,
     );
-    await this.createPrebuildEventFile(db, {
-      filePath: args.fsFilePath,
+
+    const outputFsDrivePath = path.join(
+      HOST_PERSISTENT_DIR,
+      "fs",
+      `${prebuildEvent.externalId}.ext4`,
+    );
+    const outputProjectDrivePath = path.join(
+      HOST_PERSISTENT_DIR,
+      "project",
+      `${prebuildEvent.externalId}.ext4`,
+    );
+    let sourceFsDrivePath: string;
+    if (args.buildfsEventId != null) {
+      const buildfsEvent = await db.buildfsEvent.findUniqueOrThrow({
+        where: { id: args.buildfsEventId },
+        include: { fsFiles: { include: { file: true } } },
+      });
+      sourceFsDrivePath = unwrap(
+        buildfsEvent.fsFiles.find((f) => f.agentInstanceId === args.agentInstanceId),
+      ).file.path;
+    } else {
+      sourceFsDrivePath = this.agentConfig.defaultWorkspaceRootFs;
+    }
+    await this.createLocalPrebuildEventFiles({
+      sourceProjectDrivePath: args.sourceProjectDrivePath,
+      outputProjectDrivePath,
+      sourceFsDrivePath,
+      outputFsDrivePath,
+    });
+    await this.createDbPrebuildEventFiles(db, {
+      outputProjectDrivePath,
+      outputFsDrivePath,
       agentInstanceId: args.agentInstanceId,
       prebuildEventId: prebuildEvent.id,
     });
