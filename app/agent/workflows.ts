@@ -24,6 +24,7 @@ const {
   createPrebuildEvents,
   buildfs,
   prebuild,
+  createPrebuildFiles,
 } = proxyActivities<Activites>({
   startToCloseTimeout: "1 minute",
   retry: {
@@ -56,6 +57,7 @@ export async function runBuildfsAndPrebuilds(
       }),
     ),
   );
+  console.log(checkedOutResults);
   const buildfsEventsArgs = filterNull(
     checkedOutResults.flatMap((results, idx) => {
       return mapOverNull(results, ({ projectConfig, imageFileHash }, projectIdx) => {
@@ -102,6 +104,12 @@ export async function runBuildfsAndPrebuilds(
   }
   const prebuildEventsArgsFlat = prebuildEventsArgs.flat();
   const prebuildEvents = await createPrebuildEvents(prebuildEventsArgsFlat);
+  const prebuildEventIdToProjectDrivePath = new Map(
+    prebuildEventsArgsFlat.map((args, idx) => [
+      prebuildEvents[idx].id,
+      args.sourceProjectDrivePath,
+    ]),
+  );
   const buildfsEventsToPrebuilds = Array.from(
     groupBy(
       prebuildEvents,
@@ -116,8 +124,13 @@ export async function runBuildfsAndPrebuilds(
         await executeChild(runBuildfs, { args: [buildfsEventId] });
       }
       await waitForPromisesWorkflow(
-        prebuildEvents.map((prebuildEvent) =>
-          executeChild(runPrebuild, { args: [prebuildEvent.id] }),
+        prebuildEvents.map(async (prebuildEvent) =>
+          executeChild(runPrebuild, {
+            args: [
+              prebuildEvent.id,
+              unwrap(prebuildEventIdToProjectDrivePath.get(prebuildEvent.id)),
+            ],
+          }),
         ),
       );
     }),
@@ -128,6 +141,13 @@ export async function runBuildfs(buildfsEventId: bigint): Promise<void> {
   await buildfs({ buildfsEventId, outputDriveMaxSizeMiB: 10000 });
 }
 
-export async function runPrebuild(prebuildEventId: bigint): Promise<void> {
+export async function runPrebuild(
+  prebuildEventId: bigint,
+  sourceProjectDrivePath: string,
+): Promise<void> {
+  await createPrebuildFiles({
+    prebuildEventId,
+    sourceProjectDrivePath,
+  });
   await prebuild({ prebuildEventId });
 }

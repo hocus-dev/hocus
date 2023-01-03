@@ -1,4 +1,5 @@
 import fsSync from "fs";
+import path from "path";
 import { promisify } from "util";
 
 import type { AgentInstance, Prisma, VmTask } from "@prisma/client";
@@ -27,6 +28,7 @@ export class AgentUtilService {
         throw new Error(`Image file "${imagePath}" already exists`);
       }
     }
+    fsSync.mkdirSync(path.dirname(imagePath), { recursive: true });
     execCmd("dd", "if=/dev/zero", `of=${imagePath}`, "bs=1M", "count=0", `seek=${sizeMiB}`);
     execCmd("mkfs.ext4", imagePath);
   }

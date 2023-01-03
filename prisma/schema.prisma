@@ -230,6 +230,7 @@ model GitObject {
 
 model Project {
   id                       BigInt                 @id @default(autoincrement())
+  name                     String
   gitRepository            GitRepository          @relation(fields: [gitRepositoryId], references: [id])
   gitRepositoryId          BigInt
   /// relative path to the directory where the `hocus.yml` file is located

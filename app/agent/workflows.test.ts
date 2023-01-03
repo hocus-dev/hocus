@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { printErrors } from "~/test-utils";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
+import { unwrap } from "~/utils.shared";
 
 import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
@@ -79,6 +80,7 @@ test.concurrent(
     });
 
     const gitService = injector.resolve(Token.GitService);
+    const projectService = injector.resolve(Token.ProjectService);
     const pair = await gitService.createSshKeyPair(
       db,
       PRIVATE_SSH_KEY,
@@ -86,6 +88,14 @@ test.concurrent(
     );
     const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
     const updates = await db.$transaction((tdb) => gitService.updateBranches(tdb, repo.id));
+    await db.$transaction((tdb) =>
+      projectService.createProject(tdb, {
+        gitRepositoryId: repo.id,
+        rootDirectoryPath: "/",
+        name: "test",
+      }),
+    );
+    const mainBranch = unwrap(updates.newGitBranches.find((b) => b.name.includes("main")));
 
     await worker.runUntil(async () => {
       const workflowId = uuidv4();
@@ -97,13 +107,15 @@ test.concurrent(
           repo.id,
           [
             {
-              gitBranchId: updates.newGitBranches[0].id,
-              gitObjectId: updates.newGitBranches[0].gitObjectId,
+              gitBranchId: mainBranch.id,
+              gitObjectId: mainBranch.gitObjectId,
             },
           ],
         ],
       });
       expect(result).toBeUndefined();
     });
+
+    console.log("finished!");
   }),
 );

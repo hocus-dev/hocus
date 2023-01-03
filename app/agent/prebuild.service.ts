@@ -116,12 +116,41 @@ export class PrebuildService {
     });
   }
 
+  async getSourceFsDrivePath(
+    db: Prisma.Client,
+    prebuildEventId: bigint,
+    agentInstanceId: bigint,
+  ): Promise<string> {
+    let sourceFsDrivePath: string;
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: prebuildEventId },
+      include: {
+        buildfsEvent: {
+          include: { buildfsEventFiles: { include: { outputFile: true } } },
+        },
+      },
+    });
+    if (prebuildEvent.buildfsEvent != null) {
+      const buildfsEvent = prebuildEvent.buildfsEvent;
+      sourceFsDrivePath = unwrap(
+        buildfsEvent.buildfsEventFiles.find((f) => f.agentInstanceId === agentInstanceId),
+      ).outputFile.path;
+    } else {
+      sourceFsDrivePath = this.agentConfig.defaultWorkspaceRootFs;
+    }
+    return sourceFsDrivePath;
+  }
+
   async createLocalPrebuildEventFiles(args: {
     sourceProjectDrivePath: string;
     outputProjectDrivePath: string;
     sourceFsDrivePath: string;
     outputFsDrivePath: string;
   }): Promise<void> {
+    await waitForPromises([
+      fs.mkdir(path.dirname(args.outputProjectDrivePath), { recursive: true }),
+      fs.mkdir(path.dirname(args.outputFsDrivePath), { recursive: true }),
+    ]);
     await waitForPromises([
       fs.copyFile(args.sourceProjectDrivePath, args.outputProjectDrivePath),
       fs.copyFile(args.sourceFsDrivePath, args.outputFsDrivePath),
@@ -159,6 +188,48 @@ export class PrebuildService {
     });
   }
 
+  async createPrebuildEventFiles(
+    db: Prisma.NonTransactionClient,
+    args: {
+      sourceProjectDrivePath: string;
+      agentInstanceId: bigint;
+      prebuildEventId: bigint;
+    },
+  ): Promise<PrebuildEventFiles> {
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: args.prebuildEventId },
+    });
+    const outputFsDrivePath = path.join(
+      HOST_PERSISTENT_DIR,
+      "fs",
+      `${prebuildEvent.externalId}.ext4`,
+    );
+    const outputProjectDrivePath = path.join(
+      HOST_PERSISTENT_DIR,
+      "project",
+      `${prebuildEvent.externalId}.ext4`,
+    );
+    const sourceFsDrivePath = await this.getSourceFsDrivePath(
+      db,
+      args.prebuildEventId,
+      args.agentInstanceId,
+    );
+    await this.createLocalPrebuildEventFiles({
+      sourceFsDrivePath,
+      sourceProjectDrivePath: args.sourceProjectDrivePath,
+      outputProjectDrivePath,
+      outputFsDrivePath,
+    });
+    return await db.$transaction((tdb) =>
+      this.createDbPrebuildEventFiles(tdb, {
+        outputProjectDrivePath,
+        outputFsDrivePath,
+        agentInstanceId: args.agentInstanceId,
+        prebuildEventId: args.prebuildEventId,
+      }),
+    );
+  }
+
   /**
    * Creates a prebuild event and links all git branches that point to the given git object id to it.
    */
@@ -169,7 +240,6 @@ export class PrebuildService {
       projectId: bigint;
       gitObjectId: bigint;
       gitBranchIds: bigint[];
-      sourceProjectDrivePath: string;
       /** Null if project configuration was not found or did not include image config. */
       buildfsEventId: bigint | null;
       tasks: { command: string; cwd: string }[];
@@ -182,41 +252,6 @@ export class PrebuildService {
       args.buildfsEventId,
       args.tasks,
     );
-
-    const outputFsDrivePath = path.join(
-      HOST_PERSISTENT_DIR,
-      "fs",
-      `${prebuildEvent.externalId}.ext4`,
-    );
-    const outputProjectDrivePath = path.join(
-      HOST_PERSISTENT_DIR,
-      "project",
-      `${prebuildEvent.externalId}.ext4`,
-    );
-    let sourceFsDrivePath: string;
-    if (args.buildfsEventId != null) {
-      const buildfsEvent = await db.buildfsEvent.findUniqueOrThrow({
-        where: { id: args.buildfsEventId },
-        include: { buildfsEventFiles: { include: { outputFile: true } } },
-      });
-      sourceFsDrivePath = unwrap(
-        buildfsEvent.buildfsEventFiles.find((f) => f.agentInstanceId === args.agentInstanceId),
-      ).outputFile.path;
-    } else {
-      sourceFsDrivePath = this.agentConfig.defaultWorkspaceRootFs;
-    }
-    await this.createLocalPrebuildEventFiles({
-      sourceProjectDrivePath: args.sourceProjectDrivePath,
-      outputProjectDrivePath,
-      sourceFsDrivePath,
-      outputFsDrivePath,
-    });
-    await this.createDbPrebuildEventFiles(db, {
-      outputProjectDrivePath,
-      outputFsDrivePath,
-      agentInstanceId: args.agentInstanceId,
-      prebuildEventId: prebuildEvent.id,
-    });
     await this.linkGitBranchesToPrebuildEvent(db, prebuildEvent.id, args.gitBranchIds);
     return prebuildEvent;
   }
@@ -273,9 +308,14 @@ export class PrebuildService {
             ),
           );
           const imageFiles = await waitForPromises(
-            mapOverNull(configs, (c) =>
-              this.agentUtilService.readFile(ssh, c.image.file).toString(),
-            ),
+            mapOverNull(configs, (c, idx) => {
+              const pathToImageFile = path.join(
+                repoPath,
+                args.projectConfigPaths[idx],
+                c.image.file,
+              );
+              return this.agentUtilService.readFile(ssh, pathToImageFile).toString();
+            }),
           );
           const externalFilePaths = await waitForPromises(
             mapOverNull(imageFiles, (fileContent) => {
@@ -288,8 +328,10 @@ export class PrebuildService {
             }),
           );
           const externalFilesHashes = await waitForPromises(
-            mapOverNull(externalFilePaths, (filePaths) => {
-              const absoluteFilePaths = filePaths.map((p) => path.join(repoPath, p));
+            mapOverNull(externalFilePaths, (filePaths, idx) => {
+              const absoluteFilePaths = filePaths.map((p) =>
+                path.join(repoPath, args.projectConfigPaths[idx], p),
+              );
               return this.buildfsService.getSha256FromFiles(ssh, repoPath, absoluteFilePaths);
             }),
           );

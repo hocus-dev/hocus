@@ -73,6 +73,7 @@ CREATE TABLE "GitRepositoryFile" (
 -- CreateTable
 CREATE TABLE "Project" (
     "id" BIGSERIAL NOT NULL,
+    "name" TEXT NOT NULL,
     "gitRepositoryId" BIGINT NOT NULL,
     "rootDirectoryPath" TEXT NOT NULL,
     "environmentVariableSetId" BIGINT NOT NULL,

@@ -34,10 +34,7 @@ export const waitForPromises = async <T>(promises: Iterable<T>): Promise<Awaited
       if (reason instanceof Error) {
         return reason;
       }
-      if (typeof reason === "string") {
-        return new Error(reason);
-      }
-      return new Error("unknown error");
+      return new Error(String(reason));
     });
   if (errors.length > 0) {
     throw new GroupError(errors);

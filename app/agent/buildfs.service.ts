@@ -127,6 +127,9 @@ export class BuildfsService {
         throw new Error("filePath cannot contain newline");
       }
     }
+    if (filePaths.length === 0) {
+      return "";
+    }
     const out = await execSshCmd(
       {
         ssh,
