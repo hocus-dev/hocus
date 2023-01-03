@@ -49,13 +49,14 @@ CREATE TABLE "PrebuildEventToGitBranch" (
 );
 
 -- CreateTable
-CREATE TABLE "BuildfsEventFile" (
+CREATE TABLE "BuildfsEventFiles" (
     "id" BIGSERIAL NOT NULL,
     "buildfsEventId" BIGINT NOT NULL,
-    "fileId" BIGINT NOT NULL,
+    "projectFileId" BIGINT NOT NULL,
+    "outputFileId" BIGINT NOT NULL,
     "agentInstanceId" BIGINT NOT NULL,
 
-    CONSTRAINT "BuildfsEventFile_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "BuildfsEventFiles_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -123,7 +124,7 @@ CREATE UNIQUE INDEX "PrebuildEventFiles_prebuildEventId_agentInstanceId_key" ON 
 CREATE UNIQUE INDEX "PrebuildEventToGitBranch_prebuildEventId_gitBranchId_key" ON "PrebuildEventToGitBranch"("prebuildEventId", "gitBranchId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "BuildfsEventFile_buildfsEventId_agentInstanceId_key" ON "BuildfsEventFile"("buildfsEventId", "agentInstanceId");
+CREATE UNIQUE INDEX "BuildfsEventFiles_buildfsEventId_agentInstanceId_key" ON "BuildfsEventFiles"("buildfsEventId", "agentInstanceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "GitRepositoryFile_gitRepositoryId_fileId_key" ON "GitRepositoryFile"("gitRepositoryId", "fileId");
@@ -186,16 +187,22 @@ ALTER TABLE "PrebuildEventToGitBranch" ADD CONSTRAINT "PrebuildEventToGitBranch_
 ALTER TABLE "BuildfsEvent" ADD CONSTRAINT "BuildfsEvent_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "BuildfsEventFile" ADD CONSTRAINT "BuildfsEventFile_buildfsEventId_fkey" FOREIGN KEY ("buildfsEventId") REFERENCES "BuildfsEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "BuildfsEventFiles" ADD CONSTRAINT "BuildfsEventFiles_buildfsEventId_fkey" FOREIGN KEY ("buildfsEventId") REFERENCES "BuildfsEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "BuildfsEventFile" ADD CONSTRAINT "BuildfsEventFile_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "File"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "BuildfsEventFiles" ADD CONSTRAINT "BuildfsEventFiles_projectFileId_fkey" FOREIGN KEY ("projectFileId") REFERENCES "File"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "BuildfsEventFile" ADD CONSTRAINT "BuildfsEventFile_agentInstanceId_fkey" FOREIGN KEY ("agentInstanceId") REFERENCES "AgentInstance"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "BuildfsEventFiles" ADD CONSTRAINT "BuildfsEventFiles_outputFileId_fkey" FOREIGN KEY ("outputFileId") REFERENCES "File"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "BuildfsEventFile" ADD CONSTRAINT "BuildfsEventFile_fileId_agentInstanceId_fkey" FOREIGN KEY ("fileId", "agentInstanceId") REFERENCES "File"("id", "agentInstanceId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "BuildfsEventFiles" ADD CONSTRAINT "BuildfsEventFiles_agentInstanceId_fkey" FOREIGN KEY ("agentInstanceId") REFERENCES "AgentInstance"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BuildfsEventFiles" ADD CONSTRAINT "BuildfsEventFiles_projectFileId_agentInstanceId_fkey" FOREIGN KEY ("projectFileId", "agentInstanceId") REFERENCES "File"("id", "agentInstanceId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BuildfsEventFiles" ADD CONSTRAINT "BuildfsEventFiles_outputFileId_agentInstanceId_fkey" FOREIGN KEY ("outputFileId", "agentInstanceId") REFERENCES "File"("id", "agentInstanceId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "GitRepositoryFile" ADD CONSTRAINT "GitRepositoryFile_gitRepositoryId_fkey" FOREIGN KEY ("gitRepositoryId") REFERENCES "GitRepository"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

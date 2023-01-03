@@ -88,8 +88,9 @@ test.concurrent(
     const updates = await db.$transaction((tdb) => gitService.updateBranches(tdb, repo.id));
 
     await worker.runUntil(async () => {
+      const workflowId = uuidv4();
       const result = await client.workflow.execute(runBuildfsAndPrebuilds, {
-        workflowId: uuidv4(),
+        workflowId,
         taskQueue: "test",
         retry: { maximumAttempts: 1 },
         args: [

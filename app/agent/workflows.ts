@@ -1,8 +1,15 @@
-import { proxyActivities, uuid4 } from "@temporalio/workflow";
+import { proxyActivities, uuid4, executeChild } from "@temporalio/workflow";
 // the native path module is a restricted import in workflows
 import path from "path-browserify";
 import { waitForPromisesWorkflow } from "~/temporal/utils";
-import { bigintSort, filterNull, mapOverNull, unwrap } from "~/utils.shared";
+import {
+  bigintOrNullSort,
+  bigintSort,
+  filterNull,
+  mapOverNull,
+  unwrap,
+  groupBy,
+} from "~/utils.shared";
 
 import type { createActivities } from "./activities";
 import { HOST_PERSISTENT_DIR } from "./constants";
@@ -59,21 +66,18 @@ export async function runBuildfsAndPrebuilds(
           cacheHash: imageFileHash,
           gitObjectIdx: idx,
           projectIdx,
-          fsFilePath: `${HOST_PERSISTENT_DIR}/buildfs/${uuid4()}.ext4` as const,
+          outputFilePath: `${HOST_PERSISTENT_DIR}/buildfs/${uuid4()}.ext4` as const,
+          projectFilePath: checkedOutPaths[idx],
         };
       });
     }),
   );
   const buildfsEvents = await getOrCreateBuildfsEvents(buildfsEventsArgs);
-  const gitObjectIdsToBranches = new Map<bigint, bigint[]>();
-  for (const branch of branches) {
-    const branchesForGitObjectId = gitObjectIdsToBranches.get(branch.gitObjectId);
-    if (branchesForGitObjectId === undefined) {
-      gitObjectIdsToBranches.set(branch.gitObjectId, [branch.gitBranchId]);
-    } else {
-      branchesForGitObjectId.push(branch.gitBranchId);
-    }
-  }
+  const gitObjectIdsToBranches = groupBy(
+    branches,
+    (b) => b.gitObjectId,
+    (b) => b.gitBranchId,
+  );
   const prebuildEventsArgs = checkedOutResults.map((results, idx) => {
     return results.map((result, projectIdx) => {
       return {
@@ -97,16 +101,33 @@ export async function runBuildfsAndPrebuilds(
       buildfsEvents[idx].event.id;
   }
   const prebuildEventsArgsFlat = prebuildEventsArgs.flat();
-  const _prebuildEvents = await createPrebuildEvents(prebuildEventsArgsFlat);
+  const prebuildEvents = await createPrebuildEvents(prebuildEventsArgsFlat);
+  const buildfsEventsToPrebuilds = Array.from(
+    groupBy(
+      prebuildEvents,
+      (e) => e.buildfsEventId,
+      (e) => e,
+    ).entries(),
+  ).sort(([a, _1], [b, _2]) => bigintOrNullSort(a, b));
+
+  await waitForPromisesWorkflow(
+    buildfsEventsToPrebuilds.map(async ([buildfsEventId, prebuildEvents]) => {
+      if (buildfsEventId != null) {
+        await executeChild(runBuildfs, { args: [buildfsEventId] });
+      }
+      await waitForPromisesWorkflow(
+        prebuildEvents.map((prebuildEvent) =>
+          executeChild(runPrebuild, { args: [prebuildEvent.id] }),
+        ),
+      );
+    }),
+  );
 }
 
-export async function runBuildfs(buildfsEventId: bigint, inputDrivePath: string): Promise<void> {
-  await buildfs({ buildfsEventId, inputDrivePath, outputDriveMaxSizeMiB: 10000 });
+export async function runBuildfs(buildfsEventId: bigint): Promise<void> {
+  await buildfs({ buildfsEventId, outputDriveMaxSizeMiB: 10000 });
 }
 
-export async function runPrebuild(
-  prebuildEventId: bigint,
-  projectDrivePath: string,
-): Promise<void> {
-  await prebuild({ prebuildEventId, projectDrivePath });
+export async function runPrebuild(prebuildEventId: bigint): Promise<void> {
+  await prebuild({ prebuildEventId });
 }

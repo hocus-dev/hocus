@@ -123,33 +123,37 @@ model VmTask {
 }
 
 model BuildfsEvent {
-  id             BigInt             @id @default(autoincrement())
-  vmTask         VmTask             @relation(fields: [vmTaskId], references: [id])
-  vmTaskId       BigInt
+  id                BigInt              @id @default(autoincrement())
+  vmTask            VmTask              @relation(fields: [vmTaskId], references: [id])
+  vmTaskId          BigInt
   /// Relative path to the Dockerfile in the `project` directory of the input drive.
-  dockerfilePath String
+  dockerfilePath    String
   /// Relative path to the build context in the `project` directory of the input drive.
-  contextPath    String
-  cacheHash      String
-  projectId      BigInt
-  project        Project            @relation(fields: [projectId], references: [id])
-  fsFiles        BuildfsEventFile[]
-  prebuildEvents PrebuildEvent[]
+  contextPath       String
+  cacheHash         String
+  projectId         BigInt
+  project           Project             @relation(fields: [projectId], references: [id])
+  buildfsEventFiles BuildfsEventFiles[]
+  prebuildEvents    PrebuildEvent[]
 
   @@index([cacheHash])
 }
 
-model BuildfsEventFile {
+model BuildfsEventFiles {
   id              BigInt        @id @default(autoincrement())
   buildfsEvent    BuildfsEvent  @relation(fields: [buildfsEventId], references: [id])
   buildfsEventId  BigInt
-  file            File          @relation(fields: [fileId], references: [id])
-  fileId          BigInt
+  projectFile     File          @relation("buildfs_event_project_file", fields: [projectFileId], references: [id])
+  projectFileId   BigInt
+  outputFile      File          @relation("buildfs_event_output_file", fields: [outputFileId], references: [id])
+  outputFileId    BigInt
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
 
-  /// Enforce that agentInstanceId and file.agentInstanceId are the same. 
-  fileAgentMatch File @relation("buildfs_event_file_agent_match", fields: [fileId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same. 
+  projectFileAgentMatch File @relation("buildfs_event_project_file_agent_match", fields: [projectFileId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and outputFile.agentInstanceId are the same. 
+  outputFileAgentMatch  File @relation("buildfs_event_output_file_agent_match", fields: [outputFileId, agentInstanceId], references: [id, agentInstanceId])
 
   @@unique([buildfsEventId, agentInstanceId])
 }
@@ -243,7 +247,7 @@ model AgentInstance {
   externalId         String               @unique
   files              File[]
   gitRepositoryFiles GitRepositoryFile[]
-  buildfsEventFiles  BuildfsEventFile[]
+  buildfsEventFiles  BuildfsEventFiles[]
   prebuildEventFiles PrebuildEventFiles[]
 }
 
@@ -255,8 +259,10 @@ model File {
   path                                String
   gitRepositoryFiles                  GitRepositoryFile[]
   gitRepositoryFileAgentMatch         GitRepositoryFile[]  @relation("git_repository_file_agent_match")
-  buildfsEventFiles                   BuildfsEventFile[]
-  buildfsEventFileFileAgentMatch      BuildfsEventFile[]   @relation("buildfs_event_file_agent_match")
+  buildfsEventProjectFiles            BuildfsEventFiles[]  @relation("buildfs_event_project_file")
+  buildfsEventOutputFiles             BuildfsEventFiles[]  @relation("buildfs_event_output_file")
+  buildfsEventProjectFileAgentMatch   BuildfsEventFiles[]  @relation("buildfs_event_project_file_agent_match")
+  buildfsEventOutputFileAgentMatch    BuildfsEventFiles[]  @relation("buildfs_event_output_file_agent_match")
   prebuildEventFsFiles                PrebuildEventFiles[] @relation("prebuild_event_fs_file")
   prebuildEventProjectFiles           PrebuildEventFiles[] @relation("prebuild_event_project_file")
   prebuildEventFsFilesAgentMatch      PrebuildEventFiles[] @relation("prebuild_event_fs_file_agent_match")

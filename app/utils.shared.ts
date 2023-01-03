@@ -63,6 +63,19 @@ export const bigintSort = (a: bigint, b: bigint): number => {
   return 0;
 };
 
+export const bigintOrNullSort = (a: bigint | null, b: bigint | null): number => {
+  if (a === null && b === null) {
+    return 0;
+  }
+  if (a === null) {
+    return -1;
+  }
+  if (b === null) {
+    return 1;
+  }
+  return bigintSort(a, b);
+};
+
 export const mapOverNull = <T, U>(
   values: (T | null | undefined)[],
   fn: (value: T, idx: number) => U,
@@ -72,4 +85,27 @@ export const mapOverNull = <T, U>(
 
 export const filterNull = <T>(values: (T | null | undefined)[]): T[] => {
   return values.filter((value) => value != null) as T[];
+};
+
+export const makeMap = <T, K>(values: T[], fn: (value: T) => K): Map<K, T> => {
+  return new Map(values.map((value) => [fn(value), value]));
+};
+
+export const groupBy = <T, K, V>(
+  arr: Iterable<T>,
+  getKey: (x: T) => K,
+  getItem: (x: T) => V,
+): Map<K, V[]> => {
+  const map = new Map<K, V[]>();
+  for (const item of arr) {
+    const key = getKey(item);
+    const value = getItem(item);
+    const existing = map.get(key);
+    if (existing == null) {
+      map.set(key, [value]);
+    } else {
+      existing.push(value);
+    }
+  }
+  return map;
 };

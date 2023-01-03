@@ -1,6 +1,6 @@
 import path from "path";
 
-import type { BuildfsEvent, BuildfsEventFile, Prisma } from "@prisma/client";
+import type { BuildfsEvent, BuildfsEventFiles, Prisma } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { Add, Copy, DockerfileParser } from "dockerfile-ast";
 import type { NodeSSH } from "node-ssh";
@@ -27,7 +27,15 @@ export class BuildfsService {
 
   async createBuildfsEvent(
     db: Prisma.TransactionClient,
-    args: { contextPath: string; dockerfilePath: string; cacheHash: string; projectId: bigint },
+    args: {
+      agentInstanceId: bigint;
+      projectFilePath: string;
+      outputFilePath: string;
+      contextPath: string;
+      dockerfilePath: string;
+      cacheHash: string;
+      projectId: bigint;
+    },
   ): Promise<BuildfsEvent> {
     const vmTask = await this.agentUtilService.createVmTask(db, {
       command: [
@@ -38,7 +46,7 @@ export class BuildfsService {
       ],
       cwd: this.workdir,
     });
-    return await db.buildfsEvent.create({
+    const buildfsEvent = await db.buildfsEvent.create({
       data: {
         vmTaskId: vmTask.id,
         contextPath: args.contextPath,
@@ -47,22 +55,41 @@ export class BuildfsService {
         projectId: args.projectId,
       },
     });
+    await this.createBuildfsEventFiles(db, {
+      projectFilePath: args.projectFilePath,
+      outputFilePath: args.outputFilePath,
+      agentInstanceId: args.agentInstanceId,
+      buildfsEventId: buildfsEvent.id,
+    });
+    return buildfsEvent;
   }
 
-  async createBuildfsEventFile(
+  async createBuildfsEventFiles(
     db: Prisma.TransactionClient,
-    args: { filePath: string; agentInstanceId: bigint; buildfsEventId: bigint },
-  ): Promise<BuildfsEventFile> {
-    const file = await db.file.create({
+    args: {
+      projectFilePath: string;
+      outputFilePath: string;
+      agentInstanceId: bigint;
+      buildfsEventId: bigint;
+    },
+  ): Promise<BuildfsEventFiles> {
+    const projectFile = await db.file.create({
       data: {
         agentInstanceId: args.agentInstanceId,
-        path: args.filePath,
+        path: args.projectFilePath,
       },
     });
-    return await db.buildfsEventFile.create({
+    const outputFile = await db.file.create({
+      data: {
+        agentInstanceId: args.agentInstanceId,
+        path: args.outputFilePath,
+      },
+    });
+    return await db.buildfsEventFiles.create({
       data: {
         buildfsEventId: args.buildfsEventId,
-        fileId: file.id,
+        projectFileId: projectFile.id,
+        outputFileId: outputFile.id,
         agentInstanceId: args.agentInstanceId,
       },
     });
@@ -130,14 +157,12 @@ export class BuildfsService {
     cacheHash: string,
     agentInstanceId: bigint,
   ): Promise<BuildfsEvent | null> {
-    const buildfsFile = await db.buildfsEventFile.findFirst({
+    const buildfsFile = await db.buildfsEventFiles.findFirst({
       where: {
+        agentInstanceId,
         buildfsEvent: {
           cacheHash,
           projectId,
-        },
-        file: {
-          agentInstanceId,
         },
       },
       include: {
@@ -153,14 +178,18 @@ export class BuildfsService {
   async getOrCreateBuildfsEvent(
     db: Prisma.TransactionClient,
     args: {
+      outputFilePath: string;
+      projectFilePath: string;
       agentInstanceId: bigint;
       contextPath: string;
       dockerfilePath: string;
       cacheHash: string;
-      fsFilePath: string;
       projectId: bigint;
     },
-  ): Promise<{ event: BuildfsEvent; status: "created" | "found" }> {
+  ): Promise<{
+    event: BuildfsEvent;
+    status: "created" | "found";
+  }> {
     const existingEvent = await this.getExistingBuildfsEvent(
       db,
       args.projectId,
@@ -178,8 +207,6 @@ export class BuildfsService {
     db: Prisma.NonTransactionClient;
     firecrackerService: FirecrackerService;
     buildfsEventId: bigint;
-    /** Path to a drive with a Dockerfile. */
-    inputDrivePath: string;
     outputDriveMaxSizeMiB: number;
   }) {
     const agentInstance = await args.db.$transaction((tdb) =>
@@ -188,18 +215,21 @@ export class BuildfsService {
     const buildfsEvent = await args.db.buildfsEvent.findUniqueOrThrow({
       where: { id: args.buildfsEventId },
       include: {
-        fsFiles: {
+        buildfsEventFiles: {
           include: {
-            file: true,
+            outputFile: true,
+            projectFile: true,
           },
         },
       },
     });
-    const outputFile = unwrap(
-      buildfsEvent.fsFiles.find((f) => f.file.agentInstanceId === agentInstance.id),
+    const files = unwrap(
+      buildfsEvent.buildfsEventFiles.find((f) => f.agentInstanceId === agentInstance.id),
     );
+    const outputFile = files.outputFile;
+    const projectFile = files.projectFile;
 
-    this.agentUtilService.createExt4Image(outputFile.file.path, args.outputDriveMaxSizeMiB, true);
+    this.agentUtilService.createExt4Image(outputFile.path, args.outputDriveMaxSizeMiB, true);
 
     const result = await args.firecrackerService.withVM(
       {
@@ -210,8 +240,8 @@ export class BuildfsService {
         kernelPath: this.agentConfig.defaultKernel,
         rootFsPath: this.agentConfig.buildfsRootFs,
         extraDrives: [
-          { pathOnHost: outputFile.file.path, guestMountPath: this.outputDir },
-          { pathOnHost: args.inputDrivePath, guestMountPath: this.inputDir },
+          { pathOnHost: outputFile.path, guestMountPath: this.outputDir },
+          { pathOnHost: projectFile.path, guestMountPath: this.inputDir },
         ],
       },
       async ({ ssh, sshConfig }) => {

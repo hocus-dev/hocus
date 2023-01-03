@@ -197,11 +197,11 @@ export class PrebuildService {
     if (args.buildfsEventId != null) {
       const buildfsEvent = await db.buildfsEvent.findUniqueOrThrow({
         where: { id: args.buildfsEventId },
-        include: { fsFiles: { include: { file: true } } },
+        include: { buildfsEventFiles: { include: { outputFile: true } } },
       });
       sourceFsDrivePath = unwrap(
-        buildfsEvent.fsFiles.find((f) => f.agentInstanceId === args.agentInstanceId),
-      ).file.path;
+        buildfsEvent.buildfsEventFiles.find((f) => f.agentInstanceId === args.agentInstanceId),
+      ).outputFile.path;
     } else {
       sourceFsDrivePath = this.agentConfig.defaultWorkspaceRootFs;
     }

@@ -112,10 +112,7 @@ export const createActivities = async (
    * and the corresponding public key to the private key used to connect to the VM
    * (`agentConfig.prebuildSshPrivateKey`) is already present in the `hocus` user's authorized_keys.
    */
-  const prebuild = async (args: {
-    projectDrivePath: string;
-    prebuildEventId: bigint;
-  }): Promise<VMTaskOutput[]> => {
+  const prebuild = async (args: { prebuildEventId: bigint }): Promise<VMTaskOutput[]> => {
     const runId = uuidv4();
     const instanceId = `prebuild-${runId}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
@@ -126,19 +123,7 @@ export const createActivities = async (
       where: { id: args.prebuildEventId },
       include: {
         tasks: { include: { vmTask: true } },
-        buildfsEvent: {
-          include: {
-            fsFiles: {
-              include: {
-                file: {
-                  include: {
-                    agentInstance: true,
-                  },
-                },
-              },
-            },
-          },
-        },
+        prebuildEventFiles: { include: { agentInstance: true, fsFile: true, projectFile: true } },
         project: {
           include: {
             environmentVariableSet: {
@@ -150,9 +135,9 @@ export const createActivities = async (
         },
       },
     });
-    const fsFile = unwrap(
-      unwrap(prebuildEvent.buildfsEvent).fsFiles.find(
-        (f) => f.file.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
+    const prebuildEventFiles = unwrap(
+      prebuildEvent.prebuildEventFiles.find(
+        (f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
       ),
     );
     const envVariablesLength =
@@ -171,9 +156,12 @@ export const createActivities = async (
           privateKey: agentConfig.prebuildSshPrivateKey,
         },
         kernelPath: agentConfig.defaultKernel,
-        rootFsPath: fsFile.file.path,
+        rootFsPath: prebuildEventFiles.fsFile.path,
         extraDrives: [
-          { pathOnHost: args.projectDrivePath, guestMountPath: prebuildService.devDir },
+          {
+            pathOnHost: prebuildEventFiles.projectFile.path,
+            guestMountPath: prebuildService.devDir,
+          },
         ],
       },
       async ({ ssh, sshConfig }) => {
@@ -302,7 +290,8 @@ export const createActivities = async (
       contextPath: string;
       dockerfilePath: string;
       cacheHash: string | null;
-      fsFilePath: string;
+      outputFilePath: string;
+      projectFilePath: string;
       projectId: bigint;
     }[],
   ): Promise<GetOrCreateBuildfsEventsReturnType> => {
