@@ -115,7 +115,5 @@ test.concurrent(
       });
       expect(result).toBeUndefined();
     });
-
-    console.log("finished!");
   }),
 );

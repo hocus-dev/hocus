@@ -43,7 +43,6 @@ export async function runBuildfsAndPrebuilds(
   gitObjects.sort((a, b) => bigintSort(a.id, b.id));
   projects.sort((a, b) => bigintSort(a.id, b.id));
   await fetchRepository(gitRepositoryId);
-
   const checkedOutPaths = gitObjects.map(
     (o) => `${HOST_PERSISTENT_DIR}/checked-out/${o.hash}.ext4` as const,
   );
@@ -57,7 +56,6 @@ export async function runBuildfsAndPrebuilds(
       }),
     ),
   );
-  console.log(checkedOutResults);
   const buildfsEventsArgs = filterNull(
     checkedOutResults.flatMap((results, idx) => {
       return mapOverNull(results, ({ projectConfig, imageFileHash }, projectIdx) => {
