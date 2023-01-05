@@ -133,9 +133,7 @@ test.concurrent(
     );
     const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
 
-    const { newGitBranches, updatedGitBranches } = await db.$transaction((tdb) =>
-      gitService.updateBranches(tdb, repo.id),
-    );
+    const { newGitBranches, updatedGitBranches } = await gitService.updateBranches(db, repo.id);
     expect(updatedGitBranches.length).toEqual(0);
     expect(newGitBranches.length).not.toEqual(0);
     const repo2 = await db.gitRepository.findUniqueOrThrow({
@@ -152,7 +150,7 @@ test.concurrent(
     gitService.getRemotes = jest.fn().mockResolvedValue(mockRemotes);
 
     const { newGitBranches: newGitBranches2, updatedGitBranches: updatedGitBranches2 } =
-      await db.$transaction((tdb) => gitService.updateBranches(tdb, repo.id));
+      await gitService.updateBranches(db, repo.id);
 
     expect(updatedGitBranches2.length).toEqual(1);
     expect(newGitBranches2.length).toEqual(0);
@@ -232,7 +230,9 @@ test.concurrent(
     );
     const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
 
-    const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(db);
+    const agentInstance = await db.$transaction((tdb) =>
+      agentUtilService.getOrCreateSoloAgentInstance(tdb),
+    );
     const files = await waitForPromises(
       Array.from({ length: 25 }).map(() =>
         db.$transaction((tdb) =>

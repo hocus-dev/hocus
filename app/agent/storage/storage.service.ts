@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 
+import { Mutex } from "async-mutex";
 import lockfile from "proper-lockfile";
 import yaml from "yaml";
 import { Token } from "~/token";
@@ -54,15 +55,21 @@ export class LowLevelStorageService {
 }
 
 export class StorageService {
+  private static mutex = new Mutex();
   static inject = [Token.LowLevelStorageService] as const;
   constructor(private readonly lowLevelStorageService: LowLevelStorageService) {}
 
   async withStorage<T>(fn: (storage: LowLevelStorageService) => Promise<T>): Promise<T> {
-    const release = await this.lowLevelStorageService.lockStorage();
-    try {
-      return await fn(this.lowLevelStorageService);
-    } finally {
-      await release();
-    }
+    // We use a mutex because the same process cannot attempt to lock the same file twice.
+    // If there were two async functions trying to lock the storage file at the same time,
+    // one of them would fail.
+    return await StorageService.mutex.runExclusive(async () => {
+      const release = await this.lowLevelStorageService.lockStorage();
+      try {
+        return await fn(this.lowLevelStorageService);
+      } finally {
+        await release();
+      }
+    });
   }
 }

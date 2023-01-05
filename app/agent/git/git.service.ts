@@ -229,7 +229,7 @@ export class GitService {
   }
 
   async updateBranches(
-    db: Prisma.TransactionClient,
+    db: Prisma.NonTransactionClient,
     gitRepositoryId: bigint,
   ): Promise<{
     newGitBranches: (GitBranch & {
@@ -254,71 +254,73 @@ export class GitService {
       gitRepository.url,
       gitRepository.sshKeyPair.privateKey,
     );
-    await db.$executeRaw`SELECT id FROM "GitRepository" WHERE id = ${gitRepositoryId} FOR UPDATE`;
-    const currentRemotes: GitRemoteInfo[] = gitRepository.gitBranches.map((b) => ({
-      name: b.name,
-      hash: b.gitObject.hash,
-    }));
-    const remoteUpdates = await this.findRemoteUpdates(currentRemotes, newRemotes);
-    const newBranches = remoteUpdates.filter((u) => u.state === "new");
-    const updatedBranches = remoteUpdates.filter((u) => u.state === "updated");
-    const hashes = Array.from(
-      new Set([
-        ...newBranches.map((b) => b.remoteInfo.hash),
-        ...updatedBranches.map((b) => b.remoteInfo.hash),
-      ]),
-    );
-    const gitObjects = await waitForPromises(
-      hashes.map((hash) =>
-        db.gitObject.upsert({
-          create: {
-            hash,
-          },
-          update: {},
-          where: {
-            hash,
-          },
-        }),
-      ),
-    );
-    const gitObjectMap = new Map(gitObjects.map((o) => [o.hash, o]));
-    const newGitBranches = await waitForPromises(
-      newBranches.map((b) =>
-        db.gitBranch.create({
+    return await db.$transaction(async (tdb) => {
+      await tdb.$executeRaw`SELECT id FROM "GitRepository" WHERE id = ${gitRepositoryId} FOR UPDATE`;
+      const currentRemotes: GitRemoteInfo[] = gitRepository.gitBranches.map((b) => ({
+        name: b.name,
+        hash: b.gitObject.hash,
+      }));
+      const remoteUpdates = await this.findRemoteUpdates(currentRemotes, newRemotes);
+      const newBranches = remoteUpdates.filter((u) => u.state === "new");
+      const updatedBranches = remoteUpdates.filter((u) => u.state === "updated");
+      const hashes = Array.from(
+        new Set([
+          ...newBranches.map((b) => b.remoteInfo.hash),
+          ...updatedBranches.map((b) => b.remoteInfo.hash),
+        ]),
+      );
+      const gitObjects = await waitForPromises(
+        hashes.map((hash) =>
+          tdb.gitObject.upsert({
+            create: {
+              hash,
+            },
+            update: {},
+            where: {
+              hash,
+            },
+          }),
+        ),
+      );
+      const gitObjectMap = new Map(gitObjects.map((o) => [o.hash, o]));
+      const newGitBranches = await waitForPromises(
+        newBranches.map((b) =>
+          tdb.gitBranch.create({
+            data: {
+              name: b.remoteInfo.name,
+              gitRepositoryId,
+              gitObjectId: unwrap(gitObjectMap.get(b.remoteInfo.hash)).id,
+            },
+            include: {
+              gitObject: true,
+            },
+          }),
+        ),
+      );
+      const updatedGitBranches = await waitForPromises(
+        updatedBranches.map((b) =>
+          tdb.gitBranch.update({
+            // eslint-disable-next-line camelcase
+            where: { gitRepositoryId_name: { gitRepositoryId, name: b.remoteInfo.name } },
+            data: {
+              gitObjectId: unwrap(gitObjectMap.get(b.remoteInfo.hash)).id,
+            },
+            include: {
+              gitObject: true,
+            },
+          }),
+        ),
+      );
+      if (newGitBranches.length + updatedGitBranches.length > 0) {
+        await tdb.gitRepository.update({
+          where: { id: gitRepositoryId },
           data: {
-            name: b.remoteInfo.name,
-            gitRepositoryId,
-            gitObjectId: unwrap(gitObjectMap.get(b.remoteInfo.hash)).id,
+            lastBranchUpdateAt: new Date(),
           },
-          include: {
-            gitObject: true,
-          },
-        }),
-      ),
-    );
-    const updatedGitBranches = await waitForPromises(
-      updatedBranches.map((b) =>
-        db.gitBranch.update({
-          // eslint-disable-next-line camelcase
-          where: { gitRepositoryId_name: { gitRepositoryId, name: b.remoteInfo.name } },
-          data: {
-            gitObjectId: unwrap(gitObjectMap.get(b.remoteInfo.hash)).id,
-          },
-          include: {
-            gitObject: true,
-          },
-        }),
-      ),
-    );
-    if (newGitBranches.length + updatedGitBranches.length > 0) {
-      await db.gitRepository.update({
-        where: { id: gitRepositoryId },
-        data: {
-          lastBranchUpdateAt: new Date(),
-        },
-      });
-    }
-    return { newGitBranches, updatedGitBranches };
+        });
+      }
+      return { newGitBranches, updatedGitBranches };
+    });
   }
 
   async fetchRepository(

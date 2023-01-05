@@ -119,7 +119,11 @@ export async function runBuildfsAndPrebuilds(
   await waitForPromisesWorkflow(
     buildfsEventsToPrebuilds.map(async ([buildfsEventId, prebuildEvents]) => {
       if (buildfsEventId != null) {
-        await executeChild(runBuildfs, { args: [buildfsEventId] });
+        const buildfsResult = await executeChild(runBuildfs, { args: [buildfsEventId] });
+        if (!buildfsResult.buildSuccessful) {
+          // TODO: cancel prebuilds
+          throw new Error("Buildfs failed");
+        }
       }
       await waitForPromisesWorkflow(
         prebuildEvents.map(async (prebuildEvent) =>
@@ -135,8 +139,8 @@ export async function runBuildfsAndPrebuilds(
   );
 }
 
-export async function runBuildfs(buildfsEventId: bigint): Promise<void> {
-  await buildfs({ buildfsEventId, outputDriveMaxSizeMiB: 10000 });
+export async function runBuildfs(buildfsEventId: bigint): Promise<{ buildSuccessful: boolean }> {
+  return await buildfs({ buildfsEventId, outputDriveMaxSizeMiB: 10000 });
 }
 
 export async function runPrebuild(

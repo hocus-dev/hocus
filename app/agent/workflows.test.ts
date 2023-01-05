@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { printErrors } from "~/test-utils";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
-import { unwrap } from "~/utils.shared";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
 import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
@@ -87,16 +87,25 @@ test.concurrent(
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
     const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
-    const updates = await db.$transaction((tdb) => gitService.updateBranches(tdb, repo.id));
+    const updates = await gitService.updateBranches(db, repo.id);
     await db.$transaction((tdb) =>
-      projectService.createProject(tdb, {
-        gitRepositoryId: repo.id,
-        rootDirectoryPath: "/",
-        name: "test",
-      }),
+      waitForPromises(
+        [
+          { name: "test1", path: "/" },
+          { name: "test2", path: "inner-project" },
+        ].map(({ name, path }) =>
+          projectService.createProject(tdb, {
+            gitRepositoryId: repo.id,
+            rootDirectoryPath: path,
+            name: name,
+          }),
+        ),
+      ),
     );
-    const mainBranch = unwrap(updates.newGitBranches.find((b) => b.name.includes("main")));
-
+    const testBranches = [
+      "refs/heads/run-buildfs-and-prebuilds-test-1",
+      "refs/heads/run-buildfs-and-prebuilds-test-2",
+    ].map((name) => unwrap(updates.newGitBranches.find((b) => b.name === name)));
     await worker.runUntil(async () => {
       const workflowId = uuidv4();
       const result = await client.workflow.execute(runBuildfsAndPrebuilds, {
@@ -105,12 +114,7 @@ test.concurrent(
         retry: { maximumAttempts: 1 },
         args: [
           repo.id,
-          [
-            {
-              gitBranchId: mainBranch.id,
-              gitObjectId: mainBranch.gitObjectId,
-            },
-          ],
+          testBranches.map((b) => ({ gitBranchId: b.id, gitObjectId: b.gitObjectId })),
         ],
       });
       expect(result).toBeUndefined();

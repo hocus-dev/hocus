@@ -13,7 +13,7 @@ import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { VMTaskOutput } from "./agent-util.types";
 import { SOLO_AGENT_INSTANCE_ID, TASK_SCRIPT_TEMPLATE } from "./constants";
-import { execCmd, execSshCmd, sleep, withSsh } from "./utils";
+import { execCmd, execSshCmd, retry, sleep, withSsh } from "./utils";
 
 export class AgentUtilService {
   static inject = [Token.Logger] as const;
@@ -67,9 +67,14 @@ export class AgentUtilService {
     let contents: Buffer | null = null;
     await ssh.withSFTP(async (sftp) => {
       const readFile = promisify(sftp.readFile.bind(sftp));
-      contents = await readFile(path).catch((err) => {
-        throw new Error(`Failed to read file "${path}": ${err?.message}`);
-      });
+      contents = await retry(
+        async () =>
+          readFile(path).catch((err) => {
+            throw new Error(`Failed to read file "${path}": ${err?.message}`);
+          }),
+        5,
+        200,
+      );
     });
     return contents as unknown as Buffer;
   }

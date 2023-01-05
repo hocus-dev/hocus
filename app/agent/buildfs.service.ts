@@ -73,11 +73,19 @@ export class BuildfsService {
       buildfsEventId: bigint;
     },
   ): Promise<BuildfsEventFiles> {
-    const projectFile = await db.file.create({
-      data: {
+    const projectFile = await db.file.upsert({
+      where: {
+        // eslint-disable-next-line camelcase
+        agentInstanceId_path: {
+          agentInstanceId: args.agentInstanceId,
+          path: args.projectFilePath,
+        },
+      },
+      create: {
         agentInstanceId: args.agentInstanceId,
         path: args.projectFilePath,
       },
+      update: {},
     });
     const outputFile = await db.file.create({
       data: {
@@ -211,7 +219,7 @@ export class BuildfsService {
     firecrackerService: FirecrackerService;
     buildfsEventId: bigint;
     outputDriveMaxSizeMiB: number;
-  }) {
+  }): Promise<{ buildSuccessful: boolean }> {
     const agentInstance = await args.db.$transaction((tdb) =>
       this.agentUtilService.getOrCreateSoloAgentInstance(tdb),
     );

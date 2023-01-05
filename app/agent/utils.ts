@@ -175,12 +175,16 @@ export const retry = async <T>(
   fn: () => Promise<T>,
   maxRetries: number,
   retryDelayMs: number,
+  isRetriable: (err: unknown) => boolean = () => true,
 ): Promise<T> => {
   let lastError: unknown = void 0;
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fn();
     } catch (err) {
+      if (!isRetriable(err)) {
+        throw err;
+      }
       lastError = err;
       if (i < maxRetries - 1) {
         await sleep(retryDelayMs);
