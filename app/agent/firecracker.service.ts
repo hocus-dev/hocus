@@ -12,7 +12,7 @@ import type { Config as SSHConfig, NodeSSH } from "node-ssh";
 import { fetch, Agent } from "undici";
 import type { Config } from "~/config";
 import { Token } from "~/token";
-import { unwrap } from "~/utils.shared";
+import { displayError, unwrap } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
 import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "./constants";
@@ -47,6 +47,7 @@ export class FirecrackerService {
   private api: DefaultApi;
   private readonly pathToSocket: string;
   private readonly instanceDir: string;
+  private readonly instanceDirRoot: string;
   private readonly agentConfig: ReturnType<Config["agent"]>;
 
   constructor(
@@ -57,8 +58,9 @@ export class FirecrackerService {
     public readonly instanceId: string,
   ) {
     this.agentConfig = config.agent();
-    this.instanceDir = `/srv/jailer/firecracker/${instanceId}/root`;
-    this.pathToSocket = path.join(this.instanceDir, CHROOT_PATH_TO_SOCK);
+    this.instanceDir = `/srv/jailer/firecracker/${instanceId}`;
+    this.instanceDirRoot = `${this.instanceDir}/root`;
+    this.pathToSocket = path.join(this.instanceDirRoot, CHROOT_PATH_TO_SOCK);
     if (this.pathToSocket.length > MAX_UNIX_SOCKET_PATH_LENGTH) {
       // https://blog.8-p.info/en/2020/06/11/unix-domain-socket-length/
       throw new Error(
@@ -246,14 +248,21 @@ export class FirecrackerService {
   }
 
   private linkToJailerChroot(filePath: string, relativePathInChroot: string): void {
-    const chrootPath = path.join(this.instanceDir, relativePathInChroot);
+    const chrootPath = path.join(this.instanceDirRoot, relativePathInChroot);
     execCmd("ln", filePath, chrootPath);
     execCmd("chown", `${JAILER_USER_ID}:${JAILER_GROUP_ID}`, chrootPath);
   }
 
+  private copyToJailerChroot(filePath: string, relativePathInChroot: string): void {
+    const chrootPath = path.join(this.instanceDirRoot, relativePathInChroot);
+    execCmd("cp", filePath, chrootPath);
+    execCmd("chown", `${JAILER_USER_ID}:${JAILER_GROUP_ID}`, chrootPath);
+  }
+
   /**
-   * Paths to kernel and drives should be absolute. They will be hardlinked to the jailer's
-   * chroot directory and paths supplied to firecracker will be properly modified.
+   * Paths to kernel and drives should be absolute. They will be hardlinked or copied
+   * to the jailer's chroot directory and paths supplied to firecracker will be
+   * properly modified.
    */
   async createVM(cfg: {
     kernelPath: string;
@@ -262,7 +271,18 @@ export class FirecrackerService {
     tapDeviceIp: string;
     tapDeviceName: string;
     tapDeviceCidr: number;
-    extraDrives: PutGuestDriveByIDRequest["body"][];
+    extraDrives: (PutGuestDriveByIDRequest["body"] & {
+      /**
+       * By default the drive is hard linked into a firecracker-managed directory.
+       * If set to to `true`, the drive will be copied instead.
+       * */
+      copy?: boolean;
+    })[];
+    /**
+     * By default the root fs is hard linked into a firecracker-managed directory.
+     * If set to to `true`, the root fs will be copied instead.
+     * */
+    copyRootFs?: boolean;
   }): Promise<FullVmConfiguration> {
     const mask = new Netmask(`255.255.255.255/${cfg.tapDeviceCidr}`).mask;
     const ipArg = `ip=${cfg.vmIp}::${cfg.tapDeviceIp}:${mask}::eth0:off`;
@@ -271,9 +291,19 @@ export class FirecrackerService {
     const chrootRootFsPath = "/rootfs.ext4";
 
     this.linkToJailerChroot(cfg.kernelPath, chrootKernelPath);
-    this.linkToJailerChroot(cfg.rootFsPath, chrootRootFsPath);
+    const shouldCopyRootFs = cfg.copyRootFs ?? false;
+    if (shouldCopyRootFs) {
+      this.copyToJailerChroot(cfg.rootFsPath, chrootRootFsPath);
+    } else {
+      this.linkToJailerChroot(cfg.rootFsPath, chrootRootFsPath);
+    }
     for (const [idx, drive] of cfg.extraDrives.entries()) {
-      this.linkToJailerChroot(drive.pathOnHost, `/drive${idx}`);
+      const shouldCopyFs = drive.copy ?? false;
+      if (shouldCopyFs) {
+        this.copyToJailerChroot(drive.pathOnHost, `/drive${idx}`);
+      } else {
+        this.linkToJailerChroot(drive.pathOnHost, `/drive${idx}`);
+      }
     }
 
     await this.api.putGuestBootSource({
@@ -323,10 +353,11 @@ export class FirecrackerService {
       ssh: Omit<SSHConfig, "host">;
       kernelPath?: string;
       rootFsPath: string;
+      copyRootFs?: boolean;
       /**
        * Paths to extra drives to attach to the VM.
        */
-      extraDrives?: { pathOnHost: string; guestMountPath: string }[];
+      extraDrives?: { pathOnHost: string; guestMountPath: string; copy?: boolean }[];
       /**
        * Defaults to true.
        */
@@ -362,9 +393,11 @@ export class FirecrackerService {
         tapDeviceIp,
         tapDeviceName,
         tapDeviceCidr: TAP_DEVICE_CIDR,
-        extraDrives: extraDrives.map(({ pathOnHost }, idx) => ({
+        copyRootFs: config.copyRootFs,
+        extraDrives: extraDrives.map(({ pathOnHost, copy }, idx) => ({
           driveId: `drive${idx}`,
           pathOnHost: pathOnHost,
+          copy,
           isReadOnly: false,
           isRootDevice: false,
         })),
@@ -396,6 +429,9 @@ export class FirecrackerService {
       if (shouldPoweroff && ipBlockId !== null) {
         await this.releaseVmResources(ipBlockId);
       }
+      if (shouldPoweroff) {
+        await this.tryDeleteVmDir();
+      }
     }
   }
 
@@ -424,6 +460,14 @@ export class FirecrackerService {
       }
     }
     await this.releaseIpBlockId(ipBlockId);
+  }
+
+  async tryDeleteVmDir(): Promise<void> {
+    try {
+      await fsAsync.rm(this.instanceDir, { recursive: true, force: true });
+    } catch (err) {
+      this.logger.error(`failed to delete vm dir ${this.instanceDir}: ${displayError(err)}`);
+    }
   }
 
   changeVMNetworkVisibility(ipBlockId: number, changeTo: "public" | "private"): void {

@@ -292,6 +292,7 @@ export class PrebuildService {
           },
           kernelPath: this.agentConfig.defaultKernel,
           rootFsPath: this.agentConfig.checkoutAndInspectRootFs,
+          copyRootFs: true,
           extraDrives: [{ pathOnHost: args.outputDrivePath, guestMountPath: workdir }],
         },
         async ({ ssh }) => {
