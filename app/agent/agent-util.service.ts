@@ -33,6 +33,11 @@ export class AgentUtilService {
     execCmd("mkfs.ext4", imagePath);
   }
 
+  async expandDriveImage(drivePath: string, appendSizeMiB: number): Promise<void> {
+    execCmd("dd", "if=/dev/zero", `of=${drivePath}`, "bs=1M", "count=0", `seek=${appendSizeMiB}`);
+    execCmd("resize2fs", drivePath);
+  }
+
   getDriveUuid(drivePath: string): string {
     const fileOutput = execCmd("blkid", drivePath).stdout.toString();
     const uuidMatch = fileOutput.match(/UUID="([^"]+)"/);

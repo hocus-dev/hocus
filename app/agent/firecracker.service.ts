@@ -357,7 +357,14 @@ export class FirecrackerService {
       /**
        * Paths to extra drives to attach to the VM.
        */
-      extraDrives?: { pathOnHost: string; guestMountPath: string; copy?: boolean }[];
+      extraDrives?: {
+        pathOnHost: string;
+        guestMountPath: string;
+        /**
+         * If true, the drive will be copied instead of hard linked.
+         */
+        copy?: boolean;
+      }[];
       /**
        * Defaults to true.
        */

@@ -22,7 +22,7 @@ import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 import type { AgentUtilService } from "../agent-util.service";
 import { HOST_PERSISTENT_DIR, PROJECT_DIR } from "../constants";
 import type { FirecrackerService } from "../firecracker.service";
-import { doesFileExist, execCmdWithOpts, execSshCmd } from "../utils";
+import { doesFileExist, execCmdWithOpts, execSshCmd, withFileLock } from "../utils";
 
 import { GitUrlError } from "./error";
 import { RemoteInfoTupleValidator } from "./validator";
@@ -353,75 +353,78 @@ export class GitService {
       this.logger.info(`empty output image created at ${outputDrive.pathOnHost}`);
     }
     const outputDir = "/tmp/output";
-    await firecrackerService.withVM(
-      {
-        ssh: {
-          username: "hocus",
-          password: "hocus",
-        },
-        kernelPath: this.agentConfig.defaultKernel,
-        rootFsPath: this.agentConfig.fetchRepositoryRootFs,
-        extraDrives: [
-          {
-            pathOnHost: outputDrive.pathOnHost,
-            guestMountPath: outputDir,
+    return await withFileLock(outputDrive.pathOnHost, async () => {
+      await firecrackerService.withVM(
+        {
+          ssh: {
+            username: "hocus",
+            password: "hocus",
           },
-        ],
-      },
-      async ({ ssh }) => {
-        const repositoryDir = path.join(outputDir, PROJECT_DIR);
-        const logFilePath = "/tmp/ssh-fetchrepo.log";
-        if (!outputDriveExists) {
-          await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
-        }
-
-        const sshKey = repository.credentials.privateSshKey;
-        const sshDir = "/home/hocus/.ssh";
-        const sshKeyPath = path.join(sshDir, `${uuidv4()}.key`);
-        await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
-        await execSshCmd({ ssh }, ["sudo", "mount", "-t", "tmpfs", "ssh", sshDir]);
-        await execSshCmd({ ssh }, ["sudo", "chown", "hocus:hocus", sshDir]);
-        await execSshCmd({ ssh }, ["chmod", "700", sshDir]);
-        await this.agentUtilService.writeFile(ssh, sshKeyPath, sshKey);
-        await execSshCmd({ ssh }, ["chmod", "400", sshKeyPath]);
-
-        const sshOpts = {
-          execOptions: {
-            env: {
-              // Without this, git will ask for user input and the command will fail.
-              // This is obviously not secure, the correct method would be to
-              // TODO: allow the user to specify a known_hosts file.
-              GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o  UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no`,
-            } as any,
-          },
-        };
-
-        const repositoryExists =
-          (
-            await execSshCmd({ ssh, allowNonZeroExitCode: true }, [
-              "test",
-              "-d",
-              `${repositoryDir}/.git`,
-            ])
-          ).code === 0;
-        if (repositoryExists) {
-          await execSshCmd({ ssh, logFilePath, opts: { ...sshOpts, cwd: repositoryDir } }, [
-            "git",
-            "fetch",
-            "--all",
-          ]);
-        } else {
-          await execSshCmd(
+          kernelPath: this.agentConfig.defaultKernel,
+          rootFsPath: this.agentConfig.fetchRepositoryRootFs,
+          copyRootFs: true,
+          extraDrives: [
             {
-              ssh,
-              logFilePath,
-              opts: sshOpts,
+              pathOnHost: outputDrive.pathOnHost,
+              guestMountPath: outputDir,
             },
-            ["git", "clone", "--no-checkout", repository.url, repositoryDir],
-          );
-        }
-      },
-    );
+          ],
+        },
+        async ({ ssh }) => {
+          const repositoryDir = path.join(outputDir, PROJECT_DIR);
+          const logFilePath = "/tmp/ssh-fetchrepo.log";
+          if (!outputDriveExists) {
+            await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
+          }
+
+          const sshKey = repository.credentials.privateSshKey;
+          const sshDir = "/home/hocus/.ssh";
+          const sshKeyPath = path.join(sshDir, `${uuidv4()}.key`);
+          await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
+          await execSshCmd({ ssh }, ["sudo", "mount", "-t", "tmpfs", "ssh", sshDir]);
+          await execSshCmd({ ssh }, ["sudo", "chown", "hocus:hocus", sshDir]);
+          await execSshCmd({ ssh }, ["chmod", "700", sshDir]);
+          await this.agentUtilService.writeFile(ssh, sshKeyPath, sshKey);
+          await execSshCmd({ ssh }, ["chmod", "400", sshKeyPath]);
+
+          const sshOpts = {
+            execOptions: {
+              env: {
+                // Without this, git will ask for user input and the command will fail.
+                // This is obviously not secure, the correct method would be to
+                // TODO: allow the user to specify a known_hosts file.
+                GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o  UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no`,
+              } as any,
+            },
+          };
+
+          const repositoryExists =
+            (
+              await execSshCmd({ ssh, allowNonZeroExitCode: true }, [
+                "test",
+                "-d",
+                `${repositoryDir}/.git`,
+              ])
+            ).code === 0;
+          if (repositoryExists) {
+            await execSshCmd({ ssh, logFilePath, opts: { ...sshOpts, cwd: repositoryDir } }, [
+              "git",
+              "fetch",
+              "--all",
+            ]);
+          } else {
+            await execSshCmd(
+              {
+                ssh,
+                logFilePath,
+                opts: sshOpts,
+              },
+              ["git", "clone", "--no-checkout", repository.url, repositoryDir],
+            );
+          }
+        },
+      );
+    });
   }
 
   async getOrCreateGitRepositoryFile(

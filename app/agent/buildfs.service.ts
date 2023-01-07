@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import path from "path";
 
 import type { BuildfsEvent, BuildfsEventFiles, Prisma } from "@prisma/client";
@@ -9,8 +10,9 @@ import { Token } from "~/token";
 import { unwrap } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
+import { HOST_PERSISTENT_DIR } from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
-import { execSshCmd } from "./utils";
+import { doesFileExist, execSshCmd, withFileLock } from "./utils";
 
 export class BuildfsService {
   workdir = "/tmp/workdir" as const;
@@ -186,6 +188,21 @@ export class BuildfsService {
     return null;
   }
 
+  /**
+   * Returns the path to the rootfs drive.
+   */
+  private async getOrCreateRootFsDriveForProject(projectExternalId: string): Promise<string> {
+    const drivePath = path.join(HOST_PERSISTENT_DIR, "buildfs-drives", `${projectExternalId}.ext4`);
+    if (await doesFileExist(drivePath)) {
+      return drivePath;
+    }
+    await fs.mkdir(path.dirname(drivePath), { recursive: true });
+    await fs.copyFile(this.agentConfig.buildfsRootFs, drivePath);
+    await this.agentUtilService.expandDriveImage(drivePath, 50000);
+
+    return drivePath;
+  }
+
   async getOrCreateBuildfsEvent(
     db: Prisma.TransactionClient,
     args: {
@@ -232,6 +249,7 @@ export class BuildfsService {
             projectFile: true,
           },
         },
+        project: true,
       },
     });
     const files = unwrap(
@@ -241,35 +259,40 @@ export class BuildfsService {
     const projectFile = files.projectFile;
 
     this.agentUtilService.createExt4Image(outputFile.path, args.outputDriveMaxSizeMiB, true);
-
-    const result = await args.firecrackerService.withVM(
-      {
-        ssh: {
-          username: "root",
-          password: "root",
-        },
-        kernelPath: this.agentConfig.defaultKernel,
-        rootFsPath: this.agentConfig.buildfsRootFs,
-        extraDrives: [
-          { pathOnHost: outputFile.path, guestMountPath: this.outputDir },
-          { pathOnHost: projectFile.path, guestMountPath: this.inputDir },
-        ],
-      },
-      async ({ ssh, sshConfig }) => {
-        const workdir = "/tmp/workdir";
-        const buildfsScriptPath = `${workdir}/bin/buildfs.sh`;
-        await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
-        await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
-        await ssh.putDirectory(this.agentConfig.hostBuildfsResourcesDir, workdir);
-        await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
-
-        const taskResults = await this.agentUtilService.execVmTasks(sshConfig, args.db, [
-          { vmTaskId: buildfsEvent.vmTaskId },
-        ]);
-        return taskResults[0];
-      },
+    const rootfsDrivePath = await this.getOrCreateRootFsDriveForProject(
+      buildfsEvent.project.externalId,
     );
 
-    return { buildSuccessful: result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS };
+    return await withFileLock(rootfsDrivePath, async () => {
+      const result = await args.firecrackerService.withVM(
+        {
+          ssh: {
+            username: "root",
+            password: "root",
+          },
+          kernelPath: this.agentConfig.defaultKernel,
+          rootFsPath: rootfsDrivePath,
+          extraDrives: [
+            { pathOnHost: outputFile.path, guestMountPath: this.outputDir },
+            { pathOnHost: projectFile.path, guestMountPath: this.inputDir },
+          ],
+        },
+        async ({ ssh, sshConfig }) => {
+          const workdir = "/tmp/workdir";
+          const buildfsScriptPath = `${workdir}/bin/buildfs.sh`;
+          await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
+          await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
+          await ssh.putDirectory(this.agentConfig.hostBuildfsResourcesDir, workdir);
+          await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
+
+          const taskResults = await this.agentUtilService.execVmTasks(sshConfig, args.db, [
+            { vmTaskId: buildfsEvent.vmTaskId },
+          ]);
+          return taskResults[0];
+        },
+      );
+
+      return { buildSuccessful: result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS };
+    });
   }
 }
