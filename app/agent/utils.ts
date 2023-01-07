@@ -3,8 +3,10 @@ import { spawnSync } from "child_process";
 import { createHash } from "crypto";
 import fs from "fs";
 
+import { Mutex } from "async-mutex";
 import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from "node-ssh";
 import { NodeSSH } from "node-ssh";
+import lockfile from "proper-lockfile";
 import { Tail } from "tail";
 import type { Object } from "ts-toolbelt";
 import { unwrap } from "~/utils.shared";
@@ -208,4 +210,55 @@ export const doesFileExist = async (filePath: string): Promise<boolean> => {
 
 export const sha256 = (str: Buffer | string): string => {
   return createHash("sha256").update(str).digest("hex");
+};
+
+const lockedFilePaths = new Map<string, { mutex: Mutex; numLocks: number }>();
+export const withFileLock = async <T>(lockFilePath: string, fn: () => Promise<T>): Promise<T> => {
+  const locked1 = lockedFilePaths.get(lockFilePath);
+  if (locked1 != null) {
+    locked1.numLocks++;
+  } else {
+    lockedFilePaths.set(lockFilePath, { mutex: new Mutex(), numLocks: 1 });
+  }
+  const locked2 = unwrap(lockedFilePaths.get(lockFilePath));
+
+  try {
+    return await locked2.mutex.runExclusive(async () => {
+      const unlockFile = await lockfile.lock(lockFilePath);
+      try {
+        return await fn();
+      } finally {
+        await unlockFile();
+      }
+    });
+  } finally {
+    const locked3 = unwrap(lockedFilePaths.get(lockFilePath));
+    locked3.numLocks--;
+    if (locked3.numLocks === 0) {
+      lockedFilePaths.delete(lockFilePath);
+    }
+  }
+};
+
+export const withManyFileLocks = async <T>(
+  /**
+   * Make sure these paths are unique. An error will be thrown if they are not.
+   * Otherwise a deadlock would occur.
+   * */
+  lockFilePaths: string[],
+  fn: () => Promise<T>,
+): Promise<T> => {
+  const seenPaths = new Set<string>();
+
+  let fnComposite = fn;
+  for (const lockFilePath of lockFilePaths) {
+    if (seenPaths.has(lockFilePath)) {
+      throw new Error(`Duplicate lock file path: ${lockFilePath}`);
+    }
+    seenPaths.add(lockFilePath);
+
+    const innerFnCopy = fnComposite;
+    fnComposite = () => withFileLock(lockFilePath, innerFnCopy);
+  }
+  return await fnComposite();
 };
