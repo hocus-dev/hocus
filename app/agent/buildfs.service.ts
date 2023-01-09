@@ -33,18 +33,24 @@ export class BuildfsService {
       agentInstanceId: bigint;
       projectFilePath: string;
       outputFilePath: string;
+      /**
+       * Path to the directory which will be used as context for the docker build.
+       * Relative to the given project's directory.
+       */
       contextPath: string;
+      /** Path to the dockerfile. Relative to the given project's directory. */
       dockerfilePath: string;
       cacheHash: string;
       projectId: bigint;
     },
   ): Promise<BuildfsEvent> {
+    const project = await db.project.findUniqueOrThrow({ where: { id: args.projectId } });
     const vmTask = await this.agentUtilService.createVmTask(db, {
       command: [
         this.buildfsScriptPath,
-        path.join(this.inputDir, "project", args.dockerfilePath),
+        path.join(this.inputDir, "project", project.rootDirectoryPath, args.dockerfilePath),
         this.outputDir,
-        path.join(this.inputDir, "project", args.contextPath),
+        path.join(this.inputDir, "project", project.rootDirectoryPath, args.contextPath),
       ],
       cwd: this.workdir,
     });
@@ -193,14 +199,24 @@ export class BuildfsService {
    */
   private async getOrCreateRootFsDriveForProject(projectExternalId: string): Promise<string> {
     const drivePath = path.join(HOST_PERSISTENT_DIR, "buildfs-drives", `${projectExternalId}.ext4`);
-    if (await doesFileExist(drivePath)) {
-      return drivePath;
-    }
-    await fs.mkdir(path.dirname(drivePath), { recursive: true });
-    await fs.copyFile(this.agentConfig.buildfsRootFs, drivePath);
-    await this.agentUtilService.expandDriveImage(drivePath, 50000);
+    const lockPath = path.join(HOST_PERSISTENT_DIR, "buildfs-drives", `${projectExternalId}.lock`);
+    await fs.appendFile(lockPath, "");
 
-    return drivePath;
+    return await withFileLock(lockPath, async () => {
+      if (await doesFileExist(drivePath)) {
+        return drivePath;
+      }
+      await fs.mkdir(path.dirname(drivePath), { recursive: true });
+      await fs.copyFile(this.agentConfig.buildfsRootFs, drivePath);
+      // We keep the drive image small to reduce the time it takes to copy it.
+      // Copying 50GB would take a long time, like more than 30s. On the other hand,
+      // expansion is fast, like less than a second fast, so we do it here.
+      // Keep in mind that we are adding empty space - when not filled up,
+      // it takes up almost no extra space on the host.
+      await this.agentUtilService.expandDriveImage(drivePath, 50000);
+
+      return drivePath;
+    });
   }
 
   async getOrCreateBuildfsEvent(

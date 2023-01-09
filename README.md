@@ -35,6 +35,12 @@ How to test activities:
 yarn jest --testTimeout 600000 --forceExit app/agent/activities.test.ts
 ```
 
+How to test workflows:
+
+```bash
+yarn jest 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
+```
+
 ## Deployment
 
 First, build your app for production:

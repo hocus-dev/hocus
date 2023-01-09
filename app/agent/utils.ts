@@ -3,6 +3,7 @@ import { spawnSync } from "child_process";
 import { createHash } from "crypto";
 import fs from "fs";
 
+import type { Log } from "@prisma/client";
 import { Mutex } from "async-mutex";
 import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from "node-ssh";
 import { NodeSSH } from "node-ssh";
@@ -261,4 +262,21 @@ export const withManyFileLocks = async <T>(
     fnComposite = () => withFileLock(lockFilePath, innerFnCopy);
   }
   return await fnComposite();
+};
+
+export const logErrors = <T extends (...args: any[]) => Promise<any>>(fn: T): T => {
+  return (async (...args: Parameters<T>) => {
+    try {
+      return await fn(...args);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+      throw err;
+    }
+  }) as T;
+};
+
+/** Sorts the logs argument, concatenates logs, and returns a string. */
+export const parseVmTaskLogs = (logs: Log[]): string => {
+  return Buffer.concat(logs.sort((a, b) => a.idx - b.idx).map((l) => l.content)).toString("utf8");
 };
