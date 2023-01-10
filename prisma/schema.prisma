@@ -11,9 +11,10 @@ datasource db {
 }
 
 model User {
-  id         BigInt @id @default(autoincrement())
-  externalId String @unique
-  gaUserId   String @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id         BigInt      @id @default(autoincrement())
+  externalId String      @unique
+  gaUserId   String      @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  workspaces Workspace[]
 }
 
 enum LogGroupType {
@@ -59,9 +60,11 @@ model PrebuildEvent {
   buildfsEventId BigInt?
   /// Null if project configuration was not found or did not include image config.
   buildfsEvent   BuildfsEvent?              @relation(fields: [buildfsEventId], references: [id])
+  workspaceTasks String[]
 
   createdAt          DateTime             @default(now()) @db.Timestamptz(3)
   prebuildEventFiles PrebuildEventFiles[]
+  workspaces         Workspace[]
 }
 
 model PrebuildEventFiles {
@@ -215,6 +218,7 @@ model GitBranch {
   updatedAt                DateTime                   @updatedAt @db.Timestamptz(3)
   createdAt                DateTime                   @default(now()) @db.Timestamptz(3)
   PrebuildEventToGitBranch PrebuildEventToGitBranch[]
+  Workspace                Workspace[]
 
   @@unique([gitRepositoryId, name])
 }
@@ -251,6 +255,7 @@ model AgentInstance {
   gitRepositoryFiles GitRepositoryFile[]
   buildfsEventFiles  BuildfsEventFiles[]
   prebuildEventFiles PrebuildEventFiles[]
+  workspaces         Workspace[]
 }
 
 model File {
@@ -269,6 +274,10 @@ model File {
   prebuildEventProjectFiles           PrebuildEventFiles[] @relation("prebuild_event_project_file")
   prebuildEventFsFilesAgentMatch      PrebuildEventFiles[] @relation("prebuild_event_fs_file_agent_match")
   prebuildEventProjectFilesAgentMatch PrebuildEventFiles[] @relation("prebuild_event_project_file_agent_match")
+  workspacesRootFs                    Workspace[]          @relation("workspace_project_file")
+  workspacesProject                   Workspace[]          @relation("workspace_root_fs_file")
+  workspaceRootfsFileAgentMatch       Workspace[]          @relation("workspace_root_fs_file_agent_match")
+  workspaceProjectFileAgentMatch      Workspace[]          @relation("workspace_project_file_agent_match")
 
   @@unique([id, agentInstanceId])
   @@unique([agentInstanceId, path])
@@ -291,4 +300,39 @@ model EnvironmentVariableSet {
   environmentVariables EnvironmentVariable[]
   projects             Project[]
   createdAt            DateTime              @default(now()) @db.Timestamptz(3)
+}
+
+enum WorkspaceStatus {
+  WORKSPACE_STATUS_PENDING_CREATE
+  WORKSPACE_STATUS_STOPPED
+  WORKSPACE_STATUS_PENDING_START
+  WORKSPACE_STATUS_STARTED
+  WORKSPACE_STATUS_PENDING_STOP
+}
+
+model Workspace {
+  id              BigInt          @id @default(autoincrement())
+  externalId      String
+  name            String
+  userId          BigInt
+  user            User            @relation(fields: [userId], references: [id])
+  prebuildEventId BigInt
+  prebuildEvent   PrebuildEvent   @relation(fields: [prebuildEventId], references: [id])
+  gitBranchId     BigInt
+  gitBranch       GitBranch       @relation(fields: [gitBranchId], references: [id])
+  rootFsFileId    BigInt
+  rootFsFile      File            @relation("workspace_root_fs_file", fields: [rootFsFileId], references: [id])
+  projectFileId   BigInt
+  projectFile     File            @relation("workspace_project_file", fields: [projectFileId], references: [id])
+  agentInstanceId BigInt
+  agentInstance   AgentInstance   @relation(fields: [agentInstanceId], references: [id])
+  status          WorkspaceStatus
+
+  /// Enforce that agentInstanceId and rootFsFile.agentInstanceId are the same.
+  rootFsFileAgentMatch  File @relation("workspace_root_fs_file_agent_match", fields: [rootFsFileId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same.
+  projectFileAgentMatch File @relation("workspace_project_file_agent_match", fields: [projectFileId, agentInstanceId], references: [id, agentInstanceId])
+
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  lastOpenedAt DateTime @default(now()) @db.Timestamptz(3)
 }

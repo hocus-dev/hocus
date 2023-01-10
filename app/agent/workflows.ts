@@ -90,9 +90,11 @@ export async function runBuildfsAndPrebuilds(
           result === null
             ? []
             : result.projectConfig.tasks.map((task) => ({
-                command: task.command,
+                command: task.init,
                 cwd: path.join(PREBUILD_REPOSITORY_DIR, projects[projectIdx].rootDirectoryPath),
               })),
+        workspaceTasks:
+          result === null ? [] : result.projectConfig.tasks.map((task) => task.command),
       };
     });
   });

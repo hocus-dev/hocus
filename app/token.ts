@@ -23,4 +23,6 @@ export const Token = {
   BuildfsService: "BuildfsServiceT",
   GitService: "GitServiceT",
   ProjectService: "ProjectServiceT",
+  WorkspaceService: "WorkspaceServiceT",
+  WorkspaceAgentService: "WorkspaceAgentServiceT",
 } as const;

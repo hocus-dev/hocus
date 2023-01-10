@@ -52,6 +52,7 @@
     "tail": "^2.2.4",
     "typed-inject": "^3.0.1",
     "undici": "^5.11.0",
+    "unique-names-generator": "^4.7.1",
     "winston": "^3.8.1",
     "yaml": "^2.1.3"
   },

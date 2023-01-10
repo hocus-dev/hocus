@@ -1,4 +1,12 @@
-import type { GitObject, PrebuildEvent, PrebuildEventFiles, Prisma, Project } from "@prisma/client";
+import type {
+  GitObject,
+  PrebuildEvent,
+  PrebuildEventFiles,
+  Prisma,
+  Project,
+  Workspace,
+} from "@prisma/client";
+import { WorkspaceStatus } from "@prisma/client";
 import type { Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
@@ -186,6 +194,40 @@ export const createActivities = async (
     );
   };
 
+  const createWorkspace = async (args: {
+    name: string;
+    prebuildEventId: bigint;
+    gitBranchId: bigint;
+    userId: bigint;
+    externalId: string;
+  }): Promise<Workspace> => {
+    const workspaceService = injector.resolve(Token.WorkspaceService);
+    const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
+    const agentUtilService = injector.resolve(Token.AgentUtilService);
+
+    const workspace = await db.$transaction(async (tdb): Promise<Workspace> => {
+      const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(tdb);
+
+      return await workspaceService.createWorkspaceInDb(tdb, {
+        externalId: args.externalId,
+        gitBranchId: args.gitBranchId,
+        name: args.name,
+        prebuildEventId: args.prebuildEventId,
+        userId: args.userId,
+        agentInstanceId: agentInstance.id,
+      });
+    });
+
+    await workspaceAgentService.createWorkspaceFiles(db, workspace.id);
+    await workspaceService.changeWorkspaceStatus(
+      db,
+      workspace.id,
+      WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+    );
+
+    return workspace;
+  };
+
   type StartWorkspaceReturnValue = {
     firecrackerProcessPid: number;
     vmIp: string;
@@ -206,9 +248,9 @@ export const createActivities = async (
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const sshGatewayService = injector.resolve(Token.SSHGatewayService);
-    const devDir = "/home/hocus/dev";
-    const repositoryDir = `${devDir}/project`;
-    const scriptsDir = `${devDir}/.hocus/command`;
+    const devDir = "/home/hocus/dev" as const;
+    const repositoryDir = `${devDir}/project` as const;
+    const scriptsDir = `${devDir}/.hocus/command` as const;
 
     return await firecrackerService.withVM(
       {
@@ -224,8 +266,8 @@ export const createActivities = async (
       async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
         const taskFn = async (task: string, taskIdx: number): Promise<number> => {
           const script = agentUtilService.generateTaskScript(task);
-          const scriptPath = `${scriptsDir}/task-${taskIdx}.sh`;
-          const logPath = `${scriptsDir}/task-${taskIdx}.log`;
+          const scriptPath = `${scriptsDir}/task-${taskIdx}.sh` as const;
+          const logPath = `${scriptsDir}/task-${taskIdx}.log` as const;
           await execSshCmd({ ssh }, ["mkdir", "-p", scriptsDir]);
           await agentUtilService.writeFile(ssh, scriptPath, script);
 
@@ -321,6 +363,7 @@ export const createActivities = async (
       buildfsEventId: bigint | null;
       sourceProjectDrivePath: string;
       tasks: { command: string; cwd: string }[];
+      workspaceTasks: string[];
     }[],
   ): Promise<PrebuildEvent[]> => {
     const prebuildService = injector.resolve(Token.PrebuildService);
@@ -363,5 +406,6 @@ export const createActivities = async (
     getOrCreateBuildfsEvents,
     createPrebuildEvents,
     createPrebuildFiles,
+    createWorkspace,
   };
 };
