@@ -5,10 +5,12 @@ import path from "path";
 
 import type { DefaultLogger } from "@temporalio/worker";
 import type { FullVmConfiguration, PutGuestDriveByIDRequest } from "firecracker-client";
+import { FetchError } from "firecracker-client";
 import { InstanceActionInfoActionTypeEnum } from "firecracker-client";
 import { Configuration, DefaultApi } from "firecracker-client";
 import { Netmask } from "netmask";
 import type { Config as SSHConfig, NodeSSH } from "node-ssh";
+import { match } from "ts-pattern";
 import { fetch, Agent } from "undici";
 import type { Config } from "~/config";
 import { Token } from "~/token";
@@ -20,6 +22,8 @@ import { FifoFlags } from "./fifo-flags";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import type { StorageService } from "./storage/storage.service";
 import { execCmd, retry, watchFileUntilLineMatches, withSsh } from "./utils";
+import type { VmInfo } from "./vm-info.validator";
+import { VmInfoValidator } from "./vm-info.validator";
 
 const IP_PREFIX = "10.231.";
 const NS_PREFIX = ["ip", "netns", "exec", "vms"] as const;
@@ -48,6 +52,7 @@ export class FirecrackerService {
   private readonly pathToSocket: string;
   private readonly instanceDir: string;
   private readonly instanceDirRoot: string;
+  private readonly vmInfoFilePath: string;
   private readonly agentConfig: ReturnType<Config["agent"]>;
 
   constructor(
@@ -60,6 +65,7 @@ export class FirecrackerService {
     this.agentConfig = config.agent();
     this.instanceDir = `/srv/jailer/firecracker/${instanceId}`;
     this.instanceDirRoot = `${this.instanceDir}/root`;
+    this.vmInfoFilePath = `${this.instanceDirRoot}/vm-info.json`;
     this.pathToSocket = path.join(this.instanceDirRoot, CHROOT_PATH_TO_SOCK);
     if (this.pathToSocket.length > MAX_UNIX_SOCKET_PATH_LENGTH) {
       // https://blog.8-p.info/en/2020/06/11/unix-domain-socket-length/
@@ -345,7 +351,55 @@ export class FirecrackerService {
     });
     const vmConfig = await this.api.getExportVmConfig();
     this.logger.info(`vm started: ${JSON.stringify(vmConfig, null, 2)}`);
+
     return vmConfig;
+  }
+
+  async writeVmInfoFile(args: { pid: number; ipBlockId: number }): Promise<void> {
+    const vmInfo: VmInfo = {
+      ...args,
+      instanceId: this.instanceId,
+    };
+    await fsAsync.writeFile(this.vmInfoFilePath, JSON.stringify(vmInfo));
+  }
+
+  async readVmInfoFile(): Promise<VmInfo> {
+    const contents = await fsAsync.readFile(this.vmInfoFilePath);
+    return VmInfoValidator.Parse(JSON.parse(contents.toString()));
+  }
+
+  /**
+   * If the instance files are on disk, returns the result object.
+   * If the instance does not exist on disk, returns null.
+   * */
+  async getVMInfo(): Promise<{ status: "on" | "off" | "paused"; info: VmInfo } | null> {
+    const info = await this.readVmInfoFile().catch((err) => {
+      if (err?.code === "ENOENT") {
+        return null;
+      }
+      throw err;
+    });
+    if (info === null) {
+      return null;
+    }
+    const state = await this.api
+      .describeInstance()
+      .then((res) => res.state)
+      .catch((err) => {
+        if (err instanceof FetchError && (err.cause as any)?.cause?.code === "ECONNREFUSED") {
+          return null;
+        }
+        throw err;
+      });
+    return {
+      status: match(state)
+        .with("Running", () => "on" as const)
+        .with("Paused", () => "paused" as const)
+        .with("Not started", () => "off" as const)
+        .with(null, () => "off" as const)
+        .exhaustive(),
+      info,
+    };
   }
 
   async withVM<T>(
@@ -369,6 +423,8 @@ export class FirecrackerService {
        * Defaults to true.
        */
       shouldPoweroff?: boolean;
+      /** Defaults to true. */
+      removeVmDirAfterPoweroff?: boolean;
     },
     fn: (args: {
       ssh: NodeSSH;
@@ -410,6 +466,7 @@ export class FirecrackerService {
         })),
       });
       vmStarted = true;
+      await this.writeVmInfoFile({ pid: fcPid, ipBlockId });
       const sshConfig = { ...config.ssh, host: vmIp };
       return await withSsh(sshConfig, async (ssh) => {
         const useSudo = config.ssh.username !== "root";
@@ -436,7 +493,7 @@ export class FirecrackerService {
       if (shouldPoweroff && ipBlockId !== null) {
         await this.releaseVmResources(ipBlockId);
       }
-      if (shouldPoweroff) {
+      if (shouldPoweroff && config.removeVmDirAfterPoweroff !== false) {
         await this.tryDeleteVmDir();
       }
     }

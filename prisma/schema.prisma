@@ -311,22 +311,24 @@ enum WorkspaceStatus {
 }
 
 model Workspace {
-  id              BigInt          @id @default(autoincrement())
-  externalId      String
-  name            String
-  userId          BigInt
-  user            User            @relation(fields: [userId], references: [id])
-  prebuildEventId BigInt
-  prebuildEvent   PrebuildEvent   @relation(fields: [prebuildEventId], references: [id])
-  gitBranchId     BigInt
-  gitBranch       GitBranch       @relation(fields: [gitBranchId], references: [id])
-  rootFsFileId    BigInt
-  rootFsFile      File            @relation("workspace_root_fs_file", fields: [rootFsFileId], references: [id])
-  projectFileId   BigInt
-  projectFile     File            @relation("workspace_project_file", fields: [projectFileId], references: [id])
-  agentInstanceId BigInt
-  agentInstance   AgentInstance   @relation(fields: [agentInstanceId], references: [id])
-  status          WorkspaceStatus
+  id               BigInt             @id @default(autoincrement())
+  externalId       String
+  name             String
+  userId           BigInt
+  user             User               @relation(fields: [userId], references: [id])
+  prebuildEventId  BigInt
+  prebuildEvent    PrebuildEvent      @relation(fields: [prebuildEventId], references: [id])
+  gitBranchId      BigInt
+  gitBranch        GitBranch          @relation(fields: [gitBranchId], references: [id])
+  rootFsFileId     BigInt
+  rootFsFile       File               @relation("workspace_root_fs_file", fields: [rootFsFileId], references: [id])
+  projectFileId    BigInt
+  projectFile      File               @relation("workspace_project_file", fields: [projectFileId], references: [id])
+  agentInstanceId  BigInt
+  agentInstance    AgentInstance      @relation(fields: [agentInstanceId], references: [id])
+  status           WorkspaceStatus
+  activeInstanceId BigInt?
+  activeInstance   WorkspaceInstance? @relation(fields: [activeInstanceId], references: [id])
 
   /// Enforce that agentInstanceId and rootFsFile.agentInstanceId are the same.
   rootFsFileAgentMatch  File @relation("workspace_root_fs_file_agent_match", fields: [rootFsFileId, agentInstanceId], references: [id, agentInstanceId])
@@ -335,4 +337,12 @@ model Workspace {
 
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   lastOpenedAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model WorkspaceInstance {
+  id                    BigInt      @id @default(autoincrement())
+  firecrackerInstanceId String
+  vmIp                  String
+  monitoringWorkflowId  String
+  workspaces            Workspace[]
 }

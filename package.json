@@ -50,6 +50,7 @@
     "react-dom": "^17.0.2",
     "sshpk": "^1.17.0",
     "tail": "^2.2.4",
+    "ts-pattern": "^4.1.2",
     "typed-inject": "^3.0.1",
     "undici": "^5.11.0",
     "unique-names-generator": "^4.7.1",

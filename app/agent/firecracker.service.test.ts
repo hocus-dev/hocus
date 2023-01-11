@@ -1,5 +1,6 @@
 import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
+import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
 
 import { createAgentInjector } from "./agent-injector";
@@ -18,7 +19,7 @@ const provideInjector = (
     } as unknown as any,
   });
   const runId = uuidv4();
-  return async () => {
+  return printErrors(async () => {
     try {
       await testFn({ injector, runId });
     } catch (err) {
@@ -28,7 +29,7 @@ const provideInjector = (
     } finally {
       await injector.dispose();
     }
-  };
+  });
 };
 
 test.concurrent(
@@ -63,5 +64,42 @@ test.concurrent(
       tapDeviceIp: "10.231.255.253",
       vmIp: "10.231.255.254",
     });
+  }),
+);
+
+test.concurrent(
+  "getVMInfo",
+  provideInjector(async ({ injector }) => {
+    const instanceId = uuidv4();
+    const fcService = injector.resolve(Token.FirecrackerService)(instanceId);
+    const agentConfig = injector.resolve(Token.Config).agent();
+
+    const vmInfo = await fcService.withVM(
+      {
+        ssh: {
+          username: "hocus",
+          password: "hocus",
+        },
+        kernelPath: agentConfig.defaultKernel,
+        rootFsPath: agentConfig.fetchRepositoryRootFs,
+        copyRootFs: true,
+        removeVmDirAfterPoweroff: false,
+      },
+      async () => {
+        return await fcService.getVMInfo();
+      },
+    );
+    expect(vmInfo).not.toBeNull();
+    expect(vmInfo?.status).toBe("on");
+    expect(vmInfo?.info.instanceId).toBe(instanceId);
+
+    const vmInfo2 = await fcService.getVMInfo();
+    expect(vmInfo2).not.toBeNull();
+    expect(vmInfo2?.info).toEqual(vmInfo?.info);
+
+    await fcService.tryDeleteVmDir();
+
+    const vmInfo3 = await fcService.getVMInfo();
+    expect(vmInfo3).toBeNull();
   }),
 );

@@ -10468,6 +10468,11 @@ ts-node@^10.8.1, ts-node@^10.9.1:
     v8-compile-cache-lib "^3.0.1"
     yn "3.1.1"
 
+ts-pattern@^4.1.2:
+  version "4.1.2"
+  resolved "https://registry.yarnpkg.com/ts-pattern/-/ts-pattern-4.1.2.tgz#27968615b9344735b0b825aab3d5463af9a27cc0"
+  integrity sha512-R/NEQHgeQwiyQyD5++s8rVB6jC1c6KiHHac2GEm0Pf82p3dth7s/kZfSimcUkVLjz+bPJn12721Vw9sbMpY5Rw==
+
 ts-sinon@^2.0.2:
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/ts-sinon/-/ts-sinon-2.0.2.tgz#9e020ad1e76b41e71cb7344b71923dbc3c6bc7ca"

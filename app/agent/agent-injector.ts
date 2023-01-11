@@ -43,10 +43,6 @@ export const createAgentInjector = (
     .provideClass(Token.StorageService, overrides[Token.StorageService] ?? StorageService)
     .provideClass(Token.AgentUtilService, overrides[Token.AgentUtilService] ?? AgentUtilService)
     .provideClass(Token.WorkspaceService, overrides[Token.WorkspaceService] ?? WorkspaceService)
-    .provideClass(
-      Token.WorkspaceAgentService,
-      overrides[Token.WorkspaceAgentService] ?? WorkspaceAgentService,
-    )
     .provideClass(Token.GitService, overrides[Token.GitService] ?? GitService)
     .provideClass(Token.ProjectService, overrides[Token.ProjectService] ?? ProjectService)
     .provideClass(
@@ -59,5 +55,9 @@ export const createAgentInjector = (
     .provideFactory(
       Token.FirecrackerService,
       overrides[Token.FirecrackerService] ?? factoryFirecrackerService,
+    )
+    .provideClass(
+      Token.WorkspaceAgentService,
+      overrides[Token.WorkspaceAgentService] ?? WorkspaceAgentService,
     );
 export type AgentInjector = ReturnType<typeof createAgentInjector>;

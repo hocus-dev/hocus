@@ -16,9 +16,9 @@ import type { createAgentInjector } from "./agent-injector";
 import type { VMTaskOutput } from "./agent-util.types";
 import type { BuildfsService } from "./buildfs.service";
 import { SOLO_AGENT_INSTANCE_ID } from "./constants";
-import { PidValidator } from "./pid.validator";
 import type { PrebuildService } from "./prebuild.service";
 import { execSshCmd, randomString } from "./utils";
+import { WorkspaceAgentService } from "./workspace-agent.service";
 
 export const createActivities = async (
   injector: ReturnType<typeof createAgentInjector>,
@@ -56,9 +56,10 @@ export const createActivities = async (
     );
   };
 
-  const buildfs = async (
-    args: Omit<Parameters<BuildfsService["buildfs"]>[0], "db" | "firecrackerService">,
-  ): Promise<{ buildSuccessful: boolean }> => {
+  const buildfs = async (args: {
+    buildfsEventId: bigint;
+    outputDriveMaxSizeMiB: number;
+  }): Promise<{ buildSuccessful: boolean }> => {
     const instanceId = `buildfs-${uuidv4()}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const buildfsService = injector.resolve(Token.BuildfsService);
@@ -228,79 +229,16 @@ export const createActivities = async (
     return workspace;
   };
 
-  type StartWorkspaceReturnValue = {
-    firecrackerProcessPid: number;
-    vmIp: string;
-    vmInstanceId: string;
-    ipBlockId: number;
-    taskPids: number[];
-  };
+  // const startWorkspace = async (args: {
+  //   workspaceId: string;
+  // }): ReturnType<WorkspaceAgentService["startWorkspace"]> => {
+  //   const monitoringWorkflowId = uuidv4();
+  //   const fcInstanceId = `startvm-${monitoringWorkflowId}` as const;
+  //   const ;
 
-  const startWorkspace = async (args: {
-    runId?: string;
-    filesystemDrivePath: string;
-    projectDrivePath: string;
-    authorizedKeys: string[];
-    tasks: string[];
-  }): Promise<StartWorkspaceReturnValue> => {
-    const runId = args.runId ?? uuidv4();
-    const instanceId = `startvm-${runId}`;
-    const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
-    const agentUtilService = injector.resolve(Token.AgentUtilService);
-    const sshGatewayService = injector.resolve(Token.SSHGatewayService);
-    const devDir = "/home/hocus/dev" as const;
-    const repositoryDir = `${devDir}/project` as const;
-    const scriptsDir = `${devDir}/.hocus/command` as const;
-
-    return await firecrackerService.withVM(
-      {
-        ssh: {
-          username: "hocus",
-          privateKey: agentConfig.prebuildSshPrivateKey,
-        },
-        kernelPath: agentConfig.defaultKernel,
-        rootFsPath: args.filesystemDrivePath,
-        extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: devDir }],
-        shouldPoweroff: false,
-      },
-      async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
-        const taskFn = async (task: string, taskIdx: number): Promise<number> => {
-          const script = agentUtilService.generateTaskScript(task);
-          const scriptPath = `${scriptsDir}/task-${taskIdx}.sh` as const;
-          const logPath = `${scriptsDir}/task-${taskIdx}.log` as const;
-          await execSshCmd({ ssh }, ["mkdir", "-p", scriptsDir]);
-          await agentUtilService.writeFile(ssh, scriptPath, script);
-
-          const result = await execSshCmd({ ssh, opts: { cwd: repositoryDir } }, [
-            "bash",
-            "-o",
-            "pipefail",
-            "-o",
-            "errexit",
-            "-c",
-            `bash "${scriptPath}" > "${logPath}" 2>&1 & echo "$!"`,
-          ]);
-          return Number(PidValidator.Parse(result.stdout));
-        };
-        const authorizedKeys = args.authorizedKeys.map((key) => key.trim());
-        await agentUtilService.writeFile(
-          ssh,
-          "/home/hocus/.ssh/authorized_keys",
-          authorizedKeys.join("\n") + "\n",
-        );
-        const taskPids = await Promise.all(args.tasks.map(taskFn));
-        await firecrackerService.changeVMNetworkVisibility(ipBlockId, "public");
-        await sshGatewayService.addPublicKeysToAuthorizedKeys(authorizedKeys);
-        return {
-          firecrackerProcessPid: firecrackerPid,
-          vmIp,
-          taskPids,
-          ipBlockId,
-          vmInstanceId: instanceId,
-        };
-      },
-    );
-  };
+  //   const firecrackerService = injector.resolve(Token.FirecrackerService)(args.fcInstanceId);
+  //   const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
+  // };
 
   const stopWorkspace = async (args: { instanceId: string; ipBlockId: number }): Promise<void> => {
     const firecrackerService = injector.resolve(Token.FirecrackerService)(args.instanceId);
@@ -400,7 +338,7 @@ export const createActivities = async (
     buildfs,
     checkoutAndInspect,
     prebuild,
-    startWorkspace,
+    // startWorkspace,
     stopWorkspace,
     getProjectsAndGitObjects,
     getOrCreateBuildfsEvents,
