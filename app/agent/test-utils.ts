@@ -1,6 +1,10 @@
+import type { SpawnSyncReturns } from "child_process";
+import fs from "fs/promises";
+
 import type { Prisma } from "@prisma/client";
 import { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH } from "node-ssh";
+import { v4 as uuidv4 } from "uuid";
 import type { Config } from "~/config";
 import { printErrors, provideRunId } from "~/test-utils";
 import { provideDb } from "~/test-utils/db.server";
@@ -8,6 +12,8 @@ import { Token } from "~/token";
 
 import { createAgentInjector } from "./agent-injector";
 import type { FirecrackerService } from "./firecracker.service";
+import { SSH_PROXY_IP } from "./test-constants";
+import { execCmd } from "./utils";
 
 export const withTestMount = async <T>(
   fcService: FirecrackerService,
@@ -58,4 +64,35 @@ export const provideInjectorAndDb = (
   }) => Promise<void>,
 ): (() => Promise<void>) => {
   return provideInjector(({ injector }) => provideDb((db) => testFn({ injector, db }))());
+};
+
+export const execSshCmdThroughProxy = async (args: {
+  vmIp: string;
+  privateKey: string;
+  cmd: string;
+}): Promise<SpawnSyncReturns<Buffer>> => {
+  const keyPath = `/tmp/${uuidv4()}.key` as const;
+  try {
+    await fs.writeFile(keyPath, args.privateKey);
+    execCmd("chmod", "600", keyPath);
+    return execCmd(
+      "ip",
+      "netns",
+      "exec",
+      "tst",
+      "ssh",
+      "-o",
+      `ProxyCommand=ssh -W %h:%p -o StrictHostKeyChecking=no -i ${keyPath} sshgateway@${SSH_PROXY_IP}`,
+      "-o",
+      "StrictHostKeyChecking=no",
+      "-i",
+      keyPath,
+      `hocus@${args.vmIp}`,
+      args.cmd,
+    );
+  } finally {
+    await fs.unlink(keyPath).catch((_) => {
+      // do nothing
+    });
+  }
 };

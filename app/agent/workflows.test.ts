@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { printErrors } from "~/test-utils";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
+import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
@@ -14,6 +15,7 @@ import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "./test-constants";
+import { execSshCmdThroughProxy } from "./test-utils";
 import {
   runBuildfsAndPrebuilds,
   runCreateWorkspace,
@@ -161,12 +163,20 @@ test.concurrent(
           },
         ],
       });
-      await client.workflow.execute(runStartWorkspace, {
+      const workspaceInstance = await client.workflow.execute(runStartWorkspace, {
         workflowId: uuidv4(),
         taskQueue: "test",
         retry: { maximumAttempts: 1 },
         args: [workspace.id],
       });
+
+      const sshOutput = await execSshCmdThroughProxy({
+        vmIp: workspaceInstance.vmIp,
+        privateKey: TEST_USER_PRIVATE_SSH_KEY,
+        cmd: `cat /home/hocus/dev/project/proxy-test.txt`,
+      });
+      expect(sshOutput.stdout.toString()).toEqual("hello from the tests repository!\n");
+
       await client.workflow.execute(runStopWorkspace, {
         workflowId: uuidv4(),
         taskQueue: "test",
