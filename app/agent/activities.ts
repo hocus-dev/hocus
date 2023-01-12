@@ -5,6 +5,7 @@ import type {
   Prisma,
   Project,
   Workspace,
+  WorkspaceInstance,
 } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import type { Any } from "ts-toolbelt";
@@ -18,7 +19,6 @@ import type { BuildfsService } from "./buildfs.service";
 import { SOLO_AGENT_INSTANCE_ID } from "./constants";
 import type { PrebuildService } from "./prebuild.service";
 import { execSshCmd, randomString } from "./utils";
-import { WorkspaceAgentService } from "./workspace-agent.service";
 
 export const createActivities = async (
   injector: ReturnType<typeof createAgentInjector>,
@@ -202,14 +202,13 @@ export const createActivities = async (
     userId: bigint;
     externalId: string;
   }): Promise<Workspace> => {
-    const workspaceService = injector.resolve(Token.WorkspaceService);
     const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
 
     const workspace = await db.$transaction(async (tdb): Promise<Workspace> => {
       const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(tdb);
 
-      return await workspaceService.createWorkspaceInDb(tdb, {
+      return await workspaceAgentService.createWorkspaceInDb(tdb, {
         externalId: args.externalId,
         gitBranchId: args.gitBranchId,
         name: args.name,
@@ -220,30 +219,77 @@ export const createActivities = async (
     });
 
     await workspaceAgentService.createWorkspaceFiles(db, workspace.id);
-    await workspaceService.changeWorkspaceStatus(
-      db,
-      workspace.id,
-      WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
-    );
 
     return workspace;
   };
 
-  // const startWorkspace = async (args: {
-  //   workspaceId: string;
-  // }): ReturnType<WorkspaceAgentService["startWorkspace"]> => {
-  //   const monitoringWorkflowId = uuidv4();
-  //   const fcInstanceId = `startvm-${monitoringWorkflowId}` as const;
-  //   const ;
+  const startWorkspace = async (workspaceId: bigint): Promise<WorkspaceInstance> => {
+    const monitoringWorkflowId = uuidv4();
+    const fcInstanceId = monitoringWorkflowId;
 
-  //   const firecrackerService = injector.resolve(Token.FirecrackerService)(args.fcInstanceId);
-  //   const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
-  // };
+    const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
 
-  const stopWorkspace = async (args: { instanceId: string; ipBlockId: number }): Promise<void> => {
-    const firecrackerService = injector.resolve(Token.FirecrackerService)(args.instanceId);
-    await firecrackerService.shutdownVM();
-    await firecrackerService.releaseVmResources(args.ipBlockId);
+    await db.$transaction((tdb) =>
+      workspaceAgentService.markWorkspaceAs(
+        tdb,
+        workspaceId,
+        WorkspaceStatus.WORKSPACE_STATUS_PENDING_START,
+      ),
+    );
+    const workspace = await db.workspace.findUniqueOrThrow({
+      where: { id: workspaceId },
+      include: {
+        rootFsFile: true,
+        projectFile: true,
+        prebuildEvent: true,
+      },
+    });
+    const instanceInfo = await workspaceAgentService.startWorkspace({
+      fcInstanceId,
+      filesystemDrivePath: workspace.rootFsFile.path,
+      projectDrivePath: workspace.projectFile.path,
+      authorizedKeys: [],
+      tasks: workspace.prebuildEvent.workspaceTasks,
+    });
+    return await db.$transaction((tdb) =>
+      workspaceAgentService.createWorkspaceInstanceInDb(tdb, {
+        workspaceId,
+        firecrackerInstanceId: fcInstanceId,
+        monitoringWorkflowId,
+        vmIp: instanceInfo.vmIp,
+      }),
+    );
+  };
+
+  const stopWorkspace = async (workspaceId: bigint): Promise<void> => {
+    const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
+
+    await db.$transaction((tdb) =>
+      workspaceAgentService.markWorkspaceAs(
+        tdb,
+        workspaceId,
+        WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP,
+      ),
+    );
+    const workspace = await db.workspace.findUniqueOrThrow({
+      where: { id: workspaceId },
+      include: {
+        activeInstance: true,
+      },
+    });
+    const instance = unwrap(workspace.activeInstance);
+    const firecrackerService = injector.resolve(Token.FirecrackerService)(
+      instance.firecrackerInstanceId,
+    );
+
+    const vmInfo = await firecrackerService.getVMInfo();
+    if (vmInfo?.status === "on") {
+      await firecrackerService.shutdownVM();
+    }
+    if (vmInfo != null) {
+      await firecrackerService.releaseVmResources(vmInfo.info.ipBlockId);
+    }
+    await firecrackerService.tryDeleteVmDir();
   };
 
   const getProjectsAndGitObjects = async (
@@ -338,7 +384,7 @@ export const createActivities = async (
     buildfs,
     checkoutAndInspect,
     prebuild,
-    // startWorkspace,
+    startWorkspace,
     stopWorkspace,
     getProjectsAndGitObjects,
     getOrCreateBuildfsEvents,
