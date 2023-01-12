@@ -16,10 +16,21 @@ CREATE TABLE "Workspace" (
     "projectFileId" BIGINT NOT NULL,
     "agentInstanceId" BIGINT NOT NULL,
     "status" "WorkspaceStatus" NOT NULL,
+    "activeInstanceId" BIGINT,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastOpenedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Workspace_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "WorkspaceInstance" (
+    "id" BIGSERIAL NOT NULL,
+    "firecrackerInstanceId" TEXT NOT NULL,
+    "vmIp" TEXT NOT NULL,
+    "monitoringWorkflowId" TEXT NOT NULL,
+
+    CONSTRAINT "WorkspaceInstance_pkey" PRIMARY KEY ("id")
 );
 
 -- AddForeignKey
@@ -39,6 +50,9 @@ ALTER TABLE "Workspace" ADD CONSTRAINT "Workspace_projectFileId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Workspace" ADD CONSTRAINT "Workspace_agentInstanceId_fkey" FOREIGN KEY ("agentInstanceId") REFERENCES "AgentInstance"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Workspace" ADD CONSTRAINT "Workspace_activeInstanceId_fkey" FOREIGN KEY ("activeInstanceId") REFERENCES "WorkspaceInstance"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Workspace" ADD CONSTRAINT "Workspace_rootFsFileId_agentInstanceId_fkey" FOREIGN KEY ("rootFsFileId", "agentInstanceId") REFERENCES "File"("id", "agentInstanceId") ON DELETE RESTRICT ON UPDATE CASCADE;

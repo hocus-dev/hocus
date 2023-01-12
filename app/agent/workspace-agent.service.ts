@@ -1,12 +1,15 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { Prisma } from "@prisma/client";
+import type { Workspace, WorkspaceInstance } from "@prisma/client";
+import { Prisma, WorkspaceStatus } from "@prisma/client";
+import { v4 as uuidv4 } from "uuid";
 import type { Config } from "~/config";
 import { Token } from "~/token";
-import { unwrap } from "~/utils.shared";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
+import { HOST_PERSISTENT_DIR } from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
 import { PidValidator } from "./pid.validator";
 import type { SSHGatewayService } from "./ssh-gateway.service";
@@ -30,6 +33,7 @@ export class WorkspaceAgentService {
     this.agentConfig = config.agent();
   }
 
+  /** Creates the files and sets the workspace status to stopped. */
   async createWorkspaceFiles(db: Prisma.Client, workspaceId: bigint): Promise<void> {
     const workspace = await db.workspace.findUniqueOrThrow({
       where: {
@@ -50,6 +54,9 @@ export class WorkspaceAgentService {
         },
       },
     });
+    if (workspace.status !== WorkspaceStatus.WORKSPACE_STATUS_PENDING_CREATE) {
+      throw new Error("Workspace is not in pending create state");
+    }
 
     const prebuildEventFiles = unwrap(
       workspace.prebuildEvent.prebuildEventFiles.find(
@@ -67,6 +74,56 @@ export class WorkspaceAgentService {
 
     await this.agentUtilService.expandDriveImage(workspace.rootFsFile.path, 50000);
     await this.agentUtilService.expandDriveImage(workspace.projectFile.path, 50000);
+
+    await db.workspace.update({
+      where: {
+        id: workspaceId,
+      },
+      data: {
+        status: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+      },
+    });
+  }
+
+  async createWorkspaceInDb(
+    db: Prisma.TransactionClient,
+    args: {
+      name: string;
+      externalId: string;
+      prebuildEventId: bigint;
+      agentInstanceId: bigint;
+      gitBranchId: bigint;
+      userId: bigint;
+    },
+  ): Promise<Workspace> {
+    const externalId = uuidv4();
+    const dirPath = `${HOST_PERSISTENT_DIR}/workspace/${externalId}` as const;
+    const projectFilePath = `${dirPath}/project.ext4` as const;
+    const rootFsFilePath = `${dirPath}/rootfs.ext4` as const;
+
+    const [rootFsFile, projectFile] = await waitForPromises(
+      [rootFsFilePath, projectFilePath].map((filePath) =>
+        db.file.create({
+          data: {
+            path: filePath,
+            agentInstanceId: args.agentInstanceId,
+          },
+        }),
+      ),
+    );
+    return await db.workspace.create({
+      data: {
+        name: args.name,
+        externalId: args.externalId,
+        gitBranchId: args.gitBranchId,
+        status: WorkspaceStatus.WORKSPACE_STATUS_PENDING_CREATE,
+        prebuildEventId: args.prebuildEventId,
+        agentInstanceId: args.agentInstanceId,
+        userId: args.userId,
+        rootFsFileId: rootFsFile.id,
+        projectFileId: projectFile.id,
+      },
+    });
   }
 
   async startWorkspace(args: {
@@ -135,14 +192,72 @@ export class WorkspaceAgentService {
     );
   }
 
-  // async createWorkspaceInstanceInDb(
-  //   db: Prisma.TransactionClient,
-  //   args: {
-  //     workspaceId: bigint;
-  //     firecrackerInstanceId: string;
-  //     vmIp: string;
-  //     ipBlockId: number;
+  async markWorkspaceAs(
+    db: Prisma.TransactionClient,
+    workspaceId: bigint,
+    status:
+      | typeof WorkspaceStatus.WORKSPACE_STATUS_PENDING_START
+      | typeof WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP,
+  ): Promise<void> {
+    await db.$executeRawUnsafe(
+      `LOCK TABLE "${Prisma.ModelName.Workspace}" IN SHARE UPDATE EXCLUSIVE MODE`,
+    );
+    const workspace = await db.workspace.findUniqueOrThrow({
+      where: {
+        id: workspaceId,
+      },
+    });
+    const statusPredecessor: { [key in typeof status]: WorkspaceStatus } = {
+      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_START]: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP]: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
+    };
+    if (workspace.status !== statusPredecessor[status]) {
+      throw new Error(`Workspace is not in ${statusPredecessor[status]} state`);
+    }
+    await db.workspace.update({
+      where: {
+        id: workspaceId,
+      },
+      data: {
+        status: WorkspaceStatus.WORKSPACE_STATUS_PENDING_START,
+      },
+    });
+  }
 
-  //   },
-  // );
+  /** The underlying VM should already be running before calling this. */
+  async createWorkspaceInstanceInDb(
+    db: Prisma.TransactionClient,
+    args: {
+      workspaceId: bigint;
+      firecrackerInstanceId: string;
+      monitoringWorkflowId: string;
+      vmIp: string;
+    },
+  ): Promise<WorkspaceInstance> {
+    const workspace = await db.workspace.findUniqueOrThrow({
+      where: {
+        id: args.workspaceId,
+      },
+    });
+    if (workspace.status !== WorkspaceStatus.WORKSPACE_STATUS_PENDING_START) {
+      throw new Error("Workspace is not in pending start state");
+    }
+    const workspaceInstance = await db.workspaceInstance.create({
+      data: {
+        firecrackerInstanceId: args.firecrackerInstanceId,
+        monitoringWorkflowId: args.monitoringWorkflowId,
+        vmIp: args.vmIp,
+      },
+    });
+    await db.workspace.update({
+      where: {
+        id: args.workspaceId,
+      },
+      data: {
+        status: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
+        activeInstanceId: workspaceInstance.id,
+      },
+    });
+    return workspaceInstance;
+  }
 }
