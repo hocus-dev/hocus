@@ -1,6 +1,5 @@
 import fsSync from "fs";
 import path from "path";
-import { promisify } from "util";
 
 import type { AgentInstance, Prisma, VmTask } from "@prisma/client";
 import { LogGroupType } from "@prisma/client";
@@ -13,7 +12,7 @@ import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { VMTaskOutput } from "./agent-util.types";
 import { SOLO_AGENT_INSTANCE_ID, TASK_SCRIPT_TEMPLATE } from "./constants";
-import { execCmd, execSshCmd, retry, sleep, withSsh } from "./utils";
+import { execCmd, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
 
 export class AgentUtilService {
   static inject = [Token.Logger] as const;
@@ -35,7 +34,24 @@ export class AgentUtilService {
 
   async expandDriveImage(drivePath: string, appendSizeMiB: number): Promise<void> {
     execCmd("dd", "if=/dev/zero", `of=${drivePath}`, "bs=1M", "count=0", `seek=${appendSizeMiB}`);
-    execCmd("resize2fs", drivePath);
+    try {
+      execCmd("resize2fs", drivePath);
+    } catch (err) {
+      if (!(err instanceof Error && err.message.includes("e2fsck"))) {
+        throw err;
+      }
+      try {
+        execCmd("e2fsck", "-fp", drivePath);
+      } catch (e2fsckErr) {
+        // status code meaning from e2fsck man page:
+        // 1 - File system errors corrected
+        // 2 - File system errors corrected, system should be rebooted
+        if (!(e2fsckErr instanceof ExecCmdError && [1, 2].includes(e2fsckErr.status as any))) {
+          throw e2fsckErr;
+        }
+      }
+      execCmd("resize2fs", drivePath);
+    }
   }
 
   getDriveUuid(drivePath: string): string {
@@ -60,28 +76,36 @@ export class AgentUtilService {
   }
 
   async writeFile(ssh: NodeSSH, path: string, content: string): Promise<void> {
-    await ssh.withSFTP(async (sftp) => {
-      const writeFile = promisify(sftp.writeFile.bind(sftp));
-      await writeFile(path, content).catch((err) => {
-        throw new Error(`Failed to write file "${path}": ${err?.message}`);
-      });
-    });
+    // I don't use SFTP because I've found it to be unreliable, causing
+    // untraceable errors.
+    try {
+      await execSshCmd(
+        {
+          ssh,
+          opts: {
+            execOptions: {
+              env: {
+                FILE_CONTENT: content,
+              } as any,
+            },
+          },
+        },
+        ["bash", "-c", `echo -n "$FILE_CONTENT" > ${path}`],
+      );
+    } catch (err) {
+      throw new Error(`Failed to write file "${path}": ${(err as any)?.message}`);
+    }
   }
 
-  async readFile(ssh: NodeSSH, path: string): Promise<Buffer> {
-    let contents: Buffer | null = null;
-    await ssh.withSFTP(async (sftp) => {
-      const readFile = promisify(sftp.readFile.bind(sftp));
-      contents = await retry(
-        async () =>
-          readFile(path).catch((err) => {
-            throw new Error(`Failed to read file "${path}": ${err?.message}`);
-          }),
-        5,
-        200,
-      );
-    });
-    return contents as unknown as Buffer;
+  async readFile(ssh: NodeSSH, path: string): Promise<string> {
+    // I don't use SFTP because I've found it to be unreliable, causing
+    // untraceable errors.
+    try {
+      const output = await execSshCmd({ ssh }, ["cat", path]);
+      return output.stdout;
+    } catch (err) {
+      throw new Error(`Failed to read file "${path}": ${(err as any)?.message}`);
+    }
   }
 
   generateTaskScript(task: string): string {

@@ -242,13 +242,18 @@ export const createActivities = async (
         rootFsFile: true,
         projectFile: true,
         prebuildEvent: true,
+        user: {
+          include: {
+            sshPublicKeys: true,
+          },
+        },
       },
     });
     const instanceInfo = await workspaceAgentService.startWorkspace({
       fcInstanceId,
       filesystemDrivePath: workspace.rootFsFile.path,
       projectDrivePath: workspace.projectFile.path,
-      authorizedKeys: [],
+      authorizedKeys: workspace.user.sshPublicKeys.map((k) => k.publicKey),
       tasks: workspace.prebuildEvent.workspaceTasks,
     });
     return await db.$transaction((tdb) =>
@@ -290,6 +295,10 @@ export const createActivities = async (
       await firecrackerService.releaseVmResources(vmInfo.info.ipBlockId);
     }
     await firecrackerService.tryDeleteVmDir();
+
+    await db.$transaction((tdb) =>
+      workspaceAgentService.removeWorkspaceInstanceFromDb(tdb, workspaceId),
+    );
   };
 
   const getProjectsAndGitObjects = async (

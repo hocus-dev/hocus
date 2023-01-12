@@ -7,13 +7,19 @@ import { v4 as uuidv4 } from "uuid";
 import { printErrors } from "~/test-utils";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
+import { createTestUser } from "~/user/test-utils";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "./test-constants";
-import { runBuildfsAndPrebuilds } from "./workflows";
+import {
+  runBuildfsAndPrebuilds,
+  runCreateWorkspace,
+  runStartWorkspace,
+  runStopWorkspace,
+} from "./workflows";
 
 const provideActivities = (
   testFn: (args: {
@@ -88,7 +94,7 @@ test.concurrent(
     );
     const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
     const updates = await gitService.updateBranches(db, repo.id);
-    await db.$transaction((tdb) =>
+    const projects = await db.$transaction((tdb) =>
       waitForPromises(
         [
           { name: "test1", path: "/" },
@@ -118,6 +124,55 @@ test.concurrent(
         ],
       });
       expect(result).toBeUndefined();
+
+      const project = await db.project.findUniqueOrThrow({
+        where: {
+          id: projects[0].id,
+        },
+        include: {
+          prebuildEvents: {
+            include: {
+              gitBranchLinks: {
+                include: {
+                  gitBranch: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      const prebuildEvent = unwrap(
+        project.prebuildEvents.find(
+          (e) => e.gitBranchLinks.find((l) => l.gitBranchId === testBranches[0].id) != null,
+        ),
+      );
+      const testUser = await createTestUser(db);
+      const workspace = await client.workflow.execute(runCreateWorkspace, {
+        workflowId: uuidv4(),
+        taskQueue: "test",
+        retry: { maximumAttempts: 1 },
+        args: [
+          {
+            name: "Test Workspace 😄",
+            prebuildEventId: prebuildEvent.id,
+            gitBranchId: testBranches[0].id,
+            externalId: uuidv4(),
+            userId: testUser.id,
+          },
+        ],
+      });
+      await client.workflow.execute(runStartWorkspace, {
+        workflowId: uuidv4(),
+        taskQueue: "test",
+        retry: { maximumAttempts: 1 },
+        args: [workspace.id],
+      });
+      await client.workflow.execute(runStopWorkspace, {
+        workflowId: uuidv4(),
+        taskQueue: "test",
+        retry: { maximumAttempts: 1 },
+        args: [workspace.id],
+      });
     });
   }),
 );

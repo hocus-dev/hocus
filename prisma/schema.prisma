@@ -11,10 +11,22 @@ datasource db {
 }
 
 model User {
-  id         BigInt      @id @default(autoincrement())
-  externalId String      @unique
-  gaUserId   String      @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  workspaces Workspace[]
+  id            BigInt             @id @default(autoincrement())
+  externalId    String             @unique
+  gaUserId      String             @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  workspaces    Workspace[]
+  sshPublicKeys UserSSHPublicKey[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model UserSSHPublicKey {
+  id        BigInt @id @default(autoincrement())
+  userId    BigInt
+  user      User   @relation(fields: [userId], references: [id])
+  publicKey String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 enum LogGroupType {
@@ -256,6 +268,8 @@ model AgentInstance {
   buildfsEventFiles  BuildfsEventFiles[]
   prebuildEventFiles PrebuildEventFiles[]
   workspaces         Workspace[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model File {
@@ -278,6 +292,8 @@ model File {
   workspacesProject                   Workspace[]          @relation("workspace_root_fs_file")
   workspaceRootfsFileAgentMatch       Workspace[]          @relation("workspace_root_fs_file_agent_match")
   workspaceProjectFileAgentMatch      Workspace[]          @relation("workspace_project_file_agent_match")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@unique([id, agentInstanceId])
   @@unique([agentInstanceId, path])

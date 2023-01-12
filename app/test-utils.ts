@@ -41,6 +41,9 @@ export const printErrors = <T>(testFn: () => Promise<T>): (() => Promise<T>) => 
         for (const innerError of err.errors) {
           console.error(innerError);
         }
+        if (err.errors.length === 0) {
+          console.error(err);
+        }
       } else {
         console.error(err);
       }

@@ -1,3 +1,4 @@
+import type { Workspace, WorkspaceInstance } from "@prisma/client";
 import { proxyActivities, uuid4, executeChild } from "@temporalio/workflow";
 // the native path module is a restricted import in workflows
 import path from "path-browserify";
@@ -25,13 +26,16 @@ const {
   buildfs,
   prebuild,
   createPrebuildFiles,
+  createWorkspace,
+  startWorkspace,
+  stopWorkspace,
 } = proxyActivities<Activites>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
   // project filesystem, so if several buildfs activities for the same project
   // are running at the same time, it may take a long time for all of them
   // to finish.
-  startToCloseTimeout: "10 minutes",
+  startToCloseTimeout: "24 hours",
   retry: {
     maximumAttempts: 1,
   },
@@ -159,4 +163,22 @@ export async function runPrebuild(
     sourceProjectDrivePath,
   });
   await prebuild({ prebuildEventId });
+}
+
+export async function runCreateWorkspace(args: {
+  name: string;
+  prebuildEventId: bigint;
+  gitBranchId: bigint;
+  userId: bigint;
+  externalId: string;
+}): Promise<Workspace> {
+  return await createWorkspace(args);
+}
+
+export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceInstance> {
+  return await startWorkspace(workspaceId);
+}
+
+export async function runStopWorkspace(workspaceId: bigint): Promise<void> {
+  return await stopWorkspace(workspaceId);
 }

@@ -16,6 +16,12 @@ export const execCmd = (...args: string[]): SpawnSyncReturns<Buffer> => {
   return execCmdWithOpts(args, {});
 };
 
+export class ExecCmdError extends Error {
+  constructor(public readonly status: number | null, public readonly message: string) {
+    super(message);
+  }
+}
+
 export const execCmdWithOpts = (
   args: string[],
   options: Object.Modify<
@@ -25,7 +31,8 @@ export const execCmdWithOpts = (
 ): SpawnSyncReturns<Buffer> => {
   const output = spawnSync(args[0], args.slice(1), options as SpawnSyncOptionsWithBufferEncoding);
   if (output.status !== 0) {
-    throw new Error(
+    throw new ExecCmdError(
+      output.status,
       `Command "${args.join(" ")}" failed with status ${output.status}, error name: "${
         output.error?.name
       }", error message: "${output.error?.message}", and output:\n${output.output?.toString()}`,
@@ -96,25 +103,6 @@ export const withSsh = async <T>(
   try {
     return await fn(ssh);
   } finally {
-    try {
-      // I don't know why, but ssh2 can't properly dispose of SFTP
-      // connections. There seem to be some unconsumed requests
-      // on the sftp subsystem channel and when ssh2 tries to
-      // close the channel, it throws an error. This is a workaround
-      // to drain the channel. Maybe this is a concurrency issue when
-      // you use withSFTP several times at the same time?
-      // Note that SFTP functionality itself works fine.
-      //
-      // Error message: "Unable to start subsystem: sftp"
-      // Error stack:
-      // https://github.com/mscdex/ssh2/blob/24b497ddf2d727ecf3e3e6d414a5ba6172fe320f/lib/client.js#L1762
-      // https://github.com/mscdex/ssh2/blob/24b497ddf2d727ecf3e3e6d414a5ba6172fe320f/lib/utils.js#L76
-      // https://github.com/mscdex/ssh2/blob/24b497ddf2d727ecf3e3e6d414a5ba6172fe320f/lib/utils.js#L200
-      // https://github.com/mscdex/ssh2/blob/24b497ddf2d727ecf3e3e6d414a5ba6172fe320f/lib/client.js#L769
-      await ssh.withSFTP(async () => {});
-    } catch {
-      // Ignore error
-    }
     ssh.dispose();
   }
 };

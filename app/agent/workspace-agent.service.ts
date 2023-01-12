@@ -219,7 +219,7 @@ export class WorkspaceAgentService {
         id: workspaceId,
       },
       data: {
-        status: WorkspaceStatus.WORKSPACE_STATUS_PENDING_START,
+        status,
       },
     });
   }
@@ -256,8 +256,37 @@ export class WorkspaceAgentService {
       data: {
         status: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
         activeInstanceId: workspaceInstance.id,
+        lastOpenedAt: new Date(),
       },
     });
     return workspaceInstance;
+  }
+
+  async removeWorkspaceInstanceFromDb(
+    db: Prisma.TransactionClient,
+    workspaceId: bigint,
+  ): Promise<void> {
+    const workspace = await db.workspace.findUniqueOrThrow({
+      where: {
+        id: workspaceId,
+      },
+    });
+    if (workspace.status !== WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP) {
+      throw new Error("Workspace is not in pending stop state");
+    }
+    const workspaceInstanceId = unwrap(workspace.activeInstanceId);
+    await db.workspaceInstance.delete({
+      where: {
+        id: workspaceInstanceId,
+      },
+    });
+    await db.workspace.update({
+      where: {
+        id: workspaceId,
+      },
+      data: {
+        status: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+      },
+    });
   }
 }

@@ -319,7 +319,7 @@ export class PrebuildService {
                 args.projectConfigPaths[idx],
                 c.image.file,
               );
-              return this.agentUtilService.readFile(ssh, pathToImageFile).toString();
+              return this.agentUtilService.readFile(ssh, pathToImageFile);
             }),
           );
           const externalFilePaths = await waitForPromises(
@@ -335,7 +335,12 @@ export class PrebuildService {
           const externalFilesHashes = await waitForPromises(
             mapOverNull(externalFilePaths, (filePaths, idx) => {
               const absoluteFilePaths = filePaths.map((p) =>
-                path.join(repoPath, args.projectConfigPaths[idx], p),
+                path.join(
+                  repoPath,
+                  args.projectConfigPaths[idx],
+                  unwrap(configs[idx]).image.buildContext,
+                  p,
+                ),
               );
               return this.buildfsService.getSha256FromFiles(ssh, repoPath, absoluteFilePaths);
             }),
