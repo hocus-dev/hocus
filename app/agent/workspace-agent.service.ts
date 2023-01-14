@@ -15,6 +15,8 @@ import { PidValidator } from "./pid.validator";
 import type { SSHGatewayService } from "./ssh-gateway.service";
 import { execSshCmd } from "./utils";
 
+export class InvalidWorkspaceStatusError extends Error {}
+
 export class WorkspaceAgentService {
   static inject = [
     Token.AgentUtilService,
@@ -126,6 +128,34 @@ export class WorkspaceAgentService {
     });
   }
 
+  async writeAuthorizedKeysToFs(
+    filesystemDrivePath: string,
+    authorizedKeys: string[],
+  ): Promise<void> {
+    const instanceId = uuidv4();
+    const fcService = this.fcServiceFactory(instanceId);
+    const workdir = "/workspace" as const;
+    const sshDir = `${workdir}/home/hocus/.ssh` as const;
+    const authorizedKeysPath = `${sshDir}/authorized_keys` as const;
+    return await fcService.withVM(
+      {
+        ssh: {
+          username: "hocus",
+          privateKey: this.agentConfig.prebuildSshPrivateKey,
+        },
+        kernelPath: this.agentConfig.defaultKernel,
+        rootFsPath: this.agentConfig.checkoutAndInspectRootFs,
+        copyRootFs: true,
+        extraDrives: [{ pathOnHost: filesystemDrivePath, guestMountPath: workdir }],
+      },
+      async ({ ssh }) => {
+        await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
+        const authorizedKeysContent = authorizedKeys.map((key) => key.trim()).join("\n") + "\n";
+        await this.agentUtilService.writeFile(ssh, authorizedKeysPath, authorizedKeysContent);
+      },
+    );
+  }
+
   async startWorkspace(args: {
     fcInstanceId: string;
     filesystemDrivePath: string;
@@ -142,6 +172,10 @@ export class WorkspaceAgentService {
     const devDir = "/home/hocus/dev" as const;
     const repositoryDir = `${devDir}/project` as const;
     const scriptsDir = `${devDir}/.hocus/command` as const;
+
+    await this.writeAuthorizedKeysToFs(args.filesystemDrivePath, [
+      this.agentConfig.prebuildSshPublicKey,
+    ]);
 
     return await fcService.withVM(
       {
@@ -212,7 +246,7 @@ export class WorkspaceAgentService {
       [WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP]: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
     };
     if (workspace.status !== statusPredecessor[status]) {
-      throw new Error(`Workspace is not in ${statusPredecessor[status]} state`);
+      throw new InvalidWorkspaceStatusError(`Workspace is not in ${statusPredecessor[status]} state`);
     }
     await db.workspace.update({
       where: {

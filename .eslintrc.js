@@ -30,6 +30,7 @@ module.exports = {
         "@typescript-eslint/no-redeclare": "off",
         "@typescript-eslint/no-empty-function": ["error", { allow: ["arrowFunctions"] }],
         "@typescript-eslint/no-floating-promises": "error",
+        "@typescript-eslint/no-base-to-string": "warn",
         "no-console": "warn",
         "import/order": [
           "warn",

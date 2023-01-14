@@ -4,6 +4,7 @@ import { TestWorkflowEnvironment } from "@temporalio/testing";
 import type { LogEntry } from "@temporalio/worker";
 import { Worker, Runtime, DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
+import { config } from "~/config";
 import { printErrors } from "~/test-utils";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
@@ -35,6 +36,22 @@ const provideActivities = (
     [Token.Logger]: function () {
       return new DefaultLogger("ERROR");
     } as unknown as any,
+    [Token.Config]: {
+      ...config,
+      agent: () => ({
+        ...config.agent(),
+        /**
+         * It's a regular buildfs root fs but with docker cache.
+         * I generated it manually, by executing a buildfs workflow
+         * with the regular buildfs root fs and then copying the
+         * resulting drive to the test-buildfs.ext4 file.
+         * I also shrank it with `resize2fs -M`.
+         * The tests will also work with a regular buildfs root fs,
+         * but they will be slower.
+         */
+        buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
+      }),
+    },
   });
   const runId = uuidv4();
   return printErrors(
@@ -163,26 +180,52 @@ test.concurrent(
           },
         ],
       });
-      const workspaceInstance = await client.workflow.execute(runStartWorkspace, {
-        workflowId: uuidv4(),
-        taskQueue: "test",
-        retry: { maximumAttempts: 1 },
-        args: [workspace.id],
-      });
+      const startWorkspace = () =>
+        client.workflow.execute(runStartWorkspace, {
+          workflowId: uuidv4(),
+          taskQueue: "test",
+          retry: { maximumAttempts: 1 },
+          args: [workspace.id],
+        });
+      const stopWorkspace = () =>
+        client.workflow.execute(runStopWorkspace, {
+          workflowId: uuidv4(),
+          taskQueue: "test",
+          retry: { maximumAttempts: 1 },
+          args: [workspace.id],
+        });
 
+      const workspaceInstance1 = await startWorkspace();
       const sshOutput = await execSshCmdThroughProxy({
-        vmIp: workspaceInstance.vmIp,
+        vmIp: workspaceInstance1.vmIp,
         privateKey: TEST_USER_PRIVATE_SSH_KEY,
         cmd: `cat /home/hocus/dev/project/proxy-test.txt`,
       });
       expect(sshOutput.stdout.toString()).toEqual("hello from the tests repository!\n");
+      await stopWorkspace();
 
-      await client.workflow.execute(runStopWorkspace, {
-        workflowId: uuidv4(),
-        taskQueue: "test",
-        retry: { maximumAttempts: 1 },
-        args: [workspace.id],
-      });
+      const workspaceInstance2 = await startWorkspace();
+      const firecrackerService2 = injector.resolve(Token.FirecrackerService)(
+        workspaceInstance2.firecrackerInstanceId,
+      );
+      await firecrackerService2.shutdownVM();
+      await stopWorkspace();
+
+      const workspaceInstance3 = await startWorkspace();
+      try {
+        await startWorkspace();
+        throw new Error("Expected startWorkspace to fail");
+      } catch (err) {
+        expect((err as any)?.cause?.cause?.message).toMatch(
+          /Workspace is not in WORKSPACE_STATUS_STOPPED state/,
+        );
+      }
+      const firecrackerService3 = injector.resolve(Token.FirecrackerService)(
+        workspaceInstance3.firecrackerInstanceId,
+      );
+      await firecrackerService3.shutdownVM();
+      await firecrackerService3.tryDeleteVmDir();
+      await stopWorkspace();
     });
   }),
 );
