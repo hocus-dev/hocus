@@ -371,7 +371,7 @@ export class PrebuildService {
       where: { id: { in: prebuildEventIds } },
       include: { tasks: true },
     });
-    const taskIds = prebuildEvents.flatMap((e) => e.tasks.map((t) => t.id));
+    const taskIds = prebuildEvents.flatMap((e) => e.tasks.map((t) => t.vmTaskId));
 
     await db.vmTask.updateMany({
       where: {
