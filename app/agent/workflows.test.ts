@@ -130,6 +130,7 @@ test.concurrent(
     const testBranches = [
       "refs/heads/run-buildfs-and-prebuilds-test-1",
       "refs/heads/run-buildfs-and-prebuilds-test-2",
+      "refs/heads/run-buildfs-and-prebuilds-test-3-error",
     ].map((name) => unwrap(updates.newGitBranches.find((b) => b.name === name)));
     await worker.runUntil(async () => {
       const workflowId = uuidv4();

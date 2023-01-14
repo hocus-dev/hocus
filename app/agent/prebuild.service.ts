@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 
 import type { PrebuildEvent, PrebuildEventFiles, Prisma } from "@prisma/client";
+import { VmTaskStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import type { Config } from "~/config";
@@ -359,5 +360,24 @@ export class PrebuildService {
       await fs.unlink(args.outputDrivePath);
       throw err;
     }
+  }
+
+  async cancelPrebuilds(db: Prisma.TransactionClient, prebuildEventIds: bigint[]): Promise<void> {
+    await db.prebuildEvent.updateMany({
+      where: { id: { in: prebuildEventIds } },
+      data: { status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_CANCELLED },
+    });
+    const prebuildEvents = await db.prebuildEvent.findMany({
+      where: { id: { in: prebuildEventIds } },
+      include: { tasks: true },
+    });
+    const taskIds = prebuildEvents.flatMap((e) => e.tasks.map((t) => t.id));
+
+    await db.vmTask.updateMany({
+      where: {
+        id: { in: taskIds },
+      },
+      data: { status: VmTaskStatus.VM_TASK_STATUS_CANCELLED },
+    });
   }
 }

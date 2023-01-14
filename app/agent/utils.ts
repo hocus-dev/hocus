@@ -99,7 +99,7 @@ export const withSsh = async <T>(
   connectionOptions: SSHConfig,
   fn: (ssh: NodeSSH) => Promise<T>,
 ): Promise<T> => {
-  const ssh = await retry(async () => await new NodeSSH().connect(connectionOptions), 10, 250);
+  const ssh = await retry(async () => await new NodeSSH().connect(connectionOptions), 15, 500);
   try {
     return await fn(ssh);
   } finally {

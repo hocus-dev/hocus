@@ -14,7 +14,7 @@ import { match } from "ts-pattern";
 import { fetch, Agent } from "undici";
 import type { Config } from "~/config";
 import { Token } from "~/token";
-import { displayError, unwrap } from "~/utils.shared";
+import { displayError, numericSort, unwrap } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
 import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "./constants";
@@ -148,7 +148,7 @@ export class FirecrackerService {
     child.on("error", (err) => {
       // Without this block the error is handled by the nodejs process itself and makes it
       // exit with code 1 crashing everything
-      this.logger.error(`firecracker process errored: ${err}`);
+      this.logger.error(`firecracker process errored: ${displayError(err)}`);
     });
     child.on("close", (code) => {
       this.logger.warn(`firecracker process closed: ${code}`);
@@ -178,10 +178,10 @@ export class FirecrackerService {
     const ipId = await this.storageService.withStorage(async (storage) => {
       const container = await storage.readStorage();
       const busyIpBlockIds = container.busyIpBlockIds;
-      busyIpBlockIds.sort();
+      busyIpBlockIds.sort(numericSort);
       let nextFreeIpId = MINIMUM_IP_ID;
-      for (const i of busyIpBlockIds.keys()) {
-        if (busyIpBlockIds[i] !== nextFreeIpId) {
+      for (const busyIpBlockId of busyIpBlockIds) {
+        if (busyIpBlockId !== nextFreeIpId) {
           break;
         }
         nextFreeIpId++;

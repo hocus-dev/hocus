@@ -1,7 +1,10 @@
+import fs from "fs/promises";
+
 import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
 import { createAgentInjector } from "./agent-injector";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
@@ -101,5 +104,24 @@ test.concurrent(
 
     const vmInfo3 = await fcService.getVMInfo();
     expect(vmInfo3).toBeNull();
+  }),
+);
+
+test.concurrent(
+  "ipBlocks",
+  provideInjector(async ({ injector, runId }) => {
+    const fcService = injector.resolve(Token.FirecrackerService)(runId);
+    const storageService = injector.resolve(Token.StorageService);
+    const storageFileId = uuidv4();
+    const filePath = `/tmp/hocus-storage-test-${storageFileId}.yaml`;
+    storageService["lowLevelStorageService"].getPathToStorage = () => filePath;
+    try {
+      const ipBlockIds = await waitForPromises(
+        Array.from({ length: 15 }).map(() => fcService["getFreeIpBlockId"]()),
+      );
+      expect(new Set(ipBlockIds).size).toEqual(ipBlockIds.length);
+    } finally {
+      await fs.unlink(filePath);
+    }
   }),
 );

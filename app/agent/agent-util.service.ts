@@ -69,10 +69,14 @@ export class AgentUtilService {
     guestMountPath: string,
     useSudo: boolean = true,
   ): Promise<void> {
-    const cmdPrefix = useSudo ? ["sudo"] : [];
-    const driveUuid = this.getDriveUuid(hostDrivePath);
-    await execSshCmd({ ssh }, [...cmdPrefix, "mkdir", "-p", guestMountPath]);
-    await execSshCmd({ ssh }, [...cmdPrefix, "mount", `UUID=${driveUuid}`, guestMountPath]);
+    try {
+      const cmdPrefix = useSudo ? ["sudo"] : [];
+      const driveUuid = this.getDriveUuid(hostDrivePath);
+      await execSshCmd({ ssh }, [...cmdPrefix, "mkdir", "-p", guestMountPath]);
+      await execSshCmd({ ssh }, [...cmdPrefix, "mount", `UUID=${driveUuid}`, guestMountPath]);
+    } catch (err) {
+      throw new Error(`Failed to mount drive "${hostDrivePath}" at "${guestMountPath}": ${err}`);
+    }
   }
 
   async writeFile(ssh: NodeSSH, path: string, content: string): Promise<void> {
@@ -138,7 +142,9 @@ export class AgentUtilService {
     });
     for (const vmTask of tasks) {
       if (vmTask.status !== VmTaskStatus.VM_TASK_STATUS_PENDING) {
-        throw new Error(`VM task ${vmTask.id} is not in pending state`);
+        throw new Error(
+          `VM task ${vmTask.id} status is ${vmTask.status} instead of ${VmTaskStatus.VM_TASK_STATUS_PENDING}`,
+        );
       }
     }
     const idsToVmTasks = new Map(vmTasks.map((t) => [t.vmTaskId, t]));

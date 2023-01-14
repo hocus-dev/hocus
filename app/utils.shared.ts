@@ -50,7 +50,8 @@ export const displayError = (err: unknown): string => {
   return String(err);
 };
 
-export const bigintSort = (a: bigint, b: bigint): number => {
+type NumericType = bigint | number;
+export const numericSort = (a: NumericType, b: NumericType): number => {
   if (a < b) {
     return -1;
   }
@@ -60,7 +61,7 @@ export const bigintSort = (a: bigint, b: bigint): number => {
   return 0;
 };
 
-export const bigintOrNullSort = (a: bigint | null, b: bigint | null): number => {
+export const numericOrNullSort = (a: NumericType | null, b: NumericType | null): number => {
   if (a === null && b === null) {
     return 0;
   }
@@ -70,7 +71,7 @@ export const bigintOrNullSort = (a: bigint | null, b: bigint | null): number => 
   if (b === null) {
     return 1;
   }
-  return bigintSort(a, b);
+  return numericSort(a, b);
 };
 
 export const mapOverNull = <T, U>(

@@ -4,8 +4,8 @@ import { proxyActivities, uuid4, executeChild } from "@temporalio/workflow";
 import path from "path-browserify";
 import { waitForPromisesWorkflow } from "~/temporal/utils";
 import {
-  bigintOrNullSort,
-  bigintSort,
+  numericOrNullSort,
+  numericSort,
   filterNull,
   mapOverNull,
   unwrap,
@@ -29,6 +29,7 @@ const {
   createWorkspace,
   startWorkspace,
   stopWorkspace,
+  cancelPrebuilds,
 } = proxyActivities<Activites>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -47,10 +48,10 @@ export async function runBuildfsAndPrebuilds(
 ): Promise<void> {
   const gitObjectIds = Array.from(new Set(branches.map((branch) => branch.gitObjectId)));
   // to make order deterministic
-  gitObjectIds.sort();
+  gitObjectIds.sort(numericSort);
   const { projects, gitObjects } = await getProjectsAndGitObjects(gitRepositoryId, gitObjectIds);
-  gitObjects.sort((a, b) => bigintSort(a.id, b.id));
-  projects.sort((a, b) => bigintSort(a.id, b.id));
+  gitObjects.sort((a, b) => numericSort(a.id, b.id));
+  projects.sort((a, b) => numericSort(a.id, b.id));
   await fetchRepository(gitRepositoryId);
   const checkedOutPaths = gitObjects.map(
     (o) => `${HOST_PERSISTENT_DIR}/checked-out/${o.hash}.ext4` as const,
@@ -125,15 +126,15 @@ export async function runBuildfsAndPrebuilds(
       (e) => e.buildfsEventId,
       (e) => e,
     ).entries(),
-  ).sort(([a, _1], [b, _2]) => bigintOrNullSort(a, b));
+  ).sort(([a, _1], [b, _2]) => numericOrNullSort(a, b));
 
   await waitForPromisesWorkflow(
     buildfsEventsToPrebuilds.map(async ([buildfsEventId, prebuildEvents]) => {
       if (buildfsEventId != null) {
         const buildfsResult = await executeChild(runBuildfs, { args: [buildfsEventId] });
         if (!buildfsResult.buildSuccessful) {
-          // TODO: cancel prebuilds
-          throw new Error("Buildfs failed");
+          await cancelPrebuilds(prebuildEvents.map((e) => e.id));
+          return;
         }
       }
       await waitForPromisesWorkflow(

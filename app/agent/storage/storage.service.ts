@@ -2,10 +2,10 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 
-import { Mutex } from "async-mutex";
-import lockfile from "proper-lockfile";
 import yaml from "yaml";
 import { Token } from "~/token";
+
+import { withFileLock } from "../utils";
 
 import type { AgentStorage } from "./storage.validator";
 import { AgentStorageValidator } from "./storage.validator";
@@ -17,23 +17,14 @@ import { AgentStorageValidator } from "./storage.validator";
  * ensures that the storage file is locked while it is being read or written.
  */
 export class LowLevelStorageService {
-  private async createEmptyStorageFile(): Promise<void> {
+  async createEmptyStorageFile(): Promise<void> {
     const pathToStorage = this.getPathToStorage();
     await fs.mkdir(path.dirname(pathToStorage), { recursive: true });
     await fs.writeFile(pathToStorage, "", { flag: "a" });
   }
 
-  private getPathToStorage(): string {
+  getPathToStorage(): string {
     return path.join(os.homedir(), ".hocus.yml");
-  }
-
-  /**
-   * Returns a function that releases the lock.
-   */
-  async lockStorage(): Promise<() => Promise<void>> {
-    // we create the file because lockfile will fail if it doesn't exist
-    await this.createEmptyStorageFile();
-    return await lockfile.lock(this.getPathToStorage());
   }
 
   async readStorage(): Promise<AgentStorage> {
@@ -55,21 +46,16 @@ export class LowLevelStorageService {
 }
 
 export class StorageService {
-  private static mutex = new Mutex();
   static inject = [Token.LowLevelStorageService] as const;
   constructor(private readonly lowLevelStorageService: LowLevelStorageService) {}
 
   async withStorage<T>(fn: (storage: LowLevelStorageService) => Promise<T>): Promise<T> {
+    await this.lowLevelStorageService.createEmptyStorageFile();
     // We use a mutex because the same process cannot attempt to lock the same file twice.
     // If there were two async functions trying to lock the storage file at the same time,
     // one of them would fail.
-    return await StorageService.mutex.runExclusive(async () => {
-      const release = await this.lowLevelStorageService.lockStorage();
-      try {
-        return await fn(this.lowLevelStorageService);
-      } finally {
-        await release();
-      }
+    return await withFileLock(this.lowLevelStorageService.getPathToStorage(), async () => {
+      return await fn(this.lowLevelStorageService);
     });
   }
 }

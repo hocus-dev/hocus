@@ -56,6 +56,7 @@ module.exports = {
             ],
           },
         ],
+        "@typescript-eslint/require-array-sort-compare": ["warn", { ignoreStringArrays: true }],
       },
     },
   ],

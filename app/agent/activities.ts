@@ -195,6 +195,11 @@ export const createActivities = async (
     );
   };
 
+  const cancelPrebuilds = async (prebuildEventIds: bigint[]): Promise<void> => {
+    const prebuildService = injector.resolve(Token.PrebuildService);
+    await db.$transaction((tdb) => prebuildService.cancelPrebuilds(tdb, prebuildEventIds));
+  };
+
   const createWorkspace = async (args: {
     name: string;
     prebuildEventId: bigint;
@@ -400,5 +405,6 @@ export const createActivities = async (
     createPrebuildEvents,
     createPrebuildFiles,
     createWorkspace,
+    cancelPrebuilds,
   };
 };
