@@ -3,7 +3,7 @@ import "./prisma-export-patch.server";
 
 import fs from "fs";
 
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import { runMigrations } from "graphile-worker";
@@ -11,8 +11,22 @@ import { Client as PgClient } from "pg";
 import * as build from "prisma/build";
 import { v4 as uuidv4 } from "uuid";
 import "process";
+import { waitForPromises } from "~/utils.shared";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
+
+const changeSequenceNumbers = async (db: Prisma.NonTransactionClient): Promise<void> => {
+  const modelNames = Object.values(Prisma.ModelName).sort((a, b) => a.localeCompare(b));
+  await waitForPromises(
+    modelNames.map((name, idx) =>
+      // When you pass model ids around, it's easy to accidentally pass an id representing one model
+      // to a function that expects an id representing another model. By changing the sequence numbers
+      // so that every model has its own range of ids, we can catch easily detect this kind of error
+      // during testing.
+      db.$executeRawUnsafe(`ALTER SEQUENCE "${name}_id_seq" RESTART WITH ${(idx + 1) * 1000000}`),
+    ),
+  );
+};
 
 export const provideDb = (
   testFn: (db: Prisma.NonTransactionClient) => Promise<void>,
@@ -43,6 +57,7 @@ export const provideDb = (
     migrate.stop();
 
     await runMigrations({ connectionString: dbUrl });
+    await changeSequenceNumbers(db);
 
     let error = null;
     try {
