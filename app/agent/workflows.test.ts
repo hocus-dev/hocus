@@ -67,10 +67,20 @@ beforeAll(async () => {
   // Use console.log instead of console.error to avoid red output
   // Filter INFO log messages for clearer test output
   Runtime.install({
-    logger: new DefaultLogger("WARN", (entry: LogEntry) =>
+    logger: new DefaultLogger("WARN", (entry: LogEntry) => {
+      if (
+        entry.message.includes("InvalidWorkspaceStatusError") &&
+        entry.message.includes("runStartWorkspace")
+      ) {
+        // there is a test case where we expect this error,
+        // so in order not to pollute the test output with it,
+        // we suppress it
+        return;
+      }
+
       // eslint-disable-next-line no-console
-      console.log(`[${entry.level}]`, entry.message, entry.meta),
-    ),
+      console.log(`[${entry.level}]`, entry.message, entry.meta);
+    }),
   });
 
   testEnv = await TestWorkflowEnvironment.createTimeSkipping({
