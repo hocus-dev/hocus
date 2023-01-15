@@ -21,7 +21,7 @@ const changeSequenceNumbers = async (db: Prisma.NonTransactionClient): Promise<v
     modelNames.map((name, idx) =>
       // When you pass model ids around, it's easy to accidentally pass an id representing one model
       // to a function that expects an id representing another model. By changing the sequence numbers
-      // so that every model has its own range of ids, we can catch easily detect this kind of error
+      // so that every model has its own range of ids, we can easily detect this kind of error
       // during testing.
       db.$executeRawUnsafe(`ALTER SEQUENCE "${name}_id_seq" RESTART WITH ${(idx + 1) * 1000000}`),
     ),
