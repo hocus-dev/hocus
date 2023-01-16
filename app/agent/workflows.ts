@@ -1,8 +1,15 @@
 import type { Workspace, WorkspaceInstance } from "@prisma/client";
-import { proxyActivities, uuid4, executeChild } from "@temporalio/workflow";
+import {
+  proxyActivities,
+  uuid4,
+  executeChild,
+  startChild,
+  sleep,
+  continueAsNew,
+} from "@temporalio/workflow";
 // the native path module is a restricted import in workflows
 import path from "path-browserify";
-import { waitForPromisesWorkflow } from "~/temporal/utils";
+import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
 import {
   numericOrNullSort,
   numericSort,
@@ -31,6 +38,7 @@ const {
   stopWorkspace,
   cancelPrebuilds,
   changePrebuildEventStatus,
+  getWorkspaceStatus,
 } = proxyActivities<Activites>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -186,9 +194,26 @@ export async function runCreateWorkspace(args: {
 }
 
 export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceInstance> {
-  return await startWorkspace(workspaceId);
+  const workspaceInstance = await startWorkspace(workspaceId);
+  await startChild(monitorWorkspace, {
+    args: [workspaceId],
+    workflowId: workspaceInstance.monitoringWorkflowId,
+  });
+  return workspaceInstance;
 }
 
 export async function runStopWorkspace(workspaceId: bigint): Promise<void> {
   return await stopWorkspace(workspaceId);
+}
+
+export async function monitorWorkspace(workspaceId: bigint): Promise<void> {
+  for (let i = 0; i < 1000; i++) {
+    await sleep(5000);
+    const status = await retryWorkflow(async () => await getWorkspaceStatus(workspaceId), 10, 1000);
+    if (status !== "on") {
+      await executeChild(runStopWorkspace, { args: [workspaceId] });
+      return;
+    }
+  }
+  await continueAsNew<typeof monitorWorkspace>(workspaceId);
 }

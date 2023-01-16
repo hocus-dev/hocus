@@ -18,6 +18,7 @@ import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "./test-constants";
 import { execSshCmdThroughProxy } from "./test-utils";
+import { sleep } from "./utils";
 import {
   runBuildfsAndPrebuilds,
   runCreateWorkspace,
@@ -104,12 +105,23 @@ test.concurrent("HOST_PERSISTENT_DIR has no trailing slash", async () => {
 test.concurrent(
   "runBuildfsAndPrebuilds",
   provideActivities(async ({ activities, injector, db }) => {
+    let isGetWorkspaceStatusMocked = true;
     const { client, nativeConnection } = testEnv;
     const worker = await Worker.create({
       connection: nativeConnection,
       taskQueue: "test",
       workflowsPath: require.resolve("./workflows"),
-      activities,
+      activities: {
+        ...activities,
+        getWorkspaceStatus: async (workspaceId: bigint) => {
+          if (isGetWorkspaceStatusMocked) {
+            await sleep(100);
+            return "on";
+          } else {
+            return activities.getWorkspaceStatus(workspaceId);
+          }
+        },
+      },
       dataConverter: {
         payloadConverterPath: require.resolve("~/temporal/data-converter"),
       },

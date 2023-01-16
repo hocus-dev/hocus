@@ -404,6 +404,26 @@ export const createActivities = async (
     });
   };
 
+  const getWorkspaceStatus = async (workspaceId: bigint): Promise<"on" | "off" | "paused"> => {
+    const workspace = await db.workspace.findUniqueOrThrow({
+      where: { id: workspaceId },
+      include: {
+        activeInstance: true,
+      },
+    });
+    if (workspace.activeInstance == null) {
+      return "off";
+    }
+    const firecrackerService = injector.resolve(Token.FirecrackerService)(
+      workspace.activeInstance.firecrackerInstanceId,
+    );
+    const vmInfo = await firecrackerService.getVMInfo();
+    if (vmInfo == null) {
+      return "off";
+    }
+    return vmInfo.status;
+  };
+
   return {
     fetchRepository,
     buildfs,
@@ -418,5 +438,6 @@ export const createActivities = async (
     createWorkspace,
     cancelPrebuilds,
     changePrebuildEventStatus,
+    getWorkspaceStatus,
   };
 };
