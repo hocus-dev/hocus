@@ -19,12 +19,15 @@ export const waitForPromisesWorkflow: typeof waitForPromises = async (args) => {
 
 export const retryWorkflow = async <T>(
   fn: () => Promise<T>,
-  maxRetries: number,
-  retryDelayMs: number,
-  isRetriable: (err: unknown) => boolean = () => true,
+  options: {
+    maxRetries: number;
+    retryIntervalMs: number;
+    isRetriable?: (err: unknown) => boolean;
+  },
 ): Promise<T> => {
+  const isRetriable = options.isRetriable ?? (() => true);
   let lastError: unknown = void 0;
-  for (let i = 0; i < maxRetries; i++) {
+  for (let i = 0; i < options.maxRetries; i++) {
     try {
       return await fn();
     } catch (err) {
@@ -32,8 +35,8 @@ export const retryWorkflow = async <T>(
         throw err;
       }
       lastError = err;
-      if (i < maxRetries - 1) {
-        await sleep(retryDelayMs);
+      if (i < options.maxRetries - 1) {
+        await sleep(options.retryIntervalMs);
       }
     }
   }

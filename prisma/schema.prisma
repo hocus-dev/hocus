@@ -352,6 +352,8 @@ model Workspace {
 
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   lastOpenedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([activeInstanceId])
 }
 
 model WorkspaceInstance {

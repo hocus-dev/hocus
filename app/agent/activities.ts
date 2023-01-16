@@ -404,15 +404,20 @@ export const createActivities = async (
     });
   };
 
-  const getWorkspaceStatus = async (workspaceId: bigint): Promise<"on" | "off" | "paused"> => {
-    const workspace = await db.workspace.findUniqueOrThrow({
-      where: { id: workspaceId },
+  const getWorkspaceInstanceStatus = async (
+    workspaceInstanceId: bigint,
+  ): Promise<"on" | "off" | "paused" | "removed"> => {
+    const workspace = await db.workspace.findFirst({
+      where: { activeInstanceId: workspaceInstanceId },
       include: {
         activeInstance: true,
       },
     });
+    if (workspace == null || workspace.status === WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP) {
+      return "removed";
+    }
     if (workspace.activeInstance == null) {
-      return "off";
+      throw new Error("impossible");
     }
     const firecrackerService = injector.resolve(Token.FirecrackerService)(
       workspace.activeInstance.firecrackerInstanceId,
@@ -438,6 +443,6 @@ export const createActivities = async (
     createWorkspace,
     cancelPrebuilds,
     changePrebuildEventStatus,
-    getWorkspaceStatus,
+    getWorkspaceInstanceStatus,
   };
 };

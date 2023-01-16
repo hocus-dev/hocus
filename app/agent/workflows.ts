@@ -38,7 +38,7 @@ const {
   stopWorkspace,
   cancelPrebuilds,
   changePrebuildEventStatus,
-  getWorkspaceStatus,
+  getWorkspaceInstanceStatus,
 } = proxyActivities<Activites>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -195,8 +195,8 @@ export async function runCreateWorkspace(args: {
 
 export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceInstance> {
   const workspaceInstance = await startWorkspace(workspaceId);
-  await startChild(monitorWorkspace, {
-    args: [workspaceId],
+  await startChild(monitorWorkspaceInstance, {
+    args: [workspaceId, workspaceInstance.id],
     workflowId: workspaceInstance.monitoringWorkflowId,
   });
   return workspaceInstance;
@@ -206,14 +206,23 @@ export async function runStopWorkspace(workspaceId: bigint): Promise<void> {
   return await stopWorkspace(workspaceId);
 }
 
-export async function monitorWorkspace(workspaceId: bigint): Promise<void> {
+export async function monitorWorkspaceInstance(
+  workspaceId: bigint,
+  workspaceInstanceId: bigint,
+): Promise<void> {
   for (let i = 0; i < 1000; i++) {
     await sleep(5000);
-    const status = await retryWorkflow(async () => await getWorkspaceStatus(workspaceId), 10, 1000);
+    const status = await retryWorkflow(() => getWorkspaceInstanceStatus(workspaceInstanceId), {
+      maxRetries: 10,
+      retryIntervalMs: 1000,
+    });
+    if (status === "removed") {
+      return;
+    }
     if (status !== "on") {
       await executeChild(runStopWorkspace, { args: [workspaceId] });
       return;
     }
   }
-  await continueAsNew<typeof monitorWorkspace>(workspaceId);
+  await continueAsNew<typeof monitorWorkspaceInstance>(workspaceId, workspaceInstanceId);
 }

@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { WorkspaceStatus } from "@prisma/client";
 import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
@@ -18,7 +19,7 @@ import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "./test-constants";
 import { execSshCmdThroughProxy } from "./test-utils";
-import { sleep } from "./utils";
+import { retry, sleep } from "./utils";
 import {
   runBuildfsAndPrebuilds,
   runCreateWorkspace,
@@ -70,10 +71,9 @@ beforeAll(async () => {
   // Filter INFO log messages for clearer test output
   Runtime.install({
     logger: new DefaultLogger("WARN", (entry: LogEntry) => {
-      if (
-        entry.message.includes("InvalidWorkspaceStatusError") &&
-        entry.message.includes("runStartWorkspace")
-      ) {
+      const error = entry.meta?.error;
+      const msg = "Workspace is not in WORKSPACE_STATUS_STOPPED state";
+      if (error?.stack?.includes(msg) || error?.cause?.stack?.includes(msg)) {
         // there is a test case where we expect this error,
         // so in order not to pollute the test output with it,
         // we suppress it
@@ -105,7 +105,7 @@ test.concurrent("HOST_PERSISTENT_DIR has no trailing slash", async () => {
 test.concurrent(
   "runBuildfsAndPrebuilds",
   provideActivities(async ({ activities, injector, db }) => {
-    let isGetWorkspaceStatusMocked = true;
+    let isGetWorkspaceInstanceStatusMocked = true;
     const { client, nativeConnection } = testEnv;
     const worker = await Worker.create({
       connection: nativeConnection,
@@ -113,12 +113,12 @@ test.concurrent(
       workflowsPath: require.resolve("./workflows"),
       activities: {
         ...activities,
-        getWorkspaceStatus: async (workspaceId: bigint) => {
-          if (isGetWorkspaceStatusMocked) {
+        getWorkspaceInstanceStatus: async (workspaceInstanceId: bigint) => {
+          if (isGetWorkspaceInstanceStatusMocked) {
             await sleep(100);
             return "on";
           } else {
-            return activities.getWorkspaceStatus(workspaceId);
+            return activities.getWorkspaceInstanceStatus(workspaceInstanceId);
           }
         },
       },
@@ -320,6 +320,37 @@ test.concurrent(
       await firecrackerService3.shutdownVM();
       await firecrackerService3.tryDeleteVmDir();
       await stopWorkspace();
+
+      const workspaceInstance4 = await startWorkspace();
+      isGetWorkspaceInstanceStatusMocked = false;
+      const firecrackerService4 = injector.resolve(Token.FirecrackerService)(
+        workspaceInstance4.firecrackerInstanceId,
+      );
+      await firecrackerService4.shutdownVM();
+      await sleep(1000);
+      const waitForStatus = (statuses: WorkspaceStatus[]) =>
+        retry(
+          async () => {
+            const workspace4 = await db.workspace.findUniqueOrThrow({
+              where: {
+                id: workspace.id,
+              },
+            });
+            // the monitoring workflow should have stopped the workspace
+            expect(statuses.includes(workspace4.status)).toBe(true);
+          },
+          10,
+          1000,
+        );
+      await waitForStatus([
+        WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP,
+        WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+      ]);
+      await waitForStatus([WorkspaceStatus.WORKSPACE_STATUS_STOPPED]);
+      const monitoringWorkflowInfo = await client.workflow
+        .getHandle(workspaceInstance4.monitoringWorkflowId)
+        .describe();
+      expect(monitoringWorkflowInfo.status.name).toBe("COMPLETED");
     });
   }),
 );
