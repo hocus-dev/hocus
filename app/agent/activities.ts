@@ -2,6 +2,7 @@ import type {
   GitObject,
   PrebuildEvent,
   PrebuildEventFiles,
+  PrebuildEventStatus,
   Prisma,
   Project,
   Workspace,
@@ -198,6 +199,16 @@ export const createActivities = async (
   const cancelPrebuilds = async (prebuildEventIds: bigint[]): Promise<void> => {
     const prebuildService = injector.resolve(Token.PrebuildService);
     await db.$transaction((tdb) => prebuildService.cancelPrebuilds(tdb, prebuildEventIds));
+  };
+
+  const changePrebuildEventStatus = async (
+    prebuildEventId: bigint,
+    status: PrebuildEventStatus,
+  ): Promise<void> => {
+    const prebuildService = injector.resolve(Token.PrebuildService);
+    await db.$transaction((tdb) =>
+      prebuildService.changePrebuildEventStatus(tdb, prebuildEventId, status),
+    );
   };
 
   const createWorkspace = async (args: {
@@ -406,5 +417,6 @@ export const createActivities = async (
     createPrebuildFiles,
     createWorkspace,
     cancelPrebuilds,
+    changePrebuildEventStatus,
   };
 };

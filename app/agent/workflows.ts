@@ -30,6 +30,7 @@ const {
   startWorkspace,
   stopWorkspace,
   cancelPrebuilds,
+  changePrebuildEventStatus,
 } = proxyActivities<Activites>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -130,6 +131,9 @@ export async function runBuildfsAndPrebuilds(
 
   await waitForPromisesWorkflow(
     buildfsEventsToPrebuilds.map(async ([buildfsEventId, prebuildEvents]) => {
+      await waitForPromisesWorkflow(
+        prebuildEvents.map((e) => changePrebuildEventStatus(e.id, "PREBUILD_EVENT_STATUS_RUNNING")),
+      );
       if (buildfsEventId != null) {
         const buildfsResult = await executeChild(runBuildfs, { args: [buildfsEventId] });
         if (!buildfsResult.buildSuccessful) {
@@ -163,7 +167,12 @@ export async function runPrebuild(
     prebuildEventId,
     sourceProjectDrivePath,
   });
-  await prebuild({ prebuildEventId });
+  const prebuildOutput = await prebuild({ prebuildEventId });
+  const prebuildTasksFailed = prebuildOutput.some((o) => o.status === "VM_TASK_STATUS_ERROR");
+  await changePrebuildEventStatus(
+    prebuildEventId,
+    prebuildTasksFailed ? "PREBUILD_EVENT_STATUS_ERROR" : "PREBUILD_EVENT_STATUS_SUCCESS",
+  );
 }
 
 export async function runCreateWorkspace(args: {

@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
 import type { LogEntry } from "@temporalio/worker";
@@ -137,15 +138,58 @@ test.concurrent(
         ),
       ),
     );
+    const testBranchExpectedResults = [
+      {
+        testCases: [
+          {
+            project: projects[0],
+            buildfsStatus: VmTaskStatus.VM_TASK_STATUS_SUCCESS,
+            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS,
+          },
+          {
+            project: projects[1],
+            buildfsStatus: VmTaskStatus.VM_TASK_STATUS_SUCCESS,
+            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS,
+          },
+        ],
+      },
+      {
+        testCases: [
+          {
+            project: projects[0],
+            buildfsStatus: VmTaskStatus.VM_TASK_STATUS_SUCCESS,
+            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_ERROR,
+          },
+          {
+            project: projects[1],
+            buildfsStatus: null,
+            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS,
+          },
+        ],
+      },
+      {
+        testCases: [
+          {
+            project: projects[0],
+            buildfsStatus: VmTaskStatus.VM_TASK_STATUS_ERROR,
+            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_CANCELLED,
+          },
+          {
+            project: projects[1],
+            buildfsStatus: null,
+            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS,
+          },
+        ],
+      },
+    ] as const;
     const testBranches = [
       "refs/heads/run-buildfs-and-prebuilds-test-1",
       "refs/heads/run-buildfs-and-prebuilds-test-2",
       "refs/heads/run-buildfs-and-prebuilds-test-3-error",
     ].map((name) => unwrap(updates.newGitBranches.find((b) => b.name === name)));
     await worker.runUntil(async () => {
-      const workflowId = uuidv4();
-      const result = await client.workflow.execute(runBuildfsAndPrebuilds, {
-        workflowId,
+      await client.workflow.execute(runBuildfsAndPrebuilds, {
+        workflowId: uuidv4(),
         taskQueue: "test",
         retry: { maximumAttempts: 1 },
         args: [
@@ -153,7 +197,34 @@ test.concurrent(
           testBranches.map((b) => ({ gitBranchId: b.id, gitObjectId: b.gitObjectId })),
         ],
       });
-      expect(result).toBeUndefined();
+
+      for (const i of testBranches.keys()) {
+        const branch = testBranches[i];
+        for (const { project, buildfsStatus, prebuildStatus } of testBranchExpectedResults[i]
+          .testCases) {
+          const prebuildEvents = await db.prebuildEvent.findMany({
+            where: {
+              gitObjectId: branch.gitObjectId,
+              projectId: project.id,
+            },
+            include: {
+              buildfsEvent: {
+                include: {
+                  vmTask: true,
+                },
+              },
+            },
+          });
+          expect(prebuildEvents.length).toBe(1);
+          const prebuildEvent = prebuildEvents[0];
+          expect(prebuildEvent.status).toBe(prebuildStatus);
+          if (buildfsStatus != null) {
+            expect(prebuildEvent.buildfsEvent?.vmTask?.status).toBe(buildfsStatus);
+          } else {
+            expect(prebuildEvent.buildfsEvent).toBeNull();
+          }
+        }
+      }
 
       const project = await db.project.findUniqueOrThrow({
         where: {

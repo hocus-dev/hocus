@@ -362,11 +362,27 @@ export class PrebuildService {
     }
   }
 
+  async changePrebuildEventStatus(
+    db: Prisma.Client,
+    prebuildEventId: bigint,
+    status: PrebuildEventStatus,
+  ): Promise<void> {
+    await db.prebuildEvent.update({
+      where: { id: prebuildEventId },
+      data: { status },
+    });
+  }
+
   async cancelPrebuilds(db: Prisma.TransactionClient, prebuildEventIds: bigint[]): Promise<void> {
-    await db.prebuildEvent.updateMany({
+    const updatedPrebuildEventsCount = await db.prebuildEvent.updateMany({
       where: { id: { in: prebuildEventIds } },
       data: { status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_CANCELLED },
     });
+    if (updatedPrebuildEventsCount.count !== prebuildEventIds.length) {
+      throw new Error(
+        `Updated ${updatedPrebuildEventsCount.count} rows, expected ${prebuildEventIds.length}`,
+      );
+    }
     const prebuildEvents = await db.prebuildEvent.findMany({
       where: { id: { in: prebuildEventIds } },
       include: { tasks: true },
