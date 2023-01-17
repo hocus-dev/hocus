@@ -43,7 +43,7 @@ export default function App() {
           <Links />
           <link rel="stylesheet" href="/devicon.min.css" />
         </head>
-        <body className="h-full dark:bg-gray-800 dark:text-white">
+        <body className="h-full flex flex-col dark:bg-gray-800 dark:text-white">
           <Outlet />
           <ScrollRestoration />
           <Scripts />
