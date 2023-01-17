@@ -1,9 +1,10 @@
 import { Button } from "flowbite-react";
+import { AppPage } from "~/components/app-page";
 import { GlobalContext } from "~/components/global-context.shared";
 
 export default function AppIndex(): JSX.Element {
   return (
-    <div>
+    <AppPage>
       <GlobalContext.Consumer>
         {({ gaUserId, csrfToken, userEmail }) => (
           <>
@@ -18,6 +19,6 @@ export default function AppIndex(): JSX.Element {
           Sign out
         </Button>
       </form>
-    </div>
+    </AppPage>
   );
 }
