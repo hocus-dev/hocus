@@ -22,8 +22,11 @@ export const meta: MetaFunction = () => ({
 
 export const links: LinksFunction = () => {
   return [
-    { rel: "stylesheet", href: styles },
+    { rel: "stylesheet", href: "/devicon.min.css" },
     { rel: "stylesheet", href: "/font-awesome/css/all.min.css" },
+    { rel: "stylesheet", href: styles },
+    /* Must be the last entry to prevent a flash of unstyled content. Based on https://stackoverflow.com/a/43823506 */
+    { rel: "stylesheet", href: "/unstyled-content.css" },
   ];
 };
 
@@ -42,9 +45,10 @@ export default function App() {
     <GlobalContext.Provider value={{ gaUserId, csrfToken, userEmail }}>
       <html className="dark h-full" lang="en">
         <head>
+          {/* Prevents a flash of unstyled content. Based on https://stackoverflow.com/a/43823506 */}
+          <style>{"html { display: none; }"}</style>
           <Meta />
           <Links />
-          <link rel="stylesheet" href="/devicon.min.css" />
         </head>
         <body className="h-full flex flex-col dark:bg-gray-800 dark:text-white">
           <Outlet />
