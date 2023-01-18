@@ -20,7 +20,9 @@ export const Navbar = (): JSX.Element => {
           <Dropdown.Header>
             <GlobalContext.Consumer>
               {({ userEmail }) => (
-                <span className="block truncate text-sm font-medium">{userEmail}</span>
+                <span className="block truncate text-sm font-medium text-gray-400">
+                  {userEmail}
+                </span>
               )}
             </GlobalContext.Consumer>
           </Dropdown.Header>

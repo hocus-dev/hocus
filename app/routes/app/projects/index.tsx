@@ -4,6 +4,7 @@ import { Button } from "flowbite-react";
 import { AppPage } from "~/components/app-page";
 import NoProjectsView from "~/components/projects/no-projects-view";
 import { ProjectList } from "~/components/projects/project-list";
+import { PagePaths } from "~/page-paths.shared";
 
 export const loader = async () => {
   const projects = Array.from({ length: 10 }).map((_, i) => ({
@@ -25,7 +26,7 @@ export default function ProjectsRoute(): JSX.Element {
     <AppPage>
       <div className="mt-8 mb-4 flex justify-between items-end">
         <h1 className="text-4xl font-bold">Projects</h1>
-        <Button href="/app/projects/new" color="success">
+        <Button href={PagePaths.NewProject} color="success">
           New Project
         </Button>
       </div>

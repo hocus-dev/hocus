@@ -1,10 +1,14 @@
 import { Button, Card } from "flowbite-react";
+import { PagePaths } from "~/page-paths.shared";
 
 export default function NoProjectsView(): JSX.Element {
   return (
     <div className="w-full flex flex-col justify-center grow">
       <div className="flex justify-center">
-        <a href="xd" className="max-w-md hover:drop-shadow-xl hover:scale-[1.03] transition-all">
+        <a
+          href={PagePaths.NewProject}
+          className="max-w-md hover:drop-shadow-xl hover:scale-[1.03] transition-all"
+        >
           <Card>
             <div className="py-6 text-center">
               <h5 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">

@@ -21,7 +21,10 @@ export const meta: MetaFunction = () => ({
 });
 
 export const links: LinksFunction = () => {
-  return [{ rel: "stylesheet", href: styles }];
+  return [
+    { rel: "stylesheet", href: styles },
+    { rel: "stylesheet", href: "/font-awesome/css/all.min.css" },
+  ];
 };
 
 export const loader = async (args: LoaderArgs) => {
