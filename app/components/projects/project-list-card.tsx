@@ -30,7 +30,7 @@ function ProjectListCardComponent(props: ProjectListCardProps): JSX.Element {
             <i className="fa-solid fa-clock text-xs mr-2"></i>
             <span>Last updated {lastUpdatedAt}</span>
           </p>
-          <Button color={"dark"} outline={true} size={"xs"}>
+          <Button tabIndex={-1} color={"dark"} outline={true} size={"xs"}>
             <span className="text-sm flex flex-nowrap items-center">
               <i className="fa-solid fa-folder-open mr-2"></i>
               <span>Open</span>
