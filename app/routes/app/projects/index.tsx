@@ -26,8 +26,9 @@ export default function ProjectsRoute(): JSX.Element {
     <AppPage>
       <div className="mt-8 mb-4 flex justify-between items-end">
         <h1 className="text-4xl font-bold">Projects</h1>
-        <Button href={PagePaths.NewProject} color="success">
-          New Project
+        <Button href={PagePaths.NewProject} color="success" className="transition-all">
+          <i className="fa-solid fa-file-circle-plus mr-2"></i>
+          <span>New Project</span>
         </Button>
       </div>
       <hr className="bg-gray-600 border-gray-600 mb-8" />

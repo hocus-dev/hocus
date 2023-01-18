@@ -15,24 +15,35 @@ export const Navbar = (): JSX.Element => {
         <Dropdown
           arrowIcon={true}
           inline={true}
-          label={<Avatar alt="User settings" color="white" rounded={true} />}
+          label={
+            <div className="opacity-[0.8]">
+              <Avatar alt="User settings" color="white" rounded={true} img="/user-icon.jpg" />
+            </div>
+          }
         >
           <Dropdown.Header>
             <GlobalContext.Consumer>
               {({ userEmail }) => (
                 <span className="block truncate text-sm font-medium text-gray-400">
-                  {userEmail}
+                  <i className="fa-solid fa-envelope mr-2"></i>
+                  <span>{userEmail}</span>
                 </span>
               )}
             </GlobalContext.Consumer>
           </Dropdown.Header>
           <a href={PagePaths.Settings}>
-            <Dropdown.Item>Settings</Dropdown.Item>
+            <Dropdown.Item>
+              <i className="fa-solid fa-gear mr-2"></i>
+              <span>Settings</span>
+            </Dropdown.Item>
           </a>
           <Dropdown.Divider />
           <form action={PagePaths.Logout} method="GET">
             <button className="w-full" type="submit">
-              <Dropdown.Item>Sign out</Dropdown.Item>
+              <Dropdown.Item>
+                <i className="fa-solid fa-right-from-bracket mr-2"></i>
+                <span>Sign out</span>
+              </Dropdown.Item>
             </button>
           </form>
         </Dropdown>
