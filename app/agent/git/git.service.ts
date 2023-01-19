@@ -141,7 +141,7 @@ export class GitService {
     return updatedRemotes;
   }
 
-  async isGitSshUrl(url: string): Promise<boolean> {
+  isGitSshUrl(url: string): boolean {
     return this.gitUrlRegex.test(url);
   }
 

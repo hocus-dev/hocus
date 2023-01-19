@@ -20,8 +20,8 @@ function ProjectListCardComponent(props: ProjectListCardProps): JSX.Element {
       className="hover:drop-shadow-xl hover:scale-[1.03] active:scale-[0.99] transition-all"
     >
       <Card key={props.externalId}>
-        <h3 className="text-lg font-extrabold">{props.name}</h3>
-        <h4 className="text-gray-400">
+        <h3 className="text-lg font-extrabold text-wrap">{props.name}</h3>
+        <h4 className="text-gray-400 truncate">
           <i className="fa-solid fa-link mr-2 text-xs"></i>
           <span>{props.repositoryUrl}</span>
         </h4>

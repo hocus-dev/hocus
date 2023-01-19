@@ -219,3 +219,17 @@ test.concurrent(
     expect(files.every((f) => f.id === files[0].id)).toBe(true);
   }),
 );
+
+test.concurrent(
+  "isGitSshUrl",
+  provideInjector(async ({ injector }) => {
+    const gitService = injector.resolve(Token.GitService);
+
+    expect(
+      gitService.isGitSshUrl(
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKiORinAjmVtn01GMUQ9TegSL4Wrz4dorS18OUOFv1YL hocus",
+      ),
+    ).toBe(false);
+    expect(gitService.isGitSshUrl(TESTS_REPO_URL)).toBe(true);
+  }),
+);
