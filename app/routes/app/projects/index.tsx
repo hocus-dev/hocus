@@ -1,3 +1,4 @@
+import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { Button } from "flowbite-react";
@@ -5,17 +6,20 @@ import { AppPage } from "~/components/app-page";
 import NoProjectsView from "~/components/projects/no-projects-view";
 import { ProjectList } from "~/components/projects/project-list";
 import { PagePaths } from "~/page-paths.shared";
+import { numericSort } from "~/utils.shared";
 
-export const loader = async () => {
-  const projects = Array.from({ length: 10 }).map((_, i) => ({
-    externalId: `woop woop ${i}`,
-    name: `My project ${i}`,
-    repositoryUrl: "git@github.com:hocus-dev/hocus.git",
-    lastUpdatedAt: Date.now() - 1000 * 60 * i,
+export const loader = async ({ context: { db } }: LoaderArgs) => {
+  const projects = await db.project.findMany({ include: { gitRepository: true } });
+  const props = projects.map((project) => ({
+    externalId: project.externalId,
+    name: project.name,
+    repositoryUrl: project.gitRepository.url,
+    createdAt: project.createdAt.getTime(),
   }));
+  props.sort((a, b) => numericSort(b.createdAt, a.createdAt));
 
   return json({
-    projects,
+    projects: props,
   });
 };
 

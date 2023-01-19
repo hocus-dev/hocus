@@ -31,6 +31,8 @@ export const config = makeConfig()({
     url: get("GOOGLE_ANALYTICS_URL", "https://www.google-analytics.com/debug"),
   }),
   agent: () => ({
+    temporalAddress: get("AGENT_TEMPORAL_ADDRESS", "localhost:7233"),
+    databaseUrl: get("AGENT_DATABASE_URL", "postgres://postgres:pass@localhost:5432/rooms"),
     defaultKernel: get("AGENT_KERNEL_PATH", "/srv/jailer/resources/vmlinux-5.6-x86_64.bin"),
     hostBuildfsResourcesDir: get("AGENT_HOST_BUILDFS_RESOURCES_DIR", "/app/resources"),
     buildfsRootFs: get("AGENT_BUILDFS_ROOTFS", "/srv/jailer/resources/buildfs.ext4"),
@@ -47,5 +49,8 @@ export const config = makeConfig()({
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:
       process.env.AGENT_PREBUILD_SSH_PRIVATE_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PRIVATE,
+  }),
+  temporalConnection: () => ({
+    temporalServerUrl: process.env.TEMPORAL_SERVER_URL ?? "localhost:7233",
   }),
 });

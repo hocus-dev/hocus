@@ -2,6 +2,7 @@ import { DefaultLogger } from "@temporalio/worker";
 import { createInjector, Scope } from "typed-inject";
 import { config } from "~/config";
 import { ProjectService } from "~/project/project.service";
+import { SshKeyService } from "~/ssh-key/ssh-key.service";
 import { Token } from "~/token";
 import { WorkspaceService } from "~/workspace/workspace.service";
 
@@ -31,6 +32,7 @@ export const createAgentInjector = (
     [Token.ProjectService]?: typeof ProjectService;
     [Token.WorkspaceService]?: typeof WorkspaceService;
     [Token.WorkspaceAgentService]?: typeof WorkspaceAgentService;
+    [Token.SshKeyService]?: typeof SshKeyService;
   } = {},
 ) =>
   createInjector()
@@ -59,5 +61,6 @@ export const createAgentInjector = (
     .provideClass(
       Token.WorkspaceAgentService,
       overrides[Token.WorkspaceAgentService] ?? WorkspaceAgentService,
-    );
+    )
+    .provideClass(Token.SshKeyService, overrides[Token.SshKeyService] ?? SshKeyService);
 export type AgentInjector = ReturnType<typeof createAgentInjector>;

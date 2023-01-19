@@ -1,4 +1,4 @@
-import type { Workspace, WorkspaceInstance } from "@prisma/client";
+import type { Workspace, WorkspaceInstance, Project, GitRepository } from "@prisma/client";
 import {
   proxyActivities,
   uuid4,
@@ -39,6 +39,7 @@ const {
   cancelPrebuilds,
   changePrebuildEventStatus,
   getWorkspaceInstanceStatus,
+  addProjectAndRepository,
 } = proxyActivities<Activites>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -225,4 +226,13 @@ export async function monitorWorkspaceInstance(
     }
   }
   await continueAsNew<typeof monitorWorkspaceInstance>(workspaceId, workspaceInstanceId);
+}
+
+export async function runAddProjectAndRepository(args: {
+  gitRepositoryUrl: string;
+  projectName: string;
+  projectWorkspaceRoot: string;
+}): Promise<{ project: Project; gitRepository: GitRepository }> {
+  // TODO: schedule repository sync workflow here
+  return await addProjectAndRepository(args);
 }

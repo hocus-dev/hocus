@@ -25,4 +25,6 @@ export const Token = {
   ProjectService: "ProjectServiceT",
   WorkspaceService: "WorkspaceServiceT",
   WorkspaceAgentService: "WorkspaceAgentServiceT",
+  TemporalClient: "TemporalClientT",
+  SshKeyService: "SshKeyServiceT",
 } as const;

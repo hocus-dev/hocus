@@ -24,4 +24,4 @@ trap clean_up INT TERM EXIT
 source "$REPO_DIR/ops/resources/gitpod-ip.sh"
 
 docker-compose -p agentdev exec agent \
-  /bin/bash -c "ops/docker/resources/setup-network.sh && yarn && ops/bin/link.sh && source ops/resources/gitpod-ip.sh && DB_HOST=db TEMPORAL_ADDRESS=$GITPOD_IP:7233 /bin/bash"
+  /bin/bash -c "ops/docker/resources/setup-network.sh && yarn && ops/bin/link.sh && source ops/resources/gitpod-ip.sh && DB_HOST=db AGENT_TEMPORAL_ADDRESS=$GITPOD_IP:7233 AGENT_DATABASE_URL=postgres://postgres:pass@$GITPOD_IP:5432/rooms /bin/bash"

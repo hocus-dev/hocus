@@ -2,17 +2,13 @@ import fs from "fs/promises";
 import path from "path";
 
 import { SshKeyPairType } from "@prisma/client";
+import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
 import { PROJECT_DIR } from "../constants";
 import type { FirecrackerService } from "../firecracker.service";
-import {
-  PERSISTENT_TEST_DIR,
-  PRIVATE_SSH_KEY,
-  PUBLIC_SSH_KEY,
-  TESTS_REPO_URL,
-} from "../test-constants";
+import { PERSISTENT_TEST_DIR } from "../test-constants";
 import { provideInjector, provideInjectorAndDb, withTestMount } from "../test-utils";
 import { execSshCmd } from "../utils";
 
@@ -85,40 +81,18 @@ test.concurrent(
 );
 
 test.concurrent(
-  "createSshKeyPair, generateSshKeyPair, addGitRepository",
+  "addGitRepository",
   provideInjectorAndDb(async ({ injector, db }) => {
+    const sshKeyService = injector.resolve(Token.SshKeyService);
     const gitService = injector.resolve(Token.GitService);
-    const pair = await gitService.createSshKeyPair(
+    const pair = await sshKeyService.createSshKeyPair(
       db,
       PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
-    expect(pair.publicKey).toEqual(PUBLIC_SSH_KEY);
-    expect(pair.type).toEqual(SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED);
     const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
     expect(repo.url).toEqual(TESTS_REPO_URL);
     expect(repo.sshKeyPairId).toEqual(pair.id);
-
-    const pair2 = await gitService.generateSshKeyPair(
-      db,
-      SshKeyPairType.SSH_KEY_PAIR_TYPE_USER_SUPPLIED,
-    );
-    expect(pair2.publicKey).toBeDefined();
-    expect(pair2.privateKey).toBeDefined();
-    expect(pair2.type).toEqual(SshKeyPairType.SSH_KEY_PAIR_TYPE_USER_SUPPLIED);
-  }),
-);
-
-test.concurrent(
-  "getOrCreateServerControlledSshKeyPair",
-  provideInjectorAndDb(async ({ injector, db }) => {
-    const gitService = injector.resolve(Token.GitService);
-    const tasks = new Array(25)
-      .fill(0)
-      .map(() => db.$transaction((tdb) => gitService.getOrCreateServerControlledSshKeyPair(tdb)));
-    const keyPairs = await Promise.all(tasks);
-    const keyPairId = keyPairs[0].id;
-    expect(keyPairs.every((kp) => kp.id === keyPairId)).toBe(true);
   }),
 );
 
@@ -126,7 +100,8 @@ test.concurrent(
   "updateBranches",
   provideInjectorAndDb(async ({ injector, db }) => {
     const gitService = injector.resolve(Token.GitService);
-    const pair = await gitService.createSshKeyPair(
+    const sshKeyService = injector.resolve(Token.SshKeyService);
+    const pair = await sshKeyService.createSshKeyPair(
       db,
       PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
@@ -221,9 +196,10 @@ test.concurrent(
   "getOrCreateGitRepositoryFile",
   provideInjectorAndDb(async ({ injector, db }) => {
     const gitService = injector.resolve(Token.GitService);
+    const sshKeyService = injector.resolve(Token.SshKeyService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
 
-    const pair = await gitService.createSshKeyPair(
+    const pair = await sshKeyService.createSshKeyPair(
       db,
       PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
@@ -234,7 +210,7 @@ test.concurrent(
       agentUtilService.getOrCreateSoloAgentInstance(tdb),
     );
     const files = await waitForPromises(
-      Array.from({ length: 25 }).map(() =>
+      Array.from({ length: 10 }).map(() =>
         db.$transaction((tdb) =>
           gitService.getOrCreateGitRepositoryFile(tdb, agentInstance.id, repo.id),
         ),

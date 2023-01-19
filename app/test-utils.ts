@@ -1,9 +1,12 @@
+import type { Prisma } from "@prisma/client";
 import { FetchError, ResponseError } from "firecracker-client";
 import * as sinon from "ts-sinon";
 import type { Class } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
+import { createAppInjector } from "./app-injector.server";
 import { GroupError } from "./group-error";
+import { provideDb } from "./test-utils/db.server";
 
 export const constructorStub = <T extends Class.Class>(ctor: T) =>
   function () {
@@ -58,4 +61,20 @@ export const errToString = (err: unknown): string => {
     return `${err.message}\nStack: ${err.stack}`;
   }
   return String(err);
+};
+
+export const provideAppInjector = (
+  testFn: (args: { injector: ReturnType<typeof createAppInjector> }) => Promise<void>,
+): (() => Promise<void>) => {
+  const injector = createAppInjector();
+  return printErrors(() => testFn({ injector }));
+};
+
+export const provideAppInjectorAndDb = (
+  testFn: (args: {
+    injector: ReturnType<typeof createAppInjector>;
+    db: Prisma.NonTransactionClient;
+  }) => Promise<void>,
+): (() => Promise<void>) => {
+  return provideAppInjector(({ injector }) => provideDb((db) => testFn({ injector, db }))());
 };

@@ -1,4 +1,4 @@
-import { Button, Card, Label, TextInput } from "flowbite-react";
+import { Button, Card, Label, Spinner, TextInput } from "flowbite-react";
 import { useState } from "react";
 import { PagePaths } from "~/page-paths.shared";
 
@@ -6,14 +6,18 @@ import { CsrfInput } from "../csrf-input";
 
 export function NewProjectForm(props: { publicSshKey: string }): JSX.Element {
   const [isCopied, setIsCopied] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const copyPublicKeyToClipboard = async () => {
     await navigator.clipboard.writeText(props.publicSshKey);
     setIsCopied(true);
   };
+  const onSubmit = () => {
+    setIsSubmitted(true);
+  };
 
   return (
-    <form action={PagePaths.NewProject} method="POST">
+    <form action={PagePaths.NewProject} onSubmit={onSubmit} method="POST">
       <div>
         <CsrfInput />
         <div className="mb-2 block">
@@ -100,9 +104,20 @@ export function NewProjectForm(props: { publicSshKey: string }): JSX.Element {
           }
         />
         <div className="flex justify-end mt-4 w-full">
-          <Button type="submit" color="success" className="transition-all">
-            <i className="fa-solid fa-file-circle-plus mr-2"></i>
-            <span>Create Project</span>
+          <Button disabled={isSubmitted} type="submit" color="success" className="transition-all">
+            <div className="flex flex-nowrap items-center">
+              {isSubmitted && (
+                <div>
+                  <Spinner
+                    className="mr-4"
+                    color="success"
+                    aria-label="Project is being created..."
+                  />
+                </div>
+              )}
+              <i className="fa-solid fa-file-circle-plus mr-2"></i>
+              <span>Create Project</span>
+            </div>
           </Button>
         </div>
       </div>

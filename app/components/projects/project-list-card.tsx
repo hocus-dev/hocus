@@ -9,11 +9,11 @@ export interface ProjectListCardProps {
   /**
    * Timestamp in milliseconds.
    */
-  lastUpdatedAt: number;
+  createdAt: number;
 }
 
 function ProjectListCardComponent(props: ProjectListCardProps): JSX.Element {
-  const lastUpdatedAt = moment(props.lastUpdatedAt).fromNow();
+  const createdAt = moment(props.createdAt).fromNow();
   return (
     <a
       href="/xd"
@@ -28,7 +28,7 @@ function ProjectListCardComponent(props: ProjectListCardProps): JSX.Element {
         <div className="flex w-full justify-between items-end">
           <p className="text-gray-400 text-sm">
             <i className="fa-solid fa-clock text-xs mr-2"></i>
-            <span>Last updated {lastUpdatedAt}</span>
+            <span>Created {createdAt}</span>
           </p>
           <Button tabIndex={-1} color={"dark"} outline={true} size={"xs"}>
             <span className="text-sm flex flex-nowrap items-center">

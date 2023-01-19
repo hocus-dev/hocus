@@ -1,5 +1,6 @@
 import type {
   GitObject,
+  GitRepository,
   PrebuildEvent,
   PrebuildEventFiles,
   PrebuildEventStatus,
@@ -429,6 +430,30 @@ export const createActivities = async (
     return vmInfo.status;
   };
 
+  const addProjectAndRepository = async (args: {
+    gitRepositoryUrl: string;
+    projectName: string;
+    projectWorkspaceRoot: string;
+  }): Promise<{ project: Project; gitRepository: GitRepository }> => {
+    const gitService = injector.resolve(Token.GitService);
+    const sshKeyService = injector.resolve(Token.SshKeyService);
+    const projectService = injector.resolve(Token.ProjectService);
+    return await db.$transaction(async (tdb) => {
+      const sshKeyPair = await sshKeyService.getOrCreateServerControlledSshKeyPair(tdb);
+      const gitRepository = await gitService.addGitRepositoryIfNotExists(
+        tdb,
+        args.gitRepositoryUrl,
+        sshKeyPair.id,
+      );
+      const project = await projectService.createProject(tdb, {
+        gitRepositoryId: gitRepository.id,
+        name: args.projectName,
+        rootDirectoryPath: args.projectWorkspaceRoot,
+      });
+      return { project, gitRepository };
+    });
+  };
+
   return {
     fetchRepository,
     buildfs,
@@ -444,5 +469,6 @@ export const createActivities = async (
     cancelPrebuilds,
     changePrebuildEventStatus,
     getWorkspaceInstanceStatus,
+    addProjectAndRepository,
   };
 };

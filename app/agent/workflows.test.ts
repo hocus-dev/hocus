@@ -8,6 +8,7 @@ import { Worker, Runtime, DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "~/config";
 import { printErrors } from "~/test-utils";
+import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
@@ -17,11 +18,11 @@ import { unwrap, waitForPromises } from "~/utils.shared";
 import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
-import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "./test-constants";
 import { execSshCmdThroughProxy } from "./test-utils";
 import { retry, sleep } from "./utils";
 import {
   runBuildfsAndPrebuilds,
+  runAddProjectAndRepository,
   runCreateWorkspace,
   runStartWorkspace,
   runStopWorkspace,
@@ -129,7 +130,8 @@ test.concurrent(
 
     const gitService = injector.resolve(Token.GitService);
     const projectService = injector.resolve(Token.ProjectService);
-    const pair = await gitService.createSshKeyPair(
+    const sshKeyService = injector.resolve(Token.SshKeyService);
+    const pair = await sshKeyService.createSshKeyPair(
       db,
       PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
@@ -351,6 +353,46 @@ test.concurrent(
         .getHandle(workspaceInstance4.monitoringWorkflowId)
         .describe();
       expect(monitoringWorkflowInfo.status.name).toBe("COMPLETED");
+    });
+  }),
+);
+
+test.concurrent(
+  "runAddProjectAndRepository",
+  provideActivities(async ({ activities }) => {
+    const { client, nativeConnection } = testEnv;
+    const worker = await Worker.create({
+      connection: nativeConnection,
+      taskQueue: "test",
+      workflowsPath: require.resolve("./workflows"),
+      activities,
+      dataConverter: {
+        payloadConverterPath: require.resolve("~/temporal/data-converter"),
+      },
+    });
+
+    await worker.runUntil(async () => {
+      const runWorkflow = () =>
+        client.workflow.execute(runAddProjectAndRepository, {
+          workflowId: uuidv4(),
+          taskQueue: "test",
+          retry: { maximumAttempts: 1 },
+          args: [
+            {
+              gitRepositoryUrl: TESTS_REPO_URL,
+              projectName: "Test",
+              projectWorkspaceRoot: "/",
+            },
+          ],
+        });
+      const { project, gitRepository } = await runWorkflow();
+      expect(project.name).toBe("Test");
+      expect(project.rootDirectoryPath).toBe("/");
+      expect(gitRepository.url).toBe(TESTS_REPO_URL);
+
+      const { project: project2, gitRepository: gitRepository2 } = await runWorkflow();
+      expect(project2.id).not.toBe(project.id);
+      expect(gitRepository2.id).toBe(gitRepository.id);
     });
   }),
 );
