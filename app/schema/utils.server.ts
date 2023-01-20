@@ -3,6 +3,10 @@ import type { TypeCheck, ValueError } from "@sinclair/typebox/compiler";
 import { TypeCompiler } from "@sinclair/typebox/compiler";
 import type { Any } from "ts-toolbelt";
 
+import { AdditionalFormats } from "./additional-formats.server";
+
+AdditionalFormats.Configure();
+
 type SchemaValueType<T extends TSchema> = Any.Compute<Static<T>>;
 export type Validator<T extends TSchema> = TypeCheck<T> & {
   Parse: typeof parse<T>;
