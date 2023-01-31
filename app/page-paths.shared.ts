@@ -4,3 +4,5 @@ export const PagePaths = {
   ProjectList: "/app/projects",
   NewProject: "/app/new-project",
 } as const;
+
+export const getProjectPath = (projectId: string) => `/app/projects/${projectId}` as const;

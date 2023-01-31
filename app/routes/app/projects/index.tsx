@@ -10,6 +10,7 @@ import { numericSort } from "~/utils.shared";
 
 export const loader = async ({ context: { db } }: LoaderArgs) => {
   const projects = await db.project.findMany({ include: { gitRepository: true } });
+
   const props = projects.map((project) => ({
     externalId: project.externalId,
     name: project.name,
@@ -17,7 +18,6 @@ export const loader = async ({ context: { db } }: LoaderArgs) => {
     createdAt: project.createdAt.getTime(),
   }));
   props.sort((a, b) => numericSort(b.createdAt, a.createdAt));
-
   return json({
     projects: props,
   });

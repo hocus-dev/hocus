@@ -1,8 +1,7 @@
 import { Avatar, Dropdown, Navbar as FlowbiteNavbar } from "flowbite-react";
-import { GlobalContext } from "~/components/global-context.shared";
 import { PagePaths } from "~/page-paths.shared";
 
-export const Navbar = (): JSX.Element => {
+export const Navbar = (props: { userEmail?: string }): JSX.Element => {
   return (
     <FlowbiteNavbar fluid={true} rounded={false}>
       <FlowbiteNavbar.Brand href="/">
@@ -21,16 +20,14 @@ export const Navbar = (): JSX.Element => {
             </div>
           }
         >
-          <Dropdown.Header>
-            <GlobalContext.Consumer>
-              {({ userEmail }) => (
-                <span className="block truncate text-sm font-medium text-gray-400">
-                  <i className="fa-solid fa-envelope mr-2"></i>
-                  <span>{userEmail}</span>
-                </span>
-              )}
-            </GlobalContext.Consumer>
-          </Dropdown.Header>
+          {props.userEmail && (
+            <Dropdown.Header>
+              <span className="block truncate text-sm font-medium text-gray-400">
+                <i className="fa-solid fa-envelope mr-2"></i>
+                <span>{props.userEmail}</span>
+              </span>
+            </Dropdown.Header>
+          )}
           <a href={PagePaths.Settings}>
             <Dropdown.Item>
               <i className="fa-solid fa-gear mr-2"></i>

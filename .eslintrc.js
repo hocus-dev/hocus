@@ -1,6 +1,6 @@
 module.exports = {
   plugins: ["filename-rules"],
-  ignorePatterns: ["node_modules/**/*", "public/**/*", "build/**/*", "ops/**/*"],
+  ignorePatterns: ["node_modules/**/*", "public/**/*", "build/**/*", "ops/**/*", "deps/**/*"],
   overrides: [
     {
       files: ["*.ts", "*.tsx"],
@@ -15,6 +15,22 @@ module.exports = {
         ],
       },
     },
+    // {
+    //   files: ["app/routes/**/*.ts", "app/routes/**/*.tsx"],
+    //   parserOptions: {
+    //     project: "./tsconfig.json",
+    //   },
+    //   rules: {
+    //     "no-restricted-syntax": [
+    //       "warn",
+    //       {
+    //         selector:
+    //           ":matches([id.name='loader'], [id.name='action']):not([init.callee.name='handleRouteErrors'])",
+    //         message: "Always wrap your loader and action functions in handleRouteErrors",
+    //       },
+    //     ],
+    //   },
+    // },
     {
       files: ["*.ts", "*.tsx"],
       extends: ["@remix-run/eslint-config", "@remix-run/eslint-config/node"],

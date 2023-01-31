@@ -1,6 +1,7 @@
 import { Button, Card } from "flowbite-react";
 import moment from "moment";
 import React from "react";
+import { getProjectPath } from "~/page-paths.shared";
 
 export interface ProjectListCardProps {
   externalId: string;
@@ -14,9 +15,11 @@ export interface ProjectListCardProps {
 
 function ProjectListCardComponent(props: ProjectListCardProps): JSX.Element {
   const createdAt = moment(props.createdAt).fromNow();
+  const projectPath = getProjectPath(props.externalId);
+
   return (
     <a
-      href="/xd"
+      href={projectPath}
       className="hover:drop-shadow-xl hover:scale-[1.03] active:scale-[0.99] transition-all"
     >
       <Card key={props.externalId}>

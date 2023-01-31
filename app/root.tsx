@@ -12,10 +12,10 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { Card } from "flowbite-react";
-import { getReasonPhrase } from "http-status-codes";
+import { getReasonPhrase, StatusCodes } from "http-status-codes";
 
+import { AppPagePure } from "./components/app-page";
 import { GlobalContext } from "./components/global-context.shared";
-import { translateIntoHttpError } from "./http-error";
 import styles from "./styles/app.css";
 
 export const meta: MetaFunction = () => ({
@@ -77,15 +77,17 @@ function ErrorCard(props: { status: number; statusText: string }) {
   const extraText = originalStatusText !== props.statusText ? originalStatusText : void 0;
   return (
     <App>
-      <div className="h-full flex flex-col justify-center items-center">
-        <Card className="min-h-[15rem] w-96 text-center">
-          <div>
-            <h1 className="text-4xl font-bold">{props.status}</h1>
-            {extraText && <h2 className="text-xs text-gray-400 mt-2">{extraText}</h2>}
-          </div>
-          <p className="text-gray-300">{props.statusText}</p>
-        </Card>
-      </div>
+      <AppPagePure>
+        <div className="h-full flex flex-col justify-center items-center">
+          <Card className="min-h-[15rem] w-96 text-center">
+            <div>
+              <h1 className="text-4xl font-bold">{props.status}</h1>
+              {extraText && <h2 className="text-xs text-gray-400 mt-2">{extraText}</h2>}
+            </div>
+            <p className="text-gray-400">{props.statusText}</p>
+          </Card>
+        </div>
+      </AppPagePure>
     </App>
   );
 }
@@ -95,7 +97,11 @@ export function CatchBoundary() {
   return <ErrorCard status={caught.status} statusText={caught.statusText} />;
 }
 
-export function ErrorBoundary(args: { error: unknown }) {
-  const httpError = translateIntoHttpError(args.error);
-  return <ErrorCard status={httpError.status} statusText={httpError.statusText} />;
+export function ErrorBoundary({ error }: { error: unknown }) {
+  const status = (error as any)?.status ?? StatusCodes.INTERNAL_SERVER_ERROR;
+  const statusText =
+    (error as any)?.statusText ?? getReasonPhrase(StatusCodes.INTERNAL_SERVER_ERROR);
+  // eslint-disable-next-line no-console
+  console.error(error);
+  return <ErrorCard status={status} statusText={statusText} />;
 }

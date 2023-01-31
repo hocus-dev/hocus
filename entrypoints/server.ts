@@ -59,7 +59,11 @@ app.all("*", async (req, res, next) => {
         user,
         oidcUser,
       }),
-    })(req, res, next);
+    })(req, res, (content) => {
+      console.log("hey");
+      console.log(content);
+      next(content);
+    });
   } catch (err) {
     next(err);
   }

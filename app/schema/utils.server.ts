@@ -43,7 +43,9 @@ function parse<T extends TSchema>(this: TypeCheck<T>, value: unknown): SchemaVal
 function safeParse<T extends TSchema>(
   this: TypeCheck<T>,
   value: unknown,
-): { success: true; value: SchemaValueType<T> } | { success: false; error: ValidationError } {
+):
+  | { success: true; value: SchemaValueType<T> }
+  | { success: false; value?: undefined; error: ValidationError } {
   if (this.Check(value)) {
     return { success: true, value: value as SchemaValueType<T> };
   }
