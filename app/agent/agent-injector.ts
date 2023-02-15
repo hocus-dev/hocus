@@ -3,6 +3,7 @@ import { createInjector, Scope } from "typed-inject";
 import { config } from "~/config";
 import { ProjectService } from "~/project/project.service";
 import { SshKeyService } from "~/ssh-key/ssh-key.service";
+import { clientFactory } from "~/temporal/client-factory";
 import { Token } from "~/token";
 import { WorkspaceService } from "~/workspace/workspace.service";
 
@@ -33,6 +34,7 @@ export const createAgentInjector = (
     [Token.WorkspaceService]?: typeof WorkspaceService;
     [Token.WorkspaceAgentService]?: typeof WorkspaceAgentService;
     [Token.SshKeyService]?: typeof SshKeyService;
+    [Token.TemporalClient]?: typeof clientFactory;
   } = {},
 ) =>
   createInjector()
@@ -62,5 +64,6 @@ export const createAgentInjector = (
       Token.WorkspaceAgentService,
       overrides[Token.WorkspaceAgentService] ?? WorkspaceAgentService,
     )
-    .provideClass(Token.SshKeyService, overrides[Token.SshKeyService] ?? SshKeyService);
+    .provideClass(Token.SshKeyService, overrides[Token.SshKeyService] ?? SshKeyService)
+    .provideFactory(Token.TemporalClient, overrides[Token.TemporalClient] ?? clientFactory);
 export type AgentInjector = ReturnType<typeof createAgentInjector>;
