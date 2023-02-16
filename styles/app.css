@@ -1,3 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Tabs are automatically highlighted by Chrome when the page is opened and it looks weird.
+ * This makes the highlight invisible.
+ */
+[role="tab"] {
+  outline: none !important;
+}

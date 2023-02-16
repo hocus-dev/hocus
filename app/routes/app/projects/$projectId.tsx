@@ -6,6 +6,7 @@ import { StatusCodes } from "http-status-codes";
 import moment from "moment";
 import path from "path-browserify";
 import { AppPage } from "~/components/app-page";
+import { PrebuildList } from "~/components/projects/prebuilds/prebuild-list";
 import { HttpError } from "~/http-error.server";
 import { PagePaths } from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
@@ -19,7 +20,19 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   }
   const project = await db.project.findUnique({
     where: { externalId: projectExternalId },
-    include: { gitRepository: true },
+    include: {
+      gitRepository: true,
+      prebuildEvents: {
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          gitObject: true,
+          gitBranchLinks: {
+            include: { gitBranch: true },
+          },
+        },
+      },
+    },
   });
   if (project == null) {
     throw new HttpError(StatusCodes.NOT_FOUND, "Project not found");
@@ -31,6 +44,13 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
       externalId: project.externalId,
       createdAt: project.createdAt.getTime(),
     },
+    prebuildEvents: project.prebuildEvents.map((e) => ({
+      branches: e.gitBranchLinks.map((b) => b.gitBranch.name).sort(),
+      commitHash: e.gitObject.hash.substring(0, 8),
+      createdAt: e.createdAt.getTime(),
+      externalId: e.externalId,
+      status: e.status,
+    })),
     gitRepository: {
       url: project.gitRepository.url,
     },
@@ -38,7 +58,7 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
 };
 
 export default function ProjectRoute(): JSX.Element {
-  const { project, gitRepository } = useLoaderData<typeof loader>();
+  const { project, gitRepository, prebuildEvents } = useLoaderData<typeof loader>();
   const createdAt = moment(project.createdAt).fromNow();
 
   return (
@@ -55,7 +75,7 @@ export default function ProjectRoute(): JSX.Element {
       <div className="mb-8 flex justify-between items-end">
         <h1 className="text-4xl font-bold">{project.name}</h1>
         <Button href={"#"} color="success" className="transition-all">
-          <i className="fa-solid fa-file-circle-plus mr-2"></i>
+          <i className="fa-solid fa-circle-plus mr-2"></i>
           <span>New Workspace</span>
         </Button>
       </div>
@@ -69,23 +89,29 @@ export default function ProjectRoute(): JSX.Element {
           <span className="font-bold">{createdAt}</span>
         </p>
       </div>
-      <Tabs.Group aria-label="Tabs with icons" className="mt-4">
+      {/* eslint-disable-next-line react/style-prop-object */}
+      <Tabs.Group aria-label="Tabs with icons" style="underline" className="mt-4">
         <Tabs.Item
-          active={true}
           title={
             <>
-              <i className="fa-solid fa-file-circle-plus mr-2"></i>
+              <i className="fa-solid fa-laptop-code mr-2"></i>
               <span className="font-bold">Workspaces</span>
             </>
           }
         >
-          Profile content
+          Workspaces
         </Tabs.Item>
-        <Tabs.Item title="Dashboard">Dashboard content</Tabs.Item>
-        <Tabs.Item title="Settings">Settings content</Tabs.Item>
-        <Tabs.Item title="Contacts">Contacts content</Tabs.Item>
-        <Tabs.Item disabled={true} title="Disabled">
-          Disabled content
+        <Tabs.Item
+          active={true}
+          className="p-0"
+          title={
+            <>
+              <i className="fa-solid fa-list-check mr-2"></i>
+              <span className="font-bold">Prebuilds</span>
+            </>
+          }
+        >
+          <PrebuildList elements={prebuildEvents} />
         </Tabs.Item>
       </Tabs.Group>
     </AppPage>
