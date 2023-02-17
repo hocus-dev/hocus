@@ -2,6 +2,7 @@ import type { SpawnSyncOptionsWithBufferEncoding, SpawnSyncReturns } from "child
 import { spawnSync } from "child_process";
 import { createHash } from "crypto";
 import fs from "fs";
+import path from "path";
 
 import type { Log } from "@prisma/client";
 import { Mutex } from "async-mutex";
@@ -227,6 +228,18 @@ export const withFileLock = async <T>(lockFilePath: string, fn: () => Promise<T>
       lockedFilePaths.delete(lockFilePath);
     }
   }
+};
+
+export const withFileLockCreateIfNotExists = async <T>(
+  lockFilePath: string,
+  fn: () => Promise<T>,
+): Promise<T> => {
+  const exists = await doesFileExist(lockFilePath);
+  if (!exists) {
+    await fs.promises.mkdir(path.dirname(lockFilePath), { recursive: true });
+    await fs.promises.appendFile(lockFilePath, "");
+  }
+  return await withFileLock(lockFilePath, fn);
 };
 
 export const withManyFileLocks = async <T>(

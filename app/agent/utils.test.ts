@@ -5,7 +5,7 @@ import path from "path";
 import { Mutex } from "async-mutex";
 import { v4 as uuidv4 } from "uuid";
 
-import { withFileLock, sleep, withManyFileLocks } from "./utils";
+import { withFileLock, sleep, withManyFileLocks, withFileLockCreateIfNotExists } from "./utils";
 
 test.concurrent("withFileLock", async () => {
   const runId = uuidv4();
@@ -36,6 +36,16 @@ test.concurrent("withFileLock", async () => {
     ]);
 
     expect(results).toEqual([1, 2, 3]);
+  } finally {
+    await fs.rm(pathToLockFile);
+  }
+});
+
+test.concurrent("withFileLockCreateIfNotExists", async () => {
+  const runId = uuidv4();
+  const pathToLockFile = path.join(os.tmpdir(), `withFileLock-${runId}.lock`);
+  try {
+    await withFileLockCreateIfNotExists(pathToLockFile, async () => {});
   } finally {
     await fs.rm(pathToLockFile);
   }
