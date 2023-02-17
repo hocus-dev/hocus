@@ -21,7 +21,7 @@ import {
 } from "./prebuild-constants";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
-import { doesFileExist, execSshCmd, sha256 } from "./utils";
+import { doesFileExist, execSshCmd, sha256, withFileLock } from "./utils";
 
 export class PrebuildService {
   static inject = [
@@ -286,7 +286,9 @@ export class PrebuildService {
       );
     }
     await fs.mkdir(path.dirname(args.outputDrivePath), { recursive: true });
-    await fs.copyFile(args.repositoryDrivePath, args.outputDrivePath);
+    await withFileLock(args.repositoryDrivePath, async () => {
+      await fs.copyFile(args.repositoryDrivePath, args.outputDrivePath);
+    });
     const workdir = "/tmp/workdir";
     try {
       return await args.fcService.withVM(
