@@ -7,6 +7,7 @@ import {
   sleep,
   continueAsNew,
   ApplicationFailure,
+  ParentClosePolicy,
 } from "@temporalio/workflow";
 // the native path module is a restricted import in workflows
 import path from "path-browserify";
@@ -43,6 +44,9 @@ const {
   changePrebuildEventStatus,
   getWorkspaceInstanceStatus,
   addProjectAndRepository,
+  getRepositoryProjects,
+  updateGitBranchesAndObjects,
+  getDefaultBranch,
 } = proxyActivities<Activites>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -299,6 +303,7 @@ export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceI
   await startChild(monitorWorkspaceInstance, {
     args: [workspaceId, workspaceInstance.id],
     workflowId: workspaceInstance.monitoringWorkflowId,
+    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
   });
   return workspaceInstance;
 }
@@ -328,12 +333,44 @@ export async function monitorWorkspaceInstance(
   await continueAsNew<typeof monitorWorkspaceInstance>(workspaceId, workspaceInstanceId);
 }
 
-export async function runSyncGitRepository(gitRepositoryId: bigint): Promise<void> {
-  const seenProjectIds = new Set<bigint>();
+export async function runSyncGitRepository(
+  gitRepositoryId: bigint,
+  seenProjectIds: Set<bigint>,
+): Promise<void> {
   for (let i = 0; i < 1000; i++) {
+    const updates = await updateGitBranchesAndObjects(gitRepositoryId);
+    const projects = await getRepositoryProjects(gitRepositoryId);
+    const seenProjects = projects.filter((p) => seenProjectIds.has(p.id));
+    const newProjects = projects.filter((p) => !seenProjectIds.has(p.id));
+    if (newProjects.length > 0) {
+      const defaultBranch = await getDefaultBranch(gitRepositoryId);
+      if (defaultBranch !== null) {
+        await waitForPromisesWorkflow(
+          newProjects.map((p) => {
+            return startChild(runBuildfsAndPrebuilds, {
+              args: [
+                [
+                  {
+                    projectId: p.id,
+                    branches: [
+                      { gitBranchId: defaultBranch.id, gitObjectId: defaultBranch.gitObjectId },
+                    ],
+                  },
+                ],
+              ],
+              parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+            });
+          }),
+        );
+      }
+      for (const p of newProjects) {
+        seenProjectIds.add(p.id);
+      }
+    }
+
     await sleep(5000);
   }
-  await continueAsNew<typeof runSyncGitRepository>(gitRepositoryId);
+  await continueAsNew<typeof runSyncGitRepository>(gitRepositoryId, seenProjectIds);
 }
 
 export async function runAddProjectAndRepository(args: {
@@ -341,6 +378,10 @@ export async function runAddProjectAndRepository(args: {
   projectName: string;
   projectWorkspaceRoot: string;
 }): Promise<{ project: Project; gitRepository: GitRepository }> {
-  // TODO: schedule repository sync workflow here
-  return await addProjectAndRepository(args);
+  const result = await addProjectAndRepository(args);
+  await startChild(runSyncGitRepository, {
+    args: [result.gitRepository.id, new Set<bigint>()],
+    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+  });
+  return result;
 }

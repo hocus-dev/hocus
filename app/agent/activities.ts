@@ -1,4 +1,5 @@
 import type {
+  GitBranch,
   GitObject,
   GitRepository,
   PrebuildEvent,
@@ -19,6 +20,7 @@ import type { createAgentInjector } from "./agent-injector";
 import type { VMTaskOutput } from "./agent-util.types";
 import type { GetOrCreateBuildfsEventsReturnType } from "./buildfs.service";
 import { SOLO_AGENT_INSTANCE_ID } from "./constants";
+import type { UpdateBranchesResult } from "./git/git.service";
 import { execSshCmd, randomString } from "./utils";
 
 export const createActivities = async (
@@ -457,6 +459,38 @@ export const createActivities = async (
     });
   };
 
+  const getRepositoryProjects = async (gitRepositoryId: bigint): Promise<Project[]> => {
+    return await db.project.findMany({
+      where: { gitRepositoryId },
+      orderBy: { id: "asc" },
+    });
+  };
+
+  const updateGitBranchesAndObjects = async (
+    gitRepositoryId: bigint,
+  ): Promise<UpdateBranchesResult> => {
+    const gitService = injector.resolve(Token.GitService);
+    return await gitService.updateBranches(db, gitRepositoryId);
+  };
+
+  const getDefaultBranch = async (gitRepositoryId: bigint): Promise<GitBranch | null> => {
+    const branches = await db.gitBranch.findMany({
+      where: {
+        gitRepositoryId,
+        name: {
+          in: ["refs/heads/main", "refs/heads/master"],
+        },
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+    if (branches.length === 0) {
+      return null;
+    }
+    return branches[0];
+  };
+
   return {
     fetchRepository,
     buildfs,
@@ -473,5 +507,8 @@ export const createActivities = async (
     changePrebuildEventStatus,
     getWorkspaceInstanceStatus,
     addProjectAndRepository,
+    getRepositoryProjects,
+    updateGitBranchesAndObjects,
+    getDefaultBranch,
   };
 };

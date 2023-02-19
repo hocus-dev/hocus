@@ -37,6 +37,15 @@ interface RemoteUpdate {
   remoteInfo: GitRemoteInfo;
 }
 
+export interface UpdateBranchesResult {
+  newGitBranches: (GitBranch & {
+    gitObject: GitObject;
+  })[];
+  updatedGitBranches: (GitBranch & {
+    gitObject: GitObject;
+  })[];
+}
+
 export class GitService {
   static inject = [Token.Logger, Token.AgentUtilService, Token.Config] as const;
   private readonly agentConfig: ReturnType<Config["agent"]>;
@@ -197,14 +206,7 @@ export class GitService {
   async updateBranches(
     db: Prisma.NonTransactionClient,
     gitRepositoryId: bigint,
-  ): Promise<{
-    newGitBranches: (GitBranch & {
-      gitObject: GitObject;
-    })[];
-    updatedGitBranches: (GitBranch & {
-      gitObject: GitObject;
-    })[];
-  }> {
+  ): Promise<UpdateBranchesResult> {
     const gitRepository = await db.gitRepository.findUniqueOrThrow({
       where: { id: gitRepositoryId },
       include: {
