@@ -10,16 +10,15 @@ import type {
   WorkspaceInstance,
 } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
-import type { Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
+import type { CheckoutAndInspectResult } from "./activities-types";
 import type { createAgentInjector } from "./agent-injector";
 import type { VMTaskOutput } from "./agent-util.types";
-import type { BuildfsService } from "./buildfs.service";
+import type { GetOrCreateBuildfsEventsReturnType } from "./buildfs.service";
 import { SOLO_AGENT_INSTANCE_ID } from "./constants";
-import type { PrebuildService } from "./prebuild.service";
 import { execSshCmd, randomString } from "./utils";
 
 export const createActivities = async (
@@ -91,7 +90,7 @@ export const createActivities = async (
      * Relative paths to directories where `hocus.yml` files are located.
      */
     projectConfigPaths: string[];
-  }): Promise<Awaited<ReturnType<PrebuildService["checkoutAndInspect"]>>> => {
+  }): Promise<CheckoutAndInspectResult[]> => {
     const instanceId = `checkout-and-inspect-${randomString(8)}`;
     const fcService = injector.resolve(Token.FirecrackerService)(instanceId);
     const prebuildService = injector.resolve(Token.PrebuildService);
@@ -319,12 +318,15 @@ export const createActivities = async (
   };
 
   const getProjectsAndGitObjects = async (
-    gitRepositoryId: bigint,
+    projectIds: bigint[],
     gitObjectIds: bigint[],
   ): Promise<{ projects: Project[]; gitObjects: GitObject[] }> => {
     const projects = await db.project.findMany({
-      where: { gitRepositoryId: gitRepositoryId },
+      where: { id: { in: projectIds } },
     });
+    if (projects.length !== projectIds.length) {
+      throw new Error("Some projects were not found");
+    }
     const gitObjects = await db.gitObject.findMany({
       where: { id: { in: gitObjectIds } },
     });
@@ -334,9 +336,6 @@ export const createActivities = async (
     return { projects, gitObjects };
   };
 
-  type GetOrCreateBuildfsEventsReturnType = Any.Compute<
-    Awaited<ReturnType<BuildfsService["getOrCreateBuildfsEvent"]>>
-  >[];
   const getOrCreateBuildfsEvents = async (
     args: {
       contextPath: string;
@@ -346,7 +345,7 @@ export const createActivities = async (
       projectFilePath: string;
       projectId: bigint;
     }[],
-  ): Promise<GetOrCreateBuildfsEventsReturnType> => {
+  ): Promise<GetOrCreateBuildfsEventsReturnType[]> => {
     const buildfsService = injector.resolve(Token.BuildfsService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const agentInstance = await db.$transaction((tdb) =>
@@ -434,13 +433,17 @@ export const createActivities = async (
     gitRepositoryUrl: string;
     projectName: string;
     projectWorkspaceRoot: string;
-  }): Promise<{ project: Project; gitRepository: GitRepository }> => {
+  }): Promise<{
+    project: Project;
+    gitRepository: GitRepository;
+    gitRepositoryCreated: boolean;
+  }> => {
     const gitService = injector.resolve(Token.GitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const projectService = injector.resolve(Token.ProjectService);
     return await db.$transaction(async (tdb) => {
       const sshKeyPair = await sshKeyService.getOrCreateServerControlledSshKeyPair(tdb);
-      const gitRepository = await gitService.addGitRepositoryIfNotExists(
+      const { gitRepository, wasCreated } = await gitService.addGitRepositoryIfNotExists(
         tdb,
         args.gitRepositoryUrl,
         sshKeyPair.id,
@@ -450,7 +453,7 @@ export const createActivities = async (
         name: args.projectName,
         rootDirectoryPath: args.projectWorkspaceRoot,
       });
-      return { project, gitRepository };
+      return { project, gitRepository, gitRepositoryCreated: wasCreated };
     });
   };
 

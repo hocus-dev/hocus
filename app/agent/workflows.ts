@@ -1,4 +1,5 @@
 import type { Workspace, WorkspaceInstance, Project, GitRepository } from "@prisma/client";
+import { ApplicationFailure } from "@temporalio/client";
 import {
   proxyActivities,
   uuid4,
@@ -14,14 +15,16 @@ import {
   numericOrNullSort,
   numericSort,
   filterNull,
-  mapOverNull,
   unwrap,
   groupBy,
+  makeMap,
 } from "~/utils.shared";
 
 import type { createActivities } from "./activities";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
+import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
+import type { BFSPWorkflowPhase, BFSPWorkflowState } from "./workflows-utils";
 
 type Activites = Awaited<ReturnType<typeof createActivities>>;
 const {
@@ -52,111 +55,206 @@ const {
   },
 });
 
+/**
+ * WARNING: This is the hairiest function in the codebase.
+ * Prepare to spend a while understanding it.
+ *
+ * All projects must be from the same repository, otherwise
+ * this workflow will fail.
+ *
+ * Here's what this workflow does:
+ *
+ * - Fetch the repository
+ * - Checkout the git objects and inspect the project configs
+ * - Create buildfs events in the db
+ * - Create prebuild events in the db
+ * - Run buildfs tasks
+ * - Run prebuild tasks
+ */
 export async function runBuildfsAndPrebuilds(
-  gitRepositoryId: bigint,
-  branches: { gitBranchId: bigint; gitObjectId: bigint }[],
+  targets: {
+    projectId: bigint;
+    branches: { gitBranchId: bigint; gitObjectId: bigint }[];
+  }[],
 ): Promise<void> {
-  const gitObjectIds = Array.from(new Set(branches.map((branch) => branch.gitObjectId)));
+  if (targets.length === 0) {
+    return;
+  }
+  const state1: BFSPWorkflowState<typeof BFSPWorkflowPhase.START> = new ArbitraryKeyMap(
+    (key) => `${key.projectId}-${key.gitObjectId}`,
+  );
+  for (const target of targets) {
+    for (const branch of target.branches) {
+      const key = { projectId: target.projectId, gitObjectId: branch.gitObjectId };
+      const value = state1.get(key);
+      if (value != null) {
+        value.gitBranchIds.push(branch.gitBranchId);
+      } else {
+        state1.set(key, { gitBranchIds: [branch.gitBranchId] });
+      }
+    }
+  }
+
+  const gitObjectIds = Array.from(new Set(state1.keys().map((key) => key.gitObjectId)));
   // to make order deterministic
   gitObjectIds.sort(numericSort);
-  const { projects, gitObjects } = await getProjectsAndGitObjects(gitRepositoryId, gitObjectIds);
+  const { projects, gitObjects } = await getProjectsAndGitObjects(
+    targets.map((t) => t.projectId),
+    gitObjectIds,
+  );
   gitObjects.sort((a, b) => numericSort(a.id, b.id));
   projects.sort((a, b) => numericSort(a.id, b.id));
+
+  const gitObjectsById = makeMap(gitObjects, (o) => o.id);
+  const projectsById = makeMap(projects, (p) => p.id);
+
+  const state2 = state1 as BFSPWorkflowState<typeof BFSPWorkflowPhase.AFTER_DB_FETCH>;
+  for (const key of state2.keys()) {
+    const { projectId, gitObjectId } = key;
+    const stateElement = unwrap(state2.get(key));
+    stateElement.gitObject = unwrap(gitObjectsById.get(gitObjectId));
+    stateElement.project = unwrap(projectsById.get(projectId));
+  }
+
+  const gitRepositoryId = projects[0].gitRepositoryId;
+  if (!projects.every((project) => project.gitRepositoryId === gitRepositoryId)) {
+    throw new ApplicationFailure("All projects must be from the same repository");
+  }
+
   await fetchRepository(gitRepositoryId);
-  const checkedOutPaths = gitObjects.map(
-    (o) => `${HOST_PERSISTENT_DIR}/checked-out/${o.hash}.ext4` as const,
+
+  const gitObjectIdToCheckOutPath = new Map(
+    gitObjects.map((o) => [o.id, `${HOST_PERSISTENT_DIR}/checked-out/${o.hash}.ext4` as const]),
   );
+  const gitObjectIdsAndProjectIds = Array.from(
+    groupBy(
+      state2.keys(),
+      (key) => key.gitObjectId,
+      (key) => key.projectId,
+    ).entries(),
+  )
+    .map(
+      ([gitObjectId, projectIds]) =>
+        [gitObjectId, Array.from(new Set(projectIds).values()).sort(numericSort)] as const,
+    )
+    .sort(([a], [b]) => numericSort(a, b));
+
   const checkedOutResults = await waitForPromisesWorkflow(
-    checkedOutPaths.map((outputPath, idx) =>
-      checkoutAndInspect({
+    gitObjectIdsAndProjectIds.map(([gitObjectId, gitObjectProjectIds]) => {
+      const gitObject = unwrap(gitObjectsById.get(gitObjectId));
+      const projectConfigPaths = gitObjectProjectIds.map(
+        (projectId) => unwrap(projectsById.get(projectId)).rootDirectoryPath,
+      );
+      const outputDrivePath = unwrap(gitObjectIdToCheckOutPath.get(gitObjectId));
+
+      return checkoutAndInspect({
         gitRepositoryId,
-        outputDrivePath: outputPath,
-        targetBranch: gitObjects[idx].hash,
-        projectConfigPaths: projects.map((project) => project.rootDirectoryPath),
-      }),
-    ),
-  );
-  const buildfsEventsArgs = filterNull(
-    checkedOutResults.flatMap((results, idx) => {
-      return mapOverNull(results, ({ projectConfig, imageFileHash }, projectIdx) => {
-        return {
-          projectId: projects[projectIdx].id,
-          contextPath: projectConfig.image.buildContext,
-          dockerfilePath: projectConfig.image.file,
-          cacheHash: imageFileHash,
-          gitObjectIdx: idx,
-          projectIdx,
-          outputFilePath: `${HOST_PERSISTENT_DIR}/buildfs/${uuid4()}.ext4` as const,
-          projectFilePath: checkedOutPaths[idx],
-        };
+        outputDrivePath,
+        targetBranch: gitObject.hash,
+        projectConfigPaths,
       });
     }),
   );
-  const buildfsEvents = await getOrCreateBuildfsEvents(buildfsEventsArgs);
-  const gitObjectIdsToBranches = groupBy(
-    branches,
-    (b) => b.gitObjectId,
-    (b) => b.gitBranchId,
-  );
-  const prebuildEventsArgs = checkedOutResults.map((results, idx) => {
-    return results.map((result, projectIdx) => {
-      return {
-        projectId: projects[projectIdx].id,
-        gitObjectId: gitObjects[idx].id,
-        buildfsEventId: null as bigint | null,
-        sourceProjectDrivePath: checkedOutPaths[idx],
-        gitBranchIds: unwrap(gitObjectIdsToBranches.get(gitObjects[idx].id)),
-        tasks:
-          result === null
-            ? []
-            : result.projectConfig.tasks.map((task) => ({
-                command: task.init,
-                cwd: path.join(PREBUILD_REPOSITORY_DIR, projects[projectIdx].rootDirectoryPath),
-              })),
-        workspaceTasks:
-          result === null ? [] : result.projectConfig.tasks.map((task) => task.command),
-      };
-    });
-  });
-  for (const [idx, args] of buildfsEventsArgs.entries()) {
-    prebuildEventsArgs[args.gitObjectIdx][args.projectIdx].buildfsEventId =
-      buildfsEvents[idx].event.id;
+
+  const state3 = state2 as BFSPWorkflowState<typeof BFSPWorkflowPhase.AFTER_CHECKOUT>;
+  for (const [
+    gitObjectIdIdx,
+    [gitObjectId, gitObjectProjectIds],
+  ] of gitObjectIdsAndProjectIds.entries()) {
+    for (const [projectIdIdx, projectId] of gitObjectProjectIds.entries()) {
+      const checkoutResult = checkedOutResults[gitObjectIdIdx][projectIdIdx];
+      const stateElement = unwrap(state3.get({ projectId, gitObjectId }));
+      stateElement.inspection = checkoutResult;
+    }
   }
-  const prebuildEventsArgsFlat = prebuildEventsArgs.flat();
-  const prebuildEvents = await createPrebuildEvents(prebuildEventsArgsFlat);
-  const prebuildEventIdToProjectDrivePath = new Map(
-    prebuildEventsArgsFlat.map((args, idx) => [
-      prebuildEvents[idx].id,
-      args.sourceProjectDrivePath,
-    ]),
+
+  const buildfsEventsArgs = filterNull(
+    state3.sortedValues().map((stateElement) => {
+      const { inspection, gitObject, project } = stateElement;
+      if (inspection === null) {
+        return null;
+      }
+      return {
+        projectId: project.id,
+        gitObjectId: gitObject.id,
+        contextPath: inspection.projectConfig.image.buildContext,
+        dockerfilePath: inspection.projectConfig.image.file,
+        cacheHash: inspection.imageFileHash,
+        outputFilePath: `${HOST_PERSISTENT_DIR}/buildfs/${uuid4()}.ext4` as const,
+        projectFilePath: unwrap(gitObjectIdToCheckOutPath.get(gitObject.id)),
+      };
+    }),
   );
-  const buildfsEventsToPrebuilds = Array.from(
+
+  const buildfsEvents = await getOrCreateBuildfsEvents(buildfsEventsArgs);
+  const state4 = state3 as BFSPWorkflowState<typeof BFSPWorkflowPhase.AFTER_BUILDFS_EVENTS>;
+  for (const [idx, args] of buildfsEventsArgs.entries()) {
+    const stateElement = unwrap(
+      state4.get({ projectId: args.projectId, gitObjectId: args.gitObjectId }),
+    );
+    stateElement.buildfsEvent = buildfsEvents[idx];
+  }
+
+  const prebuildEventsArgs = state4.sortedValues().map((stateElement) => {
+    const { inspection, gitObject, project, buildfsEvent, gitBranchIds } = stateElement;
+    const [buildfsEventId, tasks, workspaceTasks] =
+      inspection === null
+        ? [null, [], []]
+        : [
+            unwrap(buildfsEvent).event.id,
+            inspection.projectConfig.tasks.map((task) => ({
+              command: task.init,
+              cwd: path.join(PREBUILD_REPOSITORY_DIR, project.rootDirectoryPath),
+            })),
+            inspection.projectConfig.tasks.map((task) => task.command),
+          ];
+    return {
+      projectId: project.id,
+      gitObjectId: gitObject.id,
+      buildfsEventId,
+      sourceProjectDrivePath: unwrap(gitObjectIdToCheckOutPath.get(gitObject.id)),
+      gitBranchIds,
+      tasks,
+      workspaceTasks,
+    };
+  });
+
+  const prebuildEvents = await createPrebuildEvents(prebuildEventsArgs);
+  const state5 = state4 as BFSPWorkflowState<typeof BFSPWorkflowPhase.AFTER_PREBUILD_EVENTS>;
+  for (const [idx, args] of prebuildEventsArgs.entries()) {
+    const stateElement = unwrap(
+      state5.get({ projectId: args.projectId, gitObjectId: args.gitObjectId }),
+    );
+    stateElement.prebuildEvent = prebuildEvents[idx];
+    stateElement.sourceProjectDrivePath = args.sourceProjectDrivePath;
+  }
+
+  const buildfsEventsToStateElements = Array.from(
     groupBy(
-      prebuildEvents,
-      (e) => e.buildfsEventId,
+      state5.sortedValues(),
+      (e) => e.buildfsEvent?.event.id ?? null,
       (e) => e,
     ).entries(),
   ).sort(([a, _1], [b, _2]) => numericOrNullSort(a, b));
 
   await waitForPromisesWorkflow(
-    buildfsEventsToPrebuilds.map(async ([buildfsEventId, prebuildEvents]) => {
+    buildfsEventsToStateElements.map(async ([buildfsEventId, stateElements]) => {
       await waitForPromisesWorkflow(
-        prebuildEvents.map((e) => changePrebuildEventStatus(e.id, "PREBUILD_EVENT_STATUS_RUNNING")),
+        stateElements.map((e) =>
+          changePrebuildEventStatus(e.prebuildEvent.id, "PREBUILD_EVENT_STATUS_RUNNING"),
+        ),
       );
       if (buildfsEventId != null) {
         const buildfsResult = await executeChild(runBuildfs, { args: [buildfsEventId] });
         if (!buildfsResult.buildSuccessful) {
-          await cancelPrebuilds(prebuildEvents.map((e) => e.id));
+          await cancelPrebuilds(stateElements.map((e) => e.prebuildEvent.id));
           return;
         }
       }
       await waitForPromisesWorkflow(
-        prebuildEvents.map(async (prebuildEvent) =>
+        stateElements.map(async (e) =>
           executeChild(runPrebuild, {
-            args: [
-              prebuildEvent.id,
-              unwrap(prebuildEventIdToProjectDrivePath.get(prebuildEvent.id)),
-            ],
+            args: [e.prebuildEvent.id, unwrap(e.sourceProjectDrivePath)],
           }),
         ),
       );
@@ -226,6 +324,14 @@ export async function monitorWorkspaceInstance(
     }
   }
   await continueAsNew<typeof monitorWorkspaceInstance>(workspaceId, workspaceInstanceId);
+}
+
+export async function runSyncGitRepository(gitRepositoryId: bigint): Promise<void> {
+  const seenProjectIds = new Set<bigint>();
+  for (let i = 0; i < 1000; i++) {
+    await sleep(5000);
+  }
+  await continueAsNew<typeof runSyncGitRepository>(gitRepositoryId);
 }
 
 export async function runAddProjectAndRepository(args: {

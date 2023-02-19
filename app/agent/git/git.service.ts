@@ -172,12 +172,12 @@ export class GitService {
     db: Prisma.TransactionClient,
     repositoryUrl: string,
     sshKeyPairId: bigint,
-  ): Promise<GitRepository> {
+  ): Promise<{ gitRepository: GitRepository; wasCreated: boolean }> {
     const existingRepository = await db.gitRepository.findFirst({
       where: { url: repositoryUrl, sshKeyPairId },
     });
     if (existingRepository != null) {
-      return existingRepository;
+      return { gitRepository: existingRepository, wasCreated: false };
     }
     await db.$executeRawUnsafe(
       `LOCK TABLE "${Prisma.ModelName.GitRepository}" IN SHARE UPDATE EXCLUSIVE MODE`,
@@ -186,9 +186,12 @@ export class GitService {
       where: { url: repositoryUrl, sshKeyPairId },
     });
     if (existingRepoAfterLock != null) {
-      return existingRepoAfterLock;
+      return { gitRepository: existingRepoAfterLock, wasCreated: false };
     }
-    return await this.addGitRepository(db, repositoryUrl, sshKeyPairId);
+    return {
+      gitRepository: await this.addGitRepository(db, repositoryUrl, sshKeyPairId),
+      wasCreated: true,
+    };
   }
 
   async updateBranches(

@@ -14,6 +14,11 @@ import { HOST_PERSISTENT_DIR } from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
 import { doesFileExist, execSshCmd, withFileLock } from "./utils";
 
+export interface GetOrCreateBuildfsEventsReturnType {
+  event: BuildfsEvent;
+  status: "created" | "found";
+}
+
 export class BuildfsService {
   workdir = "/tmp/workdir" as const;
   buildfsScriptPath = `${this.workdir}/bin/buildfs.sh` as const;
@@ -230,10 +235,7 @@ export class BuildfsService {
       cacheHash: string;
       projectId: bigint;
     },
-  ): Promise<{
-    event: BuildfsEvent;
-    status: "created" | "found";
-  }> {
+  ): Promise<GetOrCreateBuildfsEventsReturnType> {
     const existingEvent = await this.getExistingBuildfsEvent(
       db,
       args.projectId,
