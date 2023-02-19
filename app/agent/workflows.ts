@@ -245,6 +245,8 @@ export async function runBuildfsAndPrebuilds(
         ),
       );
       if (buildfsEventId != null) {
+        // TODO HOC-64: don't run buildfs if event was found and is already successful
+        // also wait for buildfs event to be completed if it's already running
         const buildfsResult = await executeChild(runBuildfs, { args: [buildfsEventId] });
         if (!buildfsResult.buildSuccessful) {
           await cancelPrebuilds(stateElements.map((e) => e.prebuildEvent.id));
