@@ -1,5 +1,4 @@
 import type { Workspace, WorkspaceInstance, Project, GitRepository } from "@prisma/client";
-import { ApplicationFailure } from "@temporalio/client";
 import {
   proxyActivities,
   uuid4,
@@ -7,6 +6,7 @@ import {
   startChild,
   sleep,
   continueAsNew,
+  ApplicationFailure,
 } from "@temporalio/workflow";
 // the native path module is a restricted import in workflows
 import path from "path-browserify";

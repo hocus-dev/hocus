@@ -207,8 +207,13 @@ test.concurrent(
         taskQueue: "test",
         retry: { maximumAttempts: 1 },
         args: [
-          repo.id,
-          testBranches.map((b) => ({ gitBranchId: b.id, gitObjectId: b.gitObjectId })),
+          projects.map((p) => ({
+            projectId: p.id,
+            branches: testBranches.map((b) => ({
+              gitBranchId: b.id,
+              gitObjectId: b.gitObjectId,
+            })),
+          })),
         ],
       });
 
