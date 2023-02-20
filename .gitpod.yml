@@ -48,3 +48,4 @@ vscode:
     - emeraldwalk.RunOnSave
     - pomdtr.excalidraw-editor
     - bierner.markdown-mermaid
+    - ms-azuretools.vscode-docker
