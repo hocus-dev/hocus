@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "name": "Hocus Agent+CP",
+      "path": "../"
+    },
+    {
+      "name": "VSCode Extension",
+      "path": "../vscode_extension/"
+    }
+  ],
+  "settings": {}
+}
