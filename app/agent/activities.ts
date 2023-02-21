@@ -13,7 +13,7 @@ import type {
 import { WorkspaceStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
-import { unwrap, waitForPromises } from "~/utils.shared";
+import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
 import type { CheckoutAndInspectResult } from "./activities-types";
 import type { createAgentInjector } from "./agent-injector";
@@ -66,6 +66,7 @@ export const createActivities = async (
     const instanceId = `buildfs-${uuidv4()}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const buildfsService = injector.resolve(Token.BuildfsService);
+    const logger = injector.resolve(Token.Logger);
 
     return await buildfsService.buildfs({ ...args, db, firecrackerService });
   };

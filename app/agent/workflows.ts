@@ -8,6 +8,7 @@ import {
   continueAsNew,
   ApplicationFailure,
   ParentClosePolicy,
+  proxySinks,
 } from "@temporalio/workflow";
 // the native path module is a restricted import in workflows
 import path from "path-browserify";
@@ -19,6 +20,7 @@ import {
   unwrap,
   groupBy,
   makeMap,
+  displayError,
 } from "~/utils.shared";
 
 import type { createActivities } from "./activities";
@@ -26,6 +28,8 @@ import { HOST_PERSISTENT_DIR } from "./constants";
 import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
 import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
 import type { BFSPWorkflowPhase, BFSPWorkflowState } from "./workflows-utils";
+
+const { defaultWorkflowLogger: logger } = proxySinks();
 
 type Activites = Awaited<ReturnType<typeof createActivities>>;
 const {
@@ -269,7 +273,12 @@ export async function runBuildfsAndPrebuilds(
 }
 
 export async function runBuildfs(buildfsEventId: bigint): Promise<{ buildSuccessful: boolean }> {
-  return await buildfs({ buildfsEventId, outputDriveMaxSizeMiB: 10000 });
+  try {
+    return await buildfs({ buildfsEventId, outputDriveMaxSizeMiB: 10000 });
+  } catch (err) {
+    logger.error(displayError(err));
+    return { buildSuccessful: false };
+  }
 }
 
 export async function runPrebuild(

@@ -6,9 +6,8 @@ import { VmTaskStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import type { Config } from "~/config";
-import { errToString } from "~/test-utils";
 import { Token } from "~/token";
-import { mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
+import { displayError, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { BuildfsService } from "./buildfs.service";
@@ -330,7 +329,7 @@ export class PrebuildService {
               try {
                 return this.buildfsService.getExternalFilePathsFromDockerfile(fileContent);
               } catch (err) {
-                this.logger.error(errToString(err));
+                this.logger.error(displayError(err));
                 return null;
               }
             }),

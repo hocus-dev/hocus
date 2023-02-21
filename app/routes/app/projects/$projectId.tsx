@@ -7,11 +7,13 @@ import moment from "moment";
 import path from "path-browserify";
 import { AppPage } from "~/components/app-page";
 import { PrebuildList } from "~/components/projects/prebuilds/prebuild-list";
+import { WorkspaceList } from "~/components/workspaces/workspace-list";
 import { HttpError } from "~/http-error.server";
 import { PagePaths } from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
+import { unwrap } from "~/utils.shared";
 
-export const loader = async ({ context: { db, req } }: LoaderArgs) => {
+export const loader = async ({ context: { db, req, user } }: LoaderArgs) => {
   const { success, value: projectExternalId } = UuidValidator.SafeParse(
     path.parse(req.params[0]).name,
   );
@@ -29,6 +31,10 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
           gitObject: true,
           gitBranchLinks: {
             include: { gitBranch: true },
+          },
+          workspaces: {
+            where: { userId: unwrap(user).id },
+            orderBy: { createdAt: "desc" },
           },
         },
       },
@@ -53,6 +59,15 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
       externalPrebuildEventId: e.externalId,
       status: e.status,
     })),
+    workspaces: project.prebuildEvents
+      .flatMap((e) => e.workspaces)
+      .map((w) => ({
+        externalId: w.externalId,
+        status: w.status,
+        createdAt: w.createdAt.getTime(),
+        name: w.name,
+        lastOpenedAt: w.lastOpenedAt.getTime(),
+      })),
     gitRepository: {
       url: project.gitRepository.url,
     },
@@ -60,7 +75,7 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
 };
 
 export default function ProjectRoute(): JSX.Element {
-  const { project, gitRepository, prebuildEvents } = useLoaderData<typeof loader>();
+  const { project, gitRepository, prebuildEvents, workspaces } = useLoaderData<typeof loader>();
   const createdAt = moment(project.createdAt).fromNow();
 
   return (
@@ -101,7 +116,7 @@ export default function ProjectRoute(): JSX.Element {
             </>
           }
         >
-          Workspaces
+          <WorkspaceList elements={workspaces} />
         </Tabs.Item>
         <Tabs.Item
           active={true}

@@ -7,3 +7,5 @@ export const PagePaths = {
 } as const;
 
 export const getProjectPath = (projectId: string) => `/app/projects/${projectId}` as const;
+export const getWorkspacePath = (workspaceExternalId: string) =>
+  `/app/workspaces/${workspaceExternalId}` as const;

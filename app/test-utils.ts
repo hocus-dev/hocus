@@ -56,13 +56,6 @@ export const printErrors = <T>(testFn: () => Promise<T>): (() => Promise<T>) => 
   };
 };
 
-export const errToString = (err: unknown): string => {
-  if (err instanceof Error) {
-    return `${err.message}\nStack: ${err.stack}`;
-  }
-  return String(err);
-};
-
 export const provideAppInjector = (
   testFn: (args: { injector: ReturnType<typeof createAppInjector> }) => Promise<void>,
 ): (() => Promise<void>) => {
