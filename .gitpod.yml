@@ -20,13 +20,16 @@ tasks:
       mkdir -p ops/resources
       echo "export GITPOD_IP=$(tailscale ip)" > ops/resources/gitpod-ip.sh
       ops/bin/rsync.sh
-  - name: dev-env setup
+  - name: Agent+CP dev-env setup
     init: yarn install && npm run dev-prebuild && ops/bin/prepare.sh
     command: |
       ops/bin/link.sh
       ops/bin/up.sh
       ops/bin/temporal-up.sh
       npm run dev
+  - name: Extension dev-env setup
+    init: |
+      cd vscode_extension/ && yarn
 # Ports to expose on workspace startup
 ports:
   - port: 3000

@@ -12,17 +12,26 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:hocus.helloWorld"
+    "onCommand:hocus.stopWorkspace",
+    "onUri"
   ],
-  "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "hocus.helloWorld",
-        "title": "Hello World"
+        "command": "hocus.stopWorkspace",
+        "title": "[Hocus] Stop Current Workspace"
       }
-    ]
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "hocus.stopWorkspace",
+          "when": "hocus.insideHocusVM"
+        }
+      ]
+    }
   },
+  "main": "./dist/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run -S esbuild-base -- --minify",
     "esbuild-base": "rimraf dist && esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
