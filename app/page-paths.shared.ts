@@ -3,6 +3,7 @@ export const PagePaths = {
   Settings: "/app/settings",
   ProjectList: "/app/projects",
   NewProject: "/app/new-project",
+  CreateWorkspace: "/app/workspaces/create",
 } as const;
 
 export const getProjectPath = (projectId: string) => `/app/projects/${projectId}` as const;

@@ -9,6 +9,7 @@ import { UserService } from "~/user/user.service.server";
 import { ProjectService } from "./project/project.service";
 import { SshKeyService } from "./ssh-key/ssh-key.service";
 import { clientFactory } from "./temporal/client-factory";
+import { WorkspaceService } from "./workspace/workspace.service";
 
 export const createAppInjector = () =>
   createInjector()
@@ -19,5 +20,6 @@ export const createAppInjector = () =>
     .provideClass(Token.UserService, UserService)
     .provideClass(Token.ProjectService, ProjectService)
     .provideFactory(Token.TemporalClient, clientFactory)
-    .provideClass(Token.SshKeyService, SshKeyService);
+    .provideClass(Token.SshKeyService, SshKeyService)
+    .provideClass(Token.WorkspaceService, WorkspaceService);
 export type AppInjector = ReturnType<typeof createAppInjector>;

@@ -45,10 +45,12 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
       createdAt: project.createdAt.getTime(),
     },
     prebuildEvents: project.prebuildEvents.map((e) => ({
-      branches: e.gitBranchLinks.map((b) => b.gitBranch.name).sort(),
+      branches: e.gitBranchLinks
+        .map((b) => ({ name: b.gitBranch.name, externalId: b.gitBranch.externalId }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
       commitHash: e.gitObject.hash.substring(0, 8),
       createdAt: e.createdAt.getTime(),
-      externalId: e.externalId,
+      externalPrebuildEventId: e.externalId,
       status: e.status,
     })),
     gitRepository: {
@@ -74,7 +76,7 @@ export default function ProjectRoute(): JSX.Element {
       </div>
       <div className="mb-8 flex justify-between items-end">
         <h1 className="text-4xl font-bold">{project.name}</h1>
-        <Button href={"#"} color="success" className="transition-all">
+        <Button disabled={true} href={"#"} color="success" className="transition-all">
           <i className="fa-solid fa-circle-plus mr-2"></i>
           <span>New Workspace</span>
         </Button>

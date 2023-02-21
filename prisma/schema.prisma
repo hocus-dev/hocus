@@ -220,6 +220,7 @@ model GitRepositoryFile {
 
 model GitBranch {
   id              BigInt        @id @default(autoincrement())
+  externalId      String        @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   name            String
   gitRepository   GitRepository @relation(fields: [gitRepositoryId], references: [id])
   gitRepositoryId BigInt

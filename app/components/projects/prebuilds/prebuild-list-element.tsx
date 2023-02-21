@@ -1,23 +1,27 @@
 import type { PrebuildEventStatus } from "@prisma/client";
 import { Button } from "flowbite-react";
 import moment from "moment";
+import { NewWorkspaceButton } from "~/components/workspaces/new-workspace-btn";
 
 import { PrebuildStatus } from "./prebuild-status";
 
 export interface PrebuildListElementProps {
-  branches: string[];
+  branches: {
+    name: string;
+    externalId: string;
+  }[];
   commitHash: string;
   /* Timestamp in milliseconds. */
   createdAt: number;
   status: PrebuildEventStatus;
-  externalId: string;
+  externalPrebuildEventId: string;
 }
 
 export function PrebuildListElement(props: PrebuildListElementProps): JSX.Element {
   const created = moment(props.createdAt).fromNow();
   const showNewWorkspaceButton = props.status === "PREBUILD_EVENT_STATUS_SUCCESS";
   const branchesTitle = props.branches.length > 1 ? "Branches" : "Branch";
-  const branches = props.branches.join(", ");
+  const branches = props.branches.map((b) => b.name).join(", ");
   return (
     <div className="w-full flex justify-between pb-4 pt-4 first:pt-0 first:-mt-1 border-gray-700 border-b-[1px]">
       <div className="grid grid-cols-2 grid-rows-2 gap-4 mr-4">
@@ -43,10 +47,10 @@ export function PrebuildListElement(props: PrebuildListElementProps): JSX.Elemen
             <span>Details</span>
           </Button>
           {showNewWorkspaceButton && (
-            <Button color="success" className="transition-all">
-              <i className="fa-solid fa-circle-plus mr-2"></i>
-              <span>New Workspace</span>
-            </Button>
+            <NewWorkspaceButton
+              externalGitBranchId={props.branches[0].externalId}
+              externalPrebuildEventId={props.externalPrebuildEventId}
+            />
           )}
         </div>
       </div>
