@@ -19,13 +19,14 @@ export class AgentUtilService {
   constructor(private readonly logger: DefaultLogger) {}
 
   createExt4Image(imagePath: string, sizeMiB: number, overwrite: boolean = false): void {
+    const fileExists = fsSync.existsSync(imagePath);
     if (overwrite) {
-      this.logger.warn(`file already exists at "${imagePath}", it will be overwritten`);
-      execCmd("rm", "-f", imagePath);
-    } else {
-      if (fsSync.existsSync(imagePath)) {
-        throw new Error(`Image file "${imagePath}" already exists`);
+      if (fileExists) {
+        this.logger.warn(`file already exists at "${imagePath}", it will be overwritten`);
       }
+      execCmd("rm", "-f", imagePath);
+    } else if (fileExists) {
+      throw new Error(`Image file "${imagePath}" already exists`);
     }
     fsSync.mkdirSync(path.dirname(imagePath), { recursive: true });
     execCmd("dd", "if=/dev/zero", `of=${imagePath}`, "bs=1M", "count=0", `seek=${sizeMiB}`);

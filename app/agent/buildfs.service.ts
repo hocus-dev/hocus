@@ -203,15 +203,16 @@ export class BuildfsService {
    * Returns the path to the rootfs drive.
    */
   private async getOrCreateRootFsDriveForProject(projectExternalId: string): Promise<string> {
-    const drivePath = path.join(HOST_PERSISTENT_DIR, "buildfs-drives", `${projectExternalId}.ext4`);
-    const lockPath = path.join(HOST_PERSISTENT_DIR, "buildfs-drives", `${projectExternalId}.lock`);
+    const buildfsDrivesDir = path.join(HOST_PERSISTENT_DIR, "buildfs-drives");
+    const drivePath = path.join(buildfsDrivesDir, `${projectExternalId}.ext4`);
+    const lockPath = path.join(buildfsDrivesDir, `${projectExternalId}.lock`);
+    await fs.mkdir(buildfsDrivesDir, { recursive: true });
     await fs.appendFile(lockPath, "");
 
     return await withFileLock(lockPath, async () => {
       if (await doesFileExist(drivePath)) {
         return drivePath;
       }
-      await fs.mkdir(path.dirname(drivePath), { recursive: true });
       await fs.copyFile(this.agentConfig.buildfsRootFs, drivePath);
       // We keep the drive image small to reduce the time it takes to copy it.
       // Copying 50GB would take a long time, like more than 30s. On the other hand,

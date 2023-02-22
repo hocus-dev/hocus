@@ -66,7 +66,6 @@ export const createActivities = async (
     const instanceId = `buildfs-${uuidv4()}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const buildfsService = injector.resolve(Token.BuildfsService);
-    const logger = injector.resolve(Token.Logger);
 
     return await buildfsService.buildfs({ ...args, db, firecrackerService });
   };
