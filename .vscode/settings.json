@@ -46,5 +46,6 @@
       }
     ]
   },
-  "excalidraw.theme": "dark"
+  "excalidraw.theme": "dark",
+  "autoOpenWorkspace.enableAutoOpenIfSingleWorkspace": true
 }

@@ -30,6 +30,8 @@ tasks:
   - name: Extension dev-env setup
     init: |
       cd vscode_extension/ && yarn
+  - name: Terminal
+    init: sleep 0.01
 # Ports to expose on workspace startup
 ports:
   - port: 3000
@@ -53,3 +55,4 @@ vscode:
     - bierner.markdown-mermaid
     - ms-azuretools.vscode-docker
     - pomdtr.excalidraw-editor
+    - zoma.vscode-auto-open-workspace
