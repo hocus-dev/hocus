@@ -18,7 +18,7 @@ tasks:
         --hostname=gitpod-hocus
       sleep 3
       mkdir -p ops/resources
-      echo "export GITPOD_IP=$(tailscale ip)" > ops/resources/gitpod-ip.sh
+      echo "export GITPOD_IP=$(tailscale ip | head -n1)" > ops/resources/gitpod-ip.sh
       ops/bin/rsync.sh
   - name: Agent+CP dev-env setup
     init: yarn install && npm run dev-prebuild && ops/bin/prepare.sh
