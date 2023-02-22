@@ -35,6 +35,7 @@ export const loader = async ({ context: { db, req, user } }: LoaderArgs) => {
           workspaces: {
             where: { userId: unwrap(user).id },
             orderBy: { createdAt: "desc" },
+            include: { gitBranch: true, prebuildEvent: { include: { gitObject: true } } },
           },
         },
       },
@@ -67,6 +68,8 @@ export const loader = async ({ context: { db, req, user } }: LoaderArgs) => {
         createdAt: w.createdAt.getTime(),
         name: w.name,
         lastOpenedAt: w.lastOpenedAt.getTime(),
+        branchName: w.gitBranch.name,
+        commitHash: w.prebuildEvent.gitObject.hash,
       })),
     gitRepository: {
       url: project.gitRepository.url,
@@ -109,6 +112,7 @@ export default function ProjectRoute(): JSX.Element {
       {/* eslint-disable-next-line react/style-prop-object */}
       <Tabs.Group aria-label="Tabs with icons" style="underline" className="mt-4">
         <Tabs.Item
+          active={true}
           title={
             <>
               <i className="fa-solid fa-laptop-code mr-2"></i>
@@ -119,7 +123,6 @@ export default function ProjectRoute(): JSX.Element {
           <WorkspaceList elements={workspaces} />
         </Tabs.Item>
         <Tabs.Item
-          active={true}
           className="p-0"
           title={
             <>
