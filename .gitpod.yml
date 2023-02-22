@@ -13,7 +13,7 @@ tasks:
   - name: tailscale
     command: |
       sudo -E tailscale up \
-        --login-server=https://hs.hugodutka.com \
+        --login-server=$TAILSCALE_LOGIN_SERVER \
         --auth-key=$TAILSCALE_PREAUTHKEY \
         --hostname=gitpod-hocus
       sleep 3
