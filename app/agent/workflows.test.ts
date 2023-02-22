@@ -354,10 +354,16 @@ test.concurrent(
         WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
       ]);
       await waitForStatus([WorkspaceStatus.WORKSPACE_STATUS_STOPPED]);
-      const monitoringWorkflowInfo = await client.workflow
-        .getHandle(workspaceInstance4.monitoringWorkflowId)
-        .describe();
-      expect(monitoringWorkflowInfo.status.name).toBe("COMPLETED");
+      await retry(
+        async () => {
+          const monitoringWorkflowInfo = await client.workflow
+            .getHandle(workspaceInstance4.monitoringWorkflowId)
+            .describe();
+          expect(monitoringWorkflowInfo.status.name).toBe("COMPLETED");
+        },
+        5,
+        3000,
+      );
     });
   }),
 );
