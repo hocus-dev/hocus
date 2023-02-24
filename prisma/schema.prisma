@@ -328,7 +328,7 @@ enum WorkspaceStatus {
 
 model Workspace {
   id               BigInt             @id @default(autoincrement())
-  externalId       String
+  externalId       String             @unique
   name             String
   userId           BigInt
   user             User               @relation(fields: [userId], references: [id])

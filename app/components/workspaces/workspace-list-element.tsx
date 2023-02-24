@@ -2,6 +2,7 @@ import type { WorkspaceStatus } from "@prisma/client";
 import { Button } from "flowbite-react";
 import moment from "moment";
 
+import { StartWorkspaceButton } from "./start-workspace-btn";
 import { WorkspaceStatusComponent } from "./workspace-status";
 
 export interface WorkspaceListElementProps {
@@ -64,12 +65,7 @@ export function WorkspaceListElement(props: WorkspaceListElementProps): JSX.Elem
               <span>Stop</span>
             </Button>
           )}
-          {showStartButton && (
-            <Button color="success" className="transition-all">
-              <i className="fa-solid fa-circle-play mr-2"></i>
-              <span>Start</span>
-            </Button>
-          )}
+          {showStartButton && <StartWorkspaceButton workspaceExternalId={props.externalId} />}
         </div>
       </div>
     </div>
