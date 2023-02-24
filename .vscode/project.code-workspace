@@ -10,6 +10,42 @@
     }
   ],
   "settings": {
-    "autoOpenWorkspace.enableAutoOpenIfSingleWorkspace": true
+    "autoOpenWorkspace.enableAutoOpenIfSingleWorkspace": true,
+    "remote.SSH.defaultForwardedPorts": [
+      {
+        "localPort": 3000,
+        "name": "app",
+        "remotePort": 3000
+      },
+      {
+        "localPort": 4200,
+        "name": "keycloak",
+        "remotePort": 4200
+      },
+      {
+        "localPort": 5432,
+        "name": "postgres",
+        "remotePort": 5432
+      },
+      {
+        "localPort": 6432,
+        "name": "temporal-postgres",
+        "remotePort": 6432
+      },
+      {
+        "localPort": 8088,
+        "name": "temporal-web",
+        "remotePort": 8088
+      }
+    ],
+    "emeraldwalk.runonsave": {
+      "commands": [
+        {
+          "match": ".*",
+          "cmd": "ops/bin/rsync.sh"
+        }
+      ]
+    },
+    "excalidraw.theme": "dark",
   }
 }
