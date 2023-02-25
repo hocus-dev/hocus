@@ -1,4 +1,4 @@
-import type { SshKeyPair } from "@prisma/client";
+import type { SshKeyPair, UserSSHPublicKey } from "@prisma/client";
 import { SshKeyPairType, Prisma } from "@prisma/client";
 import sshpk from "sshpk";
 
@@ -54,5 +54,20 @@ export class SshKeyService {
     }
 
     return await this.generateSshKeyPair(db, SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED);
+  }
+
+  /**
+   * Throws a `sshpk.KeyParseError` if the public key is invalid.
+   */
+  async createPublicSshKeyForUser(
+    db: Prisma.TransactionClient,
+    userId: bigint,
+    publicKey: string,
+  ): Promise<UserSSHPublicKey> {
+    const parsedPublicKey = sshpk.parseKey(publicKey, "ssh");
+    const publicKeyString = parsedPublicKey.toString("ssh");
+    return await db.userSSHPublicKey.create({
+      data: { publicKey: publicKeyString, userId },
+    });
   }
 }

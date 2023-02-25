@@ -2,22 +2,28 @@
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient, SshKeyPairType } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { createAgentInjector } from "~/agent/agent-injector";
 import { runAddProjectAndRepository } from "~/agent/workflows";
+import { createAppInjector } from "~/app-injector.server";
+import { DEV_USER_EXTERNAL_ID, DEV_USER_SSH_PUBLIC_KEY } from "~/dev/constants";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
 import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
 
 async function run() {
-  const injector = createAgentInjector();
+  const injector = createAppInjector();
   const agentConfig = injector.resolve(Token.Config).agent();
   const db = new PrismaClient({ datasources: { db: { url: agentConfig.databaseUrl } } });
   const sshKeyService = injector.resolve(Token.SshKeyService);
+  const userService = injector.resolve(Token.UserService);
   await sshKeyService.createSshKeyPair(
     db,
     PRIVATE_SSH_KEY,
     SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
   );
+  const devUser = await userService.getOrCreateUser(db, DEV_USER_EXTERNAL_ID, "dev");
+  await db.$transaction(async (tdb) => {
+    await sshKeyService.createPublicSshKeyForUser(tdb, devUser.id, DEV_USER_SSH_PUBLIC_KEY);
+  });
 
   const withClient = injector.resolve(Token.TemporalClient);
   await withClient(async (client) => {

@@ -1,7 +1,9 @@
 import { SshKeyPairType } from "@prisma/client";
+import sshpk from "sshpk";
 import { provideAppInjectorAndDb } from "~/test-utils";
 import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY } from "~/test-utils/constants";
 import { Token } from "~/token";
+import { createTestUser } from "~/user/test-utils";
 
 test.concurrent(
   "createSshKeyPair, generateSshKeyPair",
@@ -37,5 +39,31 @@ test.concurrent(
     const keyPairs = await Promise.all(tasks);
     const keyPairId = keyPairs[0].id;
     expect(keyPairs.every((kp) => kp.id === keyPairId)).toBe(true);
+  }),
+);
+
+test.concurrent(
+  "createPublicSshKeyForUser",
+  provideAppInjectorAndDb(async ({ injector, db }) => {
+    const sshKeyService = injector.resolve(Token.SshKeyService);
+    const testUser = await createTestUser(db);
+    await db.$transaction(async (tdb) => {
+      const sshKey = await sshKeyService.createPublicSshKeyForUser(
+        tdb,
+        testUser.id,
+        PUBLIC_SSH_KEY,
+      );
+      expect(sshKey.publicKey).toEqual(PUBLIC_SSH_KEY);
+    });
+    try {
+      await db.$transaction(async (tdb) => {
+        await sshKeyService.createPublicSshKeyForUser(tdb, testUser.id, "xd");
+        throw new Error("unreachable");
+      });
+    } catch (err) {
+      if (!(err instanceof sshpk.KeyParseError)) {
+        throw err;
+      }
+    }
   }),
 );
