@@ -9,7 +9,6 @@ https://github.com/supabase/gotrue/blob/1c9a4dca45298eb534b03a2c2521603b6ee45728
 
 The gitpod environment contains the Control Plane and the Vscode extension together with all support services. The env expects the following environment variables:
 
-- `GITHUB_APP_HOCUS_DEV_CLIENT_SECRET` - Oauth secret for Github Auth. Required for GH auth to work.
 - `TAILSCALE_LOGIN_SERVER - If using tailscale set to `https://controlplane.tailscale.com`, otherwise set to the headscale url. Required when developing the agent.
 - `TAILSCALE_PREAUTHKEY` - Preauth key for the machine, used to authorize the env to tailscale. Required when developing the agent.
 - `DEV_MACHINE_PRIVATE_SSH_KEY` - Private key used to synchronize the codebase with the machine the Hocus agent is running on. Please remember to add \n to the private key for gitpod to work. Required when developing the agent.
@@ -18,7 +17,7 @@ The gitpod environment contains the Control Plane and the Vscode extension toget
 
 ## Control plane
 
-Just open the repo in gitpod and it should work. `localhost:3000` for the control plane. `localhost:3000/app/projects` to see the vm's. Dev Keycloak password is `admin/admin`.
+Just open the repo in gitpod and it should work. `localhost:3000` for the control plane. `localhost:3000/app/projects` to see the vms. Dev user Keycloak password is `dev/dev`. Admin Keycloak password is `admin/admin`.
 
 ## Vscode extension
 
@@ -80,7 +79,6 @@ This starts your app in development mode, which will purge the server require ca
 
 ```bash
 docker run --network=host -it -e PGPASSWORD=pass postgres:alpine pg_dump -h localhost -U postgres keycloak > ops/docker/resources/keycloak-db-dump.sql
-sed -i "s/$GITHUB_APP_HOCUS_DEV_CLIENT_SECRET/github_client_secret_goes_here/g" ops/docker/resources/keycloak-db-dump.sql
 ```
 
 ## Tests

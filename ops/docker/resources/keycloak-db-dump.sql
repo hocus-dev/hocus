@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 14.5
--- Dumped by pg_dump version 14.5
+-- Dumped from database version 15.2
+-- Dumped by pg_dump version 15.2
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2027,7 +2027,7 @@ e914359c-a7d8-4ab2-82cb-cdf7abc13465	Allowed Protocol Mapper Types	8ce1928e-b671
 a8939957-72ac-47d0-99e7-ab7e85e4c8dd	rsa-enc-generated	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	rsa-enc-generated	org.keycloak.keys.KeyProvider	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N
 5ec6cc62-57b1-4fbc-a274-de95c8210ebe	aes-generated	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	aes-generated	org.keycloak.keys.KeyProvider	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N
 e81316e1-7b1a-43ec-9a09-da3873896b98	rsa-generated	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	rsa-generated	org.keycloak.keys.KeyProvider	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N
-ffdf834f-0528-48ed-9e78-f06bbf131e87	\N	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	declarative-user-profile	org.keycloak.userprofile.UserProfileProvider	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N
+841029ed-f41e-4acb-aac7-a8bce7883682	\N	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	declarative-user-profile	org.keycloak.userprofile.UserProfileProvider	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	\N
 \.
 
 
@@ -2197,6 +2197,7 @@ e8c01625-cda6-4510-a2d6-29214855ce90	24999798-ea13-42cc-b508-051af1110258
 
 COPY public.credential (id, salt, type, user_id, created_date, user_label, secret_data, credential_data, priority) FROM stdin;
 19d1b731-6542-49b0-9302-55a29995928d	\N	password	08766cb6-30f0-4060-bbae-b5cde0c325be	1664040030099	\N	{"value":"q7oESsAY9uMIDHIn1Oa8BpALcMCKtYbC9/Ae5U7qgMDiJM0qyAZYGtg+Kxt/BNDUIgrHoQOu445ceiQ+BpuPGA==","salt":"5FyiTLRcJ98EOLa1PccVTw==","additionalParameters":{}}	{"hashIterations":27500,"algorithm":"pbkdf2-sha256","additionalParameters":{}}	10
+738fb444-a457-4fbd-9242-b1583928d48c	\N	password	7480bd02-16d0-4727-a3dc-3832144aaa95	1677336830385	\N	{"value":"I1hLQ+SbFZd6+aGly0T9PJKWIn9rXlpiCEe+saSVak9md2f3cngNKWnuDKJpijkqRVCnwVk091iwmOTRiHuC2Q==","salt":"lvlNx58cNifCmI3OrCfLgg==","additionalParameters":{}}	{"hashIterations":27500,"algorithm":"pbkdf2-sha256","additionalParameters":{}}	10
 \.
 
 
@@ -2455,7 +2456,6 @@ COPY public.group_role_mapping (role_id, group_id) FROM stdin;
 --
 
 COPY public.identity_provider (internal_id, enabled, provider_alias, provider_id, store_token, authenticate_by_default, realm_id, add_token_role, trust_email, first_broker_login_flow_id, post_broker_login_flow_id, provider_display_name, link_only) FROM stdin;
-b8b63c96-7b3e-47a7-92f7-d5c0c8959101	t	github	github	f	f	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	f	f	4cf8e0d3-9efb-4c20-be8d-6b2e4919de8f	\N	\N	f
 \.
 
 
@@ -2464,12 +2464,6 @@ b8b63c96-7b3e-47a7-92f7-d5c0c8959101	t	github	github	f	f	8ce1928e-b671-44b2-ab2f
 --
 
 COPY public.identity_provider_config (identity_provider_id, value, name) FROM stdin;
-b8b63c96-7b3e-47a7-92f7-d5c0c8959101	false	hideOnLoginPage
-b8b63c96-7b3e-47a7-92f7-d5c0c8959101	false	acceptsPromptNoneForwardFromClient
-b8b63c96-7b3e-47a7-92f7-d5c0c8959101	2087dfc1cb8f1a0b2f66	clientId
-b8b63c96-7b3e-47a7-92f7-d5c0c8959101	false	disableUserInfo
-b8b63c96-7b3e-47a7-92f7-d5c0c8959101	IMPORT	syncMode
-b8b63c96-7b3e-47a7-92f7-d5c0c8959101	github_client_secret_goes_here	clientSecret
 \.
 
 
@@ -3006,7 +3000,7 @@ f0b4fabc-ab56-4c40-9358-bce0db238c9a	String	jsonType.label
 
 COPY public.realm (id, access_code_lifespan, user_action_lifespan, access_token_lifespan, account_theme, admin_theme, email_theme, enabled, events_enabled, events_expiration, login_theme, name, not_before, password_policy, registration_allowed, remember_me, reset_password_allowed, social, ssl_required, sso_idle_timeout, sso_max_lifespan, update_profile_on_soc_login, verify_email, master_admin_client, login_lifespan, internationalization_enabled, default_locale, reg_email_as_username, admin_events_enabled, admin_events_details_enabled, edit_username_allowed, otp_policy_counter, otp_policy_window, otp_policy_period, otp_policy_digits, otp_policy_alg, otp_policy_type, browser_flow, registration_flow, direct_grant_flow, reset_credentials_flow, client_auth_flow, offline_session_idle_timeout, revoke_refresh_token, access_token_life_implicit, login_with_email_allowed, duplicate_emails_allowed, docker_auth_flow, refresh_token_max_reuse, allow_user_managed_access, sso_max_lifespan_remember_me, sso_idle_timeout_remember_me, default_role) FROM stdin;
 65e9a13f-13e5-431c-8500-c136a2014a70	60	300	60	\N	\N	\N	t	f	0	\N	master	0	\N	f	f	f	f	EXTERNAL	1800	36000	f	f	852e20a2-bc82-4a22-bd43-3d09702452fa	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	fe605ee4-a865-4142-8ad5-2ff12a1816d1	89e71be5-0fce-4c06-a542-6b6f8952444d	04e8e7ab-6450-4440-9a6f-6e0edafe5589	3c8babf4-e626-45a8-9fa2-35c503e7a05b	7bcb46cd-c5c1-4f5b-8333-82449cfa5b13	2592000	f	900	t	f	9f04ad5f-f308-4f56-82ac-2e96fc0aa0bb	0	f	0	0	c3729e00-622c-4432-b7c4-30929326b88f
-8ce1928e-b671-44b2-ab2f-ba0a2fc46762	60	300	300				t	f	0	hocus	hocus	0	\N	f	f	f	f	EXTERNAL	1800	36000	f	f	7c83487d-a523-408e-ad85-666f44f21031	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	6b950abd-0602-4993-9837-c2a4e0d72f35	d9619104-b36e-46f2-bc36-92d2cd74fbd4	77c83491-af58-412d-97eb-1490ae30a233	9badc312-6bac-4212-a42a-26b329c8d75b	3fe1323e-b3b4-43a0-b8c8-b084d05b3c39	2592000	f	900	t	f	4034bbd9-d9b2-4ea7-a860-4da8a1dac0ee	0	f	0	0	e8c01625-cda6-4510-a2d6-29214855ce90
+8ce1928e-b671-44b2-ab2f-ba0a2fc46762	60	300	300				t	f	0	keycloak	hocus	0	\N	t	f	f	f	EXTERNAL	1800	36000	f	f	7c83487d-a523-408e-ad85-666f44f21031	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	6b950abd-0602-4993-9837-c2a4e0d72f35	d9619104-b36e-46f2-bc36-92d2cd74fbd4	77c83491-af58-412d-97eb-1490ae30a233	9badc312-6bac-4212-a42a-26b329c8d75b	3fe1323e-b3b4-43a0-b8c8-b084d05b3c39	2592000	f	900	t	f	4034bbd9-d9b2-4ea7-a860-4da8a1dac0ee	0	f	0	0	e8c01625-cda6-4510-a2d6-29214855ce90
 \.
 
 
@@ -3327,6 +3321,7 @@ COPY public.user_consent_client_scope (user_consent_id, scope_id) FROM stdin;
 COPY public.user_entity (id, email, email_constraint, email_verified, enabled, federation_link, first_name, last_name, realm_id, username, created_timestamp, service_account_client_link, not_before) FROM stdin;
 08766cb6-30f0-4060-bbae-b5cde0c325be	\N	b1366559-0f3b-41a3-92a6-ab0c31095a30	f	t	\N	\N	\N	65e9a13f-13e5-431c-8500-c136a2014a70	admin	1664040029975	\N	0
 62f57438-be34-4c20-8901-c6cb7c893db4	\N	7334e327-848f-42fc-978f-15bc1da0430f	f	t	\N	\N	\N	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	service-account-realm-management	1664040029576	ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	0
+7480bd02-16d0-4727-a3dc-3832144aaa95	dev@example.com	dev@example.com	f	t	\N	dev	dev	8ce1928e-b671-44b2-ab2f-ba0a2fc46762	dev	1677336830307	\N	0
 \.
 
 
@@ -3385,6 +3380,7 @@ COPY public.user_required_action (user_id, required_action) FROM stdin;
 COPY public.user_role_mapping (role_id, user_id) FROM stdin;
 c3729e00-622c-4432-b7c4-30929326b88f	08766cb6-30f0-4060-bbae-b5cde0c325be
 88d4f17e-2eb0-4b28-8ce2-7d53301ad91a	08766cb6-30f0-4060-bbae-b5cde0c325be
+e8c01625-cda6-4510-a2d6-29214855ce90	7480bd02-16d0-4727-a3dc-3832144aaa95
 \.
 
 
