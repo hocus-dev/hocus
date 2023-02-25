@@ -1,4 +1,5 @@
-import type { User, Prisma } from "@prisma/client";
+import type { User } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { GAEventName } from "~/analytics/event.server";
 import { TaskId } from "~/tasks/schemas.server";
 import type { TaskService } from "~/tasks/task.service.server";
@@ -14,13 +15,21 @@ export class UserService {
     externalId: string,
     loginMethod: string,
   ): Promise<User> {
-    const user = await db.user.findUnique({ where: { externalId } });
+    let user = await db.user.findUnique({ where: { externalId } });
     if (user != null) {
       return user;
     }
 
     return await db.$transaction(async (tdb) => {
-      const user = await tdb.user.create({ data: { externalId } });
+      await tdb.$executeRawUnsafe(
+        `LOCK TABLE "${Prisma.ModelName.User}" IN SHARE UPDATE EXCLUSIVE MODE`,
+      );
+      user = await db.user.findUnique({ where: { externalId } });
+      if (user != null) {
+        return user;
+      }
+
+      user = await tdb.user.create({ data: { externalId } });
       await this.taskService.scheduleTask(tdb, {
         taskId: TaskId.SendGAEvent,
         payload: {

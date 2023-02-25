@@ -24,6 +24,8 @@ services:
     image: worker-dev
     restart: "no"
     privileged: true
+    ports:
+      - 8822:22
     volumes:
       - "${REPO_DIR}:/app"
       - "${HOCUS_RESOURCES_DIR}:/srv/jailer"

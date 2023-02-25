@@ -6,7 +6,8 @@ export function PrebuildList(props: { elements: PrebuildListElementProps[] }): J
     <div className="flex flex-col items-center justify-center h-full mt-16">
       <i className="fa-solid fa-ship text-5xl text-gray-400"></i>
       <p className="text-gray-400 mt-4">
-        No prebuilds yet. Push a commit to the repository to start one.
+        No prebuilds yet. It usually takes a minute after a project is added before the first
+        prebuild is automatically started.
       </p>
     </div>
   );
