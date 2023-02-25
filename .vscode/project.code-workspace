@@ -47,5 +47,6 @@
       ]
     },
     "excalidraw.theme": "dark",
+    "typescript.tsdk": "./node_modules/typescript/lib",
   }
 }
