@@ -6,6 +6,7 @@ import { LogGroupType } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, Config as SSHConfig } from "node-ssh";
+import { config } from "~/config";
 import { GroupError } from "~/group-error";
 import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
@@ -280,6 +281,7 @@ export class AgentUtilService {
       update: {},
       create: {
         externalId: SOLO_AGENT_INSTANCE_ID,
+        externalIp: config.agent.externalIp,
       },
     });
   }

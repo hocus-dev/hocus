@@ -54,7 +54,7 @@ export function WorkspaceListElement(props: WorkspaceListElementProps): JSX.Elem
             <span>Details</span>
           </Button>
           {showOpenButton && (
-            <Button color="success" className="transition-all">
+            <Button href="vscode://hocus.hocus/?aaaaa" color="success" className="transition-all">
               <i className="fa-solid fa-circle-play mr-2"></i>
               <span>Open</span>
             </Button>
