@@ -38,7 +38,7 @@
     "express-openid-connect": "^2.8.0",
     "firecracker-client": "./deps/firecracker-client",
     "flowbite": "^1.6.2",
-    "flowbite-react": "^0.3.7",
+    "flowbite-react": "^0.3.8",
     "graphile-worker": "^0.13.0",
     "http-status-codes": "^2.2.0",
     "moment": "^2.29.4",

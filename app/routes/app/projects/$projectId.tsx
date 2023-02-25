@@ -1,10 +1,11 @@
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
-import { Button, Tabs } from "flowbite-react";
+import { useLoaderData, useSearchParams } from "@remix-run/react";
+import { Button, Tabs, TabsRef } from "flowbite-react";
 import { StatusCodes } from "http-status-codes";
 import moment from "moment";
 import path from "path-browserify";
+import { useRef } from "react";
 import { AppPage } from "~/components/app-page";
 import { PrebuildList } from "~/components/projects/prebuilds/prebuild-list";
 import { WorkspaceList } from "~/components/workspaces/workspace-list";
@@ -81,6 +82,18 @@ export default function ProjectRoute(): JSX.Element {
   const { project, gitRepository, prebuildEvents, workspaces } = useLoaderData<typeof loader>();
   const createdAt = moment(project.createdAt).fromNow();
 
+  const [searchParams] = useSearchParams();
+  const tabsRef = useRef<TabsRef>(null);
+  let tabId = parseInt(searchParams.get("tabId") ?? "0");
+  if (isNaN(tabId)) {
+    tabId = 0;
+  }
+  const setTabIdQueryParam = (tabId: number) => {
+    const url = new URL(window.location as any);
+    url.searchParams.set("tabId", tabId.toString());
+    window.history.replaceState(null, "", url.toString());
+  };
+
   return (
     <AppPage>
       <div className="mt-8 mb-4">
@@ -109,10 +122,16 @@ export default function ProjectRoute(): JSX.Element {
           <span className="font-bold">{createdAt}</span>
         </p>
       </div>
-      {/* eslint-disable-next-line react/style-prop-object */}
-      <Tabs.Group aria-label="Tabs with icons" style="underline" className="mt-4">
+      <Tabs.Group
+        aria-label="Tabs with icons"
+        /* eslint-disable-next-line react/style-prop-object */
+        style="underline"
+        className="mt-4"
+        ref={tabsRef}
+        onActiveTabChange={setTabIdQueryParam}
+      >
         <Tabs.Item
-          active={true}
+          active={tabId === 0}
           title={
             <>
               <i className="fa-solid fa-laptop-code mr-2"></i>
@@ -123,6 +142,7 @@ export default function ProjectRoute(): JSX.Element {
           <WorkspaceList elements={workspaces} />
         </Tabs.Item>
         <Tabs.Item
+          active={tabId === 1}
           className="p-0"
           title={
             <>
