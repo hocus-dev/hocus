@@ -4,7 +4,7 @@ import { PagePaths } from "~/page-paths.shared";
 export const Navbar = (props: { userEmail?: string }): JSX.Element => {
   return (
     <FlowbiteNavbar fluid={true} rounded={false}>
-      <FlowbiteNavbar.Brand href="/">
+      <FlowbiteNavbar.Brand href={PagePaths.ProjectList}>
         <img src="/logo-leaf.png" className="mr-3 h-6 sm:h-6" alt="Hocus Logo" />
         <span className="self-center whitespace-nowrap text-xl font-semibold dark:text-white">
           Hocus
