@@ -1,7 +1,8 @@
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams } from "@remix-run/react";
-import { Button, Tabs, TabsRef } from "flowbite-react";
+import type { TabsRef } from "flowbite-react";
+import { Button, Tabs } from "flowbite-react";
 import { StatusCodes } from "http-status-codes";
 import moment from "moment";
 import path from "path-browserify";
