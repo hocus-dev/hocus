@@ -263,7 +263,6 @@ model Project {
 model AgentInstance {
   id                 BigInt               @id @default(autoincrement())
   externalId         String               @unique
-  externalIp         String
   files              File[]
   gitRepositoryFiles GitRepositoryFile[]
   buildfsEventFiles  BuildfsEventFiles[]

@@ -30,6 +30,9 @@ export const config = makeConfig()({
     apiSecret: get("GOOGLE_ANALYTICS_API_SECRET", "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"),
     url: get("GOOGLE_ANALYTICS_URL", "https://www.google-analytics.com/debug"),
   }),
+  controlPlane: () => ({
+    agentHostname: get("CONTROL_PLANE_AGENT_HOSTNAME", "localhost"),
+  }),
   agent: () => ({
     temporalAddress: get("AGENT_TEMPORAL_ADDRESS", "localhost:7233"),
     databaseUrl: get("AGENT_DATABASE_URL", "postgres://postgres:pass@localhost:5432/rooms"),
@@ -49,7 +52,6 @@ export const config = makeConfig()({
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:
       process.env.AGENT_PREBUILD_SSH_PRIVATE_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PRIVATE,
-    externalIp: process.env.DEV_MACHINE_HOSTNAME ?? "localhost",
   }),
   temporalConnection: () => ({
     temporalServerUrl: process.env.TEMPORAL_SERVER_URL ?? "localhost:7233",

@@ -15,7 +15,7 @@ export interface WorkspaceListElementProps {
   status: WorkspaceStatus;
   branchName: string;
   commitHash: string;
-  workspaceHostname: string;
+  workspaceHostname?: string;
   agentHostname: string;
 }
 

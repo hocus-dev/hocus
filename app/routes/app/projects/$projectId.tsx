@@ -13,15 +13,17 @@ import { WorkspaceList } from "~/components/workspaces/workspace-list";
 import { HttpError } from "~/http-error.server";
 import { PagePaths } from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
+import { Token } from "~/token";
 import { unwrap } from "~/utils.shared";
 
-export const loader = async ({ context: { db, req, user } }: LoaderArgs) => {
+export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) => {
   const { success, value: projectExternalId } = UuidValidator.SafeParse(
     path.parse(req.params[0]).name,
   );
   if (!success) {
     throw new HttpError(StatusCodes.BAD_REQUEST, "Project id must be a UUID");
   }
+  const config = await app.resolve(Token.Config).controlPlane();
   const project = await db.project.findUnique({
     where: { externalId: projectExternalId },
     include: {
@@ -77,7 +79,7 @@ export const loader = async ({ context: { db, req, user } }: LoaderArgs) => {
         lastOpenedAt: w.lastOpenedAt.getTime(),
         branchName: w.gitBranch.name,
         commitHash: w.prebuildEvent.gitObject.hash,
-        agentHostname: w.agentInstance.externalIp,
+        agentHostname: config.agentHostname,
         workspaceHostname: w.activeInstance?.vmIp,
       })),
     gitRepository: {

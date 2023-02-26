@@ -286,7 +286,6 @@ export class AgentUtilService {
       update: {},
       create: {
         externalId: SOLO_AGENT_INSTANCE_ID,
-        externalIp: this.agentConfig.externalIp,
       },
     });
   }

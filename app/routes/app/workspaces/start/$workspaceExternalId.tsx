@@ -20,6 +20,7 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
   const { success, value: workspaceExternalId } = UuidValidator.SafeParse(
     path.parse(req.params[0]).name,
   );
+  const config = await app.resolve(Token.Config).controlPlane();
   if (!success) {
     throw new HttpError(StatusCodes.BAD_REQUEST, "Workspace id must be a UUID");
   }
@@ -49,7 +50,7 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
   return json({
     workspaceInstanceId: instance.id.toString(),
     agentHostname: instance.vmIp,
-    workspaceHostname: workspace.agentInstance.externalIp,
+    workspaceHostname: config.agentHostname,
   });
 };
 
