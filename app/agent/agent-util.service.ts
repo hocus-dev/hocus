@@ -6,7 +6,7 @@ import { LogGroupType } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, Config as SSHConfig } from "node-ssh";
-import { config } from "~/config";
+import { Config, config } from "~/config";
 import { GroupError } from "~/group-error";
 import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
@@ -17,7 +17,11 @@ import { execCmd, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
 
 export class AgentUtilService {
   static inject = [Token.Logger] as const;
-  constructor(private readonly logger: DefaultLogger) {}
+  private readonly agentConfig: ReturnType<Config["agent"]>;
+
+  constructor(private readonly logger: DefaultLogger) {
+    this.agentConfig = config.agent();
+  }
 
   createExt4Image(imagePath: string, sizeMiB: number, overwrite: boolean = false): void {
     const fileExists = fsSync.existsSync(imagePath);
@@ -281,7 +285,7 @@ export class AgentUtilService {
       update: {},
       create: {
         externalId: SOLO_AGENT_INSTANCE_ID,
-        externalIp: config.agent.externalIp,
+        externalIp: this.agentConfig.externalIp,
       },
     });
   }
