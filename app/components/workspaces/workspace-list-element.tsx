@@ -15,6 +15,8 @@ export interface WorkspaceListElementProps {
   status: WorkspaceStatus;
   branchName: string;
   commitHash: string;
+  workspaceHostname: string;
+  agentHostname: string;
 }
 
 export function WorkspaceListElement(props: WorkspaceListElementProps): JSX.Element {
@@ -54,7 +56,11 @@ export function WorkspaceListElement(props: WorkspaceListElementProps): JSX.Elem
             <span>Details</span>
           </Button>
           {showOpenButton && (
-            <Button href="vscode://hocus.hocus/?aaaaa" color="success" className="transition-all">
+            <Button
+              href={`vscode://hocus.hocus/?agent-hostname=${props.agentHostname}?workspace-hostname=${props.workspaceHostname}`}
+              color="success"
+              className="transition-all"
+            >
               <i className="fa-solid fa-circle-play mr-2"></i>
               <span>Open</span>
             </Button>

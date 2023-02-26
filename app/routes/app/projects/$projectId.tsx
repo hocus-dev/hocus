@@ -37,7 +37,12 @@ export const loader = async ({ context: { db, req, user } }: LoaderArgs) => {
           workspaces: {
             where: { userId: unwrap(user).id },
             orderBy: { createdAt: "desc" },
-            include: { gitBranch: true, prebuildEvent: { include: { gitObject: true } } },
+            include: {
+              gitBranch: true,
+              prebuildEvent: { include: { gitObject: true } },
+              agentInstance: true,
+              activeInstance: true,
+            },
           },
         },
       },
@@ -72,6 +77,8 @@ export const loader = async ({ context: { db, req, user } }: LoaderArgs) => {
         lastOpenedAt: w.lastOpenedAt.getTime(),
         branchName: w.gitBranch.name,
         commitHash: w.prebuildEvent.gitObject.hash,
+        agentHostname: w.agentInstance.externalIp,
+        workspaceHostname: w.activeInstance?.vmIp,
       })),
     gitRepository: {
       url: project.gitRepository.url,
