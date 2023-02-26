@@ -47,6 +47,10 @@ export function WorkspaceListElement(props: WorkspaceListElementProps): JSX.Elem
             <span className="mr-1">Status: </span>
             <WorkspaceStatusComponent status={props.status} />
           </p>
+          <p className="text-gray-400">
+            <span className="mr-1">Id: </span>
+            <span className="font-bold">{props.externalId}</span>
+          </p>
         </div>
       </div>
       <div className="flex flex-col justify-center">
