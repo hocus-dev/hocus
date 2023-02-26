@@ -61,7 +61,7 @@ export default function ProjectRoute(): JSX.Element {
       <div className="flex flex-col justify-center">
         <div className="flex gap-4">
           <Button
-            href={`vscode://hocus.hocus/?agent-hostname=${actionData?.agentHostname}?workspace-hostname=${actionData?.workspaceHostname}`}
+            href={`vscode://hocus.hocus/?agent-hostname=${actionData?.agentHostname}&workspace-hostname=${actionData?.workspaceHostname}`}
             color="success"
             className="transition-all"
           >

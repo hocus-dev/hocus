@@ -11,8 +11,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   vscode.window.registerUriHandler({
     handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
+      const p = new URLSearchParams(uri.query);
+      const agentHostname = p.get("agent-hostname");
+      const workspaceHostname = p.get("workspace-hostname");
+      console.log(agentHostname);
+      console.log(workspaceHostname);
       // TODO: parse the URL, connect to the remote machine and/or write the required ssh config
       vscode.window.showInformationMessage(`Hocus URI handler called: ${uri.toString()}`);
+
+      vscode.commands.executeCommand(
+        "vscode.openFolder",
+        vscode.Uri.parse("vscode-remote://ssh-remote+myubuntubox/home/x/projects/foo"),
+      );
     },
   });
 

@@ -57,7 +57,7 @@ export function WorkspaceListElement(props: WorkspaceListElementProps): JSX.Elem
           </Button>
           {showOpenButton && (
             <Button
-              href={`vscode://hocus.hocus/?agent-hostname=${props.agentHostname}?workspace-hostname=${props.workspaceHostname}`}
+              href={`vscode://hocus.hocus/?agent-hostname=${props.agentHostname}&workspace-hostname=${props.workspaceHostname}`}
               color="success"
               className="transition-all"
             >
