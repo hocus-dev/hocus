@@ -101,23 +101,24 @@ export async function activate(context: vscode.ExtensionContext) {
 
       // TODO: Key management
       // TODO: Delete unused workspaces
-      getHocusSshConfigPath().then((path) => {
-        fs.appendFile(path, `
+      getHocusSshConfigPath().then(async (path) => {
+        const config = await fs.readFile(path);
+        if (!config.includes(`Host ${workspaceName}.hocus.dev`)) {
+          await fs.appendFile(path, `
 Host ${workspaceName}.hocus.dev
     HostName ${workspaceHostname}
     User hocus
-    IdentityFile ~/.ssh/hocus_dev_user
-    Port 22
-    ProxyCommand ssh -W %h:%p -o StrictHostKeyChecking=no -i ~/.ssh/hocus_dev_user sshgateway@${agentHostname} -p 8822
+    ProxyJump sshgateway@${agentHostname}:8822
     UserKnownHostsFile /dev/null
     StrictHostKeyChecking no
 `
-        ).then(() => {
+          )
+        }
+        await
           vscode.commands.executeCommand(
             "vscode.openFolder",
             vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev/home/hocus/dev/project`),
           );
-        })
       })
     },
   });
