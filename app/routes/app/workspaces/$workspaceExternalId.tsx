@@ -10,7 +10,7 @@ import { AppPage } from "~/components/app-page";
 import { WorkspaceStatusCard } from "~/components/workspaces/workspace-status-card";
 import { WorkspaceStatusCardPlaceholder } from "~/components/workspaces/workspace-status-card-placeholder";
 import { HttpError } from "~/http-error.server";
-import { getProjectPath, getWorkspaceStatusPath } from "~/page-paths.shared";
+import { getProjectPath, getWorkspaceStatusPath, WorkspacePathParams } from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
 import { Token } from "~/token";
 import { max, sleep, unwrap } from "~/utils.shared";
@@ -30,7 +30,7 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
     unwrap(user).id,
     workspaceExternalId,
   );
-  const justCreated = req.query.justCreated != null;
+  const justCreated = req.query[WorkspacePathParams.JUST_CREATED] != null;
   if (workspace == null && justCreated) {
     return json({ workspaceExternalId, workspace: null });
   }
@@ -45,7 +45,7 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
 
 export default function ProjectRoute(): JSX.Element {
   const loaderData = useLoaderData<typeof loader>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [fetchLoopStarted, setFetchLoopStarted] = useState(false);
   const [fetchedData, setFetchedData] = useState<WorkspaceRouteLoaderData | undefined>(void 0);
   useEffect(() => {
@@ -84,8 +84,14 @@ export default function ProjectRoute(): JSX.Element {
       innerfn();
     }
   }, [loaderData, setFetchedData, fetchLoopStarted, setFetchLoopStarted]);
-  const justStarted = searchParams.get("justStarted") != null;
+  const justStarted = searchParams.get(WorkspacePathParams.JUST_STARTED) != null;
   const workspace = fetchedData?.workspace ?? loaderData.workspace;
+  useEffect(() => {
+    if (searchParams.get(WorkspacePathParams.JUST_CREATED) != null && workspace != null) {
+      searchParams.delete(WorkspacePathParams.JUST_CREATED);
+      setSearchParams(searchParams);
+    }
+  });
 
   if (workspace == null) {
     return (

@@ -9,9 +9,18 @@ export const PagePaths = {
 } as const;
 
 export const getProjectPath = (projectId: string) => `/app/projects/${projectId}` as const;
+
+export const WorkspacePathParams = {
+  JUST_CREATED: "justCreated",
+  JUST_STARTED: "justStarted",
+} as const;
+
 export const getWorkspacePath = (
   workspaceExternalId: string,
-  options: { justStarted?: boolean; justCreated?: boolean },
+  options: {
+    [WorkspacePathParams.JUST_STARTED]?: boolean;
+    [WorkspacePathParams.JUST_CREATED]?: boolean;
+  },
 ) => {
   const { justStarted, justCreated } = options;
   return `/app/workspaces/${workspaceExternalId}${

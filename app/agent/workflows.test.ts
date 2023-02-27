@@ -278,6 +278,7 @@ test.concurrent(
             gitBranchId: testBranches[0].id,
             externalId: uuidv4(),
             userId: testUser.id,
+            startWorkspace: false,
           },
         ],
       });

@@ -303,8 +303,17 @@ export async function runCreateWorkspace(args: {
   gitBranchId: bigint;
   userId: bigint;
   externalId: string;
+  startWorkspace: boolean;
 }): Promise<Workspace> {
-  return await createWorkspace(args);
+  const workspace = await createWorkspace(args);
+  if (args.startWorkspace) {
+    await startChild(runStartWorkspace, {
+      args: [workspace.id],
+      workflowId: uuid4(),
+      parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+    });
+  }
+  return workspace;
 }
 
 export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceInstance> {

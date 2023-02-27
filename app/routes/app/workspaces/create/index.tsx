@@ -1,12 +1,11 @@
 import { PrebuildEventStatus } from "@prisma/client";
 import type { ActionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useActionData } from "@remix-run/react";
+import { redirect } from "@remix-run/node";
 import { StatusCodes } from "http-status-codes";
 import { v4 as uuidv4 } from "uuid";
 import { runCreateWorkspace } from "~/agent/workflows";
-import { AppPage } from "~/components/app-page";
 import { HttpError } from "~/http-error.server";
+import { getWorkspacePath } from "~/page-paths.shared";
 import { CreateWorkspaceFormValidator } from "~/schema/create-workspace-form.validator.server";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
 import { Token } from "~/token";
@@ -43,7 +42,7 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
   const workspaceName = workspaceService.generateWorkspaceName();
 
   await withClient(async (client) => {
-    return await client.workflow.execute(runCreateWorkspace, {
+    return await client.workflow.start(runCreateWorkspace, {
       workflowId: uuidv4(),
       taskQueue: MAIN_TEMPORAL_QUEUE,
       retry: { maximumAttempts: 1 },
@@ -54,18 +53,11 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
           prebuildEventId: prebuildEvent.id,
           gitBranchId: gitBranch.id,
           userId: unwrap(user).id,
+          startWorkspace: true,
         },
       ],
     });
   });
 
-  return json({
-    workspaceId: externalWorkspaceId,
-  });
+  return redirect(getWorkspacePath(externalWorkspaceId, { justCreated: true, justStarted: true }));
 };
-
-export default function ProjectRoute(): JSX.Element {
-  const actionData = useActionData<typeof action>();
-
-  return <AppPage>workspace id: {actionData?.workspaceId}</AppPage>;
-}
