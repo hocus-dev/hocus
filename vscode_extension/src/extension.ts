@@ -87,13 +87,17 @@ export async function activate(context: vscode.ExtensionContext) {
   vscode.window.registerUriHandler({
     handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
       const p = new URLSearchParams(uri.query);
-      // TODO: Sanitize this, this is unsafe AF what i had done here
       const agentHostname = p.get("agent-hostname");
       const workspaceHostname = p.get("workspace-hostname");
       const workspaceName = p.get("workspace-name");
-      console.log(agentHostname);
-      console.log(workspaceHostname);
-      console.log(workspaceName);
+
+      for (const x of [agentHostname, workspaceHostname, workspaceName]) {
+        // Kind of permissive but should be mostly enough for now
+        if (x === void 0 || x === null || x.match(/^[0-9a-zA-Z\.\-\_]*$/g) === null) {
+          vscode.window.showInformationMessage(`Invalid callback parameter: ${x}`);
+          return;
+        }
+      }
 
       // TODO: Key management
       // TODO: Delete unused workspaces
