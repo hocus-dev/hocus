@@ -4,7 +4,7 @@ import { Card, Button, Spinner } from "flowbite-react";
 import { WorkspaceStatusComponent } from "./workspace-status";
 
 export function WorkspaceStatusCard(props: {
-  justCreated: boolean;
+  justStarted: boolean;
   workspace: {
     status: WorkspaceStatus;
     name: string;
@@ -16,6 +16,11 @@ export function WorkspaceStatusCard(props: {
   };
 }): JSX.Element {
   const { workspace } = props;
+  const status =
+    props.justStarted && workspace.status === "WORKSPACE_STATUS_STOPPED"
+      ? "WORKSPACE_STATUS_PENDING_START"
+      : workspace.status;
+
   const spinnerColor: Record<WorkspaceStatus, string> = {
     WORKSPACE_STATUS_PENDING_CREATE: "warning",
     WORKSPACE_STATUS_PENDING_START: "info",
@@ -25,7 +30,7 @@ export function WorkspaceStatusCard(props: {
   };
   const spinner = (
     <div className="w-full flex justify-center mt-10">
-      <Spinner size="lg" color={spinnerColor[workspace.status]} />
+      <Spinner size="lg" color={spinnerColor[status]} />
     </div>
   );
   const lowerPart: Record<WorkspaceStatus, JSX.Element> = {
@@ -41,9 +46,7 @@ export function WorkspaceStatusCard(props: {
         </div>
       </>
     ),
-    WORKSPACE_STATUS_STOPPED: props.justCreated ? (
-      spinner
-    ) : (
+    WORKSPACE_STATUS_STOPPED: (
       <div className="grid grid-cols-2 gap-4 mt-10">
         <Button color="light">Details</Button>
         <Button color="success">Open</Button>
@@ -57,7 +60,7 @@ export function WorkspaceStatusCard(props: {
     <Card className="w-[28rem] max-w-xl">
       <div>
         <h2 className="text-center text-md text-gray-400 mb-4">
-          <WorkspaceStatusComponent status={workspace.status} />
+          <WorkspaceStatusComponent status={status} />
         </h2>
         <h2 className="text-center text-md text-gray-400">Workspace</h2>
         <h1 className="text-center text-xl font-bold">{workspace.name}</h1>
@@ -73,7 +76,7 @@ export function WorkspaceStatusCard(props: {
             </div>
           ))}
         </div>
-        {lowerPart[workspace.status]}
+        {lowerPart[status]}
       </div>
     </Card>
   );

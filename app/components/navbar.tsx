@@ -1,7 +1,8 @@
 import { Avatar, Dropdown, Navbar as FlowbiteNavbar } from "flowbite-react";
+import React from "react";
 import { PagePaths } from "~/page-paths.shared";
 
-export const Navbar = (props: { userEmail?: string }): JSX.Element => {
+const NavbarComponent = (props: { userEmail?: string }): JSX.Element => {
   return (
     <FlowbiteNavbar fluid={true} rounded={false}>
       <FlowbiteNavbar.Brand href={PagePaths.ProjectList}>
@@ -48,3 +49,5 @@ export const Navbar = (props: { userEmail?: string }): JSX.Element => {
     </FlowbiteNavbar>
   );
 };
+
+export const Navbar = React.memo(NavbarComponent);

@@ -107,3 +107,11 @@ export const groupBy = <T, K, V>(
   }
   return map;
 };
+
+export const sleep = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+export const max = (a: number, b: number): number => {
+  return a > b ? a : b;
+};

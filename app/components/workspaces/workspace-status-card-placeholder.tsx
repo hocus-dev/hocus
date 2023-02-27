@@ -17,7 +17,7 @@ export function WorkspaceStatusCardPlaceholder(): JSX.Element {
         </h1>
         <div className="flex flex-col mt-8 gap-4">
           {[
-            [20, 32],
+            [20, 36],
             [36, 28],
             [28, 36],
           ].map(([lw, rw], idx) => (
