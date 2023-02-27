@@ -13,6 +13,7 @@ export const getProjectPath = (projectId: string) => `/app/projects/${projectId}
 export const WorkspacePathParams = {
   JUST_CREATED: "justCreated",
   JUST_STARTED: "justStarted",
+  SHOULD_OPEN: "shouldOpen",
 } as const;
 
 export const getWorkspacePath = (
@@ -20,11 +21,12 @@ export const getWorkspacePath = (
   options: {
     [WorkspacePathParams.JUST_STARTED]?: boolean;
     [WorkspacePathParams.JUST_CREATED]?: boolean;
+    [WorkspacePathParams.SHOULD_OPEN]?: boolean;
   },
 ) => {
-  const { justStarted, justCreated } = options;
+  const optionsExist = Array.from(Object.values(options)).some((v) => v);
   return `/app/workspaces/${workspaceExternalId}${
-    justStarted || justCreated ? `?${qs.stringify(options)}` : ""
+    optionsExist ? `?${qs.stringify(options)}` : ""
   }` as const;
 };
 export const getWorkspaceStartPath = (workspaceExternalId: string) =>

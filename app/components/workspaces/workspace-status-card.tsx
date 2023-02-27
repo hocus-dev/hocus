@@ -3,6 +3,8 @@ import { useSearchParams } from "@remix-run/react";
 import { Card, Button, Spinner } from "flowbite-react";
 import { useEffect } from "react";
 import { WorkspacePathParams } from "~/page-paths.shared";
+import { unwrap } from "~/utils.shared";
+import { createVSCodeURI } from "~/workspace/utils";
 
 import { WorkspaceStatusComponent } from "./workspace-status";
 
@@ -16,6 +18,8 @@ export function WorkspaceStatusCard(props: {
     };
     branchName: string;
     commitHash: string;
+    agentHostname: string;
+    workspaceHostname?: string;
   };
 }): JSX.Element {
   const { workspace } = props;
@@ -24,13 +28,31 @@ export function WorkspaceStatusCard(props: {
       ? "WORKSPACE_STATUS_PENDING_START"
       : workspace.status;
   const [searchParams, setSearchParams] = useSearchParams();
+  const vsCodeUri =
+    workspace.status === "WORKSPACE_STATUS_STARTED"
+      ? createVSCodeURI({
+          agentHostname: workspace.agentHostname,
+          // if the workspace is started, the workspaceHostname is guaranteed to be defined
+          workspaceHostname: unwrap(workspace.workspaceHostname),
+        })
+      : "";
   useEffect(() => {
     if (
-      searchParams.get(WorkspacePathParams.JUST_STARTED) &&
+      searchParams.get(WorkspacePathParams.JUST_STARTED) != null &&
       workspace.status === "WORKSPACE_STATUS_STARTED"
     ) {
       searchParams.delete(WorkspacePathParams.JUST_STARTED);
-      setSearchParams(searchParams);
+      setSearchParams(searchParams, { replace: true });
+    }
+  });
+  useEffect(() => {
+    if (
+      searchParams.get(WorkspacePathParams.SHOULD_OPEN) != null &&
+      workspace.status === "WORKSPACE_STATUS_STARTED"
+    ) {
+      searchParams.delete(WorkspacePathParams.SHOULD_OPEN);
+      setSearchParams(searchParams, { replace: true });
+      window.open(vsCodeUri, "_blank");
     }
   });
 
@@ -55,7 +77,11 @@ export function WorkspaceStatusCard(props: {
         </div>
         <div className="grid grid-cols-2 gap-4 mt-6">
           <Button color="light">Details</Button>
-          <Button color="success">Open in VSCode</Button>
+          <a href={vsCodeUri} target="_blank" rel="noreferrer">
+            <Button className="w-full" color="success">
+              Open in VSCode
+            </Button>
+          </a>
         </div>
       </>
     ),

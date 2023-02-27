@@ -87,9 +87,9 @@ export default function ProjectRoute(): JSX.Element {
   const justStarted = searchParams.get(WorkspacePathParams.JUST_STARTED) != null;
   const workspace = fetchedData?.workspace ?? loaderData.workspace;
   useEffect(() => {
-    if (searchParams.get(WorkspacePathParams.JUST_CREATED) != null && workspace != null) {
+    if (searchParams.get(WorkspacePathParams.JUST_CREATED) && workspace != null) {
       searchParams.delete(WorkspacePathParams.JUST_CREATED);
-      setSearchParams(searchParams);
+      setSearchParams(searchParams, { replace: true });
     }
   });
 

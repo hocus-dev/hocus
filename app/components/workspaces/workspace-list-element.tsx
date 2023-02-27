@@ -1,6 +1,7 @@
 import type { WorkspaceStatus } from "@prisma/client";
 import { Button } from "flowbite-react";
 import moment from "moment";
+import { getWorkspacePath } from "~/page-paths.shared";
 
 import { StartWorkspaceButton } from "./start-workspace-btn";
 import { WorkspaceStatusComponent } from "./workspace-status";
@@ -61,7 +62,7 @@ export function WorkspaceListElement(props: WorkspaceListElementProps): JSX.Elem
           </Button>
           {showOpenButton && (
             <Button
-              href={`vscode://hocus.hocus/?agent-hostname=${props.agentHostname}&workspace-hostname=${props.workspaceHostname}`}
+              href={getWorkspacePath(props.externalId, { shouldOpen: true })}
               color="success"
               className="transition-all"
             >

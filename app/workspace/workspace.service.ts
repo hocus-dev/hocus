@@ -1,8 +1,10 @@
 import type { Prisma, WorkspaceStatus } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
-import type { Config } from "unique-names-generator";
 import { uniqueNamesGenerator, adjectives, animals } from "unique-names-generator";
+import type { Config as NameGeneratorConfig } from "unique-names-generator";
+import type { Config } from "~/config";
 import { HttpError } from "~/http-error.server";
+import { Token } from "~/token";
 
 export interface WorkspaceInfo {
   status: WorkspaceStatus;
@@ -13,9 +15,17 @@ export interface WorkspaceInfo {
     externalId: string;
     name: string;
   };
+  agentHostname: string;
+  workspaceHostname?: string;
 }
 export class WorkspaceService {
-  private nameGeneratorConfig: Config = {
+  private readonly agentHostname: string;
+  static inject = [Token.Config] as const;
+  constructor(config: Config) {
+    this.agentHostname = config.controlPlane().agentHostname;
+  }
+
+  private nameGeneratorConfig: NameGeneratorConfig = {
     dictionaries: [adjectives, animals],
     length: 2,
     separator: " ",
@@ -41,6 +51,7 @@ export class WorkspaceService {
           include: { project: true, gitObject: true },
         },
         gitBranch: true,
+        activeInstance: true,
       },
     });
     if (workspace == null) {
@@ -58,6 +69,8 @@ export class WorkspaceService {
         externalId: workspace.prebuildEvent.project.externalId,
         name: workspace.prebuildEvent.project.name,
       },
+      agentHostname: this.agentHostname,
+      workspaceHostname: workspace.activeInstance?.vmIp,
     };
   }
 }
