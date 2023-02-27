@@ -23,13 +23,18 @@ async function ensureSshNewEnough() {
   return;
 }
 
-async function getSshConfigDir() {
+async function getUserSshConfigDir() {
   // TODO: Windows support
   return path.join(os.homedir(), ".ssh");
 }
 
+async function getHocusSshConfigPath() {
+  // TODO: Windows support
+  return path.join(await getUserSshConfigDir(), "hocus", "config");
+}
+
 async function ensureSshDirsExists() {
-  const userSshDir = await getSshConfigDir();
+  const userSshDir = await getUserSshConfigDir();
   const hocusSshDir = path.join(userSshDir, "hocus");
   for (const dir of [userSshDir, hocusSshDir]) {
     if (!await fs.exists(dir)) {
@@ -40,12 +45,14 @@ async function ensureSshDirsExists() {
   }
 }
 
+const hocusSshConfigBaner = "# Don't edit this file - your changes will be overwritten!\n# This file is managed by the Hocus Vscode integration!\n" as const;
+
 async function ensureSshConfigSetUp() {
   await ensureSshDirsExists();
-  const userSshDir = await getSshConfigDir();
+  const userSshDir = await getUserSshConfigDir();
   const sshUserConfigPath = path.join(userSshDir, "config");
-  const sshHocusConfigPath = path.join(userSshDir, "hocus", "config");
-  for (const [filePath, fileDefault] of [[sshUserConfigPath, "# This is the ssh client user configuration file. See\n# ssh_config(5) for more information.\n\n"], [sshHocusConfigPath, "# Don't edit this file - your changes will be overwritten!\n# This file is managed by the Hocus Vscode integration!\n"]] as const) {
+  const sshHocusConfigPath = await getHocusSshConfigPath();
+  for (const [filePath, fileDefault] of [[sshUserConfigPath, "# This is the ssh client user configuration file. See\n# ssh_config(5) for more information.\n\n"], [sshHocusConfigPath, hocusSshConfigBaner]] as const) {
     if (!await fs.exists(filePath)) {
       console.log(`Creating ssh config ${filePath}`);
       await fs.createFile(filePath);
@@ -74,48 +81,35 @@ export async function activate(context: vscode.ExtensionContext) {
   // For now don't hide anything in the UI
   vscode.commands.executeCommand("setContext", "hocus.insideHocusVM", true);
 
-  /* * Resources with the `file` scheme come from the] same extension host as the extension.
-   * * Resources with the `vscode-local` scheme come from an extension host running in the same place as the UI. */
-
   // TODO: Attach terminals to tasks
   //vscode.window.showTextDocument(vscode.Uri.parse("vscode-local:/proc/self/status"));
 
   vscode.window.registerUriHandler({
     handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
-      vscode.workspace.fs
-        .readDirectory(vscode.Uri.parse("vscode-local:/proc/self/"))
-        .then(console.log);
-
-      vscode.workspace.fs
-        .readDirectory(vscode.Uri.parse("vscode-local:${userHome}"))
-        .then(console.log);
-
-      console.log(vscode.workspace.fs.isWritableFileSystem("vscode-local:/home/zxcvq"));
-      console.log(vscode.workspace.fs.isWritableFileSystem("vscode-local:/home/gorbak25"));
-      console.log(process.env);
-
-      vscode.workspace
-        .openTextDocument(vscode.Uri.parse("vscode-local:/proc/self/status"))
-        .then((x) => console.log(x.getText()));
-
-      console.log(vscode.extensions.all);
-      console.log(vscode.extensions.getExtension("vscode-local:/ms-vscode-remote.remote-ssh"));
-      console.log(context);
-      console.log(vscode.window.activeTextEditor?.document.uri);
-
       const p = new URLSearchParams(uri.query);
       const agentHostname = p.get("agent-hostname");
       const workspaceHostname = p.get("workspace-hostname");
+      const workspaceName = p.get("workspace-name");
       console.log(agentHostname);
       console.log(workspaceHostname);
+      console.log(workspaceName);
 
-      // TODO: parse the URL, connect to the remote machine and/or write the required ssh config
-      vscode.window.showInformationMessage(`Hocus URI handler called: ${uri.toString()}`);
-
-      /*vscode.commands.executeCommand(
-        "vscode.openFolder",
-        vscode.Uri.parse("vscode-remote://ssh-remote+myubuntubox/home/x/projects/foo"),
-      );*/
+      getHocusSshConfigPath().then((path) => {
+        fs.appendFile(path, `
+Host ${workspaceName}.hocus.dev
+    HostName ${workspaceHostname}
+    User hocus
+    IdentityFile ~/.ssh/hocus_dev_user
+    Port 22
+    ProxyCommand ssh -W %h:%p -o StrictHostKeyChecking=no -i ~/.ssh/hocus_dev_user sshgateway@${agentHostname} -p 8822
+    StrictHostKeyChecking no
+        `).then(() => {
+          vscode.commands.executeCommand(
+            "vscode.openFolder",
+            vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev/home/hocus`),
+          );
+        })
+      })
     },
   });
 
