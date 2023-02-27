@@ -7,7 +7,7 @@ https://github.com/supabase/gotrue/blob/1c9a4dca45298eb534b03a2c2521603b6ee45728
 
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/hugodutka/rooms)
 
-The gitpod environment contains the Control Plane and the Vscode extension together with all support services. The env expects the following environment variables:
+The gitpod environment contains the Control Plane together with all support services. The env expects the following environment variables:
 
 - `TAILSCALE_LOGIN_SERVER - If using tailscale set to `https://controlplane.tailscale.com`, otherwise set to the headscale url. Required when developing the agent.
 - `TAILSCALE_PREAUTHKEY` - Preauth key for the machine, used to authorize the env to tailscale. Required when developing the agent.
@@ -19,7 +19,10 @@ The gitpod environment contains the Control Plane and the Vscode extension toget
 
 Just open the repo in gitpod and it should work. `localhost:3000` for the control plane. `localhost:3000/app/projects` to see the vms. Dev user Keycloak password is `dev/dev`. Admin Keycloak password is `admin/admin`.
 
-## Vscode extension
+## Hocus Local Vscode extension
+**MUST BE DEVELOPED LOCALLY**
+
+I haven't figured out a way to develop an UI extension via gitpod - vscode just refuses to load the extension. Workspace extensions inside gitpod work. Manually loading a packaged prerelease worked but it was a hassle and I couldn't attach a debugger to it .-. The thing is that inside gitpod there is a CUSTOM vscode server - it's possible that this was the reason I couldn't develop an UI extension there. 
 
 [Here](vscode_extension/CONTRIBUTING.md) are some docs.
 

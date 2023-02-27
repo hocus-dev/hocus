@@ -1,6 +1,6 @@
 # Launching the extension
 
-1. Open the project inside Gitpod
+1. Open the project LOCALLY
 2. Go to `.vscode/project.code-workspace`
 3. Press the "Open Workspace button"
 4. Expand the "VSCode Extension" workspace
@@ -11,8 +11,6 @@
 ## Testing the URI handler
 
 Inside a terminal on the **HOST/LOCAL** machine!!! please run `xdg-open "vscode://hocus.hocus/<query>"`
-
-> **This won't work inside the terminal on the remote machine!!!**
 
 # Publishing
 

@@ -11,9 +11,17 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "remote development",
+    "remote"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
   "activationEvents": [
     "onCommand:hocus.stopWorkspace",
-    "onUri"
+    "onUri",
+    "onStartupFinished"
   ],
   "contributes": {
     "commands": [
