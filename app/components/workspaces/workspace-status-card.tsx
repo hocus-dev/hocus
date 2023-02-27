@@ -1,5 +1,8 @@
 import type { WorkspaceStatus } from "@prisma/client";
+import { useSearchParams } from "@remix-run/react";
 import { Card, Button, Spinner } from "flowbite-react";
+import { useEffect } from "react";
+import { WorkspacePathParams } from "~/page-paths.shared";
 
 import { WorkspaceStatusComponent } from "./workspace-status";
 
@@ -20,6 +23,16 @@ export function WorkspaceStatusCard(props: {
     props.justStarted && workspace.status === "WORKSPACE_STATUS_STOPPED"
       ? "WORKSPACE_STATUS_PENDING_START"
       : workspace.status;
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (
+      searchParams.get(WorkspacePathParams.JUST_STARTED) &&
+      workspace.status === "WORKSPACE_STATUS_STARTED"
+    ) {
+      searchParams.delete(WorkspacePathParams.JUST_STARTED);
+      setSearchParams(searchParams);
+    }
+  });
 
   const spinnerColor: Record<WorkspaceStatus, string> = {
     WORKSPACE_STATUS_PENDING_CREATE: "warning",
