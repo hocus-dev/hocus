@@ -87,6 +87,7 @@ export async function activate(context: vscode.ExtensionContext) {
   vscode.window.registerUriHandler({
     handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
       const p = new URLSearchParams(uri.query);
+      // TODO: Sanitize this, this is unsafe AF what i had done here
       const agentHostname = p.get("agent-hostname");
       const workspaceHostname = p.get("workspace-hostname");
       const workspaceName = p.get("workspace-name");
@@ -94,6 +95,8 @@ export async function activate(context: vscode.ExtensionContext) {
       console.log(workspaceHostname);
       console.log(workspaceName);
 
+      // TODO: Key management
+      // TODO: Delete unused workspaces
       getHocusSshConfigPath().then((path) => {
         fs.appendFile(path, `
 Host ${workspaceName}.hocus.dev
@@ -102,11 +105,13 @@ Host ${workspaceName}.hocus.dev
     IdentityFile ~/.ssh/hocus_dev_user
     Port 22
     ProxyCommand ssh -W %h:%p -o StrictHostKeyChecking=no -i ~/.ssh/hocus_dev_user sshgateway@${agentHostname} -p 8822
+    UserKnownHostsFile /dev/null
     StrictHostKeyChecking no
-        `).then(() => {
+`
+        ).then(() => {
           vscode.commands.executeCommand(
             "vscode.openFolder",
-            vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev/home/hocus`),
+            vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev/home/hocus/dev/project`),
           );
         })
       })
