@@ -65,5 +65,6 @@
   },
   "dependencies": {
     "fs-extra": "^11.1.0"
-  }
+  },
+  "extensionDependencies": ["ms-vscode-remote.remote-ssh"]
 }
