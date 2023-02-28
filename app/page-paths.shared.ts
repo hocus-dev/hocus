@@ -14,6 +14,7 @@ export const WorkspacePathParams = {
   JUST_CREATED: "justCreated",
   JUST_STARTED: "justStarted",
   SHOULD_OPEN: "shouldOpen",
+  JUST_STOPPED: "justStopped",
 } as const;
 
 export const getWorkspacePath = (
@@ -22,6 +23,7 @@ export const getWorkspacePath = (
     [WorkspacePathParams.JUST_STARTED]?: boolean;
     [WorkspacePathParams.JUST_CREATED]?: boolean;
     [WorkspacePathParams.SHOULD_OPEN]?: boolean;
+    [WorkspacePathParams.JUST_STOPPED]?: boolean;
   },
 ) => {
   const optionsExist = Array.from(Object.values(options)).some((v) => v);
@@ -31,5 +33,7 @@ export const getWorkspacePath = (
 };
 export const getWorkspaceStartPath = (workspaceExternalId: string) =>
   `/app/workspaces/start/${workspaceExternalId}` as const;
+export const getWorkspaceStopPath = (workspaceExternalId: string) =>
+  `/app/workspaces/stop/${workspaceExternalId}` as const;
 export const getWorkspaceStatusPath = (workspaceExternalId: string) =>
   `/app/workspaces/status/${workspaceExternalId}` as const;

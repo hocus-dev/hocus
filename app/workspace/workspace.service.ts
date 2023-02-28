@@ -8,6 +8,7 @@ import { Token } from "~/token";
 
 export interface WorkspaceInfo {
   status: WorkspaceStatus;
+  externalId: string;
   name: string;
   branchName: string;
   commitHash: string;
@@ -61,6 +62,7 @@ export class WorkspaceService {
       throw new HttpError(StatusCodes.FORBIDDEN, "Workspace does not belong to user");
     }
     return {
+      externalId: workspace.externalId,
       status: workspace.status,
       name: workspace.name,
       branchName: workspace.gitBranch.name,

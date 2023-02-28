@@ -84,7 +84,6 @@ export default function ProjectRoute(): JSX.Element {
       innerfn();
     }
   }, [loaderData, setFetchedData, fetchLoopStarted, setFetchLoopStarted]);
-  const justStarted = searchParams.get(WorkspacePathParams.JUST_STARTED) != null;
   const workspace = fetchedData?.workspace ?? loaderData.workspace;
   useEffect(() => {
     if (searchParams.get(WorkspacePathParams.JUST_CREATED) && workspace != null) {
@@ -119,7 +118,7 @@ export default function ProjectRoute(): JSX.Element {
         </a>
       </div>
       <div className="h-full flex flex-col justify-center items-center">
-        <WorkspaceStatusCard justStarted={justStarted} workspace={workspace} />
+        <WorkspaceStatusCard workspace={workspace} />
       </div>
     </AppPage>
   );

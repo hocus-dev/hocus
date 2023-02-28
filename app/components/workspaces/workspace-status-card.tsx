@@ -5,29 +5,24 @@ import { useEffect } from "react";
 import { WorkspacePathParams } from "~/page-paths.shared";
 import { unwrap } from "~/utils.shared";
 import { createVSCodeURI } from "~/workspace/utils";
+import type { WorkspaceInfo } from "~/workspace/workspace.service";
 
+import { StartWorkspaceButton } from "./start-workspace-btn";
+import { StopWorkspaceButton } from "./stop-workspace-btn";
 import { WorkspaceStatusComponent } from "./workspace-status";
 
-export function WorkspaceStatusCard(props: {
-  justStarted: boolean;
-  workspace: {
-    status: WorkspaceStatus;
-    name: string;
-    project: {
-      name: string;
-    };
-    branchName: string;
-    commitHash: string;
-    agentHostname: string;
-    workspaceHostname?: string;
-  };
-}): JSX.Element {
+export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.Element {
   const { workspace } = props;
-  const status =
-    props.justStarted && workspace.status === "WORKSPACE_STATUS_STOPPED"
-      ? "WORKSPACE_STATUS_PENDING_START"
-      : workspace.status;
   const [searchParams, setSearchParams] = useSearchParams();
+  const justStarted = searchParams.get(WorkspacePathParams.JUST_STARTED) != null;
+  const justStopped = searchParams.get(WorkspacePathParams.JUST_STOPPED) != null;
+  let status = workspace.status;
+  if (justStarted && workspace.status === "WORKSPACE_STATUS_STOPPED") {
+    status = "WORKSPACE_STATUS_PENDING_START";
+  } else if (justStopped && workspace.status === "WORKSPACE_STATUS_STARTED") {
+    status = "WORKSPACE_STATUS_PENDING_STOP";
+  }
+
   const vsCodeUri =
     workspace.status === "WORKSPACE_STATUS_STARTED"
       ? createVSCodeURI({
@@ -37,10 +32,7 @@ export function WorkspaceStatusCard(props: {
         })
       : "";
   useEffect(() => {
-    if (
-      searchParams.get(WorkspacePathParams.JUST_STARTED) != null &&
-      workspace.status === "WORKSPACE_STATUS_STARTED"
-    ) {
+    if (justStarted && workspace.status === "WORKSPACE_STATUS_STARTED") {
       searchParams.delete(WorkspacePathParams.JUST_STARTED);
       setSearchParams(searchParams, { replace: true });
     }
@@ -53,6 +45,12 @@ export function WorkspaceStatusCard(props: {
       searchParams.delete(WorkspacePathParams.SHOULD_OPEN);
       setSearchParams(searchParams, { replace: true });
       window.open(vsCodeUri, "_blank");
+    }
+  });
+  useEffect(() => {
+    if (justStopped && workspace.status === "WORKSPACE_STATUS_STOPPED") {
+      searchParams.delete(WorkspacePathParams.JUST_STOPPED);
+      setSearchParams(searchParams, { replace: true });
     }
   });
 
@@ -76,10 +74,11 @@ export function WorkspaceStatusCard(props: {
           <p>If it does not, click the button below.</p>
         </div>
         <div className="grid grid-cols-2 gap-4 mt-6">
-          <Button color="light">Details</Button>
+          <StopWorkspaceButton workspaceExternalId={workspace.externalId} className={"w-full"} />
           <a href={vsCodeUri} target="_blank" rel="noreferrer">
             <Button className="w-full" color="success">
-              Open in VSCode
+              <i className="fa-solid fa-code mr-2"></i>
+              <span>Open in VSCode</span>
             </Button>
           </a>
         </div>
@@ -88,7 +87,7 @@ export function WorkspaceStatusCard(props: {
     WORKSPACE_STATUS_STOPPED: (
       <div className="grid grid-cols-2 gap-4 mt-10">
         <Button color="light">Details</Button>
-        <Button color="success">Open</Button>
+        <StartWorkspaceButton workspaceExternalId={workspace.externalId} className={"w-full"} />
       </div>
     ),
     WORKSPACE_STATUS_PENDING_CREATE: spinner,

@@ -4,6 +4,7 @@ import moment from "moment";
 import { getWorkspacePath } from "~/page-paths.shared";
 
 import { StartWorkspaceButton } from "./start-workspace-btn";
+import { StopWorkspaceButton } from "./stop-workspace-btn";
 import { WorkspaceStatusComponent } from "./workspace-status";
 
 export interface WorkspaceListElementProps {
@@ -70,12 +71,7 @@ export function WorkspaceListElement(props: WorkspaceListElementProps): JSX.Elem
               <span>Open</span>
             </Button>
           )}
-          {showStopButton && (
-            <Button color="dark" className="transition-all">
-              <i className="fa-solid fa-circle-stop mr-2"></i>
-              <span>Stop</span>
-            </Button>
-          )}
+          {showStopButton && <StopWorkspaceButton workspaceExternalId={props.externalId} />}
           {showStartButton && <StartWorkspaceButton workspaceExternalId={props.externalId} />}
         </div>
       </div>
