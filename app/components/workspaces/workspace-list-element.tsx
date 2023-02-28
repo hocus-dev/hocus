@@ -57,7 +57,11 @@ export function WorkspaceListElement(props: WorkspaceListElementProps): JSX.Elem
       </div>
       <div className="flex flex-col justify-center">
         <div className="flex gap-4">
-          <Button color="light" className="transition-all">
+          <Button
+            href={getWorkspacePath(props.externalId, {})}
+            color="light"
+            className="transition-all"
+          >
             <i className="fa-solid fa-circle-info mr-2"></i>
             <span>Details</span>
           </Button>

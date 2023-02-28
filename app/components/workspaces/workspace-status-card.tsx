@@ -7,6 +7,7 @@ import { unwrap } from "~/utils.shared";
 import { createVSCodeURI } from "~/workspace/utils";
 import type { WorkspaceInfo } from "~/workspace/workspace.service";
 
+import { DeleteWorkspaceButton } from "./delete-workspace-btn";
 import { StartWorkspaceButton } from "./start-workspace-btn";
 import { StopWorkspaceButton } from "./stop-workspace-btn";
 import { WorkspaceStatusComponent } from "./workspace-status";
@@ -86,7 +87,10 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
     ),
     WORKSPACE_STATUS_STOPPED: (
       <div className="grid grid-cols-2 gap-4 mt-10">
-        <Button color="light">Details</Button>
+        <DeleteWorkspaceButton
+          workspaceExternalId={workspace.externalId}
+          workspaceName={workspace.name}
+        />
         <StartWorkspaceButton workspaceExternalId={workspace.externalId} className={"w-full"} />
       </div>
     ),
