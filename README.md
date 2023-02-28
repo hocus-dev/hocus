@@ -14,15 +14,17 @@ The gitpod environment contains the Control Plane together with all support serv
 - `DEV_MACHINE_PRIVATE_SSH_KEY` - Private key used to synchronize the codebase with the machine the Hocus agent is running on. Please remember to add \n to the private key for gitpod to work. Required when developing the agent.
 - `DEV_MACHINE_USER` - the user used for syncing the codebase with the machine the agent is running on. Required when developing the agent.
 - `DEV_MACHINE_HOSTNAME` - the hostname used for syncing the codebase with the machine the agent is running on. Set to tailscale ip or MagicDNS of the machine with the agent. Required when developing the agent.
+- `CONTROL_PLANE_AGENT_HOSTNAME` - the hostname or ip where your vscode should connect to, by default it's set to `localhost` but when developing over tailscale you probably want to set it to `DEV_MACHINE_HOSTNAME`. When on LAN you may set it to the LAN address of the machine the agent is running on.
 
 ## Control plane
 
 Just open the repo in gitpod and it should work. `localhost:3000` for the control plane. `localhost:3000/app/projects` to see the vms. Dev user Keycloak password is `dev/dev`. Admin Keycloak password is `admin/admin`.
 
 ## Hocus Local Vscode extension
+
 **MUST BE DEVELOPED LOCALLY**
 
-I haven't figured out a way to develop an UI extension via gitpod - vscode just refuses to load the extension. Workspace extensions inside gitpod work. Manually loading a packaged prerelease worked but it was a hassle and I couldn't attach a debugger to it .-. The thing is that inside gitpod there is a CUSTOM vscode server - it's possible that this was the reason I couldn't develop an UI extension there. 
+I haven't figured out a way to develop an UI extension via gitpod - vscode just refuses to load the extension. Workspace extensions inside gitpod work. Manually loading a packaged prerelease worked but it was a hassle and I couldn't attach a debugger to it .-. The thing is that inside gitpod there is a CUSTOM vscode server - it's possible that this was the reason I couldn't develop an UI extension there.
 
 [Here](vscode_extension/CONTRIBUTING.md) are some docs.
 
