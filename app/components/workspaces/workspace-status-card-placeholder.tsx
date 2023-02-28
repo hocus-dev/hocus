@@ -20,6 +20,8 @@ export function WorkspaceStatusCardPlaceholder(): JSX.Element {
             [20, 36],
             [36, 28],
             [28, 36],
+            [36, 20],
+            [20, 36],
           ].map(([lw, rw], idx) => (
             <div key={idx} className="grid grid-cols-2">
               <div className="flex justify-start">

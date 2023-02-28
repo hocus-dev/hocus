@@ -18,6 +18,8 @@ export interface WorkspaceInfo {
   };
   agentHostname: string;
   workspaceHostname?: string;
+  lastOpenedAt: number;
+  createdAt: number;
 }
 export class WorkspaceService {
   private readonly agentHostname: string;
@@ -73,6 +75,8 @@ export class WorkspaceService {
       },
       agentHostname: this.agentHostname,
       workspaceHostname: workspace.activeInstance?.vmIp,
+      lastOpenedAt: workspace.lastOpenedAt.getTime(),
+      createdAt: workspace.createdAt.getTime(),
     };
   }
 }

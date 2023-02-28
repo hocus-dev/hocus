@@ -111,6 +111,8 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
             ["Project:", workspace.project.name],
             ["Based on branch:", workspace.branchName],
             ["Based on commit:", workspace.commitHash.substring(0, 7)],
+            ["Last opened at:", new Date(workspace.lastOpenedAt).toLocaleString()],
+            ["Created at:", new Date(workspace.createdAt).toLocaleString()],
           ].map(([title, content], idx) => (
             <div key={idx} className="grid grid-cols-2">
               <div className="text-gray-400">{title}</div>
