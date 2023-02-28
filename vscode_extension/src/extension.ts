@@ -132,6 +132,8 @@ Host ${workspaceName}.hocus.dev
     ProxyJump sshgateway@${agentHostname}:8822
     UserKnownHostsFile /dev/null
     StrictHostKeyChecking no
+    ForwardAgent yes
+    AddKeysToAgent yes
 `
           )
         }
