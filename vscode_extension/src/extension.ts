@@ -95,7 +95,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // TODO: Detect if we are inside a Hocus VM
   // TODO: The simplest way is to check for a JWT/OIDC token
   // For now don't hide anything in the UI
-  vscode.commands.executeCommand("setContext", "hocus.insideHocusVM", true);
+  //vscode.commands.executeCommand("setContext", "hocus.insideHocusVM", true);
 
   // TODO: Attach terminals to tasks
   //vscode.window.showTextDocument(vscode.Uri.parse("vscode-local:/proc/self/status"));
@@ -146,12 +146,12 @@ Host ${workspaceName}.hocus.dev
     },
   });
 
-  context.subscriptions.push(
+  /*context.subscriptions.push(
     vscode.commands.registerCommand("hocus.stopWorkspace", () => {
       // TODO: Stop the workspace
       vscode.window.showInformationMessage("TODO");
     }),
-  );
+  );*/
 }
 
 export function deactivate() {

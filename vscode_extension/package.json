@@ -19,25 +19,10 @@
     "ui"
   ],
   "activationEvents": [
-    "onCommand:hocus.stopWorkspace",
     "onUri",
     "onStartupFinished"
   ],
   "contributes": {
-    "commands": [
-      {
-        "command": "hocus.stopWorkspace",
-        "title": "[Hocus] Stop Current Workspace"
-      }
-    ],
-    "menus": {
-      "commandPalette": [
-        {
-          "command": "hocus.stopWorkspace",
-          "when": "hocus.insideHocusVM"
-        }
-      ]
-    }
   },
   "main": "./dist/extension.js",
   "scripts": {
