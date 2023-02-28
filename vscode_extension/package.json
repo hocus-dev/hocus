@@ -1,6 +1,9 @@
 {
   "name": "hocus",
   "publisher": "hocus",
+  "homepage": "https://hocus.dev",
+  "maintainers": ["gorbak25"],
+  "preview": true,
   "displayName": "Hocus",
   "description": "Vscode Hocus integration",
   "version": "0.0.1",
