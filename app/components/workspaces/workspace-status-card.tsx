@@ -30,6 +30,7 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
           agentHostname: workspace.agentHostname,
           // if the workspace is started, the workspaceHostname is guaranteed to be defined
           workspaceHostname: unwrap(workspace.workspaceHostname),
+          workspaceName: workspace.name.toLowerCase().replace(" ", "-"),
         })
       : "";
   useEffect(() => {

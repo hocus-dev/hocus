@@ -87,6 +87,11 @@ export async function activate(context: vscode.ExtensionContext) {
   vscode.window.registerUriHandler({
     handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
       const p = new URLSearchParams(uri.query);
+      if (uri.path !== "connect") {
+        vscode.window.showInformationMessage(`Unsupported path: ${uri.path}`);
+        return;
+      }
+
       const agentHostname = p.get("agent-hostname");
       const workspaceHostname = p.get("workspace-hostname");
       const workspaceName = p.get("workspace-name");
