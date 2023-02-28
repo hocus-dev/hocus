@@ -44,9 +44,13 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
       searchParams.get(WorkspacePathParams.SHOULD_OPEN) != null &&
       workspace.status === "WORKSPACE_STATUS_STARTED"
     ) {
+      window.open(vsCodeUri, "_self", "noreferrer");
+
+      // MUST BE AFTER window.open
+      // Otherwise remix crashes on firefox but not chrome!!!
+      // I have no idea why but it took me some time to figure it out
       searchParams.delete(WorkspacePathParams.SHOULD_OPEN);
       setSearchParams(searchParams, { replace: true });
-      window.open(vsCodeUri, "_blank");
     }
   });
   useEffect(() => {
@@ -77,7 +81,7 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
         </div>
         <div className="grid grid-cols-2 gap-4 mt-6">
           <StopWorkspaceButton workspaceExternalId={workspace.externalId} className={"w-full"} />
-          <a href={vsCodeUri} target="_blank" rel="noreferrer">
+          <a href={vsCodeUri} target="_self" rel="noreferrer">
             <Button className="w-full" color="success">
               <i className="fa-solid fa-code mr-2"></i>
               <span>Open in VSCode</span>
