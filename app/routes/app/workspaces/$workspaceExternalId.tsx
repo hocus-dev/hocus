@@ -7,10 +7,11 @@ import { useLoaderData, useSearchParams } from "@remix-run/react";
 import { StatusCodes } from "http-status-codes";
 import { useEffect, useState } from "react";
 import { AppPage } from "~/components/app-page";
+import { BackToProjectLink } from "~/components/projects/back-to-project-link";
 import { WorkspaceStatusCard } from "~/components/workspaces/workspace-status-card";
 import { WorkspaceStatusCardPlaceholder } from "~/components/workspaces/workspace-status-card-placeholder";
 import { HttpError } from "~/http-error.server";
-import { getProjectPath, getWorkspaceStatusPath, WorkspacePathParams } from "~/page-paths.shared";
+import { getWorkspaceStatusPath, ProjectPathTabId, WorkspacePathParams } from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
 import { Token } from "~/token";
 import { max, sleep, unwrap } from "~/utils.shared";
@@ -108,15 +109,7 @@ export default function ProjectRoute(): JSX.Element {
   }
   return (
     <AppPage>
-      <div className="mt-8 mb-4">
-        <a
-          href={getProjectPath(workspace.project.externalId)}
-          className="text-sm text-gray-400 hover:text-gray-300 transition-all"
-        >
-          <i className="fa-solid fa-arrow-left mr-2"></i>
-          <span>Back to project "{workspace.project.name}"</span>
-        </a>
-      </div>
+      <BackToProjectLink project={workspace.project} tabId={ProjectPathTabId.WORKSPACES} />
       <div className="h-full flex flex-col justify-center items-center">
         <WorkspaceStatusCard workspace={workspace} />
       </div>

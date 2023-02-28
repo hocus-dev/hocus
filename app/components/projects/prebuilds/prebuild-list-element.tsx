@@ -2,6 +2,7 @@ import type { PrebuildEventStatus } from "@prisma/client";
 import { Button } from "flowbite-react";
 import moment from "moment";
 import { NewWorkspaceButton } from "~/components/workspaces/new-workspace-btn";
+import { getPrebuildPath } from "~/page-paths.shared";
 
 import { PrebuildStatus } from "./prebuild-status";
 
@@ -42,7 +43,11 @@ export function PrebuildListElement(props: PrebuildListElementProps): JSX.Elemen
       </div>
       <div className="flex flex-col justify-center">
         <div className="flex gap-4">
-          <Button color="light" className="transition-all">
+          <Button
+            href={getPrebuildPath(props.externalPrebuildEventId)}
+            color="light"
+            className="transition-all"
+          >
             <i className="fa-solid fa-circle-info mr-2"></i>
             <span>Details</span>
           </Button>

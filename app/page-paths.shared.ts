@@ -1,5 +1,7 @@
 import qs from "qs";
 
+import type { valueof } from "./types/utils";
+
 export const PagePaths = {
   Logout: "/app/logout",
   Settings: "/app/settings",
@@ -8,7 +10,14 @@ export const PagePaths = {
   CreateWorkspace: "/app/workspaces/create",
 } as const;
 
-export const getProjectPath = (projectId: string) => `/app/projects/${projectId}` as const;
+export type ProjectPathTabId = valueof<typeof ProjectPathTabId>;
+export const ProjectPathTabId = {
+  WORKSPACES: 0,
+  PREBUILDS: 1,
+} as const;
+
+export const getProjectPath = (projectExternalId: string, tabId?: ProjectPathTabId) =>
+  `/app/projects/${projectExternalId}${tabId != null ? `?tabId=${tabId}` : ""}` as const;
 
 export const WorkspacePathParams = {
   JUST_CREATED: "justCreated",
@@ -37,3 +46,6 @@ export const getWorkspaceStopPath = (workspaceExternalId: string) =>
   `/app/workspaces/stop/${workspaceExternalId}` as const;
 export const getWorkspaceStatusPath = (workspaceExternalId: string) =>
   `/app/workspaces/status/${workspaceExternalId}` as const;
+
+export const getPrebuildPath = (prebuildExternalId: string) =>
+  `/app/prebuilds/${prebuildExternalId}` as const;
