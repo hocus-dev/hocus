@@ -45,9 +45,10 @@ async function ensureSshDirsExists() {
   }
 }
 
-const hocusSshConfigBaner = "# Don't edit this file - your changes will be overwritten!\n# This file is managed by the Hocus Vscode integration!\n" as const;
+// This also serves as a versioning string, If this changes the old config will be deleted
+const hocusSshConfigBaner = "# Don't edit this file - your changes WILL be overwritten!!!\n# Please perform customizations in the main config file under Host *.hocus.dev\n# This file is managed by Hocus\n# Hocus SSH Integration 0.0.1\n" as const;
 
-async function ensureSshConfigSetUp() {
+async function ensureSshConfigSetUp(recursed?: boolean) {
   await ensureSshDirsExists();
   const userSshDir = await getUserSshConfigDir();
   const sshUserConfigPath = path.join(userSshDir, "config");
@@ -61,12 +62,27 @@ async function ensureSshConfigSetUp() {
     }
   }
 
-  const config = await fs.readFile(sshUserConfigPath);
-  if (!config.includes("Include hocus/config")) {
+  // Ensure the Hocus config path is included
+  const userConfig = await fs.readFile(sshUserConfigPath);
+  if (!userConfig.includes("Include hocus/config")) {
     console.log(`Installing integration into ssh config`);
-    // Now ensure the Hocus config path is included
+
     fs.appendFile(sshUserConfigPath, "\n\n# Beginning of Hocus Vscode integration\nHost *.hocus.dev\n    Include hocus/config\n# End of Hocus Vscode integration\n")
   }
+
+  // Ensure the baner is up to date - if not then delete the config
+  const hocusConfig = await fs.readFile(sshHocusConfigPath);
+  if (!hocusConfig.includes(hocusSshConfigBaner)) {
+    await fs.rm(sshHocusConfigPath);
+
+    // Time to recurse
+    if (recursed !== void 0) {
+      vscode.window.showInformationMessage(`Fatal error - failed to install SSH configs. Did more than 2 install calls`);
+      return;
+    }
+    ensureSshConfigSetUp(true);
+  }
+
 }
 
 export async function activate(context: vscode.ExtensionContext) {
