@@ -44,5 +44,5 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
     });
   });
 
-  return redirect(getWorkspacePath(workspaceExternalId, { justStarted: true }));
+  return redirect(getWorkspacePath(workspaceExternalId, { justStarted: true, shouldOpen: true }));
 };
