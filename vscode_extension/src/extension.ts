@@ -87,7 +87,7 @@ export async function activate(context: vscode.ExtensionContext) {
   vscode.window.registerUriHandler({
     handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
       const p = new URLSearchParams(uri.query);
-      if (uri.path !== "connect") {
+      if (uri.path !== "/connect") {
         vscode.window.showInformationMessage(`Unsupported path: ${uri.path}`);
         return;
       }
