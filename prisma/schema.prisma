@@ -127,6 +127,7 @@ enum VmTaskStatus {
 
 model VmTask {
   id                 BigInt              @id @default(autoincrement())
+  externalId         String              @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   command            String[]
   cwd                String
   status             VmTaskStatus

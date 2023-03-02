@@ -47,5 +47,5 @@ export const getWorkspaceStopPath = (workspaceExternalId: string) =>
 export const getWorkspaceStatusPath = (workspaceExternalId: string) =>
   `/app/workspaces/status/${workspaceExternalId}` as const;
 
-export const getPrebuildPath = (prebuildExternalId: string) =>
-  `/app/prebuilds/${prebuildExternalId}` as const;
+export const getPrebuildPath = (prebuildExternalId: string, taskIdx?: number) =>
+  `/app/prebuilds/${prebuildExternalId}${taskIdx != null ? `?task=${taskIdx}` : ""}` as const;
