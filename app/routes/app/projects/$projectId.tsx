@@ -8,6 +8,7 @@ import moment from "moment";
 import path from "path-browserify";
 import { useRef } from "react";
 import { AppPage } from "~/components/app-page";
+import { EnvironmentTab } from "~/components/environment/environment-tab";
 import { PrebuildList } from "~/components/projects/prebuilds/prebuild-list";
 import { WorkspaceList } from "~/components/workspaces/workspace-list";
 import { HttpError } from "~/http-error.server";
@@ -153,7 +154,6 @@ export default function ProjectRoute(): JSX.Element {
         </Tabs.Item>
         <Tabs.Item
           active={tabId === 1}
-          className="p-0"
           title={
             <>
               <i className="fa-solid fa-list-check mr-2"></i>
@@ -162,6 +162,17 @@ export default function ProjectRoute(): JSX.Element {
           }
         >
           <PrebuildList elements={prebuildEvents} />
+        </Tabs.Item>
+        <Tabs.Item
+          active={tabId === 2}
+          title={
+            <>
+              <i className="fa-solid fa-terminal mr-2"></i>
+              <span className="font-bold">Environment</span>
+            </>
+          }
+        >
+          <EnvironmentTab />
         </Tabs.Item>
       </Tabs.Group>
     </AppPage>

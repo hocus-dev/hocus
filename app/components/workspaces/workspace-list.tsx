@@ -14,6 +14,10 @@ export function WorkspaceList(props: { elements: WorkspaceListElementProps[] }):
       {props.elements.map((element, idx) => (
         <WorkspaceListElement {...element} key={idx} />
       ))}
+      <div className="mt-8 text-center text-gray-400 text-sm">
+        <i className="fa-solid fa-circle-info mr-2"></i>
+        <span>Only your workspaces are listed here.</span>
+      </div>
     </div>
   );
 }
