@@ -184,6 +184,7 @@ export default function PrebuildRoute(): JSX.Element {
                         activeTask.task.vmTaskExternalId,
                       )}
                       color="dark"
+                      className="transition-all"
                     >
                       <i className="fa-solid fa-download mr-2"></i>
                       <span>Download Log</span>
