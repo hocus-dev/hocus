@@ -1,9 +1,10 @@
 import type { LoaderArgs } from "@remix-run/node";
+import { Response } from "@remix-run/node";
 import { StatusCodes } from "http-status-codes";
 import { HttpError } from "~/http-error.server";
 import { PrebuildLogsValidator } from "~/schema/prebuild-logs.validator.server";
 
-export const loader = async ({ context: { db, req, res } }: LoaderArgs) => {
+export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   const { success, value: query } = PrebuildLogsValidator.SafeParse(req.query);
   if (!success) {
     throw new HttpError(StatusCodes.BAD_REQUEST, "Invalid query");
@@ -44,13 +45,13 @@ export const loader = async ({ context: { db, req, res } }: LoaderArgs) => {
       idx: "asc",
     },
   });
-  res.setHeader("Content-Type", "text/plain");
-  res.setHeader("Content-disposition", `attachment; filename=${vmTask.externalId}.log`);
-  res.charset = "utf-8";
-  for (const log of logs) {
-    res.write(log.content);
-  }
-  res.end();
 
-  return null;
+  const body = Buffer.concat(logs.map((log) => Buffer.from(log.content)));
+  return new Response(body, {
+    status: StatusCodes.OK,
+    headers: {
+      "Content-Type": "text/plain",
+      "Content-disposition": `attachment; filename=${vmTask.externalId}.log`,
+    },
+  });
 };
