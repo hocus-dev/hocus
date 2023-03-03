@@ -17,7 +17,6 @@ export const LogViewer = (props: { text: string }) => {
         value={props.text}
         readOnly={true}
         className="p-6 w-full h-full bg-gray-900 border-none resize-none text-sm focus:ring-0"
-        // style={{ outline: "none !important" }}
       ></textarea>
       {/* I'm doing it here too because useEffect lags visibly */}
       <script
