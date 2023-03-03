@@ -12,7 +12,7 @@ import { LogViewer } from "~/components/projects/prebuilds/log-viewer";
 import { PrebuildStatus } from "~/components/projects/prebuilds/prebuild-status";
 import { VmTaskStatusComponent } from "~/components/projects/prebuilds/vm-task-status";
 import { HttpError } from "~/http-error.server";
-import { getPrebuildPath, ProjectPathTabId } from "~/page-paths.shared";
+import { getPrebuildLogsPath, getPrebuildPath, ProjectPathTabId } from "~/page-paths.shared";
 import { PrebuildQueryValidator } from "~/schema/prebuild-query.validator.server";
 import { UuidValidator } from "~/schema/uuid.validator.server";
 import { numericSort } from "~/utils.shared";
@@ -178,7 +178,13 @@ export default function PrebuildRoute(): JSX.Element {
                     </p>
                   </div>
                   <div className="grow flex flex-col justify-center items-center">
-                    <Button color="dark">
+                    <Button
+                      href={getPrebuildLogsPath(
+                        prebuild.externalId,
+                        activeTask.task.vmTaskExternalId,
+                      )}
+                      color="dark"
+                    >
                       <i className="fa-solid fa-download mr-2"></i>
                       <span>Download Log</span>
                     </Button>
