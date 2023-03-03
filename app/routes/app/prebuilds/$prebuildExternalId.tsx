@@ -3,12 +3,14 @@ import path from "path";
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+import { Button } from "flowbite-react";
 import { StatusCodes } from "http-status-codes";
 import moment from "moment";
 import { AppPage } from "~/components/app-page";
 import { BackToProjectLink } from "~/components/projects/back-to-project-link";
 import { LogViewer } from "~/components/projects/prebuilds/log-viewer";
 import { PrebuildStatus } from "~/components/projects/prebuilds/prebuild-status";
+import { VmTaskStatusComponent } from "~/components/projects/prebuilds/vm-task-status";
 import { HttpError } from "~/http-error.server";
 import { getPrebuildPath, ProjectPathTabId } from "~/page-paths.shared";
 import { PrebuildQueryValidator } from "~/schema/prebuild-query.validator.server";
@@ -144,9 +146,9 @@ export default function PrebuildRoute(): JSX.Element {
           </p>
         </div>
       </div>
-      <div className="w-full mt-6 rounded-lg border border-gray-700">
-        <div className="h-[30rem] flex">
-          <div className="w-56 h-full border-r border-gray-700 shrink-0">
+      <div className="grow min-h-[30rem] max-h-[100rem] w-full mt-6 rounded-lg border border-gray-700">
+        <div className="h-full flex">
+          <div className="w-[14rem] h-full border-r border-gray-700 shrink-0">
             <h1 className="h-16 font-bold text-lg p-4 border-b border-gray-700 flex flex-col justify-center">
               <span>Tasks</span>
             </h1>
@@ -157,16 +159,30 @@ export default function PrebuildRoute(): JSX.Element {
                     activeTask?.task.idx === task.idx ? "bg-slate-700 text-white " : ""
                   }transition-all text-left w-full font-mono text-sm text-gray-400 p-4 border-b border-gray-700 hover:bg-slate-600 hover:text-white whitespace-nowrap truncate`}
                 >
-                  {task.command}
+                  <VmTaskStatusComponent status={task.status} />
+                  <span className="ml-2">{task.command}</span>
                 </button>
               </a>
             ))}
           </div>
-          <div className="h-full grow flex flex-col">
+          <div className="h-full flex flex-col" style={{ width: "calc(100% - 14rem)" }}>
             {activeTask ? (
               <>
-                <div className="shrink-0 h-16 font-mono text-sm p-4 border-b border-gray-700 flex flex-col justify-center">
-                  <span>{activeTask.task.command}</span>
+                <div className="border-b border-gray-700 flex">
+                  <div
+                    className="shrink-0 h-16 font-mono text-sm flex flex-col justify-center"
+                    style={{ width: "calc(100% - 11rem)" }}
+                  >
+                    <p className="whitespace-nowrap overflow-y-hidden overflow-x-auto p-6">
+                      {activeTask.task.command}
+                    </p>
+                  </div>
+                  <div className="grow flex flex-col justify-center items-center">
+                    <Button color="dark">
+                      <i className="fa-solid fa-download mr-2"></i>
+                      <span>Download Log</span>
+                    </Button>
+                  </div>
                 </div>
                 <div className="grow bg-gray-900 rounded-br-lg font-mono text-sm overflow-auto">
                   <LogViewer text={activeTask.logs} />
