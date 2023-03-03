@@ -52,5 +52,5 @@ export const loader = async ({ context: { db, req, res } }: LoaderArgs) => {
   }
   res.end();
 
-  return;
+  return null;
 };
