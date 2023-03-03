@@ -46,7 +46,7 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
     },
   });
 
-  const body = Buffer.concat(logs.map((log) => Buffer.from(log.content)));
+  const body = Buffer.concat(logs.map((log) => log.content));
   return new Response(body, {
     status: StatusCodes.OK,
     headers: {
