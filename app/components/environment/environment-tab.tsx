@@ -1,12 +1,15 @@
-import { Button, TextInput } from "flowbite-react";
+import { Button } from "flowbite-react";
+
+import { CsrfInput } from "../csrf-input";
+
+import { EnvVarInput } from "./env-var-input";
 
 export const EnvironmentTab = (): JSX.Element => {
   const mockValues = [
-    ["FOO", "bar", true],
-    ["BAR", "baz", false],
-    ["BAZ", "foo", false],
+    ["FOO", "bar", "abc-1"],
+    ["BAR", "baz", "abc-2"],
+    ["BAZ", "foo", "abc-3"],
   ] as const;
-  const gridStr = "grid grid-cols-[20rem_minmax(0,_1fr)_3rem]";
   return (
     <div>
       <div>
@@ -16,37 +19,26 @@ export const EnvironmentTab = (): JSX.Element => {
           accessible during prebuilds.
         </p>
         <div className="mt-4">
-          <div className={`${gridStr} gap-x-4 mb-2`}>
+          <div className="grid grid-cols-envlist gap-x-4 mb-2">
             <h3 className="text-gray-400">Name</h3>
             <h3 className="text-gray-400">Value</h3>
             <div></div>
           </div>
-          {mockValues.map(([name, value, edited], idx) => (
-            <div className={`${gridStr} gap-4 mb-4`} key={idx}>
-              <TextInput className="font-mono" type="text" defaultValue={name} />
-              <div className="flex">
-                <TextInput className="font-mono grow" type="text" defaultValue={value} />
-                {edited && (
-                  <div className="h-full flex justify-center items-center ml-4">
-                    <Button
-                      aria-label="reset variable"
-                      color="light"
-                      className="min-h-full transition-all"
-                    >
-                      <i className="fa-solid fa-eraser"></i>
-                    </Button>
-                  </div>
-                )}
-              </div>
-              <Button
-                aria-label="delete variable"
-                color="failure"
-                className="min-h-full transition-all"
-              >
-                <i className="fa-solid fa-trash"></i>
-              </Button>
+          <form>
+            <CsrfInput />
+            {mockValues.map(([name, value, envVarExternalId], idx) => (
+              <EnvVarInput
+                key={idx}
+                initialName={name}
+                initialValue={value}
+                envVarExternalId={envVarExternalId}
+              />
+            ))}
+            <hr className="bg-gray-600 border-gray-600 mb-8" />
+            <div className="flex justify-end">
+              <Button color="success">Save Changes</Button>
             </div>
-          ))}
+          </form>
         </div>
       </div>
     </div>

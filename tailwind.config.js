@@ -6,6 +6,9 @@ module.exports = {
       spacing: {
         128: "32rem",
       },
+      gridTemplateColumns: {
+        envlist: "20rem minmax(0, 1fr) 3rem",
+      },
     },
   },
   plugins: [require("flowbite/plugin")],
