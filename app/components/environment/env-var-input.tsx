@@ -1,10 +1,12 @@
-import { TextInput, Button } from "flowbite-react";
+import { TextInput, Button, Tooltip, Flowbite } from "flowbite-react";
+import React, { useEffect } from "react";
 import { useCallback, useState } from "react";
 
-export const EnvVarInput = (props: {
+const EnvVarInputComponent = (props: {
   initialName: string;
   initialValue: string;
   envVarExternalId: string;
+  setParentEdited: (isEdited: boolean) => void;
 }): JSX.Element => {
   const [focused, setFocused] = useState(false);
   const [name, setName] = useState(props.initialName);
@@ -25,57 +27,82 @@ export const EnvVarInput = (props: {
     setName(props.initialName);
   }, [props.initialValue, props.initialName]);
   const onDelete = useCallback(() => setDeleted(true), []);
+  const onRestore = useCallback(() => setDeleted(false), []);
   const nameEdited = name !== props.initialName;
   const valueEdited = value !== props.initialValue;
-  const edited = nameEdited || valueEdited;
+  const edited = nameEdited || valueEdited || deleted;
   const formNameId = `env-var-name-${props.envVarExternalId}`;
   const formValueId = `env-var-value-${props.envVarExternalId}`;
   const formDeletedId = `env-var-deleted-${props.envVarExternalId}`;
 
-  if (deleted) {
-    return <input type="hidden" name={formDeletedId} value="yes"></input>;
-  }
+  useEffect(() => {
+    props.setParentEdited(edited);
+  }, [edited, props]);
 
   return (
     <div className="grid grid-cols-envlist gap-4 mb-4">
       <TextInput
-        name={nameEdited ? formNameId : void 0}
+        name={nameEdited && !deleted ? formNameId : void 0}
         className="font-mono"
         type="text"
-        value={name}
+        value={deleted ? props.initialName : name}
         onInput={onNameInput}
+        disabled={deleted}
       />
       <div className="flex">
         <TextInput
-          name={valueEdited ? formValueId : void 0}
+          name={valueEdited && !deleted ? formValueId : void 0}
           className="font-mono grow"
-          type={focused ? "text" : "password"}
-          value={value}
+          type={focused || deleted ? "text" : "password"}
+          value={deleted ? "deleted" : value}
           onFocus={onFocus}
           onBlur={onBlur}
           onInput={onValueInput}
+          disabled={deleted}
         />
-        {edited && (
+        {edited && !deleted && (
           <div className="h-full flex justify-center items-center ml-4">
-            <Button
-              onClick={onReset}
-              aria-label="reset variable"
-              color="light"
-              className="min-h-full transition-all"
-            >
-              <i className="fa-solid fa-eraser"></i>
-            </Button>
+            <Flowbite theme={{ theme: { tooltip: { target: "h-full" } } }}>
+              <Tooltip className="drop-shadow" placement="top" content="Reset">
+                <Button
+                  onClick={onReset}
+                  aria-label="reset variable"
+                  color="gray"
+                  className="min-h-full"
+                >
+                  <i className="fa-solid fa-eraser"></i>
+                </Button>
+              </Tooltip>
+            </Flowbite>
           </div>
         )}
       </div>
-      <Button
-        onClick={onDelete}
-        aria-label="delete variable"
-        color="failure"
-        className="min-h-full transition-all"
-      >
-        <i className="fa-solid fa-trash"></i>
-      </Button>
+      {deleted ? (
+        <Tooltip placement="right" content="Restore">
+          <Button
+            onClick={onRestore}
+            aria-label="restore variable"
+            color="success"
+            className="min-h-full"
+          >
+            <i className="fa-solid fa-arrow-rotate-left"></i>
+          </Button>
+        </Tooltip>
+      ) : (
+        <Tooltip placement="right" content="Delete">
+          <Button
+            onClick={onDelete}
+            aria-label="delete variable"
+            color="dark"
+            className="min-h-full"
+          >
+            <i className="fa-solid fa-trash"></i>
+          </Button>
+        </Tooltip>
+      )}
+      {deleted && <input type="hidden" name={formDeletedId} value="yes"></input>}
     </div>
   );
 };
+
+export const EnvVarInput = React.memo(EnvVarInputComponent);
