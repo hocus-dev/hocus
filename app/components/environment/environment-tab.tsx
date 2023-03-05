@@ -1,4 +1,4 @@
-import { Button } from "flowbite-react";
+import { Badge, Button } from "flowbite-react";
 import React from "react";
 import { useState } from "react";
 
@@ -16,6 +16,12 @@ export const EnvironmentTab = (): JSX.Element => {
       ] as const,
     [],
   );
+  const [newVariableCounter, setNewVariableCounter] = useState(0);
+  const [newVariables, setNewVariables] = useState<{ id: number }[]>([]);
+  const addVariable = React.useCallback(() => {
+    setNewVariables((prev) => [...prev, { id: newVariableCounter }]);
+    setNewVariableCounter((prev) => prev + 1);
+  }, [newVariableCounter]);
   const [edited, setEdited] = useState({ edited: mockValues.map((_) => false) });
   const setEditedAtIndexFns = React.useMemo(
     () =>
@@ -32,7 +38,10 @@ export const EnvironmentTab = (): JSX.Element => {
   return (
     <div>
       <div>
-        <h1 className="font-bold text-xl">Project Variables</h1>
+        <h1 className="flex justify-between gap-4 items-end">
+          <span className="font-bold text-xl">Project Variables</span>
+          {formEdited && <Badge color="gray">Unsaved changes</Badge>}
+        </h1>
         <p className="mt-2 text-gray-400">
           Project-level environment variables are available to all project members. They are
           accessible both during prebuilds and in workspaces.
@@ -43,7 +52,7 @@ export const EnvironmentTab = (): JSX.Element => {
             <h3 className="text-gray-400">Value</h3>
             <div></div>
           </div>
-          <form>
+          <form method="POST">
             <CsrfInput />
             {mockValues.map(([name, value, envVarExternalId], idx) => (
               <EnvVarInput
@@ -54,10 +63,24 @@ export const EnvironmentTab = (): JSX.Element => {
                 setParentEdited={setEditedAtIndexFns[idx]}
               />
             ))}
+            {newVariables.map(({ id }) => (
+              <EnvVarInput
+                key={id}
+                initialName=""
+                initialValue=""
+                setParentEdited={() => {}}
+                envVarExternalId=""
+              />
+            ))}
+            <div className="mt-8 mb-4">
+              <Button color="success" onClick={addVariable}>
+                <i className="fa-solid fa-circle-plus mr-2"></i>
+                <span>New Variable</span>
+              </Button>
+            </div>
             <hr className="border-gray-700 mb-4" />
             <div className="flex justify-end items-center gap-4">
-              {formEdited && <p className="text-gray-400 text-sm">Unsaved changes.</p>}
-              <Button color="success" disabled={!formEdited}>
+              <Button type="submit" color="success" disabled={!formEdited}>
                 <i className="fa-solid fa-floppy-disk mr-2"></i>
                 <span>Save Changes</span>
               </Button>

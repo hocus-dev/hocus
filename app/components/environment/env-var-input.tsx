@@ -43,15 +43,18 @@ const EnvVarInputComponent = (props: {
     <div className="grid grid-cols-envlist gap-4 mb-4">
       <TextInput
         name={nameEdited && !deleted ? formNameId : void 0}
+        placeholder="Name"
         className="font-mono"
         type="text"
         value={deleted ? props.initialName : name}
         onInput={onNameInput}
         disabled={deleted}
+        required={true}
       />
       <div className="flex">
         <TextInput
           name={valueEdited && !deleted ? formValueId : void 0}
+          placeholder="Value"
           className="font-mono grow"
           type={focused || deleted ? "text" : "password"}
           value={deleted ? "deleted" : value}
@@ -59,6 +62,7 @@ const EnvVarInputComponent = (props: {
           onBlur={onBlur}
           onInput={onValueInput}
           disabled={deleted}
+          required={true}
         />
         {edited && !deleted && (
           <div className="h-full flex justify-center items-center ml-4">
