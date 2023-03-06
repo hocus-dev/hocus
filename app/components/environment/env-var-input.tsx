@@ -7,6 +7,7 @@ const EnvVarInputComponent = (props: {
   initialValue: string;
   envVarExternalId: string;
   setParentEdited: (isEdited: boolean) => void;
+  onDelete: () => void;
 }): JSX.Element => {
   const [focused, setFocused] = useState(false);
   const [name, setName] = useState(props.initialName);
@@ -26,7 +27,10 @@ const EnvVarInputComponent = (props: {
     setValue(props.initialValue);
     setName(props.initialName);
   }, [props.initialValue, props.initialName]);
-  const onDelete = useCallback(() => setDeleted(true), []);
+  const onDelete = useCallback(() => {
+    setDeleted(true);
+    props.onDelete();
+  }, [props]);
   const onRestore = useCallback(() => setDeleted(false), []);
   const nameEdited = name !== props.initialName;
   const valueEdited = value !== props.initialValue;
