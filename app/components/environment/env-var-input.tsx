@@ -5,6 +5,7 @@ import {
   createEnvFormDeleteId,
   createEnvFormNameId,
   createEnvFormValueId,
+  ENV_VAR_NAME_REGEX,
 } from "~/project/env-form.shared";
 
 const EnvVarInputComponent = (props: {
@@ -20,10 +21,16 @@ const EnvVarInputComponent = (props: {
   const [deleted, setDeleted] = useState(false);
   const onFocus = useCallback(() => setFocused(true), []);
   const onBlur = useCallback(() => setFocused(false), []);
-  const onNameInput: React.FormEventHandler<HTMLInputElement> = useCallback(
-    (e) => setName(e.currentTarget.value),
-    [],
-  );
+  const onNameInput: React.FormEventHandler<HTMLInputElement> = useCallback((e) => {
+    setName(e.currentTarget.value);
+    if (!ENV_VAR_NAME_REGEX.test(e.currentTarget.value)) {
+      e.currentTarget.setCustomValidity(
+        "Name must start with a letter and contain only letters, numbers, and underscores",
+      );
+    } else {
+      e.currentTarget.setCustomValidity("");
+    }
+  }, []);
   const onValueInput: React.FormEventHandler<HTMLInputElement> = useCallback(
     (e) => setValue(e.currentTarget.value),
     [],

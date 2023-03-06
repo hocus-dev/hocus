@@ -140,3 +140,6 @@ export const parseEnvForm = (
     },
   };
 };
+
+export const ENV_VAR_NAME_PATTERN = "^[a-zA-Z][a-zA-Z0-9_]*$";
+export const ENV_VAR_NAME_REGEX = new RegExp(ENV_VAR_NAME_PATTERN);

@@ -4,7 +4,7 @@ import { StatusCodes } from "http-status-codes";
 import { match } from "ts-pattern";
 import { HttpError } from "~/http-error.server";
 import { getProjectPath, ProjectPathTabId } from "~/page-paths.shared";
-import { EnvFormTarget, parseEnvForm } from "~/project/env-form.shared";
+import { EnvFormTarget, ENV_VAR_NAME_REGEX, parseEnvForm } from "~/project/env-form.shared";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 export const action = async ({ context: { db, req, user } }: ActionArgs) => {
@@ -64,6 +64,16 @@ export const action = async ({ context: { db, req, user } }: ActionArgs) => {
       .map((v) => (v.value != null ? { id: getVar(v.externalId).id, value: v.value } : null))
       .filter((v): v is { id: bigint; value: string } => v != null);
     const varsToCreate = data.create;
+
+    for (const v of [...varsToUpdateName, ...varsToCreate]) {
+      if (!ENV_VAR_NAME_REGEX.test(v.name)) {
+        throw new HttpError(
+          StatusCodes.BAD_REQUEST,
+          `Invalid variable name "${v.name}" (must match "${ENV_VAR_NAME_REGEX}")`,
+        );
+      }
+    }
+
     await db.environmentVariable.deleteMany({
       where: { id: { in: varsToDelete } },
     });

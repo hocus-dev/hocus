@@ -32,7 +32,7 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
       environmentVariableSet: {
         include: {
           environmentVariables: {
-            orderBy: { createdAt: "asc" },
+            orderBy: { name: "asc" },
           },
         },
       },
@@ -68,7 +68,7 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
       environmentSet: {
         include: {
           environmentVariables: {
-            orderBy: { createdAt: "asc" },
+            orderBy: { name: "asc" },
           },
         },
       },
