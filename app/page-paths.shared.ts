@@ -8,12 +8,14 @@ export const PagePaths = {
   ProjectList: "/app/projects",
   NewProject: "/app/new-project",
   CreateWorkspace: "/app/workspaces/create",
+  EditProjectEnvironment: "/app/projects/env",
 } as const;
 
 export type ProjectPathTabId = valueof<typeof ProjectPathTabId>;
 export const ProjectPathTabId = {
   WORKSPACES: 0,
   PREBUILDS: 1,
+  ENVIRONMENT: 2,
 } as const;
 
 export const getProjectPath = (projectExternalId: string, tabId?: ProjectPathTabId) =>

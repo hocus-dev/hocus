@@ -17,7 +17,8 @@ model User {
   workspaces    Workspace[]
   sshPublicKeys UserSSHPublicKey[]
 
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt                         DateTime                            @default(now()) @db.Timestamptz(3)
+  UserProjectEnvironmentVariableSet UserProjectEnvironmentVariableSet[]
 }
 
 model UserSSHPublicKey {
@@ -256,9 +257,10 @@ model Project {
   environmentVariableSetId BigInt
   environmentVariableSet   EnvironmentVariableSet @relation(fields: [environmentVariableSetId], references: [id])
 
-  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
-  prebuildEvents PrebuildEvent[]
-  buildfsEvents  BuildfsEvent[]
+  createdAt                         DateTime                            @default(now()) @db.Timestamptz(3)
+  prebuildEvents                    PrebuildEvent[]
+  buildfsEvents                     BuildfsEvent[]
+  UserProjectEnvironmentVariableSet UserProjectEnvironmentVariableSet[]
 }
 
 model AgentInstance {
@@ -302,6 +304,7 @@ model File {
 
 model EnvironmentVariable {
   id                       BigInt                 @id @default(autoincrement())
+  externalId               String                 @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   name                     String
   value                    String
   environmentVariableSetId BigInt
@@ -313,10 +316,11 @@ model EnvironmentVariable {
 }
 
 model EnvironmentVariableSet {
-  id                   BigInt                @id @default(autoincrement())
-  environmentVariables EnvironmentVariable[]
-  projects             Project[]
-  createdAt            DateTime              @default(now()) @db.Timestamptz(3)
+  id                                BigInt                              @id @default(autoincrement())
+  environmentVariables              EnvironmentVariable[]
+  projects                          Project[]
+  createdAt                         DateTime                            @default(now()) @db.Timestamptz(3)
+  UserProjectEnvironmentVariableSet UserProjectEnvironmentVariableSet[]
 }
 
 enum WorkspaceStatus {
@@ -364,4 +368,18 @@ model WorkspaceInstance {
   vmIp                  String
   monitoringWorkflowId  String
   workspaces            Workspace[]
+}
+
+model UserProjectEnvironmentVariableSet {
+  id               BigInt                 @id @default(autoincrement())
+  userId           BigInt
+  user             User                   @relation(fields: [userId], references: [id])
+  environmentSetId BigInt
+  environmentSet   EnvironmentVariableSet @relation(fields: [environmentSetId], references: [id])
+  projectId        BigInt
+  project          Project                @relation(fields: [projectId], references: [id])
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([userId, projectId])
 }

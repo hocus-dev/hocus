@@ -1,6 +1,11 @@
 import { TextInput, Button, Tooltip, Flowbite } from "flowbite-react";
 import React, { useEffect } from "react";
 import { useCallback, useState } from "react";
+import {
+  createEnvFormDeleteId,
+  createEnvFormNameId,
+  createEnvFormValueId,
+} from "~/project/env-form.shared";
 
 const EnvVarInputComponent = (props: {
   initialName: string;
@@ -35,9 +40,9 @@ const EnvVarInputComponent = (props: {
   const nameEdited = name !== props.initialName;
   const valueEdited = value !== props.initialValue;
   const edited = nameEdited || valueEdited || deleted;
-  const formNameId = `env-var-name-${props.envVarExternalId}`;
-  const formValueId = `env-var-value-${props.envVarExternalId}`;
-  const formDeletedId = `env-var-deleted-${props.envVarExternalId}`;
+  const formNameId = createEnvFormNameId(props.envVarExternalId);
+  const formValueId = createEnvFormValueId(props.envVarExternalId);
+  const formDeletedId = createEnvFormDeleteId(props.envVarExternalId);
 
   useEffect(() => {
     props.setParentEdited(edited);

@@ -1,19 +1,25 @@
 import { Badge, Button } from "flowbite-react";
 import React from "react";
 import { useState } from "react";
+import { PagePaths } from "~/page-paths.shared";
+import type { EnvFormTarget } from "~/project/env-form.shared";
 
 import { CsrfInput } from "../csrf-input";
 
 import { EnvVarInput } from "./env-var-input";
 
+export interface EnvVarFormVariable {
+  name: string;
+  value: string;
+  externalId: string;
+}
+
 export const EnvVarForm = (props: {
   title: string;
   subtitle: string;
-  variables: {
-    name: string;
-    value: string;
-    externalId: string;
-  }[];
+  projectExternalId: string;
+  target: EnvFormTarget;
+  variables: EnvVarFormVariable[];
 }): JSX.Element => {
   const [variables, setVariables] = useState(
     props.variables.map((v) => ({ ...v, new: false, edited: false })),
@@ -66,13 +72,17 @@ export const EnvVarForm = (props: {
       </h1>
       <p className="mt-2 text-gray-400">{props.subtitle}</p>
       <div className="mt-4">
-        <div className="grid grid-cols-envlist gap-x-4 mb-2">
-          <h3 className="text-gray-400">Name</h3>
-          <h3 className="text-gray-400">Value</h3>
-          <div></div>
-        </div>
-        <form method="POST">
+        {variables.length > 0 && (
+          <div className="grid grid-cols-envlist gap-x-4 mb-2">
+            <h3 className="text-gray-400">Name</h3>
+            <h3 className="text-gray-400">Value</h3>
+            <div></div>
+          </div>
+        )}
+        <form action={PagePaths.EditProjectEnvironment} method="POST">
           <CsrfInput />
+          <input type="hidden" name="project-id" value={props.projectExternalId} />
+          <input type="hidden" name="target" value={props.target} />
           {variables.map(({ name, value, externalId }, idx) => (
             <EnvVarInput
               key={externalId}
@@ -83,6 +93,11 @@ export const EnvVarForm = (props: {
               onDelete={onDeletes[idx]}
             />
           ))}
+          {variables.length === 0 && (
+            <div className="font-bold text-gray-400 mt-8">
+              <span>No variables yet</span>
+            </div>
+          )}
           <div className="mt-8 mb-4">
             <Button color="success" onClick={addVariable}>
               <i className="fa-solid fa-circle-plus mr-2"></i>

@@ -12,7 +12,7 @@ import { EnvironmentTab } from "~/components/environment/environment-tab";
 import { PrebuildList } from "~/components/projects/prebuilds/prebuild-list";
 import { WorkspaceList } from "~/components/workspaces/workspace-list";
 import { HttpError } from "~/http-error.server";
-import { PagePaths } from "~/page-paths.shared";
+import { PagePaths, ProjectPathTabId } from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
 import { Token } from "~/token";
 import { unwrap } from "~/utils.shared";
@@ -29,6 +29,13 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
     where: { externalId: projectExternalId },
     include: {
       gitRepository: true,
+      environmentVariableSet: {
+        include: {
+          environmentVariables: {
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      },
       prebuildEvents: {
         orderBy: { createdAt: "desc" },
         take: 100,
@@ -54,12 +61,37 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
   if (project == null) {
     throw new HttpError(StatusCodes.NOT_FOUND, "Project not found");
   }
+  const userVariableSet = await db.userProjectEnvironmentVariableSet.findUnique({
+    // eslint-disable-next-line camelcase
+    where: { userId_projectId: { userId: unwrap(user).id, projectId: project.id } },
+    include: {
+      environmentSet: {
+        include: {
+          environmentVariables: {
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      },
+    },
+  });
+  const userVariables =
+    userVariableSet?.environmentSet.environmentVariables.map((v) => ({
+      name: v.name,
+      value: v.value,
+      externalId: v.externalId,
+    })) ?? [];
 
   return json({
     project: {
       name: project.name,
       externalId: project.externalId,
       createdAt: project.createdAt.getTime(),
+      envVars: project.environmentVariableSet.environmentVariables.map((v) => ({
+        name: v.name,
+        value: v.value,
+        externalId: v.externalId,
+      })),
+      userVariables,
     },
     prebuildEvents: project.prebuildEvents.map((e) => ({
       branches: e.gitBranchLinks
@@ -142,7 +174,7 @@ export default function ProjectRoute(): JSX.Element {
         onActiveTabChange={setTabIdQueryParam}
       >
         <Tabs.Item
-          active={tabId === 0}
+          active={tabId === ProjectPathTabId.WORKSPACES}
           title={
             <>
               <i className="fa-solid fa-laptop-code mr-2"></i>
@@ -153,7 +185,7 @@ export default function ProjectRoute(): JSX.Element {
           <WorkspaceList elements={workspaces} />
         </Tabs.Item>
         <Tabs.Item
-          active={tabId === 1}
+          active={tabId === ProjectPathTabId.PREBUILDS}
           title={
             <>
               <i className="fa-solid fa-list-check mr-2"></i>
@@ -164,7 +196,7 @@ export default function ProjectRoute(): JSX.Element {
           <PrebuildList elements={prebuildEvents} />
         </Tabs.Item>
         <Tabs.Item
-          active={tabId === 2}
+          active={tabId === ProjectPathTabId.ENVIRONMENT}
           title={
             <>
               <i className="fa-solid fa-terminal mr-2"></i>
@@ -172,7 +204,11 @@ export default function ProjectRoute(): JSX.Element {
             </>
           }
         >
-          <EnvironmentTab />
+          <EnvironmentTab
+            projectVariables={project.envVars}
+            userVariables={project.userVariables}
+            projectExternalId={project.externalId}
+          />
         </Tabs.Item>
       </Tabs.Group>
     </AppPage>
