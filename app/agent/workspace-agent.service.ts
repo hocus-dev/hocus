@@ -9,7 +9,13 @@ import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
-import { HOST_PERSISTENT_DIR } from "./constants";
+import {
+  HOST_PERSISTENT_DIR,
+  WORKSPACE_DEV_DIR,
+  WORKSPACE_ENV_SCRIPT_PATH,
+  WORKSPACE_REPOSITORY_DIR,
+  WORKSPACE_SCRIPTS_DIR,
+} from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
 import { PidValidator } from "./pid.validator";
 import type { SSHGatewayService } from "./ssh-gateway.service";
@@ -162,6 +168,7 @@ export class WorkspaceAgentService {
     projectDrivePath: string;
     authorizedKeys: string[];
     tasks: string[];
+    environmentVariables: { name: string; value: string }[];
   }): Promise<{
     firecrackerProcessPid: number;
     vmIp: string;
@@ -169,9 +176,6 @@ export class WorkspaceAgentService {
     taskPids: number[];
   }> {
     const fcService = this.fcServiceFactory(args.fcInstanceId);
-    const devDir = "/home/hocus/dev" as const;
-    const repositoryDir = `${devDir}/project` as const;
-    const scriptsDir = `${devDir}/.hocus/command` as const;
 
     await this.writeAuthorizedKeysToFs(args.filesystemDrivePath, [
       this.agentConfig.prebuildSshPublicKey,
@@ -185,18 +189,20 @@ export class WorkspaceAgentService {
         },
         kernelPath: this.agentConfig.defaultKernel,
         rootFsPath: args.filesystemDrivePath,
-        extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: devDir }],
+        extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: WORKSPACE_DEV_DIR }],
         shouldPoweroff: false,
       },
       async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
         const taskFn = async (task: string, taskIdx: number): Promise<number> => {
           const script = this.agentUtilService.generateTaskScript(task);
-          const scriptPath = `${scriptsDir}/task-${taskIdx}.sh` as const;
-          const logPath = `${scriptsDir}/task-${taskIdx}.log` as const;
-          await execSshCmd({ ssh }, ["mkdir", "-p", scriptsDir]);
+          const scriptPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.sh` as const;
+          const logPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.log` as const;
+          const envScript = this.agentUtilService.generateEnvVarsScript(args.environmentVariables);
+          await execSshCmd({ ssh }, ["mkdir", "-p", WORKSPACE_SCRIPTS_DIR]);
           await this.agentUtilService.writeFile(ssh, scriptPath, script);
+          await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
 
-          const result = await execSshCmd({ ssh, opts: { cwd: repositoryDir } }, [
+          const result = await execSshCmd({ ssh, opts: { cwd: WORKSPACE_REPOSITORY_DIR } }, [
             "bash",
             "-o",
             "pipefail",
@@ -246,7 +252,9 @@ export class WorkspaceAgentService {
       [WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP]: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
     };
     if (workspace.status !== statusPredecessor[status]) {
-      throw new InvalidWorkspaceStatusError(`Workspace is not in ${statusPredecessor[status]} state`);
+      throw new InvalidWorkspaceStatusError(
+        `Workspace is not in ${statusPredecessor[status]} state`,
+      );
     }
     await db.workspace.update({
       where: {

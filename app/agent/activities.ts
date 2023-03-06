@@ -13,13 +13,13 @@ import type {
 import { WorkspaceStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
-import { displayError, unwrap, waitForPromises } from "~/utils.shared";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { CheckoutAndInspectResult } from "./activities-types";
 import type { createAgentInjector } from "./agent-injector";
 import type { VMTaskOutput } from "./agent-util.types";
 import type { GetOrCreateBuildfsEventsReturnType } from "./buildfs.service";
-import { SOLO_AGENT_INSTANCE_ID } from "./constants";
+import { SOLO_AGENT_INSTANCE_ID, WORKSPACE_ENV_SCRIPT_PATH } from "./constants";
 import type { UpdateBranchesResult } from "./git/git.service";
 import { execSshCmd, randomString } from "./utils";
 
@@ -152,13 +152,11 @@ export const createActivities = async (
         (f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
       ),
     );
-    const envVariablesLength =
-      prebuildEvent.project.environmentVariableSet.environmentVariables.length;
-    const envVariables = Object.fromEntries(
-      prebuildEvent.project.environmentVariableSet.environmentVariables.map((v) => [
-        v.name,
-        v.value,
-      ]),
+    const envVariables = prebuildEvent.project.environmentVariableSet.environmentVariables.map(
+      (v) => ({
+        name: v.name,
+        value: v.value,
+      }),
     );
     const tasks = prebuildEvent.tasks;
     return await firecrackerService.withVM(
@@ -185,13 +183,14 @@ export const createActivities = async (
             await agentUtilService.writeFile(ssh, paths.scriptPath, script);
           }),
         );
+        const envScript = agentUtilService.generateEnvVarsScript(envVariables);
+        await agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
 
         return await agentUtilService.execVmTasks(
           sshConfig,
           db,
           tasks.map((t) => ({
             vmTaskId: t.vmTask.id,
-            env: envVariablesLength > 0 ? envVariables : void 0,
           })),
         );
       },
@@ -259,7 +258,19 @@ export const createActivities = async (
       include: {
         rootFsFile: true,
         projectFile: true,
-        prebuildEvent: true,
+        prebuildEvent: {
+          include: {
+            project: {
+              include: {
+                environmentVariableSet: {
+                  include: {
+                    environmentVariables: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         user: {
           include: {
             sshPublicKeys: true,
@@ -267,12 +278,41 @@ export const createActivities = async (
         },
       },
     });
+    const userEnvVarSet = await db.userProjectEnvironmentVariableSet.findUnique({
+      where: {
+        // eslint-disable-next-line camelcase
+        userId_projectId: {
+          userId: workspace.userId,
+          projectId: workspace.prebuildEvent.projectId,
+        },
+      },
+      include: {
+        environmentSet: {
+          include: {
+            environmentVariables: true,
+          },
+        },
+      },
+    });
+    const projectEnvVariables =
+      workspace.prebuildEvent.project.environmentVariableSet.environmentVariables.map(
+        (v) => [v.name, v.value] as const,
+      );
+    const userVariables =
+      userEnvVarSet != null
+        ? userEnvVarSet.environmentSet.environmentVariables.map((v) => [v.name, v.value] as const)
+        : [];
+    const environmentVariables = Array.from(
+      new Map([...projectEnvVariables, ...userVariables]).entries(),
+    ).map(([name, value]) => ({ name, value }));
+
     const instanceInfo = await workspaceAgentService.startWorkspace({
       fcInstanceId,
       filesystemDrivePath: workspace.rootFsFile.path,
       projectDrivePath: workspace.projectFile.path,
       authorizedKeys: workspace.user.sshPublicKeys.map((k) => k.publicKey),
       tasks: workspace.prebuildEvent.workspaceTasks,
+      environmentVariables,
     });
     return await db.$transaction((tdb) =>
       workspaceAgentService.createWorkspaceInstanceInDb(tdb, {

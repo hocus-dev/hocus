@@ -123,6 +123,17 @@ export class AgentUtilService {
     return `${TASK_SCRIPT_TEMPLATE}${task}\n`;
   }
 
+  generateEnvVarsScript(vars: { name: string; value: string }[]): string {
+    return (
+      vars
+        .map((v) => {
+          const base64Encoded = Buffer.from(v.value).toString("base64");
+          return `export ${v.name}=$(echo "${base64Encoded}" | base64 -d)`;
+        })
+        .join("\n") + "\n"
+    );
+  }
+
   async createVmTask(
     db: Prisma.TransactionClient,
     task: { command: string[]; cwd: string },
