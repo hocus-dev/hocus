@@ -128,7 +128,7 @@ test.concurrent(
       },
     });
 
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     const projectService = injector.resolve(Token.ProjectService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const pair = await sshKeyService.createSshKeyPair(

@@ -10,7 +10,7 @@ import { WorkspaceService } from "~/workspace/workspace.service";
 import { AgentUtilService } from "./agent-util.service";
 import { BuildfsService } from "./buildfs.service";
 import { factoryFirecrackerService } from "./firecracker.service";
-import { GitService } from "./git/git.service";
+import { AgentGitService } from "./git/git.service";
 import { PrebuildService } from "./prebuild.service";
 import { ProjectConfigService } from "./project-config/project-config.service";
 import { SSHGatewayService } from "./ssh-gateway.service";
@@ -29,7 +29,7 @@ export const createAgentInjector = (
     [Token.ProjectConfigService]?: typeof ProjectConfigService;
     [Token.SSHGatewayService]?: typeof SSHGatewayService;
     [Token.BuildfsService]?: typeof BuildfsService;
-    [Token.GitService]?: typeof GitService;
+    [Token.AgentGitService]?: typeof AgentGitService;
     [Token.ProjectService]?: typeof ProjectService;
     [Token.WorkspaceService]?: typeof WorkspaceService;
     [Token.WorkspaceAgentService]?: typeof WorkspaceAgentService;
@@ -47,7 +47,7 @@ export const createAgentInjector = (
     .provideClass(Token.StorageService, overrides[Token.StorageService] ?? StorageService)
     .provideClass(Token.AgentUtilService, overrides[Token.AgentUtilService] ?? AgentUtilService)
     .provideClass(Token.WorkspaceService, overrides[Token.WorkspaceService] ?? WorkspaceService)
-    .provideClass(Token.GitService, overrides[Token.GitService] ?? GitService)
+    .provideClass(Token.AgentGitService, overrides[Token.AgentGitService] ?? AgentGitService)
     .provideClass(Token.ProjectService, overrides[Token.ProjectService] ?? ProjectService)
     .provideClass(
       Token.ProjectConfigService,

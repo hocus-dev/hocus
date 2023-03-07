@@ -1,3 +1,5 @@
+import path from "path";
+
 import type {
   GitBranch,
   GitObject,
@@ -14,7 +16,6 @@ import { WorkspaceStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
-import path from "path";
 
 import type { CheckoutAndInspectResult } from "./activities-types";
 import type { createAgentInjector } from "./agent-injector";
@@ -33,7 +34,7 @@ export const createActivities = async (
   const fetchRepository = async (gitRepositoryId: bigint): Promise<void> => {
     const instanceId = `fetchrepo-${uuidv4()}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const repo = await db.gitRepository.findUniqueOrThrow({
       where: { id: gitRepositoryId },
@@ -482,7 +483,7 @@ export const createActivities = async (
     gitRepository: GitRepository;
     gitRepositoryCreated: boolean;
   }> => {
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const projectService = injector.resolve(Token.ProjectService);
     return await db.$transaction(async (tdb) => {
@@ -511,7 +512,7 @@ export const createActivities = async (
   const updateGitBranchesAndObjects = async (
     gitRepositoryId: bigint,
   ): Promise<UpdateBranchesResult> => {
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     return await gitService.updateBranches(db, gitRepositoryId);
   };
 

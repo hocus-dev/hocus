@@ -17,7 +17,7 @@ import type { GitRemoteInfo } from "./git.service";
 test.concurrent(
   "getRemotes",
   provideInjector(async ({ injector }) => {
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     const remotesLinux = await gitService.getRemotes(
       "git@github.com:torvalds/linux.git",
       PRIVATE_SSH_KEY,
@@ -38,7 +38,7 @@ test.concurrent(
 test.concurrent(
   "findRemoteUpdates",
   provideInjector(async ({ injector }) => {
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     const remotes = [
       {
         name: "remote0",
@@ -84,7 +84,7 @@ test.concurrent(
   "addGitRepository",
   provideInjectorAndDb(async ({ injector, db }) => {
     const sshKeyService = injector.resolve(Token.SshKeyService);
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     const pair = await sshKeyService.createSshKeyPair(
       db,
       PRIVATE_SSH_KEY,
@@ -99,7 +99,7 @@ test.concurrent(
 test.concurrent(
   "updateBranches",
   provideInjectorAndDb(async ({ injector, db }) => {
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const pair = await sshKeyService.createSshKeyPair(
       db,
@@ -146,7 +146,7 @@ test.concurrent(
 test.concurrent(
   "fetchRepository",
   provideInjector(async ({ injector, runId }) => {
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const agentConfig = injector.resolve(Token.Config).agent();
     await fs.mkdir(PERSISTENT_TEST_DIR, { recursive: true });
@@ -195,7 +195,7 @@ test.concurrent(
 test.concurrent(
   "getOrCreateGitRepositoryFile",
   provideInjectorAndDb(async ({ injector, db }) => {
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
 
@@ -223,7 +223,7 @@ test.concurrent(
 test.concurrent(
   "isGitSshUrl",
   provideInjector(async ({ injector }) => {
-    const gitService = injector.resolve(Token.GitService);
+    const gitService = injector.resolve(Token.AgentGitService);
 
     expect(
       gitService.isGitSshUrl(

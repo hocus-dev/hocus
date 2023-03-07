@@ -46,7 +46,7 @@ export interface UpdateBranchesResult {
   })[];
 }
 
-export class GitService {
+export class AgentGitService {
   static inject = [Token.Logger, Token.AgentUtilService, Token.Config] as const;
   private readonly agentConfig: ReturnType<Config["agent"]>;
   /**
