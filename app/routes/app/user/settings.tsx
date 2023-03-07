@@ -17,7 +17,10 @@ export default function Settings(): JSX.Element {
           style={{ borderTopRightRadius: "0 !important", borderBottomRightRadius: "0 !important" }}
         >
           <ListGroup.Item className="m-4:important" active={true}>
-            SSH Keys
+            <div>
+              <i className="fa-solid fa-key mr-2"></i>
+              <span>SSH Keys</span>
+            </div>
           </ListGroup.Item>
         </ListGroup>
         <div className="rounded-r-lg border-r border-y border-gray-700 p-8">
