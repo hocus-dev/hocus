@@ -4,11 +4,11 @@ import type { valueof } from "./types/utils";
 
 export const PagePaths = {
   Logout: "/app/logout",
-  Settings: "/app/settings",
   ProjectList: "/app/projects",
   NewProject: "/app/new-project",
   CreateWorkspace: "/app/workspaces/create",
   EditProjectEnvironment: "/app/projects/env",
+  UserSettings: "/app/user/settings",
 } as const;
 
 export type ProjectPathTabId = valueof<typeof ProjectPathTabId>;

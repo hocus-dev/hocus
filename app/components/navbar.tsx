@@ -29,7 +29,7 @@ const NavbarComponent = (props: { userEmail?: string }): JSX.Element => {
               </span>
             </Dropdown.Header>
           )}
-          <a href={PagePaths.Settings}>
+          <a href={PagePaths.UserSettings}>
             <Dropdown.Item>
               <i className="fa-solid fa-gear mr-2"></i>
               <span>Settings</span>
