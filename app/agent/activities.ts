@@ -25,13 +25,90 @@ import { SOLO_AGENT_INSTANCE_ID, WORKSPACE_ENV_SCRIPT_PATH } from "./constants";
 import type { UpdateBranchesResult } from "./git/git.service";
 import { execSshCmd, randomString } from "./utils";
 
-export const createActivities = async (
-  injector: ReturnType<typeof createAgentInjector>,
-  db: Prisma.NonTransactionClient,
-) => {
-  const agentConfig = injector.resolve(Token.Config).agent();
+interface Activities {
+  fetchRepository: (gitRepositoryId: bigint) => Promise<void>;
+  buildfs: (args: {
+    buildfsEventId: bigint;
+    outputDriveMaxSizeMiB: number;
+  }) => Promise<{ buildSuccessful: boolean }>;
+  checkoutAndInspect: (args: {
+    gitRepositoryId: bigint;
+    targetBranch: string;
+    outputDrivePath: string;
+    projectConfigPaths: string[];
+  }) => Promise<CheckoutAndInspectResult[]>;
+  prebuild: (args: { prebuildEventId: bigint }) => Promise<VMTaskOutput[]>;
+  cancelPrebuilds: (prebuildEventIds: bigint[]) => Promise<void>;
+  changePrebuildEventStatus: (
+    prebuildEventId: bigint,
+    status: PrebuildEventStatus,
+  ) => Promise<void>;
+  createWorkspace: (args: {
+    name: string;
+    prebuildEventId: bigint;
+    gitBranchId: bigint;
+    userId: bigint;
+    externalId: string;
+  }) => Promise<Workspace>;
+  startWorkspace: (workspaceId: bigint) => Promise<WorkspaceInstance>;
+  stopWorkspace: (workspaceId: bigint) => Promise<void>;
+  getProjectsAndGitObjects: (
+    projectIds: bigint[],
+    gitObjectIds: bigint[],
+  ) => Promise<{ projects: Project[]; gitObjects: GitObject[] }>;
+  getOrCreateBuildfsEvents: (
+    args: {
+      contextPath: string;
+      dockerfilePath: string;
+      cacheHash: string | null;
+      outputFilePath: string;
+      projectFilePath: string;
+      projectId: bigint;
+    }[],
+  ) => Promise<GetOrCreateBuildfsEventsReturnType[]>;
+  createPrebuildEvents: (
+    args: {
+      projectId: bigint;
+      gitObjectId: bigint;
+      gitBranchIds: bigint[];
+      buildfsEventId: bigint | null;
+      sourceProjectDrivePath: string;
+      tasks: { command: string; cwd: string }[];
+      workspaceTasks: string[];
+    }[],
+  ) => Promise<PrebuildEvent[]>;
+  createPrebuildFiles: (args: {
+    prebuildEventId: bigint;
+    sourceProjectDrivePath: string;
+  }) => Promise<PrebuildEventFiles>;
+  getWorkspaceInstanceStatus: (
+    workspaceInstanceId: bigint,
+  ) => Promise<"on" | "off" | "paused" | "removed">;
+  addProjectAndRepository: (args: {
+    gitRepositoryUrl: string;
+    projectName: string;
+    projectWorkspaceRoot: string;
+  }) => Promise<{
+    project: Project;
+    gitRepository: GitRepository;
+    gitRepositoryCreated: boolean;
+  }>;
+  getRepositoryProjects: (gitRepositoryId: bigint) => Promise<Project[]>;
+  updateGitBranchesAndObjects: (gitRepositoryId: bigint) => Promise<UpdateBranchesResult>;
+  getDefaultBranch: (gitRepositoryId: bigint) => Promise<GitBranch | null>;
+}
+interface Args {
+  injector: ReturnType<typeof createAgentInjector>;
+  db: Prisma.NonTransactionClient;
+}
 
-  const fetchRepository = async (gitRepositoryId: bigint): Promise<void> => {
+type ActivitiesCreateFns = {
+  [K in keyof Activities]: (args: Args) => Activities[K];
+};
+
+const fetchRepository: ActivitiesCreateFns["fetchRepository"] =
+  ({ injector, db }: Args) =>
+  async (gitRepositoryId: bigint) => {
     const instanceId = `fetchrepo-${uuidv4()}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const gitService = injector.resolve(Token.AgentGitService);
@@ -61,7 +138,9 @@ export const createActivities = async (
     );
   };
 
-  const buildfs = async (args: {
+const buildfs: ActivitiesCreateFns["buildfs"] =
+  ({ injector, db }: Args) =>
+  async (args: {
     buildfsEventId: bigint;
     outputDriveMaxSizeMiB: number;
   }): Promise<{ buildSuccessful: boolean }> => {
@@ -72,15 +151,17 @@ export const createActivities = async (
     return await buildfsService.buildfs({ ...args, db, firecrackerService });
   };
 
-  /**
-   * Copies the contents of `repositoryDrivePath` into `outputDrivePath`, and checks
-   * out the given branch there.
-   *
-   * Returns an array of `ProjectConfig`s or `null`s corresponding to the
-   * `projectConfigPaths` argument. If a hocus config file is not present in a directory,
-   * `null` is returned.
-   */
-  const checkoutAndInspect = async (args: {
+/**
+ * Copies the contents of `repositoryDrivePath` into `outputDrivePath`, and checks
+ * out the given branch there.
+ *
+ * Returns an array of `ProjectConfig`s or `null`s corresponding to the
+ * `projectConfigPaths` argument. If a hocus config file is not present in a directory,
+ * `null` is returned.
+ */
+const checkoutAndInspect: ActivitiesCreateFns["checkoutAndInspect"] =
+  ({ injector, db }: Args) =>
+  async (args: {
     gitRepositoryId: bigint;
     /**
      * The repository will be checked out to this branch.
@@ -118,20 +199,23 @@ export const createActivities = async (
     });
   };
 
-  /**
-   * Returns the result for every task.
-   *
-   * Assumes that there is a `hocus` user with passwordless sudo on the
-   * filesystem drive, sshd is configured to start running automatically after VM boot,
-   * and the corresponding public key to the private key used to connect to the VM
-   * (`agentConfig.prebuildSshPrivateKey`) is already present in the `hocus` user's authorized_keys.
-   */
-  const prebuild = async (args: { prebuildEventId: bigint }): Promise<VMTaskOutput[]> => {
+/**
+ * Returns the result for every task.
+ *
+ * Assumes that there is a `hocus` user with passwordless sudo on the
+ * filesystem drive, sshd is configured to start running automatically after VM boot,
+ * and the corresponding public key to the private key used to connect to the VM
+ * (`agentConfig.prebuildSshPrivateKey`) is already present in the `hocus` user's authorized_keys.
+ */
+const prebuild: ActivitiesCreateFns["prebuild"] =
+  ({ injector, db }: Args) =>
+  async (args: { prebuildEventId: bigint }): Promise<VMTaskOutput[]> => {
     const runId = uuidv4();
     const instanceId = `prebuild-${runId}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const prebuildService = injector.resolve(Token.PrebuildService);
+    const agentConfig = injector.resolve(Token.Config).agent();
 
     const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
       where: { id: args.prebuildEventId },
@@ -200,22 +284,25 @@ export const createActivities = async (
     );
   };
 
-  const cancelPrebuilds = async (prebuildEventIds: bigint[]): Promise<void> => {
+const cancelPrebuilds: ActivitiesCreateFns["cancelPrebuilds"] =
+  ({ injector, db }: Args) =>
+  async (prebuildEventIds: bigint[]): Promise<void> => {
     const prebuildService = injector.resolve(Token.PrebuildService);
     await db.$transaction((tdb) => prebuildService.cancelPrebuilds(tdb, prebuildEventIds));
   };
 
-  const changePrebuildEventStatus = async (
-    prebuildEventId: bigint,
-    status: PrebuildEventStatus,
-  ): Promise<void> => {
+const changePrebuildEventStatus: ActivitiesCreateFns["changePrebuildEventStatus"] =
+  ({ injector, db }: Args) =>
+  async (prebuildEventId: bigint, status: PrebuildEventStatus): Promise<void> => {
     const prebuildService = injector.resolve(Token.PrebuildService);
     await db.$transaction((tdb) =>
       prebuildService.changePrebuildEventStatus(tdb, prebuildEventId, status),
     );
   };
 
-  const createWorkspace = async (args: {
+const createWorkspace: ActivitiesCreateFns["createWorkspace"] =
+  ({ injector, db }: Args) =>
+  async (args: {
     name: string;
     prebuildEventId: bigint;
     gitBranchId: bigint;
@@ -243,7 +330,9 @@ export const createActivities = async (
     return workspace;
   };
 
-  const startWorkspace = async (workspaceId: bigint): Promise<WorkspaceInstance> => {
+const startWorkspace: ActivitiesCreateFns["startWorkspace"] =
+  ({ injector, db }: Args) =>
+  async (workspaceId: bigint): Promise<WorkspaceInstance> => {
     const monitoringWorkflowId = uuidv4();
     const fcInstanceId = monitoringWorkflowId;
 
@@ -327,7 +416,9 @@ export const createActivities = async (
     );
   };
 
-  const stopWorkspace = async (workspaceId: bigint): Promise<void> => {
+const stopWorkspace: ActivitiesCreateFns["stopWorkspace"] =
+  ({ injector, db }: Args) =>
+  async (workspaceId: bigint): Promise<void> => {
     const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
 
     await db.$transaction((tdb) =>
@@ -362,7 +453,9 @@ export const createActivities = async (
     );
   };
 
-  const getProjectsAndGitObjects = async (
+const getProjectsAndGitObjects: ActivitiesCreateFns["getProjectsAndGitObjects"] =
+  ({ db }: Args) =>
+  async (
     projectIds: bigint[],
     gitObjectIds: bigint[],
   ): Promise<{ projects: Project[]; gitObjects: GitObject[] }> => {
@@ -381,7 +474,9 @@ export const createActivities = async (
     return { projects, gitObjects };
   };
 
-  const getOrCreateBuildfsEvents = async (
+const getOrCreateBuildfsEvents: ActivitiesCreateFns["getOrCreateBuildfsEvents"] =
+  ({ injector, db }: Args) =>
+  async (
     args: {
       contextPath: string;
       dockerfilePath: string;
@@ -409,7 +504,9 @@ export const createActivities = async (
     );
   };
 
-  const createPrebuildEvents = async (
+const createPrebuildEvents: ActivitiesCreateFns["createPrebuildEvents"] =
+  ({ injector, db }: Args) =>
+  async (
     args: {
       projectId: bigint;
       gitObjectId: bigint;
@@ -433,7 +530,9 @@ export const createActivities = async (
     });
   };
 
-  const createPrebuildFiles = async (args: {
+const createPrebuildFiles: ActivitiesCreateFns["createPrebuildFiles"] =
+  ({ injector, db }: Args) =>
+  async (args: {
     prebuildEventId: bigint;
     sourceProjectDrivePath: string;
   }): Promise<PrebuildEventFiles> => {
@@ -449,9 +548,9 @@ export const createActivities = async (
     });
   };
 
-  const getWorkspaceInstanceStatus = async (
-    workspaceInstanceId: bigint,
-  ): Promise<"on" | "off" | "paused" | "removed"> => {
+const getWorkspaceInstanceStatus: ActivitiesCreateFns["getWorkspaceInstanceStatus"] =
+  ({ injector, db }: Args) =>
+  async (workspaceInstanceId: bigint): Promise<"on" | "off" | "paused" | "removed"> => {
     const workspace = await db.workspace.findFirst({
       where: { activeInstanceId: workspaceInstanceId },
       include: {
@@ -474,7 +573,9 @@ export const createActivities = async (
     return vmInfo.status;
   };
 
-  const addProjectAndRepository = async (args: {
+const addProjectAndRepository: ActivitiesCreateFns["addProjectAndRepository"] =
+  ({ injector, db }: Args) =>
+  async (args: {
     gitRepositoryUrl: string;
     projectName: string;
     projectWorkspaceRoot: string;
@@ -502,21 +603,25 @@ export const createActivities = async (
     });
   };
 
-  const getRepositoryProjects = async (gitRepositoryId: bigint): Promise<Project[]> => {
+const getRepositoryProjects: ActivitiesCreateFns["getRepositoryProjects"] =
+  ({ db }: Args) =>
+  async (gitRepositoryId: bigint): Promise<Project[]> => {
     return await db.project.findMany({
       where: { gitRepositoryId },
       orderBy: { id: "asc" },
     });
   };
 
-  const updateGitBranchesAndObjects = async (
-    gitRepositoryId: bigint,
-  ): Promise<UpdateBranchesResult> => {
+const updateGitBranchesAndObjects: ActivitiesCreateFns["updateGitBranchesAndObjects"] =
+  ({ injector, db }: Args) =>
+  async (gitRepositoryId: bigint): Promise<UpdateBranchesResult> => {
     const gitService = injector.resolve(Token.AgentGitService);
     return await gitService.updateBranches(db, gitRepositoryId);
   };
 
-  const getDefaultBranch = async (gitRepositoryId: bigint): Promise<GitBranch | null> => {
+const getDefaultBranch: ActivitiesCreateFns["getDefaultBranch"] =
+  ({ db }: Args) =>
+  async (gitRepositoryId: bigint): Promise<GitBranch | null> => {
     const branches = await db.gitBranch.findMany({
       where: {
         gitRepositoryId,
@@ -534,24 +639,34 @@ export const createActivities = async (
     return branches[0];
   };
 
-  return {
+export const createActivities = async (
+  injector: ReturnType<typeof createAgentInjector>,
+  db: Prisma.NonTransactionClient,
+): Promise<Activities> => {
+  const fns = {
     fetchRepository,
     buildfs,
     checkoutAndInspect,
     prebuild,
+    cancelPrebuilds,
+    changePrebuildEventStatus,
+    createWorkspace,
     startWorkspace,
     stopWorkspace,
     getProjectsAndGitObjects,
     getOrCreateBuildfsEvents,
     createPrebuildEvents,
     createPrebuildFiles,
-    createWorkspace,
-    cancelPrebuilds,
-    changePrebuildEventStatus,
     getWorkspaceInstanceStatus,
     addProjectAndRepository,
     getRepositoryProjects,
     updateGitBranchesAndObjects,
     getDefaultBranch,
-  };
+  } as const;
+
+  return Object.fromEntries(
+    Object.entries(fns).map(([name, fn]) => {
+      return [name, fn({ injector, db })] as const;
+    }),
+  ) as any;
 };
