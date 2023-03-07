@@ -1,5 +1,6 @@
 import { SshKeyPairType } from "@prisma/client";
 import type { Object } from "ts-toolbelt";
+import { HttpError } from "~/http-error.server";
 import { provideAppInjectorAndDb } from "~/test-utils";
 import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
@@ -46,31 +47,84 @@ test.concurrent(
         { name: "name2", value: "value2" },
       ],
     });
-    const userEnvVars = await db.userProjectEnvironmentVariableSet
-      .findUniqueOrThrow({
-        where: {
-          // eslint-disable-next-line camelcase
-          userId_projectId: {
-            userId: testUser.id,
-            projectId: project.id,
-          },
-        },
-        include: {
-          environmentSet: {
-            include: {
-              environmentVariables: true,
+    const getUserEnvVars = () =>
+      db.userProjectEnvironmentVariableSet
+        .findUniqueOrThrow({
+          where: {
+            // eslint-disable-next-line camelcase
+            userId_projectId: {
+              userId: testUser.id,
+              projectId: project.id,
             },
           },
-        },
-      })
-      .then((r) =>
-        r.environmentSet.environmentVariables
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((v) => [v.name, v.value]),
-      );
-    expect(userEnvVars).toEqual([
+          include: {
+            environmentSet: {
+              include: {
+                environmentVariables: true,
+              },
+            },
+          },
+        })
+        .then((r) =>
+          r.environmentSet.environmentVariables.sort((a, b) => a.name.localeCompare(b.name)),
+        );
+    const getProjectEnvVars = () =>
+      db.project
+        .findUniqueOrThrow({
+          where: { id: project.id },
+          include: {
+            environmentVariableSet: {
+              include: {
+                environmentVariables: true,
+              },
+            },
+          },
+        })
+        .then((r) =>
+          r.environmentVariableSet.environmentVariables.sort((a, b) =>
+            a.name.localeCompare(b.name),
+          ),
+        );
+    const userEnvVars = await getUserEnvVars();
+    expect(userEnvVars.map((v) => [v.name, v.value])).toEqual([
       ["name1", "value1"],
       ["name2", "value2"],
     ]);
+    await runCase({
+      update: [
+        { name: "name1_updated", value: "value1_updated", externalId: userEnvVars[0].externalId },
+      ],
+      delete: [userEnvVars[1].externalId],
+    });
+    const userEnvVars2 = await getUserEnvVars();
+    expect(userEnvVars2.map((v) => [v.name, v.value])).toEqual([
+      ["name1_updated", "value1_updated"],
+    ]);
+    await runCase({
+      target: UpdateEnvVarsTarget.PROJECT,
+      create: [
+        { name: "name3", value: "value3" },
+        { name: "name4", value: "value4" },
+        { name: "name5", value: "value5" },
+      ],
+    });
+    const projectEnvVars = await getProjectEnvVars();
+    expect(projectEnvVars.map((v) => [v.name, v.value])).toEqual([
+      ["name3", "value3"],
+      ["name4", "value4"],
+      ["name5", "value5"],
+    ]);
+    try {
+      await runCase({
+        target: UpdateEnvVarsTarget.PROJECT,
+        update: [{ externalId: userEnvVars2[0].externalId, name: "name1_fail" }],
+      });
+    } catch (e) {
+      if (e instanceof HttpError) {
+        expect(e.statusText).toMatch(/not found/);
+      } else {
+        throw e;
+      }
+    }
   }),
 );
