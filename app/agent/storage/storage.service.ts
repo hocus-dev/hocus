@@ -51,9 +51,6 @@ export class StorageService {
 
   async withStorage<T>(fn: (storage: LowLevelStorageService) => Promise<T>): Promise<T> {
     await this.lowLevelStorageService.createEmptyStorageFile();
-    // We use a mutex because the same process cannot attempt to lock the same file twice.
-    // If there were two async functions trying to lock the storage file at the same time,
-    // one of them would fail.
     return await withFileLock(this.lowLevelStorageService.getPathToStorage(), async () => {
       return await fn(this.lowLevelStorageService);
     });

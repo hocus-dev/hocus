@@ -14,6 +14,7 @@ import { WorkspaceStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
+import path from "path";
 
 import type { CheckoutAndInspectResult } from "./activities-types";
 import type { createAgentInjector } from "./agent-injector";
@@ -175,6 +176,9 @@ export const createActivities = async (
         ],
       },
       async ({ ssh, sshConfig }) => {
+        const envScript = agentUtilService.generateEnvVarsScript(envVariables);
+        await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
+        await agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
         await Promise.all(
           tasks.map(async (task) => {
             const script = agentUtilService.generateTaskScript(task.originalCommand);
@@ -183,8 +187,6 @@ export const createActivities = async (
             await agentUtilService.writeFile(ssh, paths.scriptPath, script);
           }),
         );
-        const envScript = agentUtilService.generateEnvVarsScript(envVariables);
-        await agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
 
         return await agentUtilService.execVmTasks(
           sshConfig,

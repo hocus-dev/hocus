@@ -199,6 +199,7 @@ export class WorkspaceAgentService {
           const logPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.log` as const;
           const envScript = this.agentUtilService.generateEnvVarsScript(args.environmentVariables);
           await execSshCmd({ ssh }, ["mkdir", "-p", WORKSPACE_SCRIPTS_DIR]);
+          await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
           await this.agentUtilService.writeFile(ssh, scriptPath, script);
           await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
 

@@ -213,8 +213,18 @@ export const withFileLock = async <T>(lockFilePath: string, fn: () => Promise<T>
   const locked2 = unwrap(lockedFilePaths.get(lockFilePath));
 
   try {
+    // We use a mutex because the same process cannot attempt to lock the same file twice.
+    // If there were two async functions trying to lock the storage file at the same time,
+    // one of them would fail.
+    //
+    // TODO: Consider using a different method of locking, such as flock. I have experienced
+    // flaky behavior in tests with lockfile, namely the "Lockfile is already being held" error.
+    // The problem is that we are using this function within Temporal workflows, and I'm not sure
+    // if the `lockedFilePaths` map is shared across activities running concurrently on the
+    // same machine. As a workaround I slapped the 10 retries on the lockfile call below,
+    // but that's not a great solution.
     return await locked2.mutex.runExclusive(async () => {
-      const unlockFile = await lockfile.lock(lockFilePath);
+      const unlockFile = await lockfile.lock(lockFilePath, { retries: 10 });
       try {
         return await fn();
       } finally {
