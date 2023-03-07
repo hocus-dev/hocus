@@ -128,7 +128,8 @@ test.concurrent(
       },
     });
 
-    const gitService = injector.resolve(Token.AgentGitService);
+    const gitService = injector.resolve(Token.GitService);
+    const agentGitService = injector.resolve(Token.AgentGitService);
     const projectService = injector.resolve(Token.ProjectService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const pair = await sshKeyService.createSshKeyPair(
@@ -137,7 +138,7 @@ test.concurrent(
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
     const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
-    const updates = await gitService.updateBranches(db, repo.id);
+    const updates = await agentGitService.updateBranches(db, repo.id);
     const projects = await db.$transaction((tdb) =>
       waitForPromises(
         [

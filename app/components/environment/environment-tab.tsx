@@ -1,4 +1,4 @@
-import { EnvFormTarget } from "~/project/env-form.shared";
+import { UpdateEnvVarsTarget } from "~/project/env-form.shared";
 
 import type { EnvVarFormVariable } from "./env-far-form";
 import { EnvVarForm } from "./env-far-form";
@@ -14,7 +14,7 @@ export const EnvironmentTab = (props: {
         title="Project Variables"
         subtitle="Project-level environment variables are available to all project members. They are accessible both during prebuilds and in workspaces."
         projectExternalId={props.projectExternalId}
-        target={EnvFormTarget.PROJECT}
+        target={UpdateEnvVarsTarget.PROJECT}
         variables={props.projectVariables}
       />
       <div className="mt-16"></div>
@@ -22,7 +22,7 @@ export const EnvironmentTab = (props: {
         title="User Variables"
         subtitle="User-level environment variables are available only to you. You can use them to override project variables or to add your own. They are accessible only in workspaces."
         projectExternalId={props.projectExternalId}
-        target={EnvFormTarget.USER}
+        target={UpdateEnvVarsTarget.USER}
         variables={props.userVariables}
       />
     </div>

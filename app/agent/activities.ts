@@ -483,7 +483,7 @@ export const createActivities = async (
     gitRepository: GitRepository;
     gitRepositoryCreated: boolean;
   }> => {
-    const gitService = injector.resolve(Token.AgentGitService);
+    const gitService = injector.resolve(Token.GitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const projectService = injector.resolve(Token.ProjectService);
     return await db.$transaction(async (tdb) => {

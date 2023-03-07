@@ -14,8 +14,8 @@ export const createEnvFormDeleteId = (envVarExternalId: string) =>
 
 type ExternalIdPart = { new: boolean; envVarExternalId: string };
 
-export type EnvFormTarget = valueof<typeof EnvFormTarget>;
-export const EnvFormTarget = {
+export type UpdateEnvVarsTarget = valueof<typeof UpdateEnvVarsTarget>;
+export const UpdateEnvVarsTarget = {
   USER: "user",
   PROJECT: "project",
 } as const;
@@ -37,7 +37,7 @@ export type EnvFormField =
       type: "project-id";
       projectExternalId: string;
     }
-  | { type: "target"; target: EnvFormTarget };
+  | { type: "target"; target: UpdateEnvVarsTarget };
 
 export const parseEnvFormField = (name: string, value: string): EnvFormField | null => {
   if (name.startsWith(UPDATE_ENV_VAR_NAME_PREFIX)) {
@@ -77,7 +77,7 @@ interface EnvFormData {
   create: { name: string; value: string }[];
   update: { name?: string; value?: string; externalId: string }[];
   projectId: string;
-  target: EnvFormTarget;
+  target: UpdateEnvVarsTarget;
 }
 
 export const parseEnvForm = (
@@ -89,7 +89,7 @@ export const parseEnvForm = (
     .map(([name, value]) => parseEnvFormField(name, value))
     .filter((field): field is EnvFormField => field !== null);
   let projectId: string | null = null;
-  let target: EnvFormTarget | null = null;
+  let target: UpdateEnvVarsTarget | null = null;
   const idsToDelete: string[] = [];
   const idsToUpdate = new Map<string, { name?: string; value?: string }>();
   const idsToCreate = new Map<string, { name?: string; value?: string }>();

@@ -1,6 +1,7 @@
 import { DefaultLogger } from "@temporalio/worker";
 import { createInjector, Scope } from "typed-inject";
 import { config } from "~/config";
+import { GitService } from "~/git/git.service";
 import { ProjectService } from "~/project/project.service";
 import { SshKeyService } from "~/ssh-key/ssh-key.service";
 import { clientFactory } from "~/temporal/client-factory";
@@ -29,6 +30,7 @@ export const createAgentInjector = (
     [Token.ProjectConfigService]?: typeof ProjectConfigService;
     [Token.SSHGatewayService]?: typeof SSHGatewayService;
     [Token.BuildfsService]?: typeof BuildfsService;
+    [Token.GitService]?: typeof GitService;
     [Token.AgentGitService]?: typeof AgentGitService;
     [Token.ProjectService]?: typeof ProjectService;
     [Token.WorkspaceService]?: typeof WorkspaceService;
@@ -47,6 +49,7 @@ export const createAgentInjector = (
     .provideClass(Token.StorageService, overrides[Token.StorageService] ?? StorageService)
     .provideClass(Token.AgentUtilService, overrides[Token.AgentUtilService] ?? AgentUtilService)
     .provideClass(Token.WorkspaceService, overrides[Token.WorkspaceService] ?? WorkspaceService)
+    .provideClass(Token.GitService, overrides[Token.GitService] ?? GitService)
     .provideClass(Token.AgentGitService, overrides[Token.AgentGitService] ?? AgentGitService)
     .provideClass(Token.ProjectService, overrides[Token.ProjectService] ?? ProjectService)
     .provideClass(

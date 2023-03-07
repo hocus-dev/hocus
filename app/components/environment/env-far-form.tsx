@@ -2,7 +2,7 @@ import { Badge, Button } from "flowbite-react";
 import React from "react";
 import { useState } from "react";
 import { PagePaths } from "~/page-paths.shared";
-import type { EnvFormTarget } from "~/project/env-form.shared";
+import type { UpdateEnvVarsTarget } from "~/project/env-form.shared";
 
 import { CsrfInput } from "../csrf-input";
 
@@ -18,7 +18,7 @@ export const EnvVarForm = (props: {
   title: string;
   subtitle: string;
   projectExternalId: string;
-  target: EnvFormTarget;
+  target: UpdateEnvVarsTarget;
   variables: EnvVarFormVariable[];
 }): JSX.Element => {
   const [variables, setVariables] = useState(

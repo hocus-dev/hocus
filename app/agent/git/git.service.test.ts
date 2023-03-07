@@ -81,24 +81,9 @@ test.concurrent(
 );
 
 test.concurrent(
-  "addGitRepository",
-  provideInjectorAndDb(async ({ injector, db }) => {
-    const sshKeyService = injector.resolve(Token.SshKeyService);
-    const gitService = injector.resolve(Token.AgentGitService);
-    const pair = await sshKeyService.createSshKeyPair(
-      db,
-      PRIVATE_SSH_KEY,
-      SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
-    );
-    const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
-    expect(repo.url).toEqual(TESTS_REPO_URL);
-    expect(repo.sshKeyPairId).toEqual(pair.id);
-  }),
-);
-
-test.concurrent(
   "updateBranches",
   provideInjectorAndDb(async ({ injector, db }) => {
+    const appGitService = injector.resolve(Token.GitService);
     const gitService = injector.resolve(Token.AgentGitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const pair = await sshKeyService.createSshKeyPair(
@@ -106,7 +91,7 @@ test.concurrent(
       PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
-    const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
+    const repo = await appGitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
 
     const { newGitBranches, updatedGitBranches } = await gitService.updateBranches(db, repo.id);
     expect(updatedGitBranches.length).toEqual(0);
@@ -195,6 +180,7 @@ test.concurrent(
 test.concurrent(
   "getOrCreateGitRepositoryFile",
   provideInjectorAndDb(async ({ injector, db }) => {
+    const appGitService = injector.resolve(Token.GitService);
     const gitService = injector.resolve(Token.AgentGitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
@@ -204,7 +190,7 @@ test.concurrent(
       PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
-    const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
+    const repo = await appGitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
 
     const agentInstance = await db.$transaction((tdb) =>
       agentUtilService.getOrCreateSoloAgentInstance(tdb),
@@ -217,19 +203,5 @@ test.concurrent(
       ),
     );
     expect(files.every((f) => f.id === files[0].id)).toBe(true);
-  }),
-);
-
-test.concurrent(
-  "isGitSshUrl",
-  provideInjector(async ({ injector }) => {
-    const gitService = injector.resolve(Token.AgentGitService);
-
-    expect(
-      gitService.isGitSshUrl(
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKiORinAjmVtn01GMUQ9TegSL4Wrz4dorS18OUOFv1YL hocus",
-      ),
-    ).toBe(false);
-    expect(gitService.isGitSshUrl(TESTS_REPO_URL)).toBe(true);
   }),
 );
