@@ -4,9 +4,7 @@ import { PagePaths } from "~/page-paths.shared";
 
 import { CsrfInput } from "../csrf-input";
 
-import { RepoSshKeyCard } from "./repo-ssh-key-card";
-
-export function NewProjectForm(props: { publicSshKey: string }): JSX.Element {
+export function NewProjectForm(): JSX.Element {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const onSubmit = () => {
@@ -47,8 +45,6 @@ export function NewProjectForm(props: { publicSshKey: string }): JSX.Element {
             </div>
           }
         />
-        <div className="mb-4"></div>
-        <RepoSshKeyCard publicKey={props.publicSshKey} />
         <div className="mt-4 mb-2 block">
           <Label htmlFor="workspaceRootPath" value="Workspace Root Path (Optional)" />
         </div>

@@ -15,6 +15,7 @@ export const createTestUser = async (
       externalId: uuidv4(),
       sshPublicKeys: {
         create: {
+          name: "Test",
           publicKey: TEST_USER_PUBLIC_SSH_KEY,
         },
       },

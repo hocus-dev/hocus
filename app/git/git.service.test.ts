@@ -1,6 +1,6 @@
 import { SshKeyPairType } from "@prisma/client";
 import { provideAppInjector, provideAppInjectorAndDb } from "~/test-utils";
-import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
+import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
 
 test.concurrent(
@@ -10,10 +10,12 @@ test.concurrent(
     const gitService = injector.resolve(Token.GitService);
     const pair = await sshKeyService.createSshKeyPair(
       db,
-      PRIVATE_SSH_KEY,
+      TESTS_PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
-    const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
+    const repo = await db.$transaction((tdb) =>
+      gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
+    );
     expect(repo.url).toEqual(TESTS_REPO_URL);
     expect(repo.sshKeyPairId).toEqual(pair.id);
   }),

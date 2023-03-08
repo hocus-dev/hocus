@@ -1,5 +1,5 @@
 import type { SshKeyPair, UserSSHPublicKey } from "@prisma/client";
-import { SshKeyPairType, Prisma } from "@prisma/client";
+import type { SshKeyPairType, Prisma } from "@prisma/client";
 import sshpk from "sshpk";
 
 export class SshKeyService {
@@ -26,34 +26,6 @@ export class SshKeyService {
         type,
       },
     });
-  }
-
-  /**
-   * If the server has a server-controlled SSH key pair, return it.
-   * Otherwise, generate one and return it.
-   * Note: this method will lock the SshKeyPair table if a key pair does not exist
-   * until the transaction is complete.
-   * No updates will be allowed to the table until the transaction is complete. You should
-   * finish the transaction as soon as possible.
-   */
-  async getOrCreateServerControlledSshKeyPair(db: Prisma.TransactionClient): Promise<SshKeyPair> {
-    const getKeyPair = () =>
-      db.sshKeyPair.findFirst({
-        where: { type: SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED },
-      });
-    let keyPair = await getKeyPair();
-    if (keyPair) {
-      return keyPair;
-    }
-    await db.$executeRawUnsafe(
-      `LOCK TABLE "${Prisma.ModelName.SshKeyPair}" IN SHARE UPDATE EXCLUSIVE MODE`,
-    );
-    keyPair = await getKeyPair();
-    if (keyPair) {
-      return keyPair;
-    }
-
-    return await this.generateSshKeyPair(db, SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED);
   }
 
   /**

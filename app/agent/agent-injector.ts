@@ -49,6 +49,7 @@ export const createAgentInjector = (
     .provideClass(Token.StorageService, overrides[Token.StorageService] ?? StorageService)
     .provideClass(Token.AgentUtilService, overrides[Token.AgentUtilService] ?? AgentUtilService)
     .provideClass(Token.WorkspaceService, overrides[Token.WorkspaceService] ?? WorkspaceService)
+    .provideClass(Token.SshKeyService, overrides[Token.SshKeyService] ?? SshKeyService)
     .provideClass(Token.GitService, overrides[Token.GitService] ?? GitService)
     .provideClass(Token.AgentGitService, overrides[Token.AgentGitService] ?? AgentGitService)
     .provideClass(Token.ProjectService, overrides[Token.ProjectService] ?? ProjectService)
@@ -67,6 +68,5 @@ export const createAgentInjector = (
       Token.WorkspaceAgentService,
       overrides[Token.WorkspaceAgentService] ?? WorkspaceAgentService,
     )
-    .provideClass(Token.SshKeyService, overrides[Token.SshKeyService] ?? SshKeyService)
     .provideFactory(Token.TemporalClient, overrides[Token.TemporalClient] ?? clientFactory);
 export type AgentInjector = ReturnType<typeof createAgentInjector>;

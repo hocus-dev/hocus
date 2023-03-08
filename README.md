@@ -29,6 +29,7 @@ I haven't figured out a way to develop an UI extension via gitpod - vscode just 
 [Here](extensions/vscode_ui/CONTRIBUTING.md) are some docs.
 
 ## Hocus Remote Vscode extension
+
 **TODO**
 
 ## Agent

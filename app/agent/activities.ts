@@ -579,20 +579,18 @@ const addProjectAndRepository: ActivitiesCreateFns["addProjectAndRepository"] =
     gitRepositoryUrl: string;
     projectName: string;
     projectWorkspaceRoot: string;
+    sshKeyPairId?: bigint;
   }): Promise<{
     project: Project;
     gitRepository: GitRepository;
     gitRepositoryCreated: boolean;
   }> => {
     const gitService = injector.resolve(Token.GitService);
-    const sshKeyService = injector.resolve(Token.SshKeyService);
     const projectService = injector.resolve(Token.ProjectService);
     return await db.$transaction(async (tdb) => {
-      const sshKeyPair = await sshKeyService.getOrCreateServerControlledSshKeyPair(tdb);
       const { gitRepository, wasCreated } = await gitService.addGitRepositoryIfNotExists(
         tdb,
         args.gitRepositoryUrl,
-        sshKeyPair.id,
       );
       const project = await projectService.createProject(tdb, {
         gitRepositoryId: gitRepository.id,

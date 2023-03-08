@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 
 import { SshKeyPairType } from "@prisma/client";
-import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
+import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
@@ -20,12 +20,12 @@ test.concurrent(
     const gitService = injector.resolve(Token.AgentGitService);
     const remotesLinux = await gitService.getRemotes(
       "git@github.com:torvalds/linux.git",
-      PRIVATE_SSH_KEY,
+      TESTS_PRIVATE_SSH_KEY,
     );
     const linuxMaster = remotesLinux.find((r) => r.name === "refs/heads/master");
     expect(linuxMaster).toBeDefined();
 
-    const remotes = await gitService.getRemotes(TESTS_REPO_URL, PRIVATE_SSH_KEY);
+    const remotes = await gitService.getRemotes(TESTS_REPO_URL, TESTS_PRIVATE_SSH_KEY);
     const testRemote = remotes.find(
       (r) =>
         r.name === "refs/heads/git-service-test" &&
@@ -88,10 +88,12 @@ test.concurrent(
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const pair = await sshKeyService.createSshKeyPair(
       db,
-      PRIVATE_SSH_KEY,
+      TESTS_PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
-    const repo = await appGitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
+    const repo = await db.$transaction((tdb) =>
+      appGitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
+    );
 
     const { newGitBranches, updatedGitBranches } = await gitService.updateBranches(db, repo.id);
     expect(updatedGitBranches.length).toEqual(0);
@@ -146,7 +148,7 @@ test.concurrent(
           maxSizeMiB: 100,
         },
         {
-          credentials: { privateSshKey: PRIVATE_SSH_KEY },
+          credentials: { privateSshKey: TESTS_PRIVATE_SSH_KEY },
           url: TESTS_REPO_URL,
         },
       );
@@ -187,11 +189,12 @@ test.concurrent(
 
     const pair = await sshKeyService.createSshKeyPair(
       db,
-      PRIVATE_SSH_KEY,
+      TESTS_PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
-    const repo = await appGitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
-
+    const repo = await db.$transaction((tdb) =>
+      appGitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
+    );
     const agentInstance = await db.$transaction((tdb) =>
       agentUtilService.getOrCreateSoloAgentInstance(tdb),
     );

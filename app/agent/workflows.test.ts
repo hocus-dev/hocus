@@ -8,7 +8,7 @@ import { Worker, Runtime, DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "~/config";
 import { printErrors } from "~/test-utils";
-import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
+import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
@@ -134,10 +134,12 @@ test.concurrent(
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const pair = await sshKeyService.createSshKeyPair(
       db,
-      PRIVATE_SSH_KEY,
+      TESTS_PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
-    const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
+    const repo = await db.$transaction((tdb) =>
+      gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
+    );
     const updates = await agentGitService.updateBranches(db, repo.id);
     const projects = await db.$transaction((tdb) =>
       waitForPromises(

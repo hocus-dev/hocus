@@ -53,6 +53,9 @@ export const config = makeConfig()({
     prebuildSshPrivateKey:
       process.env.AGENT_PREBUILD_SSH_PRIVATE_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PRIVATE,
   }),
+  agentDev: () => ({
+    hocusRepoPrivateKey: get("HOCUS_REPO_PRIVATE_KEY", null),
+  }),
   temporalConnection: () => ({
     temporalServerUrl: process.env.TEMPORAL_SERVER_URL ?? "localhost:7233",
   }),

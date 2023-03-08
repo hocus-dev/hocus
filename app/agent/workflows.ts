@@ -356,9 +356,9 @@ export async function runSyncGitRepository(
   seenProjectIds: Set<bigint>,
 ): Promise<void> {
   for (let i = 0; i < 1000; i++) {
-    const updates = await updateGitBranchesAndObjects(gitRepositoryId);
+    const _updates = await updateGitBranchesAndObjects(gitRepositoryId);
     const projects = await getRepositoryProjects(gitRepositoryId);
-    const seenProjects = projects.filter((p) => seenProjectIds.has(p.id));
+    const _seenProjects = projects.filter((p) => seenProjectIds.has(p.id));
     const newProjects = projects.filter((p) => !seenProjectIds.has(p.id));
     if (newProjects.length > 0) {
       const defaultBranch = await getDefaultBranch(gitRepositoryId);
@@ -395,6 +395,7 @@ export async function runAddProjectAndRepository(args: {
   gitRepositoryUrl: string;
   projectName: string;
   projectWorkspaceRoot: string;
+  sshKeyPairId?: bigint;
 }): Promise<{ project: Project; gitRepository: GitRepository }> {
   const result = await addProjectAndRepository(args);
   await startChild(runSyncGitRepository, {

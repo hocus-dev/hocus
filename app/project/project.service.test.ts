@@ -2,7 +2,7 @@ import { SshKeyPairType } from "@prisma/client";
 import type { Object } from "ts-toolbelt";
 import { HttpError } from "~/http-error.server";
 import { provideAppInjectorAndDb } from "~/test-utils";
-import { PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
+import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
 import { createTestUser } from "~/user/test-utils";
 
@@ -18,10 +18,12 @@ test.concurrent(
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const pair = await sshKeyService.createSshKeyPair(
       db,
-      PRIVATE_SSH_KEY,
+      TESTS_PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
-    const repo = await gitService.addGitRepository(db, TESTS_REPO_URL, pair.id);
+    const repo = await db.$transaction((tdb) =>
+      gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
+    );
     const project = await db.$transaction((tdb) =>
       projectService.createProject(tdb, {
         gitRepositoryId: repo.id,

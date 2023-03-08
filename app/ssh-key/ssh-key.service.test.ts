@@ -1,7 +1,7 @@
 import { SshKeyPairType } from "@prisma/client";
 import sshpk from "sshpk";
 import { provideAppInjectorAndDb } from "~/test-utils";
-import { PRIVATE_SSH_KEY, PUBLIC_SSH_KEY } from "~/test-utils/constants";
+import { TESTS_PRIVATE_SSH_KEY, TESTS_PUBLIC_SSH_KEY } from "~/test-utils/constants";
 import { Token } from "~/token";
 import { createTestUser } from "~/user/test-utils";
 
@@ -11,10 +11,10 @@ test.concurrent(
     const sshKeyService = injector.resolve(Token.SshKeyService);
     const pair = await sshKeyService.createSshKeyPair(
       db,
-      PRIVATE_SSH_KEY,
+      TESTS_PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
-    expect(pair.publicKey).toEqual(PUBLIC_SSH_KEY);
+    expect(pair.publicKey).toEqual(TESTS_PUBLIC_SSH_KEY);
     expect(pair.type).toEqual(SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED);
 
     const pair2 = await sshKeyService.generateSshKeyPair(
@@ -28,21 +28,6 @@ test.concurrent(
 );
 
 test.concurrent(
-  "getOrCreateServerControlledSshKeyPair",
-  provideAppInjectorAndDb(async ({ injector, db }) => {
-    const sshKeyService = injector.resolve(Token.SshKeyService);
-    const tasks = new Array(25)
-      .fill(0)
-      .map(() =>
-        db.$transaction((tdb) => sshKeyService.getOrCreateServerControlledSshKeyPair(tdb)),
-      );
-    const keyPairs = await Promise.all(tasks);
-    const keyPairId = keyPairs[0].id;
-    expect(keyPairs.every((kp) => kp.id === keyPairId)).toBe(true);
-  }),
-);
-
-test.concurrent(
   "createPublicSshKeyForUser",
   provideAppInjectorAndDb(async ({ injector, db }) => {
     const sshKeyService = injector.resolve(Token.SshKeyService);
@@ -51,10 +36,10 @@ test.concurrent(
       const sshKey = await sshKeyService.createPublicSshKeyForUser(
         tdb,
         testUser.id,
-        PUBLIC_SSH_KEY,
+        TESTS_PUBLIC_SSH_KEY,
         "xd",
       );
-      expect(sshKey.publicKey).toEqual(PUBLIC_SSH_KEY);
+      expect(sshKey.publicKey).toEqual(TESTS_PUBLIC_SSH_KEY);
     });
     try {
       await db.$transaction(async (tdb) => {
