@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 RUN apt-get update \
-    && { curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - } \
+    && { curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -; } \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl \
     dialog \
