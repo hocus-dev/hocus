@@ -50,7 +50,7 @@ async function run() {
       sshKeyPairId: testsKeyPair.id,
     });
 
-    if (agentDevConfig.hocusRepoPrivateKey != null) {
+    if (agentDevConfig.hocusRepoPrivateKey !== "") {
       const hocusRepoKeyPair = await sshKeyService.createSshKeyPair(
         db,
         agentDevConfig.hocusRepoPrivateKey,

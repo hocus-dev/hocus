@@ -21,7 +21,7 @@ tasks:
       echo "export GITPOD_IP=$(tailscale ip | head -n1)" > ops/resources/gitpod-ip.sh
       echo "export DEV_MACHINE_HOSTNAME=$DEV_MACHINE_HOSTNAME" >> ops/resources/gitpod-ip.sh
       export REPO_PRIVATE_KEY_BASE64=$(echo -ne "$HOCUS_REPO_PRIVATE_KEY" | base64 -w 0)
-      echo "export HOCUS_REPO_PRIVATE_KEY=\$(echo -n $REPO_PRIVATE_KEY_BASE64 | base64 -d)" >> ops/resources/gitpod-ip.sh
+      echo "export HOCUS_REPO_PRIVATE_KEY=\"\$(echo -n $REPO_PRIVATE_KEY_BASE64 | base64 -d)\"" >> ops/resources/gitpod-ip.sh
       ops/bin/rsync.sh
   - name: Agent+CP dev-env setup
     init: yarn install && npm run dev-prebuild && ops/bin/prepare.sh
