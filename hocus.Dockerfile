@@ -1,7 +1,6 @@
 FROM ubuntu:22.04
 
 RUN apt-get update \
-    && { curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -; } \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl \
     dialog \
@@ -12,9 +11,10 @@ RUN apt-get update \
     sudo \
     util-linux \
     vim \
-    nodejs \
     build-essential \
     git-all \
+    && { curl -fsSL https://deb.nodesource.com/setup_18.x | bash -; } \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs \
     && npm install --global yarn \
     && rm -rf /var/lib/apt/lists/*
 RUN systemctl enable ssh
