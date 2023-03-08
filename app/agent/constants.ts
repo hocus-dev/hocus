@@ -9,9 +9,10 @@ set -o errexit
 set -o pipefail
 set -o nounset
 set -o allexport
-set -o xtrace
 
 source "${WORKSPACE_ENV_SCRIPT_PATH}"
+
+set -o xtrace
 
 `;
 
