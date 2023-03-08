@@ -1,9 +1,14 @@
 # Change Log
 
-All notable changes to the "hocus" extension will be documented in this file.
+## 0.0.2
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+- If another workspace is already open then connect to a Hocus workspace in a new window
+- Don't keep hocus enviroments in the recently opened list
+- Release under MIT license
 
-## [Unreleased]
+## 0.0.1
 
-- Initial release
+- SSH config management
+- Macos and Linux support
+- SSH agent forwarding
+- Deeplinking from the hocus app

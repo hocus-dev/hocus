@@ -85,6 +85,13 @@ async function ensureSshConfigSetUp(recursed?: boolean) {
 
 }
 
+function shouldOpenWorkspaceInNewWindow(): boolean {
+  // Check if we have an vscode workspace open
+  const remoteUri = vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.[0].uri;
+  // We should open a new window if there is already something opened
+  return remoteUri !== void 0;
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   console.log("Hocus Activated");
 
@@ -141,6 +148,7 @@ Host ${workspaceName}.hocus.dev
           vscode.commands.executeCommand(
             "vscode.openFolder",
             vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev/home/hocus/dev/project`),
+            { forceNewWindow: shouldOpenWorkspaceInNewWindow(), noRecentEntry: true }
           );
       })
     },

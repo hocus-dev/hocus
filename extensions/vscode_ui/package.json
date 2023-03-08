@@ -2,15 +2,18 @@
   "name": "hocus",
   "publisher": "hocus",
   "homepage": "https://hocus.dev",
-  "maintainers": ["gorbak25"],
+  "maintainers": [
+    "gorbak25"
+  ],
   "preview": true,
   "displayName": "Hocus",
   "description": "Vscode Hocus integration",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.75.0"
   },
   "pricing": "Free",
+  "license": "MIT",
   "categories": [
     "Other"
   ],
@@ -25,8 +28,7 @@
     "onUri",
     "onStartupFinished"
   ],
-  "contributes": {
-  },
+  "contributes": {},
   "main": "./dist/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run -S esbuild-base -- --minify",
@@ -54,5 +56,7 @@
   "dependencies": {
     "fs-extra": "^11.1.0"
   },
-  "extensionDependencies": ["ms-vscode-remote.remote-ssh"]
+  "extensionDependencies": [
+    "ms-vscode-remote.remote-ssh"
+  ]
 }
