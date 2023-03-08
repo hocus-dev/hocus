@@ -30,7 +30,7 @@ RUN useradd hocus -m -s /bin/bash && \
 COPY ./docker/ssh/sshd_config /etc/ssh/sshd_config
 RUN mkdir -p /home/hocus/.ssh && touch /home/hocus/.ssh/known_hosts && \
     ## This adds github.com as a known host - this is vulnerable to MITM but good enough for now
-    ssh-keyscan -H github.com >> ~/.ssh/known_hosts && \
+    ssh-keyscan -H github.com >> /home/hocus/.ssh/known_hosts && \
     # this public key is automatically removed when a workspace starts
     echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKk+DZs+E2GlmqUNqTCU9/R0kT/zzBjwBqbPaBtGv3MA hocus@prebuild" >> /home/hocus/.ssh/authorized_keys && \
     chown -R hocus:hocus /home/hocus/.ssh && \
