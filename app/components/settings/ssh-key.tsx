@@ -11,14 +11,14 @@ export const SshKey = (props: {
   externalId: string;
 }): JSX.Element => {
   const [openModal, setOpenModal] = useState<string | undefined>();
-  const renderModal = typeof document !== "undefined";
+  const renderModal = typeof document !== "undefined" && openModal === "default";
   const setModalToOpen = React.useCallback(() => setOpenModal("default"), []);
   const setModalToClosed = React.useCallback(() => setOpenModal(void 0), []);
 
   return (
-    <>
+    <div>
       {renderModal && (
-        <Modal dismissible={true} show={openModal === "default"} onClose={setModalToClosed}>
+        <Modal dismissible={true} show={renderModal} onClose={setModalToClosed}>
           <Modal.Header>Delete SSH Key</Modal.Header>
           <Modal.Body>
             <div className="space-y-6">
@@ -48,18 +48,16 @@ export const SshKey = (props: {
           </Modal.Footer>
         </Modal>
       )}
-      <div>
-        <div className="mb-2 flex gap-4 justify-between items-center">
-          <h3 className="font-bold mr-2">{props.name}</h3>
-          <Button size="xs" color="dark" onClick={setModalToOpen}>
-            <i className="fa-solid fa-trash mr-2"></i>
-            <span>Delete</span>
-          </Button>
-        </div>
-        <p className="font-mono text-sm text-gray-300 p-2 border border-gray-700 bg-gray-700 rounded-lg">
-          {props.publicKey}
-        </p>
+      <div className="mb-2 flex gap-4 justify-between items-center">
+        <h3 className="font-bold mr-2">{props.name}</h3>
+        <Button size="xs" color="dark" onClick={setModalToOpen}>
+          <i className="fa-solid fa-trash mr-2"></i>
+          <span>Delete</span>
+        </Button>
       </div>
-    </>
+      <p className="font-mono text-sm text-gray-300 p-2 border border-gray-700 bg-gray-700 rounded-lg">
+        {props.publicKey}
+      </p>
+    </div>
   );
 };

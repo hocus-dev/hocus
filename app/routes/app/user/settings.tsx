@@ -14,6 +14,9 @@ export const loader = async ({ context: { db, user: contextUser } }: LoaderArgs)
     where: {
       userId: user.id,
     },
+    orderBy: {
+      createdAt: "asc",
+    },
   });
 
   return json({
