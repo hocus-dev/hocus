@@ -6,10 +6,12 @@ import { Button, Tabs } from "flowbite-react";
 import { StatusCodes } from "http-status-codes";
 import moment from "moment";
 import path from "path-browserify";
-import { useRef } from "react";
+import React from "react";
+import { useRef, useState } from "react";
 import { AppPage } from "~/components/app-page";
 import { EnvironmentTab } from "~/components/environment/environment-tab";
 import { PrebuildList } from "~/components/projects/prebuilds/prebuild-list";
+import { RepoSshKeyCard } from "~/components/projects/repo-ssh-key-card";
 import { WorkspaceList } from "~/components/workspaces/workspace-list";
 import { HttpError } from "~/http-error.server";
 import { PagePaths, ProjectPathTabId } from "~/page-paths.shared";
@@ -28,7 +30,15 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
   const project = await db.project.findUnique({
     where: { externalId: projectExternalId },
     include: {
-      gitRepository: true,
+      gitRepository: {
+        include: {
+          sshKeyPair: {
+            select: {
+              publicKey: true,
+            },
+          },
+        },
+      },
       environmentVariableSet: {
         include: {
           environmentVariables: {
@@ -92,6 +102,7 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
         externalId: v.externalId,
       })),
       userVariables,
+      publicKey: project.gitRepository.sshKeyPair.publicKey,
     },
     prebuildEvents: project.prebuildEvents.map((e) => ({
       branches: e.gitBranchLinks
@@ -137,6 +148,9 @@ export default function ProjectRoute(): JSX.Element {
     window.history.replaceState(null, "", url.toString());
   };
 
+  const [showPublicKey, setShowPublicKey] = useState(false);
+  const toggleShowPublicKey = React.useCallback(() => setShowPublicKey((v) => !v), []);
+
   return (
     <AppPage>
       <div className="mt-8 mb-4">
@@ -155,15 +169,46 @@ export default function ProjectRoute(): JSX.Element {
           <span>New Workspace</span>
         </Button>
       </div>
-      <div className="text-md">
-        <p className="mb-2">
-          <span className="text-gray-400">Repository URL:</span>{" "}
+      <div className="flex flex-col gap-2">
+        <p>
+          <span className="text-gray-400">
+            <i className="w-6 fa-solid fa-link mr-2"></i>
+            <span>Repository URL: </span>
+          </span>
           <span className="font-bold">{gitRepository.url}</span>
         </p>
+        <p className="flex items-center gap-2">
+          <span className="text-gray-400">
+            <i className="w-6 fa-solid fa-key mr-2"></i>
+            <span>Public Key for Git: </span>
+          </span>
+          <Button onClick={toggleShowPublicKey} color="dark" size="xs">
+            {showPublicKey ? (
+              <>
+                <i className="fa-solid fa-eye-slash mr-2"></i>
+                <span>Hide</span>
+              </>
+            ) : (
+              <>
+                <i className="fa-solid fa-eye mr-2"></i>
+                <span>Show</span>
+              </>
+            )}
+          </Button>
+        </p>
         <p>
-          <span className="text-gray-400">Created: </span>
+          <span className="text-gray-400">
+            <i className="w-6 fa-solid fa-clock mr-2"></i>
+            <span>Created: </span>
+          </span>
           <span className="font-bold">{createdAt}</span>
         </p>
+        {showPublicKey && (
+          <>
+            <div className="mb-2"></div>
+            <RepoSshKeyCard publicKey={project.publicKey} />
+          </>
+        )}
       </div>
       <Tabs.Group
         aria-label="Tabs with icons"
