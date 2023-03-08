@@ -1,9 +1,5 @@
 # Change Log
 
-All notable changes to the "hocus" extension will be documented in this file.
+## UNRELEASED
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
-- Initial release
+- Release under MIT license

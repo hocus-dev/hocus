@@ -11,6 +11,7 @@
     "vscode": "^1.75.0"
   },
   "pricing": "Free",
+  "license": "MIT",
   "categories": [
     "Other"
   ],
