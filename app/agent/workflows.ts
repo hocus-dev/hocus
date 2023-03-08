@@ -356,16 +356,16 @@ export async function runSyncGitRepository(
   seenProjectIds: Set<bigint>,
 ): Promise<void> {
   for (let i = 0; i < 1000; i++) {
-    const _updates = await updateGitBranchesAndObjects(gitRepositoryId);
-    const projects = await getRepositoryProjects(gitRepositoryId);
-    const _seenProjects = projects.filter((p) => seenProjectIds.has(p.id));
-    const newProjects = projects.filter((p) => !seenProjectIds.has(p.id));
-    if (newProjects.length > 0) {
-      const defaultBranch = await getDefaultBranch(gitRepositoryId);
-      if (defaultBranch !== null) {
-        await waitForPromisesWorkflow(
-          newProjects.map((p) => {
-            return startChild(runBuildfsAndPrebuilds, {
+    try {
+      const _updates = await updateGitBranchesAndObjects(gitRepositoryId);
+      const projects = await getRepositoryProjects(gitRepositoryId);
+      const _seenProjects = projects.filter((p) => seenProjectIds.has(p.id));
+      const newProjects = projects.filter((p) => !seenProjectIds.has(p.id));
+      if (newProjects.length > 0) {
+        const defaultBranch = await getDefaultBranch(gitRepositoryId);
+        if (defaultBranch !== null) {
+          for (const p of newProjects) {
+            await executeChild(runBuildfsAndPrebuilds, {
               args: [
                 [
                   {
@@ -378,12 +378,15 @@ export async function runSyncGitRepository(
               ],
               parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
             });
-          }),
-        );
+          }
+          for (const p of newProjects) {
+            seenProjectIds.add(p.id);
+          }
+        }
       }
-      for (const p of newProjects) {
-        seenProjectIds.add(p.id);
-      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
     }
 
     await sleep(5000);
@@ -398,9 +401,11 @@ export async function runAddProjectAndRepository(args: {
   sshKeyPairId?: bigint;
 }): Promise<{ project: Project; gitRepository: GitRepository }> {
   const result = await addProjectAndRepository(args);
-  await startChild(runSyncGitRepository, {
-    args: [result.gitRepository.id, new Set<bigint>()],
-    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
-  });
+  if (result.gitRepositoryCreated) {
+    await startChild(runSyncGitRepository, {
+      args: [result.gitRepository.id, new Set<bigint>()],
+      parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+    });
+  }
   return result;
 }

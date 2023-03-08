@@ -591,6 +591,7 @@ const addProjectAndRepository: ActivitiesCreateFns["addProjectAndRepository"] =
       const { gitRepository, wasCreated } = await gitService.addGitRepositoryIfNotExists(
         tdb,
         args.gitRepositoryUrl,
+        args.sshKeyPairId,
       );
       const project = await projectService.createProject(tdb, {
         gitRepositoryId: gitRepository.id,
