@@ -52,12 +52,13 @@ test.concurrent(
         tdb,
         testUser.id,
         PUBLIC_SSH_KEY,
+        "xd",
       );
       expect(sshKey.publicKey).toEqual(PUBLIC_SSH_KEY);
     });
     try {
       await db.$transaction(async (tdb) => {
-        await sshKeyService.createPublicSshKeyForUser(tdb, testUser.id, "xd");
+        await sshKeyService.createPublicSshKeyForUser(tdb, testUser.id, "xd", "xd");
         throw new Error("unreachable");
       });
     } catch (err) {

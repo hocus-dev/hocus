@@ -63,11 +63,12 @@ export class SshKeyService {
     db: Prisma.TransactionClient,
     userId: bigint,
     publicKey: string,
+    name: string,
   ): Promise<UserSSHPublicKey> {
     const parsedPublicKey = sshpk.parseKey(publicKey, "ssh");
     const publicKeyString = parsedPublicKey.toString("ssh");
     return await db.userSSHPublicKey.create({
-      data: { publicKey: publicKeyString, userId },
+      data: { publicKey: publicKeyString, userId, name },
     });
   }
 }

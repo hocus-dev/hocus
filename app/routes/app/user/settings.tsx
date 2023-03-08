@@ -1,14 +1,31 @@
 import type { LoaderArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 import { Button, Label, ListGroup, Textarea, TextInput } from "flowbite-react";
 import { AppPage } from "~/components/app-page";
 import { SshKey } from "~/components/settings/ssh-key";
-import { DEV_USER_SSH_PUBLIC_KEY } from "~/dev/constants";
+import { unwrap } from "~/utils.shared";
 
-export const loader = async ({ context: _ }: LoaderArgs) => {
-  return null;
+export const loader = async ({ context: { db, user: contextUser } }: LoaderArgs) => {
+  const user = unwrap(contextUser);
+  const userPublicKeys = await db.userSSHPublicKey.findMany({
+    where: {
+      userId: user.id,
+    },
+  });
+
+  return json({
+    publicKeys: userPublicKeys.map((k) => ({
+      externalId: k.externalId,
+      name: k.name,
+      publicKey: k.publicKey,
+    })),
+  });
 };
 
 export default function Settings(): JSX.Element {
+  const { publicKeys } = useLoaderData<typeof loader>();
+
   return (
     <AppPage>
       <h1 className="mt-8 mb-4 font-bold text-4xl">Settings</h1>
@@ -30,9 +47,20 @@ export default function Settings(): JSX.Element {
           </p>
           <div className="mb-8"></div>
           <div className="flex flex-col gap-8">
-            <SshKey name="My Personal Key" publicKey={DEV_USER_SSH_PUBLIC_KEY} />
-            <SshKey name="My Personal Key 2" publicKey={DEV_USER_SSH_PUBLIC_KEY} />
-            <SshKey name="My Personal Key 3" publicKey={DEV_USER_SSH_PUBLIC_KEY} />
+            {publicKeys.map((key) => (
+              <SshKey
+                key={key.externalId}
+                externalId={key.externalId}
+                name={key.name}
+                publicKey={key.publicKey}
+              />
+            ))}
+            {publicKeys.length === 0 && (
+              <p className="text-gray-400 text-sm">
+                <i className="fa-solid fa-circle-info mr-2"></i>
+                <span>You don't have any SSH keys added to your account. Add one below.</span>
+              </p>
+            )}
           </div>
           <div className="mt-8">
             <hr className="border-gray-700 mb-8" />

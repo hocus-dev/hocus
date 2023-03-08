@@ -22,7 +22,7 @@ async function run() {
   );
   const devUser = await userService.getOrCreateUser(db, DEV_USER_EXTERNAL_ID, "dev");
   await db.$transaction(async (tdb) => {
-    await sshKeyService.createPublicSshKeyForUser(tdb, devUser.id, DEV_USER_SSH_PUBLIC_KEY);
+    await sshKeyService.createPublicSshKeyForUser(tdb, devUser.id, DEV_USER_SSH_PUBLIC_KEY, "Dev");
   });
 
   const withClient = injector.resolve(Token.TemporalClient);

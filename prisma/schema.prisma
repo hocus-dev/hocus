@@ -22,10 +22,12 @@ model User {
 }
 
 model UserSSHPublicKey {
-  id        BigInt @id @default(autoincrement())
-  userId    BigInt
-  user      User   @relation(fields: [userId], references: [id])
-  publicKey String
+  id         BigInt @id @default(autoincrement())
+  externalId String @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name       String
+  userId     BigInt
+  user       User   @relation(fields: [userId], references: [id])
+  publicKey  String
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
