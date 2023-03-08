@@ -6,7 +6,7 @@
     ".cache/": true,
     "node_modules/": true,
     "build/": true,
-    "vscode_extension": true
+    "extensions": true
   },
   "[prisma]": {
     "editor.defaultFormatter": "Prisma.prisma"

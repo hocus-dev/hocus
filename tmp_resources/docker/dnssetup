@@ -1,0 +1,10 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          dnssetup
+# Required-Start:    $all
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: Setups /etc/resolv.conf
+### END INIT INFO
+echo "nameserver 8.8.8.8" > /etc/resolv.conf

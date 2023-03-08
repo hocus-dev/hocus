@@ -26,7 +26,10 @@ Just open the repo in gitpod and it should work. `localhost:3000` for the contro
 
 I haven't figured out a way to develop an UI extension via gitpod - vscode just refuses to load the extension. Workspace extensions inside gitpod work. Manually loading a packaged prerelease worked but it was a hassle and I couldn't attach a debugger to it .-. The thing is that inside gitpod there is a CUSTOM vscode server - it's possible that this was the reason I couldn't develop an UI extension there.
 
-[Here](vscode_extension/CONTRIBUTING.md) are some docs.
+[Here](extensions/vscode_ui/CONTRIBUTING.md) are some docs.
+
+## Hocus Remote Vscode extension
+**TODO**
 
 ## Agent
 

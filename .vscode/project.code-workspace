@@ -5,8 +5,12 @@
       "path": "../"
     },
     {
-      "name": "VSCode Extension",
-      "path": "../vscode_extension/"
+      "name": "VSCode UI Extension",
+      "path": "../extensions/vscode_ui"
+    },
+    {
+      "name": "VSCode Workspace Extension",
+      "path": "../extensions/vscode_workspace"
     }
   ],
   "settings": {

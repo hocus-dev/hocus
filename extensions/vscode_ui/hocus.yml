@@ -1,0 +1,10 @@
+image:
+  file: ../../hocus.Dockerfile
+  buildContext: ../../tmp_resources
+tasks:
+  - name: hello world
+    init: sleep 0.1
+    command: sleep 0.1
+  - name: second task
+    init: sleep 0.1
+    command: sleep 0.1
