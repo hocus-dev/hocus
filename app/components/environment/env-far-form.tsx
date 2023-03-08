@@ -94,7 +94,8 @@ export const EnvVarForm = (props: {
             />
           ))}
           {variables.length === 0 && (
-            <div className="font-bold text-gray-400 mt-8">
+            <div className="text-sm text-gray-400 mt-8">
+              <i className="fa-solid fa-circle-info mr-2"></i>
               <span>No variables yet</span>
             </div>
           )}
