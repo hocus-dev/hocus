@@ -33,3 +33,8 @@ export const action = async ({ context: { db, req, user } }: ActionArgs) => {
 
   return redirect(PagePaths.UserSettings);
 };
+
+export default function Delete() {
+  // exists because errors would not be rendered without it
+  return null;
+}

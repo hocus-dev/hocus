@@ -10,6 +10,7 @@ export const PagePaths = {
   EditProjectEnvironment: "/app/projects/env",
   UserSettings: "/app/user/settings",
   UserSettingsSshKeyDelete: "/app/user/settings/ssh-key/delete",
+  UserSettingsSshKeyCreate: "/app/user/settings/ssh-key/create",
 } as const;
 
 export type ProjectPathTabId = valueof<typeof ProjectPathTabId>;

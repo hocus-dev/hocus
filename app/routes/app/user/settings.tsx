@@ -3,7 +3,9 @@ import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { Button, Label, ListGroup, Textarea, TextInput } from "flowbite-react";
 import { AppPage } from "~/components/app-page";
+import { CsrfInput } from "~/components/csrf-input";
 import { SshKey } from "~/components/settings/ssh-key";
+import { PagePaths } from "~/page-paths.shared";
 import { unwrap } from "~/utils.shared";
 
 export const loader = async ({ context: { db, user: contextUser } }: LoaderArgs) => {
@@ -65,19 +67,27 @@ export default function Settings(): JSX.Element {
           <div className="mt-8">
             <hr className="border-gray-700 mb-8" />
             <h2 className="font-bold text-xl mb-4">Add SSH Key</h2>
-            <form>
+            <form action={PagePaths.UserSettingsSshKeyCreate} method="POST">
+              <CsrfInput />
               <div className="flex flex-col gap-4">
                 <div>
                   <div className="mb-2 block">
                     <Label htmlFor="key-name" value="Name" />
                   </div>
-                  <TextInput id="key-name" type="text" placeholder="Work Laptop" required={true} />
+                  <TextInput
+                    name="name"
+                    id="key-name"
+                    type="text"
+                    placeholder="Work Laptop"
+                    required={true}
+                  />
                 </div>
                 <div>
                   <div className="mb-2 block">
                     <Label htmlFor="public-key" value="Public Key" />
                   </div>
                   <Textarea
+                    name="publicKey"
                     id="public-key"
                     placeholder="ssh-ed25519 AAAAC..."
                     required={true}
