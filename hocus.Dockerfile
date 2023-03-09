@@ -1,5 +1,14 @@
-FROM ubuntu:22.04
+FROM gcc:12.2.0 as dtach-builder
 
+RUN git clone https://github.com/hocus-dev/dtach \
+     && cd dtach \
+     && git checkout 748020b2fa79fc41b81c2a8430578b65749196a6
+WORKDIR /dtach
+RUN ./configure LDFLAGS="-static -s" CFLAGS="-O3" && make
+
+FROM ubuntu:22.04
+COPY --from=dtach-builder /dtach/dtach /usr/bin/
+RUN dtach --versions
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl \
@@ -11,6 +20,7 @@ RUN apt-get update \
     sudo \
     util-linux \
     vim \
+    tmux \
     build-essential \
     git-all \
     && { curl -fsSL https://deb.nodesource.com/setup_18.x | bash -; } \
