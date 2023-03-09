@@ -1,8 +1,10 @@
-import type { Prisma, Project } from "@prisma/client";
+import { PrebuildEventStatus } from "@prisma/client";
+import type { GitBranch, PrebuildEvent, Project } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import { match } from "ts-pattern";
 import { HttpError } from "~/http-error.server";
-import { waitForPromises } from "~/utils.shared";
+import { groupBy, unwrap, waitForPromises } from "~/utils.shared";
 
 import { ENV_VAR_NAME_REGEX, UpdateEnvVarsTarget } from "./env-form.shared";
 
@@ -118,5 +120,79 @@ export class ProjectService {
       }),
     );
     await waitForPromises([...updateNamePromises, ...updateValuePromises, ...createPromises]);
+  }
+
+  async getLatestPrebuildsByBranch(
+    db: Prisma.Client,
+    args: { projectExternalId: string },
+  ): Promise<
+    {
+      branch: GitBranch;
+      finishedPrebuild: PrebuildEvent | null;
+      ongoingPrebuild: PrebuildEvent | null;
+    }[]
+  > {
+    const project = await db.project.findUnique({
+      where: { externalId: args.projectExternalId },
+      include: {
+        gitRepository: {
+          include: {
+            gitBranches: true,
+          },
+        },
+      },
+    });
+    if (project == null) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Project not found");
+    }
+    const prebuildEventIds = await db.$queryRaw<{ prebuildEventId: bigint; gitBranchId: bigint }[]>`
+      SELECT x."prebuildEventId", x."gitBranchId"
+      FROM (
+        SELECT
+          ROW_NUMBER() OVER (PARTITION BY t."gitBranchId", t."status" ORDER BY t."createdAt" DESC) AS r,
+          t.*
+        FROM (
+          SELECT *
+          FROM "PrebuildEventToGitBranch" AS p2b
+          INNER JOIN "PrebuildEvent" AS p ON p2b."prebuildEventId" = p.id
+          WHERE p."projectId" = ${project.id}
+          ORDER BY p."createdAt" DESC
+        ) AS t
+      ) AS x
+      WHERE x."r" = 1 AND x."status" IN (
+        'PREBUILD_EVENT_STATUS_SUCCESS'::"PrebuildEventStatus",
+        'PREBUILD_EVENT_STATUS_RUNNING'::"PrebuildEventStatus",
+        'PREBUILD_EVENT_STATUS_PENDING'::"PrebuildEventStatus"
+      )
+    `;
+    const prebuildEvents = await db.prebuildEvent.findMany({
+      where: { id: { in: prebuildEventIds.map((v) => v.prebuildEventId) } },
+    });
+    const prebuildsById = new Map(prebuildEvents.map((v) => [v.id, v] as const));
+    const gitBranches = await db.gitBranch.findMany({
+      where: { id: { in: prebuildEventIds.map((v) => v.gitBranchId) } },
+    });
+    const prebuildsByBranch = groupBy(
+      prebuildEventIds,
+      (v) => v.gitBranchId,
+      (v) => unwrap(prebuildsById.get(v.prebuildEventId)),
+    );
+    const prebuildsByBranchAndStatus = new Map(
+      Array.from(prebuildsByBranch.entries()).map(([branchId, prebuilds]) => {
+        return [
+          branchId,
+          Object.fromEntries(prebuilds.map((prebuild) => [prebuild.status, prebuild] as const)),
+        ] as const;
+      }),
+    );
+    return gitBranches.map((branch) => {
+      const prebuilds = unwrap(prebuildsByBranchAndStatus.get(branch.id));
+      const finishedPrebuild = prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS] ?? null;
+      const ongoingPrebuild =
+        prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_RUNNING] ??
+        prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING] ??
+        null;
+      return { branch, finishedPrebuild, ongoingPrebuild };
+    });
   }
 }

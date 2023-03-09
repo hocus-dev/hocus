@@ -17,11 +17,11 @@ export const createAppInjector = () =>
     .provideValue(Token.Config, config)
     .provideFactory(Token.Logger, newLogger, Scope.Transient)
     .provideClass(Token.GoogleAnalyticsService, GoogleAnalyticsService)
+    .provideClass(Token.SshKeyService, SshKeyService)
     .provideClass(Token.GitService, GitService)
     .provideClass(Token.TaskService, TaskService)
     .provideClass(Token.UserService, UserService)
     .provideClass(Token.ProjectService, ProjectService)
     .provideFactory(Token.TemporalClient, clientFactory)
-    .provideClass(Token.SshKeyService, SshKeyService)
     .provideClass(Token.WorkspaceService, WorkspaceService);
 export type AppInjector = ReturnType<typeof createAppInjector>;

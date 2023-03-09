@@ -1,5 +1,5 @@
-import { SshKeyPairType } from "@prisma/client";
-import type { Object } from "ts-toolbelt";
+import { PrebuildEventStatus, SshKeyPairType } from "@prisma/client";
+import type { Partial } from "ts-toolbelt/out/Object/Partial";
 import { HttpError } from "~/http-error.server";
 import { provideAppInjectorAndDb } from "~/test-utils";
 import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
@@ -31,7 +31,7 @@ test.concurrent(
         name: "test",
       }),
     );
-    const runCase = async (args: Object.Partial<UpdateEnvVarsArgs>) => {
+    const runCase = async (args: Partial<UpdateEnvVarsArgs>) => {
       await db.$transaction(async (tdb) => {
         await projectService.updateEnvironmentVariables(tdb, {
           userId: args.userId ?? testUser.id,
@@ -128,5 +128,82 @@ test.concurrent(
         throw e;
       }
     }
+  }),
+);
+
+test.concurrent(
+  "getLatestPrebuildsByBranch",
+  provideAppInjectorAndDb(async ({ injector, db }) => {
+    const projectService = injector.resolve(Token.ProjectService);
+    const gitService = injector.resolve(Token.GitService);
+    const sshKeyService = injector.resolve(Token.SshKeyService);
+    const pair = await sshKeyService.createSshKeyPair(
+      db,
+      TESTS_PRIVATE_SSH_KEY,
+      SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
+    );
+    const repo = await db.$transaction((tdb) =>
+      gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
+    );
+    const project = await db.$transaction((tdb) =>
+      projectService.createProject(tdb, {
+        gitRepositoryId: repo.id,
+        rootDirectoryPath: "/",
+        name: "test",
+      }),
+    );
+    const gitBranchArgs = ["a", "b", "c", "d", "e"].map((name, idx) => ({
+      name,
+      gitObjectHash: `hash${idx}`,
+    }));
+    for (const args of gitBranchArgs) {
+      const gitObject = await db.gitObject.create({
+        data: {
+          hash: args.gitObjectHash,
+        },
+      });
+      const gitBranch = await db.gitBranch.create({
+        data: {
+          name: args.name,
+          gitObjectId: gitObject.id,
+          gitRepositoryId: repo.id,
+        },
+      });
+      for (const status of Array.from(Object.values(PrebuildEventStatus)).sort()) {
+        for (const createdAt of [1, 2, 3]) {
+          await db.prebuildEvent.create({
+            data: {
+              createdAt: new Date(createdAt),
+              status,
+              project: {
+                connect: {
+                  id: project.id,
+                },
+              },
+              gitObject: {
+                connect: {
+                  id: gitObject.id,
+                },
+              },
+              gitBranchLinks: {
+                create: {
+                  gitBranch: {
+                    connect: {
+                      id: gitBranch.id,
+                    },
+                  },
+                },
+              },
+            },
+          });
+        }
+      }
+    }
+
+    console.log(
+      await projectService.getLatestPrebuildsByBranch(db, {
+        projectExternalId: project.externalId,
+      }),
+    );
   }),
 );
