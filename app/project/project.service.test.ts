@@ -5,6 +5,7 @@ import { provideAppInjectorAndDb } from "~/test-utils";
 import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
 import { createTestUser } from "~/user/test-utils";
+import { groupBy, unwrap } from "~/utils.shared";
 
 import { UpdateEnvVarsTarget } from "./env-form.shared";
 import type { UpdateEnvVarsArgs } from "./project.service";
@@ -155,6 +156,9 @@ test.concurrent(
     const gitBranchArgs = ["a", "b", "c", "d", "e"].map((name, idx) => ({
       name,
       gitObjectHash: `hash${idx}`,
+      runningPrebuild: idx % 2 === 0,
+      pendingPrebuild: idx % 3 === 0,
+      finishedPrebuild: idx % 2 === 1,
     }));
     for (const args of gitBranchArgs) {
       const gitObject = await db.gitObject.create({
@@ -171,6 +175,25 @@ test.concurrent(
       });
       for (const status of Array.from(Object.values(PrebuildEventStatus)).sort()) {
         for (const createdAt of [1, 2, 3]) {
+          if (
+            status === PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING &&
+            !args.pendingPrebuild
+          ) {
+            continue;
+          }
+          if (
+            status === PrebuildEventStatus.PREBUILD_EVENT_STATUS_RUNNING &&
+            !args.runningPrebuild
+          ) {
+            continue;
+          }
+          if (
+            status === PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS &&
+            !args.finishedPrebuild
+          ) {
+            continue;
+          }
+
           await db.prebuildEvent.create({
             data: {
               createdAt: new Date(createdAt),
@@ -200,10 +223,35 @@ test.concurrent(
       }
     }
 
-    console.log(
-      await projectService.getLatestPrebuildsByBranch(db, {
-        projectExternalId: project.externalId,
-      }),
+    const latestPrebuilds = await projectService.getLatestPrebuildsByBranch(db, {
+      projectExternalId: project.externalId,
+    });
+    const latestPrebuildsByBranchName = groupBy(
+      latestPrebuilds,
+      (prebuild) => prebuild.branch.name,
+      (prebuild) => prebuild,
     );
+    for (const args of gitBranchArgs) {
+      if (!(args.finishedPrebuild || args.pendingPrebuild || args.runningPrebuild)) {
+        continue;
+      }
+      const results = unwrap(latestPrebuildsByBranchName.get(args.name));
+      expect(results.length).toEqual(1);
+      const result = results[0];
+      if (args.finishedPrebuild) {
+        const prebuild = unwrap(result.finishedPrebuild);
+        expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS);
+        expect(prebuild.createdAt.getTime()).toEqual(3);
+      }
+      if (args.runningPrebuild) {
+        const prebuild = unwrap(result.ongoingPrebuild);
+        expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_RUNNING);
+        expect(prebuild.createdAt.getTime()).toEqual(3);
+      } else if (args.pendingPrebuild) {
+        const prebuild = unwrap(result.ongoingPrebuild);
+        expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING);
+        expect(prebuild.createdAt.getTime()).toEqual(3);
+      }
+    }
   }),
 );
