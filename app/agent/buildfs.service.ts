@@ -126,7 +126,7 @@ export class BuildfsService {
     const filePaths: string[] = [];
     for (const instruction of instructions) {
       const isAdd = instruction instanceof Add;
-      const isCopy = !isAdd && instruction instanceof Copy;
+      const isCopy = !isAdd && instruction instanceof Copy && (instruction as Copy).getFromFlag() === null;
       if (isAdd || isCopy) {
         const args = instruction.getArguments();
         // the last item is the destination path
