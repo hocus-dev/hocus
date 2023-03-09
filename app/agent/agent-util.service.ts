@@ -13,7 +13,12 @@ import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { VMTaskOutput } from "./agent-util.types";
-import { SOLO_AGENT_INSTANCE_ID, TASK_SCRIPT_TEMPLATE } from "./constants";
+import {
+  SOLO_AGENT_INSTANCE_ID,
+  PREBUILD_TASK_SCRIPT_TEMPLATE,
+  TASK_INPUT_TEMPLATE,
+  ATTACH_TO_TASK_SCRIPT_TEMPLATE,
+} from "./constants";
 import { execCmd, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
 
 export class AgentUtilService {
@@ -119,8 +124,16 @@ export class AgentUtilService {
     }
   }
 
-  generateTaskScript(task: string): string {
-    return `${TASK_SCRIPT_TEMPLATE}${task}\n`;
+  generatePrebuildTaskScript(task: string): string {
+    return PREBUILD_TASK_SCRIPT_TEMPLATE(task);
+  }
+
+  generateTaskInput(task: string, cwd: string): string {
+    return TASK_INPUT_TEMPLATE(task, cwd);
+  }
+
+  generateAttachToTaskScript(socketPath: string, logPath: string): string {
+    return ATTACH_TO_TASK_SCRIPT_TEMPLATE(socketPath, logPath);
   }
 
   generateEnvVarsScript(vars: { name: string; value: string }[]): string {

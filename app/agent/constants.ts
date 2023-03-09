@@ -4,7 +4,7 @@ export const WORKSPACE_ENV_DIR = `${WORKSPACE_DEV_DIR}/.hocus` as const;
 export const WORKSPACE_ENV_SCRIPT_PATH = `${WORKSPACE_ENV_DIR}/env.sh` as const;
 export const WORKSPACE_SCRIPTS_DIR = `${WORKSPACE_DEV_DIR}/.hocus/command` as const;
 
-export const TASK_SCRIPT_TEMPLATE = `#!/bin/bash
+export const PREBUILD_TASK_SCRIPT_TEMPLATE = (task: string) => `#!/bin/bash
 set -o errexit
 set -o pipefail
 set -o nounset
@@ -14,6 +14,18 @@ source "${WORKSPACE_ENV_SCRIPT_PATH}"
 
 set -o xtrace
 
+${task}
+`;
+
+export const TASK_INPUT_TEMPLATE = (task: string, cwd: string) =>
+  `source "${WORKSPACE_ENV_SCRIPT_PATH}"
+cd ${cwd}
+${task}
+`;
+
+export const ATTACH_TO_TASK_SCRIPT_TEMPLATE = (socketPath: string, logPath: string) => `#!/bin/bash
+clear
+cat ${logPath} && dtach -a ${socketPath} -r none -E -z
 `;
 
 export const DEFAULT_PREBUILD_SSH_KEY_PUBLIC = `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKk+DZs+E2GlmqUNqTCU9/R0kT/zzBjwBqbPaBtGv3MA hocus@prebuild`;

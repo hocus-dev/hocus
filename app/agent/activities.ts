@@ -266,7 +266,7 @@ const prebuild: ActivitiesCreateFns["prebuild"] =
         await agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
         await Promise.all(
           tasks.map(async (task) => {
-            const script = agentUtilService.generateTaskScript(task.originalCommand);
+            const script = agentUtilService.generatePrebuildTaskScript(task.originalCommand);
             const paths = prebuildService.getPrebuildTaskPaths(task.idx);
             await execSshCmd({ ssh }, ["mkdir", "-p", prebuildService.prebuildScriptsDir]);
             await agentUtilService.writeFile(ssh, paths.scriptPath, script);

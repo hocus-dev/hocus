@@ -173,7 +173,6 @@ export class WorkspaceAgentService {
     firecrackerProcessPid: number;
     vmIp: string;
     ipBlockId: number;
-    taskPids: number[];
   }> {
     const fcService = this.fcServiceFactory(args.fcInstanceId);
 
@@ -193,26 +192,48 @@ export class WorkspaceAgentService {
         shouldPoweroff: false,
       },
       async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
-        const taskFn = async (task: string, taskIdx: number): Promise<number> => {
-          const script = this.agentUtilService.generateTaskScript(task);
-          const scriptPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.sh` as const;
-          const logPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.log` as const;
+        const taskFn = async (task: string, taskIdx: number): Promise<void> => {
+          // The idea is to have a tmux session which is attached to an inescapable dtach session
+          // Tmux logs everything which is happening in the session to a file so we may replay it when attaching using dtach
+          // You may attach to the task either via tmux or by dtach :)
+          const taskLogPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.log` as const;
+          const dtachSocketPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.sock` as const;
+          const tmuxSessionName = `hocus-task-${taskIdx}` as const;
           const envScript = this.agentUtilService.generateEnvVarsScript(args.environmentVariables);
+
+          const taskInput = this.agentUtilService.generateTaskInput(task, WORKSPACE_REPOSITORY_DIR);
+          const taskInputPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.in` as const;
+          const attachToTaskScript = this.agentUtilService.generateAttachToTaskScript(
+            dtachSocketPath,
+            taskLogPath,
+          );
+          const attachToTaskScriptPath = `${WORKSPACE_SCRIPTS_DIR}/attach-${taskIdx}.sh` as const;
+
+          // TODO: In the future i would like to use fish personally >.<
+          const shellName = "bash" as const;
+
           await execSshCmd({ ssh }, ["mkdir", "-p", WORKSPACE_SCRIPTS_DIR]);
           await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
-          await this.agentUtilService.writeFile(ssh, scriptPath, script);
+          await this.agentUtilService.writeFile(ssh, taskInputPath, taskInput);
+          await this.agentUtilService.writeFile(ssh, attachToTaskScriptPath, attachToTaskScript);
           await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
 
-          const result = await execSshCmd({ ssh, opts: { cwd: WORKSPACE_REPOSITORY_DIR } }, [
-            "bash",
-            "-o",
-            "pipefail",
-            "-o",
-            "errexit",
-            "-c",
-            `bash "${scriptPath}" > "${logPath}" 2>&1 & echo "$!"`,
+          await execSshCmd({ ssh }, [
+            "tmux",
+            "new",
+            "-d",
+            "-s",
+            tmuxSessionName,
+            `"tmux pipe-pane -o 'cat >>${taskLogPath}'; dtach -A ${dtachSocketPath} -E -z ${shellName} && exit"`,
           ]);
-          return Number(PidValidator.Parse(result.stdout));
+
+          await execSshCmd({ ssh }, [
+            "bash",
+            "-c",
+            `cat ${taskInputPath} | dtach -p ${dtachSocketPath}`,
+          ]);
+
+          return;
         };
         const authorizedKeys = args.authorizedKeys.map((key) => key.trim());
         await this.agentUtilService.writeFile(
@@ -220,13 +241,12 @@ export class WorkspaceAgentService {
           "/home/hocus/.ssh/authorized_keys",
           authorizedKeys.join("\n") + "\n",
         );
-        const taskPids = await Promise.all(args.tasks.map(taskFn));
+        await Promise.all(args.tasks.map(taskFn));
         await fcService.changeVMNetworkVisibility(ipBlockId, "public");
         await this.sshGatewayService.addPublicKeysToAuthorizedKeys(authorizedKeys);
         return {
           firecrackerProcessPid: firecrackerPid,
           vmIp,
-          taskPids,
           ipBlockId,
         };
       },
