@@ -16,5 +16,8 @@ declare module "@prisma/client" {
     export interface NonTransactionClient extends prisma.PrismaClient {}
 
     export interface Client extends Omit<TransactionClient, typeof TRANSACTION_CLIENT_REQUIRED> {}
+
+    // Somehow this useless fake export fixes type errors .-.
+    export const _____FakeModelNameDoNotUse______: typeof prisma.Prisma.ModelName;
   }
 }
