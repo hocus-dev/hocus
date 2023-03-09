@@ -8,7 +8,7 @@ RUN ./configure LDFLAGS="-static -s" CFLAGS="-O3" && make
 
 FROM ubuntu:22.04
 COPY --from=dtach-builder /dtach/dtach /usr/bin/
-RUN dtach --versions
+RUN dtach --version
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl \
