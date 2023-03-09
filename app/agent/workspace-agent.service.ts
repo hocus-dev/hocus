@@ -224,7 +224,7 @@ export class WorkspaceAgentService {
             "-d",
             "-s",
             tmuxSessionName,
-            `"tmux pipe-pane -o 'cat >>${taskLogPath}'; dtach -A ${dtachSocketPath} -E -z ${shellName} && exit"`,
+            `tmux pipe-pane -o 'cat >>${taskLogPath}'; dtach -A ${dtachSocketPath} -E -z ${shellName} && exit`,
           ]);
 
           await execSshCmd({ ssh }, [
