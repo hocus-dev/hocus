@@ -2,7 +2,7 @@ FROM gcc:12.2.0 as dtach-builder
 
 RUN git clone https://github.com/hocus-dev/dtach \
      && cd dtach \
-     && git checkout 748020b2fa79fc41b81c2a8430578b65749196a6
+     && git checkout 9691ed5322c8e599cce6a3fbcae04ac483fa727f
 WORKDIR /dtach
 RUN ./configure LDFLAGS="-static -s" CFLAGS="-O3" && make
 
