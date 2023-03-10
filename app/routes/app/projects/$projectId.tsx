@@ -165,7 +165,7 @@ export default function ProjectRoute(): JSX.Element {
       <div className="mb-8 flex justify-between items-end">
         <h1 className="text-4xl font-bold">{project.name}</h1>
         <Button
-          href={getNewWorkspacePath(project.externalId)}
+          href={getNewWorkspacePath({ projectExternalId: project.externalId })}
           color="success"
           className="transition-all"
         >

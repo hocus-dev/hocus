@@ -1,25 +1,55 @@
+import type { Prisma } from "@prisma/client";
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { Card } from "flowbite-react";
 import { StatusCodes } from "http-status-codes";
+import { match, Pattern } from "ts-pattern";
 import { AppPage } from "~/components/app-page";
 import { BackToProjectLink } from "~/components/projects/back-to-project-link";
 import { NewWorkspaceBranchListElement } from "~/components/workspaces/new-workspace-branch-list-element";
 import { HttpError } from "~/http-error.server";
 import { ProjectPathTabId } from "~/page-paths.shared";
+import type { ProjectService } from "~/project/project.service";
 import { NewWorkspaceValidator } from "~/schema/new-workspace.validator.server";
 import { Token } from "~/token";
 
-export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
-  const projectService = app.resolve(Token.ProjectService);
-  const { success, value: workspaceInfo } = NewWorkspaceValidator.SafeParse(req.query);
-  if (!success) {
-    throw new HttpError(StatusCodes.BAD_REQUEST, "Invalid query data");
+const findPrebuild = async (db: Prisma.Client, prebuildId: string) => {
+  const prebuildEvent = await db.prebuildEvent.findUnique({
+    where: {
+      externalId: prebuildId,
+    },
+    include: {
+      gitBranchLinks: {
+        include: {
+          gitBranch: true,
+        },
+      },
+      gitObject: true,
+      project: true,
+    },
+  });
+  if (prebuildEvent == null) {
+    throw new HttpError(StatusCodes.NOT_FOUND, "Prebuild not found");
   }
+  return [
+    prebuildEvent.project,
+    prebuildEvent.gitBranchLinks.map((link) => ({
+      branch: link.gitBranch,
+      ongoingPrebuild: null,
+      finishedPrebuild: prebuildEvent,
+    })),
+  ] as const;
+};
+
+const findProject = async (
+  db: Prisma.Client,
+  projectId: string,
+  projectService: ProjectService,
+) => {
   const project = await db.project.findUnique({
     where: {
-      externalId: workspaceInfo.projectId,
+      externalId: projectId,
     },
   });
   if (project == null) {
@@ -28,8 +58,30 @@ export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
   const prebuildsByBranch = await projectService.getLatestPrebuildsByBranch(db, {
     projectExternalId: project.externalId,
   });
+  return [project, prebuildsByBranch] as const;
+};
+
+export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
+  const projectService = app.resolve(Token.ProjectService);
+  const { success, value: workspaceInfo } = NewWorkspaceValidator.SafeParse(req.query);
+  if (!success) {
+    throw new HttpError(StatusCodes.BAD_REQUEST, "Invalid query data");
+  }
+  const nullPattern = Pattern.optional(Pattern.nullish);
+  const [project, prebuildsByBranch] = await match(workspaceInfo)
+    .with({ projectId: Pattern.string, prebuildId: nullPattern }, ({ projectId }) =>
+      findProject(db, projectId, projectService),
+    )
+    .with({ projectId: nullPattern, prebuildId: Pattern.string }, ({ prebuildId }) => {
+      return findPrebuild(db, prebuildId);
+    })
+    .exhaustive();
 
   return json({
+    prebuildCommitHash:
+      workspaceInfo.prebuildId != null
+        ? prebuildsByBranch[0].finishedPrebuild?.gitObject.hash.substring(0, 8)
+        : void 0,
     project: {
       name: project.name,
       externalId: project.externalId,
@@ -55,7 +107,9 @@ export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
 };
 
 export default function NewWorkspace(): JSX.Element {
-  const { project, branches } = useLoaderData<typeof loader>();
+  const { project, branches, prebuildCommitHash } = useLoaderData<typeof loader>();
+  const heading = `New Workspace in ${project.name}`;
+  const subheading = prebuildCommitHash != null ? `From commit ${prebuildCommitHash}` : void 0;
 
   return (
     <AppPage>
@@ -63,7 +117,8 @@ export default function NewWorkspace(): JSX.Element {
       <div className="h-full flex flex-col justify-center items-center">
         <Card className="min-w-[36rem] min-h-[20rem]">
           <div className="flex flex-col gap-2">
-            <h1 className="text-xl font-bold">New Workspace</h1>
+            <h1 className="text-xl font-bold">{heading}</h1>
+            {subheading && <h2 className="font-bold mb- text-gray-400 mb-4">{subheading}</h2>}
             <h3 className="text-gray-400">Choose a branch</h3>
           </div>
 
