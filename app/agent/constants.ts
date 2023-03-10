@@ -17,8 +17,14 @@ set -o xtrace
 ${task}
 `;
 
+/*
+ * I'm including the boot time and a new line so one may easilly distinguing
+ * logs from different boots - I've decided to do so after starting and stopping the vm multiple times :)
+ */
 export const TASK_INPUT_TEMPLATE = (task: string, cwd: string) =>
-  `source "${WORKSPACE_ENV_SCRIPT_PATH}"
+  `
+# Hocus task boot time ${Date.now()}
+source "${WORKSPACE_ENV_SCRIPT_PATH}"
 cd ${cwd}
 ${task}
 `;

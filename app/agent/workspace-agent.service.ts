@@ -17,9 +17,8 @@ import {
   WORKSPACE_SCRIPTS_DIR,
 } from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
-import { PidValidator } from "./pid.validator";
 import type { SSHGatewayService } from "./ssh-gateway.service";
-import { execSshCmd } from "./utils";
+import { execSshCmd, sleep } from "./utils";
 
 export class InvalidWorkspaceStatusError extends Error {}
 
@@ -216,6 +215,7 @@ export class WorkspaceAgentService {
           await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
           await this.agentUtilService.writeFile(ssh, taskInputPath, taskInput);
           await this.agentUtilService.writeFile(ssh, attachToTaskScriptPath, attachToTaskScript);
+          await execSshCmd({ ssh }, ["chmod", "+x", attachToTaskScriptPath]);
           await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
 
           await execSshCmd({ ssh }, [
@@ -227,10 +227,11 @@ export class WorkspaceAgentService {
             `tmux pipe-pane -o 'cat >>${taskLogPath}'; dtach -A ${dtachSocketPath} -E -z ${shellName} && exit`,
           ]);
 
+          // If the socket does not exist then pools every 0.1 s up to a max of 5s
           await execSshCmd({ ssh }, [
             "bash",
             "-c",
-            `cat ${taskInputPath} | dtach -p ${dtachSocketPath}`,
+            `timeout 5 bash -c "while [ ! -S ${dtachSocketPath} ]; do sleep 0.1; done;"; cat ${taskInputPath} | dtach -p ${dtachSocketPath}`,
           ]);
 
           return;
