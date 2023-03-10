@@ -2,7 +2,9 @@
   "name": "hocus-remote",
   "publisher": "hocus",
   "homepage": "https://hocus.dev",
-  "maintainers": ["gorbak25"],
+  "maintainers": [
+    "gorbak25"
+  ],
   "preview": true,
   "displayName": "Hocus Remote",
   "description": "Vscode Hocus integration",
@@ -25,8 +27,7 @@
   "activationEvents": [
     "onStartupFinished"
   ],
-  "contributes": {
-  },
+  "contributes": {},
   "main": "./dist/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run -S esbuild-base -- --minify",
@@ -47,7 +48,7 @@
     "@vscode/test-electron": "^2.2.2",
     "esbuild": "^0.17.10",
     "eslint": "^8.33.0",
-    "glob": "^8.1.0",
+    "glob": "^9.2.1",
     "mocha": "^10.1.0",
     "typescript": "^4.9.4"
   },
