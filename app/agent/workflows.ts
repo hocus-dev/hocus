@@ -214,7 +214,7 @@ export async function runBuildfsAndPrebuilds(
               command: task.init,
               cwd: path.join(PREBUILD_REPOSITORY_DIR, project.rootDirectoryPath),
             })),
-            inspection.projectConfig.tasks.map((task) => task.command),
+            inspection.projectConfig.tasks.map((task) => ({commandShell: task.commandShell ?? "bash", command: task.command})),
           ];
     return {
       projectId: project.id,

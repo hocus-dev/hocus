@@ -74,7 +74,9 @@ model PrebuildEvent {
   buildfsEventId BigInt?
   /// Null if project configuration was not found or did not include image config.
   buildfsEvent   BuildfsEvent?              @relation(fields: [buildfsEventId], references: [id])
-  workspaceTasks String[]
+  // Nah, until https://github.com/prisma/prisma/issues/4263 gets fixed then just leave it...
+  workspaceTasksCommand String[]
+  workspaceTasksShell String[]
 
   createdAt          DateTime             @default(now()) @db.Timestamptz(3)
   prebuildEventFiles PrebuildEventFiles[]

@@ -74,7 +74,7 @@ interface Activities {
       buildfsEventId: bigint | null;
       sourceProjectDrivePath: string;
       tasks: { command: string; cwd: string }[];
-      workspaceTasks: string[];
+      workspaceTasks: { command: string; commandShell: string }[];
     }[],
   ) => Promise<PrebuildEvent[]>;
   createPrebuildFiles: (args: {
@@ -403,7 +403,7 @@ const startWorkspace: ActivitiesCreateFns["startWorkspace"] =
       filesystemDrivePath: workspace.rootFsFile.path,
       projectDrivePath: workspace.projectFile.path,
       authorizedKeys: workspace.user.sshPublicKeys.map((k) => k.publicKey),
-      tasks: workspace.prebuildEvent.workspaceTasks,
+      tasks: workspace.prebuildEvent.workspaceTasksCommand.map((command, idx) => ({command, commandShell: workspace.prebuildEvent.workspaceTasksShell[idx] })),
       environmentVariables,
     });
     return await db.$transaction((tdb) =>
@@ -514,7 +514,7 @@ const createPrebuildEvents: ActivitiesCreateFns["createPrebuildEvents"] =
       buildfsEventId: bigint | null;
       sourceProjectDrivePath: string;
       tasks: { command: string; cwd: string }[];
-      workspaceTasks: string[];
+      workspaceTasks: { command: string, commandShell: string }[];
     }[],
   ): Promise<PrebuildEvent[]> => {
     const prebuildService = injector.resolve(Token.PrebuildService);

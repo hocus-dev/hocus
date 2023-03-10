@@ -22,17 +22,23 @@ RUN apt-get update \
     vim \
     tmux \
     build-essential \
+    fish \
+    zsh \
+    ash \
     git-all \
+    git-lfs \
     && { curl -fsSL https://deb.nodesource.com/setup_18.x | bash -; } \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs \
     && npm install --global yarn \
+    && { curl https://get.docker.com/ | bash -; } \
     && rm -rf /var/lib/apt/lists/*
-RUN systemctl enable ssh
+RUN systemctl enable ssh docker
 COPY ./docker/dnssetup /etc/init.d/dnssetup
 RUN chmod 755 /etc/init.d/dnssetup && \
     chown root:root /etc/init.d/dnssetup && \
     update-rc.d dnssetup defaults
 RUN useradd hocus -m -s /bin/bash && \
+    usermod -aG docker hocus && \
     usermod -aG sudo hocus && \
     passwd -d hocus && \
     echo "hocus ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
@@ -48,3 +54,5 @@ RUN mkdir -p /home/hocus/.ssh && touch /home/hocus/.ssh/known_hosts && \
     chmod 600 /home/hocus/.ssh/authorized_keys && \
     chmod 600 /home/hocus/.ssh/known_hosts
 RUN echo 'set -g default-terminal "tmux-256color"' >> /home/hocus/.tmux.conf
+# Cause ubuntu defaults are...
+RUN echo '127.0.0.1       localhost' >> /etc/hosts

@@ -60,7 +60,7 @@ export class PrebuildService {
     projectId: bigint,
     gitObjectId: bigint,
     buildfsEventId: bigint | null,
-    workspaceTasks: string[],
+    workspaceTasks: {command: string, commandShell: string}[],
     tasks: {
       command: string;
       cwd: string;
@@ -72,7 +72,8 @@ export class PrebuildService {
         gitObjectId,
         buildfsEventId,
         status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING,
-        workspaceTasks,
+        workspaceTasksCommand: workspaceTasks.map((x) => x.command),
+        workspaceTasksShell: workspaceTasks.map((x) => x.commandShell),
       },
     });
     await Promise.all(
@@ -245,7 +246,7 @@ export class PrebuildService {
       /** Null if project configuration was not found or did not include image config. */
       buildfsEventId: bigint | null;
       tasks: { command: string; cwd: string }[];
-      workspaceTasks: string[];
+      workspaceTasks: {command: string, commandShell: string}[];
     },
   ): Promise<PrebuildEvent> {
     const prebuildEvent = await this.createPrebuildEvent(

@@ -166,7 +166,7 @@ export class WorkspaceAgentService {
     filesystemDrivePath: string;
     projectDrivePath: string;
     authorizedKeys: string[];
-    tasks: string[];
+    tasks: {command: string, commandShell: string}[];
     environmentVariables: { name: string; value: string }[];
   }): Promise<{
     firecrackerProcessPid: number;
@@ -191,7 +191,7 @@ export class WorkspaceAgentService {
         shouldPoweroff: false,
       },
       async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
-        const taskFn = async (task: string, taskIdx: number): Promise<void> => {
+        const taskFn = async (task: {command: string, commandShell: string}, taskIdx: number): Promise<void> => {
           // The idea is to have a tmux session which is attached to an inescapable dtach session
           // Tmux logs everything which is happening in the session to a file so we may replay it when attaching using dtach
           // You may attach to the task either via tmux or by dtach :)
@@ -200,7 +200,7 @@ export class WorkspaceAgentService {
           const tmuxSessionName = `hocus-task-${taskIdx}` as const;
           const envScript = this.agentUtilService.generateEnvVarsScript(args.environmentVariables);
 
-          const taskInput = this.agentUtilService.generateTaskInput(task, WORKSPACE_REPOSITORY_DIR);
+          const taskInput = this.agentUtilService.generateTaskInput(task.command, WORKSPACE_REPOSITORY_DIR);
           const taskInputPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.in` as const;
           const attachToTaskScript = this.agentUtilService.generateAttachToTaskScript(
             dtachSocketPath,
@@ -208,8 +208,7 @@ export class WorkspaceAgentService {
           );
           const attachToTaskScriptPath = `${WORKSPACE_SCRIPTS_DIR}/attach-${taskIdx}.sh` as const;
 
-          // TODO: In the future i would like to use fish personally >.<
-          const shellName = "bash" as const;
+          const shellName = task.commandShell;
 
           await execSshCmd({ ssh }, ["mkdir", "-p", WORKSPACE_SCRIPTS_DIR]);
           await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
