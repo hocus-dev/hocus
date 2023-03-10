@@ -224,10 +224,11 @@ export class WorkspaceAgentService {
             "-d",
             "-s",
             tmuxSessionName,
+            // tmux handles logging, also if the dtach session exits(EOF in the terminal) then the tmux session will exit
             `tmux pipe-pane -o 'cat >>${taskLogPath}'; dtach -A ${dtachSocketPath} -E -z ${shellName} && exit`,
           ]);
 
-          // If the socket does not exist then pools every 0.1 s up to a max of 5s
+          // If the socket does not exist then polls every 0.1 s up to a max of 5s
           await execSshCmd({ ssh }, [
             "bash",
             "-c",
