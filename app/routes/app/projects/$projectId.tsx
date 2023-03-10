@@ -14,7 +14,7 @@ import { PrebuildList } from "~/components/projects/prebuilds/prebuild-list";
 import { RepoSshKeyCard } from "~/components/projects/repo-ssh-key-card";
 import { WorkspaceList } from "~/components/workspaces/workspace-list";
 import { HttpError } from "~/http-error.server";
-import { PagePaths, ProjectPathTabId } from "~/page-paths.shared";
+import { getNewWorkspacePath, PagePaths, ProjectPathTabId } from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
 import { Token } from "~/token";
 import { unwrap } from "~/utils.shared";
@@ -164,7 +164,11 @@ export default function ProjectRoute(): JSX.Element {
       </div>
       <div className="mb-8 flex justify-between items-end">
         <h1 className="text-4xl font-bold">{project.name}</h1>
-        <Button disabled={true} href={"#"} color="success" className="transition-all">
+        <Button
+          href={getNewWorkspacePath(project.externalId)}
+          color="success"
+          className="transition-all"
+        >
           <i className="fa-solid fa-circle-plus mr-2"></i>
           <span>New Workspace</span>
         </Button>

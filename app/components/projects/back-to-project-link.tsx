@@ -12,7 +12,7 @@ export const BackToProjectLink = (props: {
         className="text-sm text-gray-400 hover:text-gray-300 transition-all"
       >
         <i className="fa-solid fa-arrow-left mr-2"></i>
-        <span>Back to project "{props.project.name}"</span>
+        <span>Back to Project "{props.project.name}"</span>
       </a>
     </div>
   );

@@ -1,10 +1,11 @@
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { Button, Card } from "flowbite-react";
+import { Card } from "flowbite-react";
 import { StatusCodes } from "http-status-codes";
 import { AppPage } from "~/components/app-page";
 import { BackToProjectLink } from "~/components/projects/back-to-project-link";
+import { NewWorkspaceBranchListElement } from "~/components/workspaces/new-workspace-branch-list-element";
 import { HttpError } from "~/http-error.server";
 import { ProjectPathTabId } from "~/page-paths.shared";
 import { NewWorkspaceValidator } from "~/schema/new-workspace.validator.server";
@@ -39,6 +40,15 @@ export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
           name: r.branch.name,
           externalId: r.branch.externalId,
         },
+        ongoingPrebuild:
+          r.ongoingPrebuild != null ? { externalId: r.ongoingPrebuild.externalId } : null,
+        finishedPrebuild:
+          r.finishedPrebuild != null
+            ? {
+                externalId: r.finishedPrebuild.externalId,
+                commitHash: r.finishedPrebuild.gitObject.hash,
+              }
+            : null,
       }))
       .sort((a, b) => a.branch.name.localeCompare(b.branch.name)),
   });
@@ -58,17 +68,13 @@ export default function NewWorkspace(): JSX.Element {
           </div>
 
           <div className="grow">
-            {branches.map(({ branch: { name } }, idx) => (
-              <div
-                key={idx}
-                className="border-t border-gray-700 p-2 text-gray-400 last:border-b flex items-center justify-between gap-4"
-              >
-                <p>{name}</p>
-                <Button size="sm" color="success">
-                  Open
-                </Button>
+            {branches.length !== 0 && (
+              <div className="grid auto-rows-[1fr]">
+                {branches.map((args, idx) => (
+                  <NewWorkspaceBranchListElement {...args} key={idx} />
+                ))}
               </div>
-            ))}
+            )}
             {branches.length === 0 && (
               <div className="h-full flex flex-col gap-2 justify-center items-center p-4 text-gray-400 border-t border-gray-700">
                 <p>No branches found.</p>

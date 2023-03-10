@@ -44,6 +44,8 @@ export const getWorkspacePath = (
     optionsExist ? `?${qs.stringify(options)}` : ""
   }` as const;
 };
+export const getNewWorkspacePath = (projectExternalId: string) =>
+  `/app/workspaces/new?projectId=${projectExternalId}` as const;
 export const getWorkspaceStartPath = (workspaceExternalId: string) =>
   `/app/workspaces/start/${workspaceExternalId}` as const;
 export const getWorkspaceStopPath = (workspaceExternalId: string) =>

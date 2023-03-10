@@ -1,5 +1,5 @@
 import { PrebuildEventStatus } from "@prisma/client";
-import type { GitBranch, PrebuildEvent, Project } from "@prisma/client";
+import type { GitBranch, PrebuildEvent, Project, GitObject } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import { match } from "ts-pattern";
@@ -128,7 +128,7 @@ export class ProjectService {
   ): Promise<
     {
       branch: GitBranch;
-      finishedPrebuild: PrebuildEvent | null;
+      finishedPrebuild: (PrebuildEvent & { gitObject: GitObject }) | null;
       ongoingPrebuild: PrebuildEvent | null;
     }[]
   > {
@@ -167,6 +167,9 @@ export class ProjectService {
     `;
     const prebuildEvents = await db.prebuildEvent.findMany({
       where: { id: { in: prebuildEventIds.map((v) => v.prebuildEventId) } },
+      include: {
+        gitObject: true,
+      },
     });
     const prebuildsById = new Map(prebuildEvents.map((v) => [v.id, v] as const));
     const gitBranches = await db.gitBranch.findMany({
