@@ -54,5 +54,3 @@ RUN mkdir -p /home/hocus/.ssh && touch /home/hocus/.ssh/known_hosts && \
     chmod 600 /home/hocus/.ssh/authorized_keys && \
     chmod 600 /home/hocus/.ssh/known_hosts
 RUN echo 'set -g default-terminal "tmux-256color"' >> /home/hocus/.tmux.conf
-# Cause ubuntu defaults are...
-RUN echo '127.0.0.1       localhost' >> /etc/hosts

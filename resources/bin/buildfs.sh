@@ -30,8 +30,8 @@ clean_up() {
 
 trap clean_up INT TERM EXIT
 
-docker build --tag "${IMAGE_NAME}" --file "${DOCKERFILE_PATH}" "${CONTEXT_DIR}"
-docker container create --name "${CONTAINER_NAME}" "${IMAGE_NAME}"
+docker build --add-host "localhost:127.0.0.1" --tag "${IMAGE_NAME}" --file "${DOCKERFILE_PATH}" "${CONTEXT_DIR}"
+docker container create --add-host "localhost:127.0.0.1" --name "${CONTAINER_NAME}" "${IMAGE_NAME}"
 
 cd "${OUTPUT_PATH}"
 docker container export "${CONTAINER_NAME}" | tar -xf -
