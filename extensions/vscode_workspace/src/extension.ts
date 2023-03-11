@@ -72,7 +72,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (taskState.running) {
       // TODO: Ask the user whether to kill the terminal
       // TODO: If the user agrees then we would need to find the terminal process and shot it with SIGKILL
-      vscode.window.showInformationMessage("The terminal you closed is still running in the background. Reload the window to get the terminal back")
+      vscode.window.showInformationMessage("The terminal you closed is still running in the background. Reload the window to bring it back up.")
     }
   })
 }
