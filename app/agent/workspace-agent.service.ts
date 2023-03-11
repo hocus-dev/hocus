@@ -3,6 +3,7 @@ import path from "path";
 
 import type { Workspace, WorkspaceInstance } from "@prisma/client";
 import { Prisma, WorkspaceStatus } from "@prisma/client";
+import type { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 import type { Config } from "~/config";
 import { Token } from "~/token";
@@ -18,12 +19,13 @@ import {
 } from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
 import type { SSHGatewayService } from "./ssh-gateway.service";
-import { execSshCmd } from "./utils";
+import { doesFileExist, execSshCmd } from "./utils";
 
 export class InvalidWorkspaceStatusError extends Error {}
 
 export class WorkspaceAgentService {
   static inject = [
+    Token.Logger,
     Token.AgentUtilService,
     Token.SSHGatewayService,
     Token.FirecrackerService,
@@ -32,6 +34,7 @@ export class WorkspaceAgentService {
   private readonly agentConfig: ReturnType<Config["agent"]>;
 
   constructor(
+    private readonly logger: DefaultLogger,
     private readonly agentUtilService: AgentUtilService,
     private readonly sshGatewayService: SSHGatewayService,
     private readonly fcServiceFactory: (id: string) => FirecrackerService,
@@ -265,7 +268,8 @@ export class WorkspaceAgentService {
     workspaceId: bigint,
     status:
       | typeof WorkspaceStatus.WORKSPACE_STATUS_PENDING_START
-      | typeof WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP,
+      | typeof WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP
+      | typeof WorkspaceStatus.WORKSPACE_STATUS_PENDING_DELETE,
   ): Promise<void> {
     await db.$executeRawUnsafe(
       `LOCK TABLE "${Prisma.ModelName.Workspace}" IN SHARE UPDATE EXCLUSIVE MODE`,
@@ -278,6 +282,7 @@ export class WorkspaceAgentService {
     const statusPredecessor: { [key in typeof status]: WorkspaceStatus } = {
       [WorkspaceStatus.WORKSPACE_STATUS_PENDING_START]: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
       [WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP]: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
+      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_DELETE]: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
     };
     if (workspace.status !== statusPredecessor[status]) {
       throw new InvalidWorkspaceStatusError(
@@ -356,6 +361,43 @@ export class WorkspaceAgentService {
       },
       data: {
         status: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+      },
+    });
+  }
+
+  async deleteWorkspaceFilesFromDisk(args: {
+    rootFsFilePath: string;
+    projectFilePath: string;
+  }): Promise<void> {
+    for (const filePath of [args.rootFsFilePath, args.projectFilePath]) {
+      const fileExists = await doesFileExist(filePath);
+      if (fileExists) {
+        await fs.unlink(filePath);
+      } else {
+        this.logger.warn(`File at ${filePath} does not exist`);
+      }
+    }
+  }
+
+  async deleteWorkspaceFromDb(db: Prisma.TransactionClient, workspaceId: bigint): Promise<void> {
+    const workspace = await db.workspace.findUniqueOrThrow({
+      where: {
+        id: workspaceId,
+      },
+    });
+    if (workspace.status !== WorkspaceStatus.WORKSPACE_STATUS_PENDING_DELETE) {
+      throw new Error("Workspace is not in pending delete state");
+    }
+    await db.workspace.delete({
+      where: {
+        id: workspaceId,
+      },
+    });
+    await db.file.deleteMany({
+      where: {
+        id: {
+          in: [workspace.rootFsFileId, workspace.projectFileId],
+        },
       },
     });
   }

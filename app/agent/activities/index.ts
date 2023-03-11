@@ -18,6 +18,8 @@ import type { CreatePrebuildFilesActivity } from "./create-prebuild-files";
 import { createPrebuildFiles } from "./create-prebuild-files";
 import type { CreateWorkspaceActivity } from "./create-workspace";
 import { createWorkspace } from "./create-workspace";
+import type { DeleteWorkspaceActivity } from "./delete-workspace";
+import { deleteWorkspace } from "./delete-workspace";
 import type { FetchRepositoryActivity } from "./fetch-repository";
 import { fetchRepository } from "./fetch-repository";
 import type { GetDefaultBranchActivity } from "./get-default-branch";
@@ -58,6 +60,7 @@ export interface Activities {
   updateGitBranchesAndObjects: UpdateGitBranchesAndObjectsActivity;
   getDefaultBranch: GetDefaultBranchActivity;
   getRepositoryProjects: GetRepositoryProjectsActivity;
+  deleteWorkspace: DeleteWorkspaceActivity;
 }
 
 export interface ActivityArgs {
@@ -92,6 +95,7 @@ export const createActivities = async (
     getRepositoryProjects,
     updateGitBranchesAndObjects,
     getDefaultBranch,
+    deleteWorkspace,
   };
 
   return Object.fromEntries(

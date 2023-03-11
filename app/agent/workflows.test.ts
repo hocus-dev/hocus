@@ -19,13 +19,14 @@ import { createActivities } from "./activities";
 import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { execSshCmdThroughProxy } from "./test-utils";
-import { retry, sleep } from "./utils";
+import { doesFileExist, retry, sleep } from "./utils";
 import {
   runBuildfsAndPrebuilds,
   runAddProjectAndRepository,
   runCreateWorkspace,
   runStartWorkspace,
   runStopWorkspace,
+  runDeleteWorkspace,
 } from "./workflows";
 
 const provideActivities = (
@@ -368,6 +369,29 @@ test.concurrent(
         5,
         3000,
       );
+      const workspaceWithFiles = await db.workspace.findUniqueOrThrow({
+        where: {
+          id: workspace.id,
+        },
+        include: {
+          projectFile: true,
+          rootFsFile: true,
+        },
+      });
+      await client.workflow.execute(runDeleteWorkspace, {
+        workflowId: uuidv4(),
+        taskQueue: "test",
+        retry: { maximumAttempts: 1 },
+        args: [{ workspaceId: workspace.id }],
+      });
+      expect(await doesFileExist(workspaceWithFiles.projectFile.path)).toBe(false);
+      expect(await doesFileExist(workspaceWithFiles.rootFsFile.path)).toBe(false);
+      const workspaceAfterDelete = await db.workspace.findUnique({
+        where: {
+          id: workspace.id,
+        },
+      });
+      expect(workspaceAfterDelete).toBeNull();
     });
   }),
 );

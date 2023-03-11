@@ -62,21 +62,21 @@ enum PrebuildEventStatus {
 }
 
 model PrebuildEvent {
-  id             BigInt                     @id @default(autoincrement())
-  externalId     String                     @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  tasks          PrebuildEventTask[]
-  project        Project                    @relation(fields: [projectId], references: [id])
-  projectId      BigInt
-  gitObject      GitObject                  @relation(fields: [gitObjectId], references: [id])
-  gitObjectId    BigInt
-  status         PrebuildEventStatus
-  gitBranchLinks PrebuildEventToGitBranch[]
-  buildfsEventId BigInt?
+  id                    BigInt                     @id @default(autoincrement())
+  externalId            String                     @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tasks                 PrebuildEventTask[]
+  project               Project                    @relation(fields: [projectId], references: [id])
+  projectId             BigInt
+  gitObject             GitObject                  @relation(fields: [gitObjectId], references: [id])
+  gitObjectId           BigInt
+  status                PrebuildEventStatus
+  gitBranchLinks        PrebuildEventToGitBranch[]
+  buildfsEventId        BigInt?
   /// Null if project configuration was not found or did not include image config.
-  buildfsEvent   BuildfsEvent?              @relation(fields: [buildfsEventId], references: [id])
+  buildfsEvent          BuildfsEvent?              @relation(fields: [buildfsEventId], references: [id])
   // Nah, until https://github.com/prisma/prisma/issues/4263 gets fixed then just leave it...
   workspaceTasksCommand String[]
-  workspaceTasksShell String[]
+  workspaceTasksShell   String[]
 
   createdAt          DateTime             @default(now()) @db.Timestamptz(3)
   prebuildEventFiles PrebuildEventFiles[]
@@ -333,6 +333,7 @@ enum WorkspaceStatus {
   WORKSPACE_STATUS_PENDING_START
   WORKSPACE_STATUS_STARTED
   WORKSPACE_STATUS_PENDING_STOP
+  WORKSPACE_STATUS_PENDING_DELETE
 }
 
 model Workspace {
