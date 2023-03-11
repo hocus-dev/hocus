@@ -11,7 +11,12 @@ import { BackToProjectLink } from "~/components/projects/back-to-project-link";
 import { WorkspaceStatusCard } from "~/components/workspaces/workspace-status-card";
 import { WorkspaceStatusCardPlaceholder } from "~/components/workspaces/workspace-status-card-placeholder";
 import { HttpError } from "~/http-error.server";
-import { getWorkspaceStatusPath, ProjectPathTabId, WorkspacePathParams } from "~/page-paths.shared";
+import {
+  getProjectPath,
+  getWorkspaceStatusPath,
+  ProjectPathTabId,
+  WorkspacePathParams,
+} from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
 import { Token } from "~/token";
 import { max, sleep, unwrap } from "~/utils.shared";
@@ -48,7 +53,9 @@ export default function ProjectRoute(): JSX.Element {
   const loaderData = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [fetchLoopStarted, setFetchLoopStarted] = useState(false);
-  const [fetchedData, setFetchedData] = useState<WorkspaceRouteLoaderData | undefined>(void 0);
+  const [fetchedData, setFetchedData] = useState<WorkspaceRouteLoaderData | undefined | null>(
+    void 0,
+  );
   useEffect(() => {
     const innerfn = async () => {
       const intervalsMs: Record<WorkspaceStatus, number> = {
@@ -57,6 +64,7 @@ export default function ProjectRoute(): JSX.Element {
         WORKSPACE_STATUS_PENDING_STOP: 1000,
         WORKSPACE_STATUS_STARTED: 10000,
         WORKSPACE_STATUS_STOPPED: 1000,
+        WORKSPACE_STATUS_PENDING_DELETE: 1000,
       };
       let lastFetchAt = 0;
       let intervalMs = 1000;
@@ -69,6 +77,7 @@ export default function ProjectRoute(): JSX.Element {
               credentials: "same-origin",
             },
           ).then((r) => r.json());
+          // data is `null` if 404 happened
           setFetchedData(data);
           intervalMs = intervalsMs[data.workspace?.status ?? "WORKSPACE_STATUS_PENDING_CREATE"];
         } catch (e) {
@@ -90,6 +99,14 @@ export default function ProjectRoute(): JSX.Element {
     if (searchParams.get(WorkspacePathParams.JUST_CREATED) && workspace != null) {
       searchParams.delete(WorkspacePathParams.JUST_CREATED);
       setSearchParams(searchParams, { replace: true });
+    }
+    if (searchParams.get(WorkspacePathParams.JUST_DELETED) && fetchedData?.workspace === null) {
+      const projectId = searchParams.get(WorkspacePathParams.PROJECT_ID);
+      if (projectId != null) {
+        window.location.replace(getProjectPath(projectId));
+      } else {
+        setSearchParams(new URLSearchParams(), { replace: true });
+      }
     }
   });
 

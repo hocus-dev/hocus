@@ -1,5 +1,8 @@
 import { Button, Modal } from "flowbite-react";
 import { useState } from "react";
+import { getWorkspaceDeletePath } from "~/page-paths.shared";
+
+import { CsrfInput } from "../csrf-input";
 
 export function DeleteWorkspaceButton(props: {
   workspaceName: string;
@@ -39,10 +42,13 @@ export function DeleteWorkspaceButton(props: {
                 <i className="fa-solid fa-xmark mr-2"></i>
                 <span>Cancel</span>
               </Button>
-              <Button className="w-full" color="failure" disabled={true}>
-                <i className="fa-solid fa-trash mr-2"></i>
-                <span>Delete (not implemented yet)</span>
-              </Button>
+              <form method="POST" action={getWorkspaceDeletePath(props.workspaceExternalId)}>
+                <CsrfInput />
+                <Button type="submit" className="w-full" color="failure">
+                  <i className="fa-solid fa-trash mr-2"></i>
+                  <span>Delete</span>
+                </Button>
+              </form>
             </div>
           </Modal.Footer>
         </Modal>

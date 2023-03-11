@@ -28,6 +28,8 @@ export const WorkspacePathParams = {
   JUST_STARTED: "justStarted",
   SHOULD_OPEN: "shouldOpen",
   JUST_STOPPED: "justStopped",
+  JUST_DELETED: "justDeleted",
+  PROJECT_ID: "projectId",
 } as const;
 
 export const getWorkspacePath = (
@@ -37,6 +39,8 @@ export const getWorkspacePath = (
     [WorkspacePathParams.JUST_CREATED]?: boolean;
     [WorkspacePathParams.SHOULD_OPEN]?: boolean;
     [WorkspacePathParams.JUST_STOPPED]?: boolean;
+    [WorkspacePathParams.JUST_DELETED]?: boolean;
+    [WorkspacePathParams.PROJECT_ID]?: string;
   },
 ) => {
   const optionsExist = Array.from(Object.values(options)).some((v) => v);
@@ -64,6 +68,8 @@ export const getWorkspaceStopPath = (workspaceExternalId: string) =>
   `/app/workspaces/stop/${workspaceExternalId}` as const;
 export const getWorkspaceStatusPath = (workspaceExternalId: string) =>
   `/app/workspaces/status/${workspaceExternalId}` as const;
+export const getWorkspaceDeletePath = (workspaceExternalId: string) =>
+  `/app/workspaces/delete/${workspaceExternalId}` as const;
 
 export const getPrebuildPath = (prebuildExternalId: string, taskIdx?: number) =>
   `/app/prebuilds/${prebuildExternalId}${taskIdx != null ? `?task=${taskIdx}` : ""}` as const;

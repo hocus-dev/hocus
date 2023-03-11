@@ -24,6 +24,11 @@ export function WorkspaceStatusComponent(props: { status: WorkspaceStatus }): JS
       "text-yellow-400",
     ])
     .with("WORKSPACE_STATUS_STOPPED", () => ["fa-solid fa-circle-stop", "Stopped", "text-gray-400"])
+    .with("WORKSPACE_STATUS_PENDING_DELETE", () => [
+      "fa-solid fa-trash",
+      "Deleting...",
+      "text-gray-400",
+    ])
     .exhaustive();
 
   return (

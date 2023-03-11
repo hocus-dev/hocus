@@ -17,11 +17,14 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
   const [searchParams, setSearchParams] = useSearchParams();
   const justStarted = searchParams.get(WorkspacePathParams.JUST_STARTED) != null;
   const justStopped = searchParams.get(WorkspacePathParams.JUST_STOPPED) != null;
+  const justDeleted = searchParams.get(WorkspacePathParams.JUST_DELETED) != null;
   let status = workspace.status;
   if (justStarted && workspace.status === "WORKSPACE_STATUS_STOPPED") {
     status = "WORKSPACE_STATUS_PENDING_START";
   } else if (justStopped && workspace.status === "WORKSPACE_STATUS_STARTED") {
     status = "WORKSPACE_STATUS_PENDING_STOP";
+  } else if (justDeleted && workspace.status === "WORKSPACE_STATUS_STOPPED") {
+    status = "WORKSPACE_STATUS_PENDING_DELETE";
   }
 
   const vsCodeUri =
@@ -67,6 +70,7 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
     WORKSPACE_STATUS_PENDING_STOP: "warning",
     WORKSPACE_STATUS_STARTED: "success",
     WORKSPACE_STATUS_STOPPED: "gray",
+    WORKSPACE_STATUS_PENDING_DELETE: "gray",
   };
   const spinner = (
     <div className="w-full flex justify-center mt-10">
@@ -103,6 +107,7 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
     WORKSPACE_STATUS_PENDING_CREATE: spinner,
     WORKSPACE_STATUS_PENDING_START: spinner,
     WORKSPACE_STATUS_PENDING_STOP: spinner,
+    WORKSPACE_STATUS_PENDING_DELETE: spinner,
   };
   return (
     <Card className="w-[28rem] max-w-xl">
