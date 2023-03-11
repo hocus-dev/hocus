@@ -15,6 +15,7 @@ export interface WorkspaceInfo {
   project: {
     externalId: string;
     name: string;
+    rootDirectoryPath: string;
   };
   agentHostname: string;
   workspaceHostname?: string;
@@ -72,6 +73,7 @@ export class WorkspaceService {
       project: {
         externalId: workspace.prebuildEvent.project.externalId,
         name: workspace.prebuildEvent.project.name,
+        rootDirectoryPath: workspace.prebuildEvent.project.rootDirectoryPath,
       },
       agentHostname: this.agentHostname,
       workspaceHostname: workspace.activeInstance?.vmIp,

@@ -31,6 +31,7 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
           // if the workspace is started, the workspaceHostname is guaranteed to be defined
           workspaceHostname: unwrap(workspace.workspaceHostname),
           workspaceName: workspace.name.toLowerCase().replace(" ", "-"),
+          workspaceRoot: workspace.project.rootDirectoryPath,
         })
       : "";
   useEffect(() => {
