@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.0.3
+
+- Connect to the proper workspace within a monorepo
+- Deleting the hocus ssh config now won't break the extension
+- When the underlying IP of an workspace changes then properly update the SSH config
+
 ## 0.0.2
 
 - If another workspace is already open then connect to a Hocus workspace in a new window

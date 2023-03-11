@@ -3,6 +3,8 @@ import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
 
+const HOCUS_PROJECT_LOCATION = "/home/hocus/dev/project";
+
 /* TODO: Windows support */
 async function ensureSupportedPlatform() {
   const platform = os.platform();
@@ -46,7 +48,7 @@ async function ensureSshDirsExists() {
 }
 
 // This also serves as a versioning string, If this changes the old config will be deleted
-const hocusSshConfigBaner = "# Don't edit this file - your changes WILL be overwritten!!!\n# Please perform customizations in the main config file under Host *.hocus.dev\n# This file is managed by Hocus\n# Hocus SSH Integration 0.0.1\n" as const;
+const hocusSshConfigBaner = "# Don't edit this file - your changes WILL be overwritten!!!\n# Please perform customizations in the main config file under Host *.hocus.dev\n# This file is managed by Hocus\n# Hocus SSH Integration 0.0.3\n" as const;
 
 async function ensureSshConfigSetUp(recursed?: boolean) {
   await ensureSshDirsExists();
@@ -118,10 +120,11 @@ export async function activate(context: vscode.ExtensionContext) {
       const agentHostname = p.get("agent-hostname");
       const workspaceHostname = p.get("workspace-hostname");
       const workspaceName = p.get("workspace-name");
+      const workspaceRoot = p.get("workspace-root");
 
-      for (const x of [agentHostname, workspaceHostname, workspaceName]) {
+      for (const x of [agentHostname, workspaceHostname, workspaceName, workspaceRoot]) {
         // Kind of permissive but should be mostly enough for now
-        if (x === void 0 || x === null || x.match(/^[0-9a-zA-Z\.\-\_]*$/g) === null) {
+        if (x === void 0 || x === null || x.match(/^[0-9a-zA-Z\.\-\_\/]*$/g) === null) {
           vscode.window.showInformationMessage(`Invalid callback parameter: ${x}`);
           return;
         }
@@ -129,10 +132,33 @@ export async function activate(context: vscode.ExtensionContext) {
 
       // TODO: Key management
       // TODO: Delete unused workspaces
-      getHocusSshConfigPath().then(async (path) => {
-        const config = await fs.readFile(path);
-        if (!config.includes(`Host ${workspaceName}.hocus.dev`)) {
-          await fs.appendFile(path, `
+      getHocusSshConfigPath().then(async (hocusSshConfigPath) => {
+        const config = await fs.readFile(hocusSshConfigPath).catch(async () => {
+          // If the user manually deletes the hocus config while vscode is open
+          // then we need to set up the config again
+          console.log("The hocus config probably was deleted, reinitializing")
+          await ensureSshConfigSetUp();
+          return fs.readFile(hocusSshConfigPath);
+        });
+
+        const startMarker = `\n#<${workspaceName}>`;
+        const endMarker = `#</${workspaceName}>\n`;
+
+        const startMarkerPos = config.indexOf(startMarker);
+        if (startMarkerPos !== -1) {
+          // Welp it's possible for the IP to change - the workspace
+          // might have been moved to another agent or just got another IP on the same agent
+          const endMarkerPos = config.indexOf(endMarker, startMarkerPos + startMarker.length);
+          if (endMarkerPos === -1) {
+            vscode.window.showInformationMessage(`Fatal error - Failed to find end marker`);
+            return;
+          }
+
+          await fs.writeFile(hocusSshConfigPath, Buffer.concat([config.slice(0, startMarkerPos), config.slice(endMarkerPos + endMarker.length)]))
+        }
+
+        await fs.appendFile(hocusSshConfigPath, `
+#<${workspaceName}>
 Host ${workspaceName}.hocus.dev
     HostName ${workspaceHostname}
     User hocus
@@ -141,13 +167,14 @@ Host ${workspaceName}.hocus.dev
     StrictHostKeyChecking no
     ForwardAgent yes
     AddKeysToAgent yes
+#</${workspaceName}>
 `
-          )
-        }
+        )
+
         await
           vscode.commands.executeCommand(
             "vscode.openFolder",
-            vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev/home/hocus/dev/project`),
+            vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev${path.join(HOCUS_PROJECT_LOCATION, workspaceRoot as string)}`),
             { forceNewWindow: shouldOpenWorkspaceInNewWindow(), noRecentEntry: true }
           );
       })
