@@ -18,7 +18,7 @@ import {
 } from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
 import type { SSHGatewayService } from "./ssh-gateway.service";
-import { execSshCmd, sleep } from "./utils";
+import { execSshCmd } from "./utils";
 
 export class InvalidWorkspaceStatusError extends Error {}
 
@@ -166,7 +166,7 @@ export class WorkspaceAgentService {
     filesystemDrivePath: string;
     projectDrivePath: string;
     authorizedKeys: string[];
-    tasks: {command: string, commandShell: string}[];
+    tasks: { command: string; commandShell: string }[];
     environmentVariables: { name: string; value: string }[];
   }): Promise<{
     firecrackerProcessPid: number;
@@ -191,7 +191,10 @@ export class WorkspaceAgentService {
         shouldPoweroff: false,
       },
       async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
-        const taskFn = async (task: {command: string, commandShell: string}, taskIdx: number): Promise<void> => {
+        const taskFn = async (
+          task: { command: string; commandShell: string },
+          taskIdx: number,
+        ): Promise<void> => {
           // The idea is to have a tmux session which is attached to an inescapable dtach session
           // Tmux logs everything which is happening in the session to a file so we may replay it when attaching using dtach
           // You may attach to the task either via tmux or by dtach :)
@@ -200,7 +203,10 @@ export class WorkspaceAgentService {
           const tmuxSessionName = `hocus-task-${taskIdx}` as const;
           const envScript = this.agentUtilService.generateEnvVarsScript(args.environmentVariables);
 
-          const taskInput = this.agentUtilService.generateTaskInput(task.command, WORKSPACE_REPOSITORY_DIR);
+          const taskInput = this.agentUtilService.generateTaskInput(
+            task.command,
+            WORKSPACE_REPOSITORY_DIR,
+          );
           const taskInputPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.in` as const;
           const attachToTaskScript = this.agentUtilService.generateAttachToTaskScript(
             dtachSocketPath,
