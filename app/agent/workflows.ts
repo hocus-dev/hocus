@@ -23,7 +23,7 @@ import {
   displayError,
 } from "~/utils.shared";
 
-import type { createActivities } from "./activities";
+import type { Activities } from "./activities";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
 import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
@@ -31,7 +31,6 @@ import type { BFSPWorkflowPhase, BFSPWorkflowState } from "./workflows-utils";
 
 const { defaultWorkflowLogger: logger } = proxySinks();
 
-type Activites = Awaited<ReturnType<typeof createActivities>>;
 const {
   checkoutAndInspect,
   getProjectsAndGitObjects,
@@ -51,7 +50,7 @@ const {
   getRepositoryProjects,
   updateGitBranchesAndObjects,
   getDefaultBranch,
-} = proxyActivities<Activites>({
+} = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
   // project filesystem, so if several buildfs activities for the same project
@@ -214,7 +213,10 @@ export async function runBuildfsAndPrebuilds(
               command: task.init,
               cwd: path.join(PREBUILD_REPOSITORY_DIR, project.rootDirectoryPath),
             })),
-            inspection.projectConfig.tasks.map((task) => ({commandShell: task.commandShell ?? "bash", command: task.command})),
+            inspection.projectConfig.tasks.map((task) => ({
+              commandShell: task.commandShell ?? "bash",
+              command: task.command,
+            })),
           ];
     return {
       projectId: project.id,
