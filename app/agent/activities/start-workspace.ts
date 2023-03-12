@@ -79,6 +79,7 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
       filesystemDrivePath: workspace.rootFsFile.path,
       projectDrivePath: workspace.projectFile.path,
       authorizedKeys: workspace.user.sshPublicKeys.map((k) => k.publicKey),
+      workspaceRoot: workspace.prebuildEvent.project.rootDirectoryPath,
       tasks: workspace.prebuildEvent.workspaceTasksCommand.map((command, idx) => ({
         command,
         commandShell: workspace.prebuildEvent.workspaceTasksShell[idx],

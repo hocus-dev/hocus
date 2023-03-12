@@ -169,6 +169,7 @@ export class WorkspaceAgentService {
     filesystemDrivePath: string;
     projectDrivePath: string;
     authorizedKeys: string[];
+    workspaceRoot: string;
     tasks: { command: string; commandShell: string }[];
     environmentVariables: { name: string; value: string }[];
   }): Promise<{
@@ -208,7 +209,7 @@ export class WorkspaceAgentService {
 
           const taskInput = this.agentUtilService.generateTaskInput(
             task.command,
-            WORKSPACE_REPOSITORY_DIR,
+            path.join(WORKSPACE_REPOSITORY_DIR, args.workspaceRoot),
           );
           const taskInputPath = `${WORKSPACE_SCRIPTS_DIR}/task-${taskIdx}.in` as const;
           const attachToTaskScript = this.agentUtilService.generateAttachToTaskScript(
