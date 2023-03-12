@@ -2,9 +2,12 @@ import * as fs from "fs-extra";
 import * as glob from "glob";
 import * as os from "os";
 import * as vscode from "vscode";
+import * as yaml from "yaml";
+import { ProjectConfigValidator } from "./project-config/validator";
 
 const HOCUS_DIR = "/home/hocus/dev/.hocus";
 const HOCUS_WORKSPACE_TASKS_DIR = `${HOCUS_DIR}/command`
+const HOCUS_CONFIG_PATH = `${HOCUS_DIR}/workspace-config.yml`
 
 export async function isHocusWorkspace(): Promise<boolean> {
   // No need to probe if running in the web or locally
@@ -45,6 +48,37 @@ export function attachVscodeTerminalToTask(task: WorkspaceTask): vscode.Terminal
   );
 }
 
+export class GroupError extends Error {
+  constructor(public readonly errors: unknown[]) {
+    super(
+      `Group error: ${errors
+        .map((e) => (e instanceof Error ? e.message : `unknown error: ${String(e)}`))
+        .join(", ")}`,
+    );
+  }
+}
+
+/**
+ * Works like `Promise.allSettled` but throws an error if any of the promises fail.
+ */
+export const waitForPromises = async <T>(promises: Iterable<T>): Promise<Awaited<T>[]> => {
+  const results = await Promise.allSettled(promises);
+  const errors = results
+    .filter((result) => result.status === "rejected")
+    .map((result) => {
+      const reason = (result as PromiseRejectedResult).reason;
+      if (reason instanceof Error) {
+        return reason;
+      }
+      return new Error(String(reason));
+    });
+  if (errors.length > 0) {
+    throw new GroupError(errors);
+  }
+
+  return results.map((result) => (result as PromiseFulfilledResult<Awaited<T>>).value);
+};
+
 export async function activate(context: vscode.ExtensionContext) {
   console.log("Hocus Workspace Activated");
 
@@ -55,8 +89,24 @@ export async function activate(context: vscode.ExtensionContext) {
     return;
   }
 
+  // Ensure extensions from the workspace config are installed
+  const workspaceConfig = ProjectConfigValidator.SafeParse(yaml.parse(await fs.readFile(HOCUS_CONFIG_PATH, "utf-8")));
+  if (!workspaceConfig.success) {
+    vscode.window.showInformationMessage("Syntax error in workspace configuration");
+    console.log(workspaceConfig);
+    console.error(workspaceConfig.error);
+  } else {
+    if (workspaceConfig.value.vscode) {
+      try {
+        await waitForPromises(workspaceConfig.value.vscode.extensions.map((extName) => vscode.commands.executeCommand("workbench.extensions.installExtension", extName)));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
+
   for (const task of await scanWorkspaceTasks()) {
-    if (!task.running) continue;
+    if (!task.running) { continue; }
     attachVscodeTerminalToTask(task);
   }
 

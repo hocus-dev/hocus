@@ -50,9 +50,12 @@
     "eslint": "^8.33.0",
     "glob": "^9.2.1",
     "mocha": "^10.1.0",
+    "ts-toolbelt": "^9.6.0",
     "typescript": "^4.9.4"
   },
   "dependencies": {
-    "fs-extra": "^11.1.0"
+    "@sinclair/typebox": "^0.25.24",
+    "fs-extra": "^11.1.0",
+    "yaml": "^2.2.1"
   }
 }
