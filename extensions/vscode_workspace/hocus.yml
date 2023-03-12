@@ -9,7 +9,7 @@ tasks:
       git config --global --add user.name "Grzegorz Uriasz"
     commandShell: fish
     command: |
-      export PATH="$PATH:(yarn global bin)"
+      set PATH "$PATH:(yarn global bin)"
       yarn
 vscode:
   extensions:
