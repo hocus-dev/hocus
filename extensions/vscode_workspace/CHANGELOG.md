@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.0.3
+
+- term.creationOptions was replaced with reading from /proc
+- Newly opened terminals get focused
+
 ## 0.0.2
 
 - Skip popup when installing extensions

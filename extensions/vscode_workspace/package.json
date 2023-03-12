@@ -8,7 +8,7 @@
   "preview": true,
   "displayName": "Hocus Remote",
   "description": "Vscode Hocus integration",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "engines": {
     "vscode": "^1.75.0"
   },

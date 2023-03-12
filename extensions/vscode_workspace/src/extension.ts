@@ -9,7 +9,7 @@ const HOCUS_DIR = "/home/hocus/dev/.hocus";
 const HOCUS_WORKSPACE_TASKS_DIR = `${HOCUS_DIR}/command`
 const HOCUS_CONFIG_PATH = `${HOCUS_DIR}/workspace-config.yml`
 
-export async function isHocusWorkspace(): Promise<boolean> {
+async function isHocusWorkspace(): Promise<boolean> {
   // No need to probe if running in the web or locally
   if (vscode.env.remoteName === void 0 || vscode.env.uiKind !== vscode.UIKind.Desktop) {
     return false;
@@ -27,7 +27,7 @@ interface WorkspaceTask {
   running: boolean,
 }
 
-export async function scanWorkspaceTasks(): Promise<WorkspaceTask[]> {
+async function scanWorkspaceTasks(): Promise<WorkspaceTask[]> {
   const tasks: WorkspaceTask[] = [];
   for (const attachScriptPath of await glob.glob("attach-*.sh", { absolute: true, follow: false, cwd: HOCUS_WORKSPACE_TASKS_DIR, nodir: true })) {
     const taskIdx = +attachScriptPath.split("attach-")[1].slice(0, -3);
@@ -41,11 +41,19 @@ export async function scanWorkspaceTasks(): Promise<WorkspaceTask[]> {
   return tasks.reverse();
 }
 
-export function attachVscodeTerminalToTask(task: WorkspaceTask): vscode.Terminal {
+function attachVscodeTerminalToTask(task: WorkspaceTask): vscode.Terminal {
   // TODO: Add an icon for the terminal
   return vscode.window.createTerminal(
     { name: task.taskName, shellPath: task.attachScriptPath }
   );
+}
+
+// Turns out term.creationOptions is very unreliable. The info is lost after a window reload
+// What is preserved is the PID of the terminal. Use it to read from /proc directly :)
+// BBQ Driven Developement here we come :)
+async function getTerminalCmdLine(term: vscode.Terminal): Promise<string | undefined> {
+  const pid = await term.processId;
+  return (await fs.readFile(`/proc/${pid}/cmdline`, "utf-8")).split('\x00')[1];
 }
 
 export class GroupError extends Error {
@@ -90,36 +98,36 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // Ensure extensions from the workspace config are installed
-  const workspaceConfig = ProjectConfigValidator.SafeParse(yaml.parse(await fs.readFile(HOCUS_CONFIG_PATH, "utf-8")));
-  if (!workspaceConfig.success) {
-    vscode.window.showInformationMessage("Syntax error in workspace configuration");
-    console.log(workspaceConfig);
-    console.error(workspaceConfig.error);
-  } else {
-    if (workspaceConfig.value.vscode) {
-      try {
-        await waitForPromises(workspaceConfig.value.vscode.extensions.map((extName) => vscode.commands.executeCommand("workbench.extensions.installExtension", extName, { donotSync: true })));
-      } catch (e) {
-        console.error(e);
+  try {
+    const workspaceConfig = ProjectConfigValidator.SafeParse(yaml.parse(await fs.readFile(HOCUS_CONFIG_PATH, "utf-8")));
+    if (!workspaceConfig.success) {
+      vscode.window.showInformationMessage("Syntax error in workspace configuration");
+      console.log(workspaceConfig);
+      console.error(workspaceConfig.error);
+    } else {
+      if (workspaceConfig.value.vscode) {
+        try {
+          await waitForPromises(workspaceConfig.value.vscode.extensions.map((extName) => vscode.commands.executeCommand("workbench.extensions.installExtension", extName, { donotSync: true })));
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
+  } catch (e) {
+    console.error(e);
   }
 
-  const alreadyOpened = vscode.window.terminals.map((term) => {
-    if ((term.creationOptions as any).shellPath === void 0) { return void 0; }
-    else { return (term.creationOptions as vscode.TerminalOptions).shellPath; }
-  });
+  const alreadyOpened = await waitForPromises(vscode.window.terminals.map((term) => getTerminalCmdLine(term)));
   for (const task of await scanWorkspaceTasks()) {
     if (!task.running || alreadyOpened.includes(task.attachScriptPath)) { continue; }
-    attachVscodeTerminalToTask(task);
+    const term = attachVscodeTerminalToTask(task);
+    term.show(false);
   }
 
   vscode.window.onDidCloseTerminal(async (term) => {
-    if ((term.creationOptions as any).shellPath === void 0) { return; }
-    const creationOptions = term.creationOptions as vscode.TerminalOptions;
-
+    const cmdLine = await getTerminalCmdLine(term);
     const tasks = await scanWorkspaceTasks();
-    const taskState = tasks.find((task) => task.attachScriptPath === creationOptions.shellPath)
+    const taskState = tasks.find((task) => task.attachScriptPath === cmdLine)
 
     if (taskState === void 0) { return; }
 
