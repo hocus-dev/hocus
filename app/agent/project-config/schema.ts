@@ -32,13 +32,15 @@ export const ProjectConfigSchema = t.Object({
     }),
   }),
   tasks: t.Array(TaskSchema),
-  vscode: t.Object({
-    extensions: t.Array(
-      t.String({
-        minLength: 1,
-        description:
-          "<publisher>.<name> of the extensions which will be installed in the workspace",
-      }),
-    ),
-  }),
+  vscode: t.Optional(
+    t.Object({
+      extensions: t.Array(
+        t.String({
+          minLength: 1,
+          description:
+            "<publisher>.<name> of the extensions which will be installed in the workspace",
+        }),
+      ),
+    }),
+  ),
 });
