@@ -60,7 +60,7 @@ export class PrebuildService {
     projectId: bigint,
     gitObjectId: bigint,
     buildfsEventId: bigint | null,
-    workspaceTasks: {command: string, commandShell: string}[],
+    workspaceTasks: { command: string; commandShell: string }[],
     tasks: {
       command: string;
       cwd: string;
@@ -246,7 +246,7 @@ export class PrebuildService {
       /** Null if project configuration was not found or did not include image config. */
       buildfsEventId: bigint | null;
       tasks: { command: string; cwd: string }[];
-      workspaceTasks: {command: string, commandShell: string}[];
+      workspaceTasks: { command: string; commandShell: string }[];
     },
   ): Promise<PrebuildEvent> {
     const prebuildEvent = await this.createPrebuildEvent(
@@ -310,10 +310,13 @@ export class PrebuildService {
             "checkout",
             args.targetBranch,
           ]);
-          const configs: (ProjectConfig | null)[] = await waitForPromises(
-            args.projectConfigPaths.map((p) =>
-              this.projectConfigService.getConfig(ssh, repoPath, p),
+          const configs: (ProjectConfig | null)[] = mapOverNull(
+            await waitForPromises(
+              args.projectConfigPaths.map((p) =>
+                this.projectConfigService.getConfig(ssh, repoPath, p),
+              ),
             ),
+            (c) => c[0],
           );
           const imageFiles = await waitForPromises(
             mapOverNull(configs, (c, idx) => {

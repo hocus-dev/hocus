@@ -2,6 +2,7 @@ export const WORKSPACE_DEV_DIR = "/home/hocus/dev" as const;
 export const WORKSPACE_REPOSITORY_DIR = `${WORKSPACE_DEV_DIR}/project` as const;
 export const WORKSPACE_ENV_DIR = `${WORKSPACE_DEV_DIR}/.hocus` as const;
 export const WORKSPACE_ENV_SCRIPT_PATH = `${WORKSPACE_ENV_DIR}/env.sh` as const;
+export const WORKSPACE_CONFIG_SYMLINK_PATH = `${WORKSPACE_ENV_DIR}/workspace-config.yml` as const;
 export const WORKSPACE_SCRIPTS_DIR = `${WORKSPACE_DEV_DIR}/.hocus/command` as const;
 
 export const PREBUILD_TASK_SCRIPT_TEMPLATE = (task: string) => `#!/bin/bash

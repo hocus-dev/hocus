@@ -11,22 +11,24 @@ import { ProjectConfigValidator } from "./validator";
 
 export class ProjectConfigService {
   /**
-   * Returns `ProjectConfig` for the given repository if a hocus config file is present.
+   * Returns `[ProjectConfig, string]` for the given repository if a hocus config file is present.
    * Otherwise, returns `null`.
    */
   async getConfig(
     ssh: NodeSSH,
     repositoryPath: string,
     rootDirectoryPath: string,
-  ): Promise<ProjectConfig | null> {
+  ): Promise<[ProjectConfig, string] | null> {
     const configDir = path.join(repositoryPath, rootDirectoryPath);
     let configString: string | null = null;
+    let configPath: string | null = null;
     for (const fileName of HOCUS_CONFIG_FILE_NAMES) {
       const catOutput = await execSshCmd(
         { ssh, allowNonZeroExitCode: true, opts: { cwd: configDir } },
         ["cat", fileName],
       );
       if (catOutput.code === 0) {
+        configPath = path.join(configDir, fileName);
         configString = catOutput.stdout;
         break;
       } else if (!/No such file or directory/.test(catOutput.stderr)) {
@@ -35,10 +37,10 @@ export class ProjectConfigService {
         );
       }
     }
-    if (configString === null) {
+    if (configString === null || configPath === null) {
       return null;
     }
     const config = yaml.parse(configString);
-    return ProjectConfigValidator.Parse(config);
+    return [ProjectConfigValidator.Parse(config), configPath];
   }
 }

@@ -12,12 +12,14 @@ import { unwrap, waitForPromises } from "~/utils.shared";
 import type { AgentUtilService } from "./agent-util.service";
 import {
   HOST_PERSISTENT_DIR,
+  WORKSPACE_CONFIG_SYMLINK_PATH,
   WORKSPACE_DEV_DIR,
   WORKSPACE_ENV_SCRIPT_PATH,
   WORKSPACE_REPOSITORY_DIR,
   WORKSPACE_SCRIPTS_DIR,
 } from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
+import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { SSHGatewayService } from "./ssh-gateway.service";
 import { doesFileExist, execSshCmd } from "./utils";
 
@@ -28,6 +30,7 @@ export class WorkspaceAgentService {
     Token.Logger,
     Token.AgentUtilService,
     Token.SSHGatewayService,
+    Token.ProjectConfigService,
     Token.FirecrackerService,
     Token.Config,
   ] as const;
@@ -37,6 +40,7 @@ export class WorkspaceAgentService {
     private readonly logger: DefaultLogger,
     private readonly agentUtilService: AgentUtilService,
     private readonly sshGatewayService: SSHGatewayService,
+    private readonly projectConfigService: ProjectConfigService,
     private readonly fcServiceFactory: (id: string) => FirecrackerService,
     config: Config,
   ) {
@@ -226,6 +230,15 @@ export class WorkspaceAgentService {
           await this.agentUtilService.writeFile(ssh, attachToTaskScriptPath, attachToTaskScript);
           await execSshCmd({ ssh }, ["chmod", "+x", attachToTaskScriptPath]);
           await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
+          const cfg = await this.projectConfigService.getConfig(
+            ssh,
+            WORKSPACE_REPOSITORY_DIR,
+            args.workspaceRoot,
+          );
+          if (cfg === null) {
+            throw new Error("Config not found");
+          }
+          await execSshCmd({ ssh }, ["ln", "-s", cfg[1], WORKSPACE_CONFIG_SYMLINK_PATH]);
 
           await execSshCmd({ ssh }, [
             "tmux",
