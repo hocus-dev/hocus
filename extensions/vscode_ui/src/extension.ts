@@ -87,6 +87,16 @@ async function ensureSshConfigSetUp(recursed?: boolean) {
 
 }
 
+async function ensureRemoteExtensionSideloading() {
+  const remoteSSHconfig = vscode.workspace.getConfiguration('remote.SSH');
+  const defaultExtConfigInfo = remoteSSHconfig.inspect<string[]>('defaultExtensions');
+  const defaultExtensions = defaultExtConfigInfo?.globalValue ?? [];
+  if (!defaultExtensions.includes('hocus.hocus-remote')) {
+    defaultExtensions.unshift('hocus.hocus-remote');
+    await remoteSSHconfig.update('defaultExtensions', defaultExtensions, vscode.ConfigurationTarget.Global);
+  }
+}
+
 function shouldOpenWorkspaceInNewWindow(): boolean {
   // Check if we have an vscode workspace open
   const remoteUri = vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.[0].uri;
@@ -100,6 +110,7 @@ export async function activate(context: vscode.ExtensionContext) {
   await ensureSupportedPlatform();
   await ensureSshNewEnough();
   await ensureSshConfigSetUp();
+  await ensureRemoteExtensionSideloading();
 
   // TODO: Detect if we are inside a Hocus VM
   // TODO: The simplest way is to check for a JWT/OIDC token
@@ -171,6 +182,7 @@ Host ${workspaceName}.hocus.dev
 `
         )
 
+        await ensureRemoteExtensionSideloading();
         await
           vscode.commands.executeCommand(
             "vscode.openFolder",

@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.4
+
+- Sideload the remote part of the extension on ssh connect
+
 ## 0.0.3
 
 - Connect to the proper workspace within a monorepo
