@@ -238,7 +238,7 @@ export class WorkspaceAgentService {
           if (cfg === null) {
             throw new Error("Config not found");
           }
-          await execSshCmd({ ssh }, ["ln", "-s", cfg[1], WORKSPACE_CONFIG_SYMLINK_PATH]);
+          await execSshCmd({ ssh }, ["ln", "-sf", cfg[1], WORKSPACE_CONFIG_SYMLINK_PATH]);
 
           await execSshCmd({ ssh }, [
             "tmux",
