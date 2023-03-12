@@ -4,10 +4,13 @@ image:
 tasks:
   - name: Setup git
     init: |
+      yarn global add @vscode/vsce
       git config --global --add user.email gorbak25@gmail.com && 
       git config --global --add user.name "Grzegorz Uriasz"
     commandShell: fish
-    command: yarn
+    command: |
+      export PATH="$PATH:(yarn global bin)"
+      yarn
 vscode:
   extensions:
     - Prisma.prisma
