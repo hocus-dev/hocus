@@ -36,9 +36,9 @@ export async function scanWorkspaceTasks(): Promise<WorkspaceTask[]> {
       taskName: `Task ${taskIdx + 1}`,
       attachScriptPath,
       running: await fs.exists(attachScriptPath.replace("attach-", "task-").slice(0, -3) + ".sock")
-    })
+    });
   }
-  return tasks;
+  return tasks.reverse();
 }
 
 export function attachVscodeTerminalToTask(task: WorkspaceTask): vscode.Terminal {
@@ -98,26 +98,30 @@ export async function activate(context: vscode.ExtensionContext) {
   } else {
     if (workspaceConfig.value.vscode) {
       try {
-        await waitForPromises(workspaceConfig.value.vscode.extensions.map((extName) => vscode.commands.executeCommand("workbench.extensions.installExtension", extName)));
+        await waitForPromises(workspaceConfig.value.vscode.extensions.map((extName) => vscode.commands.executeCommand("workbench.extensions.installExtension", extName, { donotSync: true })));
       } catch (e) {
         console.error(e);
       }
     }
   }
 
+  const alreadyOpened = vscode.window.terminals.map((term) => {
+    if ((term.creationOptions as any).shellPath === void 0) { return void 0; }
+    else { return (term.creationOptions as vscode.TerminalOptions).shellPath; }
+  });
   for (const task of await scanWorkspaceTasks()) {
-    if (!task.running) { continue; }
+    if (!task.running || alreadyOpened.includes(task.attachScriptPath)) { continue; }
     attachVscodeTerminalToTask(task);
   }
 
-  vscode.window.onDidCloseTerminal(async (e) => {
-    if ((e.creationOptions as any).shellPath === void 0) return;
-    const creationOptions = e.creationOptions as vscode.TerminalOptions;
+  vscode.window.onDidCloseTerminal(async (term) => {
+    if ((term.creationOptions as any).shellPath === void 0) { return; }
+    const creationOptions = term.creationOptions as vscode.TerminalOptions;
 
     const tasks = await scanWorkspaceTasks();
     const taskState = tasks.find((task) => task.attachScriptPath === creationOptions.shellPath)
 
-    if (taskState === void 0) return;
+    if (taskState === void 0) { return; }
 
     if (taskState.running) {
       // TODO: Ask the user whether to kill the terminal
