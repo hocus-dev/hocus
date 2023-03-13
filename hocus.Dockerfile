@@ -54,3 +54,22 @@ RUN mkdir -p /home/hocus/.ssh && touch /home/hocus/.ssh/known_hosts && \
     chmod 600 /home/hocus/.ssh/authorized_keys && \
     chmod 600 /home/hocus/.ssh/known_hosts
 RUN echo 'set -g default-terminal "tmux-256color"' >> /home/hocus/.tmux.conf
+
+# Ensure ~/.ssh/ssh_auth_sock ALWAYS points to a valid symlink :)
+# Motivation: https://gist.github.com/martijnvermaat/8070533 && https://werat.dev/blog/happy-ssh-agent-forwarding/
+COPY ./docker/ssh/rc /home/hocus/.ssh/rc
+RUN chmod 700 /home/hocus/.ssh/rc && chown hocus:hocus /home/hocus/.ssh/rc
+COPY ./docker/ssh/on_ssh_disconnect.sh /etc/on_ssh_disconnect.sh
+RUN echo 'session optional pam_exec.so log=/var/log/on_ssh_disconnect.log /etc/on_ssh_disconnect.sh' >> /etc/pam.d/sshd
+
+# Ensure shells use ~/.ssh/ssh_auth_sock when used over ssh
+# Generally if there is an ssh session then one of SSH_CONNECTION, SSH_CLIENT, SSH_TTY will be set
+USER hocus
+# Fish <3
+RUN mkdir -pv ~/.config/fish && echo -ne '\nif set -q SSH_CONNECTION; or set -q SSH_CLIENT; or set -q SSH_TTY\n    set -gx SSH_AUTH_SOCK ~/.ssh/ssh_auth_sock\nend\n' >> ~/.config/fish/config.fish
+# Bash
+RUN echo -ne '\nif [ -v SSH_CONNECTION ] || [ -v SSH_CLIENT ] || [ -v SSH_TTY ]; then\n  export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock;\nfi\n' >> ~/.bashrc
+# ZSH
+RUN echo -ne '\nif [ -v SSH_CONNECTION ] || [ -v SSH_CLIENT ] || [ -v SSH_TTY ]; then\n  export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock;\nfi\n' >> ~/.zshrc
+# Ship ash, why would you run it on ubuntu? It's an alpine thing .-.
+USER root
