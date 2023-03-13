@@ -66,10 +66,10 @@ RUN echo 'session optional pam_exec.so log=/var/log/on_ssh_disconnect.log /etc/o
 # Generally if there is an ssh session then one of SSH_CONNECTION, SSH_CLIENT, SSH_TTY will be set
 USER hocus
 # Fish <3
-RUN mkdir -pv ~/.config/fish && echo -ne '\nif set -q SSH_CONNECTION; or set -q SSH_CLIENT; or set -q SSH_TTY\n    set -gx SSH_AUTH_SOCK ~/.ssh/ssh_auth_sock\nend\n' >> ~/.config/fish/config.fish
+RUN mkdir -pv ~/.config/fish && echo '\nif set -q SSH_CONNECTION; or set -q SSH_CLIENT; or set -q SSH_TTY\n    set -gx SSH_AUTH_SOCK ~/.ssh/ssh_auth_sock\nend\n' >> ~/.config/fish/config.fish
 # Bash
-RUN echo -ne '\nif [ -v SSH_CONNECTION ] || [ -v SSH_CLIENT ] || [ -v SSH_TTY ]; then\n  export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock;\nfi\n' >> ~/.bashrc
+RUN echo '\nif [ -v SSH_CONNECTION ] || [ -v SSH_CLIENT ] || [ -v SSH_TTY ]; then\n  export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock;\nfi\n' >> ~/.bashrc
 # ZSH
-RUN echo -ne '\nif [ -v SSH_CONNECTION ] || [ -v SSH_CLIENT ] || [ -v SSH_TTY ]; then\n  export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock;\nfi\n' >> ~/.zshrc
+RUN echo '\nif [ -v SSH_CONNECTION ] || [ -v SSH_CLIENT ] || [ -v SSH_TTY ]; then\n  export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock;\nfi\n' >> ~/.zshrc
 # Ship ash, why would you run it on ubuntu? It's an alpine thing .-.
 USER root
