@@ -2,6 +2,10 @@
 
 ## 0.0.3
 
+- Extensions are now installed via the Vscode CLI
+
+## 0.0.3
+
 - term.creationOptions was replaced with reading from /proc
 - Newly opened terminals get focused
 
