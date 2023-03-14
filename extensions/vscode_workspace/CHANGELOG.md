@@ -1,6 +1,6 @@
 # Change Log
 
-## 0.0.3
+## 0.0.4
 
 - Extensions are now installed via the Vscode CLI
 
