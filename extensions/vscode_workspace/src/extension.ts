@@ -1,6 +1,8 @@
+import * as child_process from "child_process";
 import * as fs from "fs-extra";
 import * as glob from "glob";
 import * as os from "os";
+import * as path from "path";
 import * as vscode from "vscode";
 import * as yaml from "yaml";
 import { ProjectConfigValidator } from "./project-config/validator";
@@ -87,6 +89,11 @@ const waitForPromises = async <T>(promises: Iterable<T>): Promise<Awaited<T>[]> 
   return results.map((result) => (result as PromiseFulfilledResult<Awaited<T>>).value);
 };
 
+async function getVSCodeProductJson() {
+  const productJsonStr = await fs.promises.readFile(path.join(vscode.env.appRoot, 'product.json'), 'utf8');
+  return JSON.parse(productJsonStr);
+}
+
 async function setupExtensions(): Promise<void> {
   // Ensure extensions from the workspace config are installed
   try {
@@ -98,7 +105,19 @@ async function setupExtensions(): Promise<void> {
     } else {
       if (workspaceConfig.value.vscode) {
         try {
-          await waitForPromises(workspaceConfig.value.vscode.extensions.map((extName) => vscode.commands.executeCommand("workbench.extensions.installExtension", extName, { donotSync: true })));
+          const productJson = await getVSCodeProductJson();
+          const binaryName = productJson.applicationName || 'code';
+          const cliPath = path.join(vscode.env.appRoot, "bin/remote-cli", binaryName);
+          const args = workspaceConfig.value.vscode.extensions.flatMap(e => ['--install-extension', e]);
+
+          const cp = child_process.spawn(cliPath, args, { timeout: 30_000, stdio: "ignore" });
+          await new Promise((resolve, reject) => {
+            cp.on("error", (err) => reject(err));
+            cp.on("exit", resolve);
+            cp.on("close", resolve);
+            cp.on("disconnect", resolve);
+          });
+
         } catch (e) {
           console.error(e);
         }
@@ -135,7 +154,7 @@ async function setupTerminals(): Promise<void> {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-  console.log("Hocus Workspace Activated");
+  console.log("Hocus Workspace started activation");
 
   const isWorkspace = await isHocusWorkspace();
   vscode.commands.executeCommand('setContext', 'hocus-remote.isHocusWorkspace', isWorkspace);
@@ -148,6 +167,8 @@ export async function activate(context: vscode.ExtensionContext) {
     setupExtensions(),
     setupTerminals(),
   ]);
+
+  console.log("Hocus Workspace finished activation");
 }
 
 export function deactivate() {
