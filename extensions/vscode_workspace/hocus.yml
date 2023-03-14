@@ -5,12 +5,11 @@ tasks:
   - name: Setup git
     init: |
       yarn global add @vscode/vsce
+      fish -c "set -U fish_user_paths $fish_user_paths ~/.yarn/bin"
       git config --global --add user.email gorbak25@gmail.com && 
       git config --global --add user.name "Grzegorz Uriasz"
     commandShell: fish
-    command: |
-      set PATH "$PATH:(yarn global bin)"
-      yarn
+    command: yarn
 vscode:
   extensions:
     - Prisma.prisma
