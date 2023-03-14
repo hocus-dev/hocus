@@ -21,7 +21,7 @@ import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "./
 import { FifoFlags } from "./fifo-flags";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import type { StorageService } from "./storage/storage.service";
-import { execCmd, retry, watchFileUntilLineMatches, withSsh } from "./utils";
+import { execCmd, execSshCmd, retry, watchFileUntilLineMatches, withSsh } from "./utils";
 import type { VmInfo } from "./vm-info.validator";
 import { VmInfoValidator } from "./vm-info.validator";
 
@@ -478,13 +478,18 @@ export class FirecrackerService {
             useSudo,
           );
         }
-        return await fn({
+        const r = await fn({
           ssh,
           sshConfig,
           firecrackerPid: fcPid,
           vmIp,
           ipBlockId: unwrap(ipBlockId),
         });
+
+        // Ensure the page cache is flushed before proceeding
+        await execSshCmd({ ssh }, ["sync"]);
+
+        return r;
       });
     } finally {
       if (shouldPoweroff && vmStarted) {
