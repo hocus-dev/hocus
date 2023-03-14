@@ -55,8 +55,7 @@ async function getTerminalCmdLine(term: vscode.Terminal): Promise<string | undef
   const pid = await term.processId;
   return (await fs.readFile(`/proc/${pid}/cmdline`, "utf-8")).split('\x00')[1];
 }
-
-export class GroupError extends Error {
+class GroupError extends Error {
   constructor(public readonly errors: unknown[]) {
     super(
       `Group error: ${errors
@@ -66,10 +65,11 @@ export class GroupError extends Error {
   }
 }
 
+//TODO: This emits the wrong type for tuples .-.
 /**
  * Works like `Promise.allSettled` but throws an error if any of the promises fail.
  */
-export const waitForPromises = async <T>(promises: Iterable<T>): Promise<Awaited<T>[]> => {
+const waitForPromises = async <T>(promises: Iterable<T>): Promise<Awaited<T>[]> => {
   const results = await Promise.allSettled(promises);
   const errors = results
     .filter((result) => result.status === "rejected")
@@ -87,16 +87,7 @@ export const waitForPromises = async <T>(promises: Iterable<T>): Promise<Awaited
   return results.map((result) => (result as PromiseFulfilledResult<Awaited<T>>).value);
 };
 
-export async function activate(context: vscode.ExtensionContext) {
-  console.log("Hocus Workspace Activated");
-
-  const isWorkspace = await isHocusWorkspace();
-  vscode.commands.executeCommand('setContext', 'hocus-remote.isHocusWorkspace', isWorkspace);
-  if (!isWorkspace) {
-    console.log("Not inside a hocus workspace");
-    return;
-  }
-
+async function setupExtensions(): Promise<void> {
   // Ensure extensions from the workspace config are installed
   try {
     const workspaceConfig = ProjectConfigValidator.SafeParse(yaml.parse(await fs.readFile(HOCUS_CONFIG_PATH, "utf-8")));
@@ -116,18 +107,22 @@ export async function activate(context: vscode.ExtensionContext) {
   } catch (e) {
     console.error(e);
   }
+}
 
-  const alreadyOpened = await waitForPromises(vscode.window.terminals.map((term) => getTerminalCmdLine(term)));
-  for (const task of await scanWorkspaceTasks()) {
+async function setupTerminals(): Promise<void> {
+  const [alreadyOpened, tasks] = await Promise.all([
+    waitForPromises(vscode.window.terminals.map((term) => getTerminalCmdLine(term))),
+    scanWorkspaceTasks()
+  ] as const);
+  for (const task of tasks) {
     if (!task.running || alreadyOpened.includes(task.attachScriptPath)) { continue; }
     const term = attachVscodeTerminalToTask(task);
     term.show(false);
   }
 
   vscode.window.onDidCloseTerminal(async (term) => {
-    const cmdLine = await getTerminalCmdLine(term);
-    const tasks = await scanWorkspaceTasks();
-    const taskState = tasks.find((task) => task.attachScriptPath === cmdLine)
+    const [cmdLine, tasks] = await Promise.all([getTerminalCmdLine(term), scanWorkspaceTasks()]);
+    const taskState = tasks.find((task) => task.attachScriptPath === cmdLine);
 
     if (taskState === void 0) { return; }
 
@@ -136,7 +131,23 @@ export async function activate(context: vscode.ExtensionContext) {
       // TODO: If the user agrees then we would need to find the terminal process and shot it with SIGKILL
       vscode.window.showInformationMessage("The terminal you closed is still running in the background. Reload the window to bring it back up.")
     }
-  })
+  });
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  console.log("Hocus Workspace Activated");
+
+  const isWorkspace = await isHocusWorkspace();
+  vscode.commands.executeCommand('setContext', 'hocus-remote.isHocusWorkspace', isWorkspace);
+  if (!isWorkspace) {
+    console.log("Not inside a hocus workspace");
+    return;
+  }
+
+  await waitForPromises([
+    setupExtensions(),
+    setupTerminals(),
+  ]);
 }
 
 export function deactivate() {
