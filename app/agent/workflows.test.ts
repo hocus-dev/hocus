@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { PrebuildEvent, Prisma } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
@@ -13,9 +13,11 @@ import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
-import { unwrap, waitForPromises } from "~/utils.shared";
+import { groupBy, unwrap, waitForPromises } from "~/utils.shared";
 
+import type { Activities } from "./activities";
 import { createActivities } from "./activities";
+import type { AgentInjector } from "./agent-injector";
 import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { execSshCmdThroughProxy } from "./test-utils";
@@ -31,10 +33,10 @@ import {
 
 const provideActivities = (
   testFn: (args: {
-    activities: Awaited<ReturnType<typeof createActivities>>;
+    activities: Activities;
     runId: string;
     db: Prisma.NonTransactionClient;
-    injector: ReturnType<typeof createAgentInjector>;
+    injector: AgentInjector;
   }) => Promise<void>,
 ): (() => Promise<void>) => {
   const injector = createAgentInjector({
@@ -206,19 +208,29 @@ test.concurrent(
       "refs/heads/run-buildfs-and-prebuilds-test-3-error",
     ].map((name) => unwrap(updates.newGitBranches.find((b) => b.name === name)));
     await worker.runUntil(async () => {
+      const branchesByGitObjectId = groupBy(
+        testBranches,
+        (b) => b.gitObjectId,
+        (b) => b,
+      );
+      const git = Array.from(branchesByGitObjectId.entries()).map(([gitObjectId, branches]) => ({
+        objectId: gitObjectId,
+        branchIds: branches.map((b) => b.id),
+      }));
+      const prebuildEvents: PrebuildEvent[] = [];
+      for (const p of projects) {
+        const { created } = await activities.getOrCreatePrebuildEvents({
+          projectId: p.id,
+          git,
+        });
+        prebuildEvents.push(...created);
+      }
+
       await client.workflow.execute(runBuildfsAndPrebuilds, {
         workflowId: uuidv4(),
         taskQueue: "test",
         retry: { maximumAttempts: 1 },
-        args: [
-          projects.map((p) => ({
-            projectId: p.id,
-            branches: testBranches.map((b) => ({
-              gitBranchId: b.id,
-              gitObjectId: b.gitObjectId,
-            })),
-          })),
-        ],
+        args: [prebuildEvents.map((e) => e.id)],
       });
 
       for (const i of testBranches.keys()) {

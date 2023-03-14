@@ -193,7 +193,8 @@ export class ProjectService {
       const finishedPrebuild = prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS] ?? null;
       const ongoingPrebuild =
         prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_RUNNING] ??
-        prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING] ??
+        prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT] ??
+        prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_READY] ??
         null;
       return { branch, finishedPrebuild, ongoingPrebuild };
     });

@@ -57,27 +57,34 @@ export class PrebuildService {
 
   async createPrebuildEvent(
     db: Prisma.TransactionClient,
-    projectId: bigint,
-    gitObjectId: bigint,
-    buildfsEventId: bigint | null,
-    workspaceTasks: { command: string; commandShell: string }[],
-    tasks: {
-      command: string;
-      cwd: string;
-    }[],
+    args: { projectId: bigint; gitObjectId: bigint; gitBranchIds: bigint[] },
   ): Promise<PrebuildEvent> {
+    const { projectId, gitObjectId, gitBranchIds } = args;
     const prebuildEvent = await db.prebuildEvent.create({
       data: {
         projectId,
         gitObjectId,
-        buildfsEventId,
-        status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING,
-        workspaceTasksCommand: workspaceTasks.map((x) => x.command),
-        workspaceTasksShell: workspaceTasks.map((x) => x.commandShell),
+        status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT,
       },
     });
+    await this.linkGitBranchesToPrebuildEvent(db, prebuildEvent.id, gitBranchIds);
+    return prebuildEvent;
+  }
+
+  async initPrebuildEvent(
+    db: Prisma.TransactionClient,
+    args: {
+      prebuildEventId: bigint;
+      buildfsEventId: bigint | null;
+      workspaceTasks: { command: string; commandShell: string }[];
+      tasks: {
+        command: string;
+        cwd: string;
+      }[];
+    },
+  ): Promise<PrebuildEvent> {
     await Promise.all(
-      tasks.map(async ({ command, cwd }, idx) => {
+      args.tasks.map(async ({ command, cwd }, idx) => {
         const paths = this.getPrebuildTaskPaths(idx);
         const vmTask = await this.agentUtilService.createVmTask(db, {
           command: [
@@ -95,7 +102,7 @@ export class PrebuildService {
         });
         await db.prebuildEventTask.create({
           data: {
-            prebuildEventId: prebuildEvent.id,
+            prebuildEventId: args.prebuildEventId,
             vmTaskId: vmTask.id,
             idx,
             originalCommand: command,
@@ -103,7 +110,15 @@ export class PrebuildService {
         });
       }),
     );
-    return prebuildEvent;
+    return await db.prebuildEvent.update({
+      where: { id: args.prebuildEventId },
+      data: {
+        status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_READY,
+        buildfsEventId: args.buildfsEventId,
+        workspaceTasksCommand: args.workspaceTasks.map((x) => x.command),
+        workspaceTasksShell: args.workspaceTasks.map((x) => x.commandShell),
+      },
+    });
   }
 
   async linkGitBranchesToPrebuildEvent(
@@ -231,34 +246,6 @@ export class PrebuildService {
         prebuildEventId: args.prebuildEventId,
       }),
     );
-  }
-
-  /**
-   * Creates a prebuild event and links all git branches that point to the given git object id to it.
-   */
-  async preparePrebuild(
-    db: Prisma.TransactionClient,
-    args: {
-      agentInstanceId: bigint;
-      projectId: bigint;
-      gitObjectId: bigint;
-      gitBranchIds: bigint[];
-      /** Null if project configuration was not found or did not include image config. */
-      buildfsEventId: bigint | null;
-      tasks: { command: string; cwd: string }[];
-      workspaceTasks: { command: string; commandShell: string }[];
-    },
-  ): Promise<PrebuildEvent> {
-    const prebuildEvent = await this.createPrebuildEvent(
-      db,
-      args.projectId,
-      args.gitObjectId,
-      args.buildfsEventId,
-      args.workspaceTasks,
-      args.tasks,
-    );
-    await this.linkGitBranchesToPrebuildEvent(db, prebuildEvent.id, args.gitBranchIds);
-    return prebuildEvent;
   }
 
   /**
