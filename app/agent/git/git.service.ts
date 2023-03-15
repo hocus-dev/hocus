@@ -47,6 +47,7 @@ export interface UpdateBranchesResult {
 export class AgentGitService {
   static inject = [Token.Logger, Token.AgentUtilService, Token.Config] as const;
   private readonly agentConfig: ReturnType<Config["agent"]>;
+  private readonly branchRefRegex = /^refs\/heads\/(.+)$/;
 
   constructor(
     private readonly logger: Logger,
@@ -161,7 +162,7 @@ export class AgentGitService {
     const newRemotes = await this.getRemotes(
       gitRepository.url,
       gitRepository.sshKeyPair.privateKey,
-    );
+    ).then((rs) => rs.filter((remote) => this.branchRefRegex.test(remote.name)));
     return await db.$transaction(async (tdb) => {
       await tdb.$executeRaw`SELECT id FROM "GitRepository" WHERE id = ${gitRepositoryId} FOR UPDATE`;
       const currentRemotes: GitRemoteInfo[] = gitRepository.gitBranches.map((b) => ({
