@@ -3,7 +3,12 @@ import { match } from "ts-pattern";
 
 export function PrebuildStatus(props: { status: PrebuildEventStatus }): JSX.Element {
   const [icon, text, color] = match(props.status)
-    .with("PREBUILD_EVENT_STATUS_PENDING", () => [
+    .with("PREBUILD_EVENT_STATUS_PENDING_INIT", () => [
+      "fa-solid fa-clock",
+      "Pending",
+      "text-yellow-400",
+    ])
+    .with("PREBUILD_EVENT_STATUS_PENDING_READY", () => [
       "fa-solid fa-clock",
       "Pending",
       "text-yellow-400",
