@@ -134,6 +134,23 @@ export class PrebuildService {
     });
   }
 
+  async upsertGitBranchesToPrebuildEvent(
+    db: Prisma.TransactionClient,
+    prebuildEventId: bigint,
+    gitBranchIds: bigint[],
+  ): Promise<void> {
+    await waitForPromises(
+      gitBranchIds.map((gitBranchId) =>
+        db.prebuildEventToGitBranch.upsert({
+          // eslint-disable-next-line camelcase
+          where: { prebuildEventId_gitBranchId: { prebuildEventId, gitBranchId } },
+          create: { prebuildEventId, gitBranchId },
+          update: {},
+        }),
+      ),
+    );
+  }
+
   async getSourceFsDrivePath(
     db: Prisma.Client,
     prebuildEventId: bigint,

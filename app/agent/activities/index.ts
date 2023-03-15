@@ -34,6 +34,8 @@ import type { GetWorkspaceInstanceStatusActivity } from "./get-workspace-instanc
 import { getWorkspaceInstanceStatus } from "./get-workspace-instance-status";
 import type { InitPrebuildEventsActivity } from "./init-prebuild-events";
 import { initPrebuildEvents } from "./init-prebuild-events";
+import type { LinkGitBranchesActivity } from "./link-git-branches";
+import { linkGitBranches } from "./link-git-branches";
 import type { PrebuildActivity } from "./prebuild";
 import { prebuild } from "./prebuild";
 import type { StartWorkspaceActivity } from "./start-workspace";
@@ -64,6 +66,7 @@ export interface Activities {
   getOrCreatePrebuildEvents: GetOrCreatePrebuildEventsActivity;
   initPrebuildEvents: InitPrebuildEventsActivity;
   getPrebuildEvents: GetPrebuildEventsActivity;
+  linkGitBranches: LinkGitBranchesActivity;
 }
 
 export interface ActivityArgs {
@@ -100,6 +103,7 @@ export const createActivities = async (
     getOrCreatePrebuildEvents,
     initPrebuildEvents,
     getPrebuildEvents,
+    linkGitBranches,
   };
 
   return Object.fromEntries(

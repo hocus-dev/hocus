@@ -51,6 +51,7 @@ const {
   getDefaultBranch,
   deleteWorkspace,
   initPrebuildEvents,
+  linkGitBranches,
 } = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -340,9 +341,9 @@ export async function runSyncGitRepository(
 ): Promise<void> {
   for (let i = 0; i < 1000; i++) {
     try {
-      const _updates = await updateGitBranchesAndObjects(gitRepositoryId);
+      const updates = await updateGitBranchesAndObjects(gitRepositoryId);
       const projects = await getRepositoryProjects(gitRepositoryId);
-      const _seenProjects = projects.filter((p) => seenProjectIds.has(p.id));
+      const seenProjects = projects.filter((p) => seenProjectIds.has(p.id));
       const newProjects = projects.filter((p) => !seenProjectIds.has(p.id));
       if (newProjects.length > 0) {
         const defaultBranch = await getDefaultBranch(gitRepositoryId);
@@ -369,6 +370,44 @@ export async function runSyncGitRepository(
             seenProjectIds.add(p.id);
           }
         }
+      }
+      if (
+        seenProjects.length > 0 &&
+        updates.newGitBranches.length + updates.updatedGitBranches.length > 0
+      ) {
+        const branches = [...updates.newGitBranches, ...updates.updatedGitBranches];
+        const branchesByGitObjectId = groupBy(
+          branches,
+          (b) => b.gitObjectId,
+          (b) => b,
+        );
+        const branchesByGitObjectIdArray = Array.from(branchesByGitObjectId.entries()).sort(
+          ([a], [b]) => numericSort(a, b),
+        );
+        const allPrebuildEvents = await waitForPromisesWorkflow(
+          seenProjects.map((p) =>
+            getOrCreatePrebuildEvents({
+              projectId: p.id,
+              git: branchesByGitObjectIdArray.map(([gitObjectId, branches]) => ({
+                objectId: gitObjectId,
+                branchIds: branches.map((b) => b.id),
+              })),
+            }),
+          ),
+        );
+        const linkArgs = allPrebuildEvents.flatMap((prebuildEvents) =>
+          prebuildEvents.found.map((e) => ({
+            prebuildEventId: e.id,
+            gitBranchIds: unwrap(branchesByGitObjectId.get(e.gitObjectId)).map((b) => b.id),
+          })),
+        );
+        await linkGitBranches(linkArgs);
+        const prebuildArgs = allPrebuildEvents.flatMap((prebuildEvents) =>
+          prebuildEvents.created.map((e) => e.id),
+        );
+        await executeChild(runBuildfsAndPrebuilds, {
+          args: [prebuildArgs],
+        });
       }
     } catch (err) {
       // eslint-disable-next-line no-console
