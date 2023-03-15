@@ -52,6 +52,7 @@ const {
   deleteWorkspace,
   initPrebuildEvents,
   linkGitBranches,
+  waitForBuildfs,
 } = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -237,12 +238,21 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
         ),
       );
       if (buildfsEventId != null) {
-        // TODO HOC-64: don't run buildfs if event was found and is already successful
-        // also wait for buildfs event to be completed if it's already running
-        const buildfsResult = await executeChild(runBuildfs, { args: [buildfsEventId] });
-        if (!buildfsResult.buildSuccessful) {
-          await cancelPrebuilds(innerPrebuildEvents.map((e) => e.id));
-          return;
+        const buildfsEvent = unwrap(buildfsEventByPrebuildEventId.get(innerPrebuildEvents[0].id));
+        if (buildfsEvent.status === "created") {
+          const buildfsResult = await executeChild(runBuildfs, { args: [buildfsEventId] });
+          if (!buildfsResult.buildSuccessful) {
+            await cancelPrebuilds(innerPrebuildEvents.map((e) => e.id));
+            return;
+          }
+        } else if (buildfsEvent.status === "found") {
+          const twoHours = 2 * 1000 * 60 * 60;
+          try {
+            await waitForBuildfs(buildfsEventId, twoHours);
+          } catch {
+            await cancelPrebuilds(innerPrebuildEvents.map((e) => e.id));
+            return;
+          }
         }
       }
       await waitForPromisesWorkflow(

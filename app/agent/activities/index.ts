@@ -44,6 +44,8 @@ import type { StopWorkspaceActivity } from "./stop-workspace";
 import { stopWorkspace } from "./stop-workspace";
 import type { UpdateGitBranchesAndObjectsActivity } from "./update-git-branches-and-objects";
 import { updateGitBranchesAndObjects } from "./update-git-branches-and-objects";
+import type { WaitForBuildfsActivity } from "./wait-for-buildfs";
+import { waitForBuildfs } from "./wait-for-buildfs";
 
 export interface Activities {
   fetchRepository: FetchRepositoryActivity;
@@ -67,6 +69,7 @@ export interface Activities {
   initPrebuildEvents: InitPrebuildEventsActivity;
   getPrebuildEvents: GetPrebuildEventsActivity;
   linkGitBranches: LinkGitBranchesActivity;
+  waitForBuildfs: WaitForBuildfsActivity;
 }
 
 export interface ActivityArgs {
@@ -104,6 +107,7 @@ export const createActivities = async (
     initPrebuildEvents,
     getPrebuildEvents,
     linkGitBranches,
+    waitForBuildfs,
   };
 
   return Object.fromEntries(
