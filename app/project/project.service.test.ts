@@ -153,11 +153,12 @@ test.concurrent(
         name: "test",
       }),
     );
-    const gitBranchArgs = ["a", "b", "c", "d", "e"].map((name, idx) => ({
+    const gitBranchArgs = ["a", "b", "c", "d", "e", "f"].map((name, idx) => ({
       name,
       gitObjectHash: `hash${idx}`,
       runningPrebuild: idx % 2 === 0,
-      pendingPrebuild: idx % 3 === 0,
+      pendingInitPrebuild: idx % 3 === 0,
+      pendingReadyPrebuild: idx % 4 === 0,
       finishedPrebuild: idx % 2 === 1,
     }));
     for (const args of gitBranchArgs) {
@@ -176,8 +177,14 @@ test.concurrent(
       for (const status of Array.from(Object.values(PrebuildEventStatus)).sort()) {
         for (const createdAt of [1, 2, 3]) {
           if (
-            status === PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING &&
-            !args.pendingPrebuild
+            status === PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT &&
+            !args.pendingInitPrebuild
+          ) {
+            continue;
+          }
+          if (
+            status === PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_READY &&
+            !args.pendingReadyPrebuild
           ) {
             continue;
           }
@@ -232,7 +239,14 @@ test.concurrent(
       (prebuild) => prebuild,
     );
     for (const args of gitBranchArgs) {
-      if (!(args.finishedPrebuild || args.pendingPrebuild || args.runningPrebuild)) {
+      if (
+        !(
+          args.finishedPrebuild ||
+          args.pendingInitPrebuild ||
+          args.pendingReadyPrebuild ||
+          args.runningPrebuild
+        )
+      ) {
         continue;
       }
       const results = unwrap(latestPrebuildsByBranchName.get(args.name));
@@ -247,9 +261,13 @@ test.concurrent(
         const prebuild = unwrap(result.ongoingPrebuild);
         expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_RUNNING);
         expect(prebuild.createdAt.getTime()).toEqual(3);
-      } else if (args.pendingPrebuild) {
+      } else if (args.pendingInitPrebuild) {
         const prebuild = unwrap(result.ongoingPrebuild);
-        expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING);
+        expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT);
+        expect(prebuild.createdAt.getTime()).toEqual(3);
+      } else if (args.pendingReadyPrebuild) {
+        const prebuild = unwrap(result.ongoingPrebuild);
+        expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_READY);
         expect(prebuild.createdAt.getTime()).toEqual(3);
       }
     }

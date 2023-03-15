@@ -12,8 +12,6 @@ import type { ChangePrebuildEventStatusActivity } from "./change-prebuild-event-
 import { changePrebuildEventStatus } from "./change-prebuild-event-status";
 import type { CheckoutAndInspectActivity } from "./checkout-and-inspect";
 import { checkoutAndInspect } from "./checkout-and-inspect";
-import type { CreatePrebuildEventsActivity } from "./create-prebuild-events";
-import { createPrebuildEvents } from "./create-prebuild-events";
 import type { CreatePrebuildFilesActivity } from "./create-prebuild-files";
 import { createPrebuildFiles } from "./create-prebuild-files";
 import type { CreateWorkspaceActivity } from "./create-workspace";
@@ -26,12 +24,16 @@ import type { GetDefaultBranchActivity } from "./get-default-branch";
 import { getDefaultBranch } from "./get-default-branch";
 import type { GetOrCreateBuildfsEventsActivity } from "./get-or-create-buildfs-events";
 import { getOrCreateBuildfsEvents } from "./get-or-create-buildfs-events";
-import type { GetProjectsAndGitObjectsActivity } from "./get-projects-and-git-objects";
-import { getProjectsAndGitObjects } from "./get-projects-and-git-objects";
+import type { GetOrCreatePrebuildEventsActivity } from "./get-or-create-prebuild-events";
+import { getOrCreatePrebuildEvents } from "./get-or-create-prebuild-events";
+import type { GetPrebuildEventsActivity } from "./get-prebuild-events";
+import { getPrebuildEvents } from "./get-prebuild-events";
 import type { GetRepositoryProjectsActivity } from "./get-repository-projects";
 import { getRepositoryProjects } from "./get-repository-projects";
 import type { GetWorkspaceInstanceStatusActivity } from "./get-workspace-instance-status";
 import { getWorkspaceInstanceStatus } from "./get-workspace-instance-status";
+import type { InitPrebuildEventsActivity } from "./init-prebuild-events";
+import { initPrebuildEvents } from "./init-prebuild-events";
 import type { PrebuildActivity } from "./prebuild";
 import { prebuild } from "./prebuild";
 import type { StartWorkspaceActivity } from "./start-workspace";
@@ -51,9 +53,7 @@ export interface Activities {
   createWorkspace: CreateWorkspaceActivity;
   startWorkspace: StartWorkspaceActivity;
   stopWorkspace: StopWorkspaceActivity;
-  getProjectsAndGitObjects: GetProjectsAndGitObjectsActivity;
   getOrCreateBuildfsEvents: GetOrCreateBuildfsEventsActivity;
-  createPrebuildEvents: CreatePrebuildEventsActivity;
   createPrebuildFiles: CreatePrebuildFilesActivity;
   getWorkspaceInstanceStatus: GetWorkspaceInstanceStatusActivity;
   addProjectAndRepository: AddProjectAndRepositoryActivity;
@@ -61,6 +61,9 @@ export interface Activities {
   getDefaultBranch: GetDefaultBranchActivity;
   getRepositoryProjects: GetRepositoryProjectsActivity;
   deleteWorkspace: DeleteWorkspaceActivity;
+  getOrCreatePrebuildEvents: GetOrCreatePrebuildEventsActivity;
+  initPrebuildEvents: InitPrebuildEventsActivity;
+  getPrebuildEvents: GetPrebuildEventsActivity;
 }
 
 export interface ActivityArgs {
@@ -86,9 +89,7 @@ export const createActivities = async (
     createWorkspace,
     startWorkspace,
     stopWorkspace,
-    getProjectsAndGitObjects,
     getOrCreateBuildfsEvents,
-    createPrebuildEvents,
     createPrebuildFiles,
     getWorkspaceInstanceStatus,
     addProjectAndRepository,
@@ -96,6 +97,9 @@ export const createActivities = async (
     updateGitBranchesAndObjects,
     getDefaultBranch,
     deleteWorkspace,
+    getOrCreatePrebuildEvents,
+    initPrebuildEvents,
+    getPrebuildEvents,
   };
 
   return Object.fromEntries(

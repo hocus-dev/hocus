@@ -19,24 +19,23 @@ import {
   filterNull,
   unwrap,
   groupBy,
-  makeMap,
   displayError,
 } from "~/utils.shared";
 
 import type { Activities } from "./activities";
+import type { CheckoutAndInspectResult } from "./activities-types";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
 import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
-import type { BFSPWorkflowPhase, BFSPWorkflowState } from "./workflows-utils";
 
 const { defaultWorkflowLogger: logger } = proxySinks();
 
 const {
   checkoutAndInspect,
-  getProjectsAndGitObjects,
   fetchRepository,
   getOrCreateBuildfsEvents,
-  createPrebuildEvents,
+  getOrCreatePrebuildEvents,
+  getPrebuildEvents,
   buildfs,
   prebuild,
   createPrebuildFiles,
@@ -51,6 +50,7 @@ const {
   updateGitBranchesAndObjects,
   getDefaultBranch,
   deleteWorkspace,
+  initPrebuildEvents,
 } = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -79,66 +79,47 @@ const {
  * - Run buildfs tasks
  * - Run prebuild tasks
  */
-export async function runBuildfsAndPrebuilds(
-  targets: {
-    projectId: bigint;
-    branches: { gitBranchId: bigint; gitObjectId: bigint }[];
-  }[],
-): Promise<void> {
-  if (targets.length === 0) {
+export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promise<void> {
+  if (prebuildEventIds.length === 0) {
     return;
   }
-  const state1: BFSPWorkflowState<typeof BFSPWorkflowPhase.START> = new ArbitraryKeyMap(
-    (key) => `${key.projectId}-${key.gitObjectId}`,
-  );
-  for (const target of targets) {
-    for (const branch of target.branches) {
-      const key = { projectId: target.projectId, gitObjectId: branch.gitObjectId };
-      const value = state1.get(key);
-      if (value != null) {
-        value.gitBranchIds.push(branch.gitBranchId);
-      } else {
-        state1.set(key, { gitBranchIds: [branch.gitBranchId] });
-      }
-    }
-  }
-
-  const gitObjectIds = Array.from(new Set(state1.keys().map((key) => key.gitObjectId)));
-  // to make order deterministic
-  gitObjectIds.sort(numericSort);
-  const { projects, gitObjects } = await getProjectsAndGitObjects(
-    targets.map((t) => t.projectId),
-    gitObjectIds,
-  );
-  gitObjects.sort((a, b) => numericSort(a.id, b.id));
-  projects.sort((a, b) => numericSort(a.id, b.id));
-
-  const gitObjectsById = makeMap(gitObjects, (o) => o.id);
-  const projectsById = makeMap(projects, (p) => p.id);
-
-  const state2 = state1 as BFSPWorkflowState<typeof BFSPWorkflowPhase.AFTER_DB_FETCH>;
-  for (const key of state2.keys()) {
-    const { projectId, gitObjectId } = key;
-    const stateElement = unwrap(state2.get(key));
-    stateElement.gitObject = unwrap(gitObjectsById.get(gitObjectId));
-    stateElement.project = unwrap(projectsById.get(projectId));
-  }
-
-  const gitRepositoryId = projects[0].gitRepositoryId;
-  if (!projects.every((project) => project.gitRepositoryId === gitRepositoryId)) {
+  const prebuildEvents = await getPrebuildEvents(prebuildEventIds);
+  const gitRepositoryId = prebuildEvents[0].project.gitRepositoryId;
+  if (!prebuildEvents.every((e) => e.project.gitRepositoryId === gitRepositoryId)) {
     throw new ApplicationFailure("All projects must be from the same repository");
+  }
+  if (!prebuildEvents.every((e) => e.status === "PREBUILD_EVENT_STATUS_PENDING_INIT")) {
+    throw new ApplicationFailure("All prebuild events must be in the pending init state");
+  }
+  const projectAndGitObjectIdToPrebuildEvent = new ArbitraryKeyMap<
+    { projectId: bigint; gitObjectId: bigint },
+    typeof prebuildEvents[0]
+  >(({ projectId, gitObjectId }) => `${projectId}-${gitObjectId}`);
+  for (const prebuildEvent of prebuildEvents) {
+    const key = { projectId: prebuildEvent.projectId, gitObjectId: prebuildEvent.gitObjectId };
+    if (projectAndGitObjectIdToPrebuildEvent.has(key)) {
+      throw new ApplicationFailure(
+        "There are multiple prebuild events for the same project and git object",
+      );
+    }
+    projectAndGitObjectIdToPrebuildEvent.set(key, prebuildEvent);
   }
 
   await fetchRepository(gitRepositoryId);
+  const gitObjectsById = new Map(prebuildEvents.map((e) => [e.gitObjectId, e.gitObject]));
+  const projectsById = new Map(prebuildEvents.map((e) => [e.projectId, e.project]));
 
   const gitObjectIdToCheckOutPath = new Map(
-    gitObjects.map((o) => [o.id, `${HOST_PERSISTENT_DIR}/checked-out/${o.hash}.ext4` as const]),
+    Array.from(gitObjectsById.values()).map((o) => [
+      o.id,
+      `${HOST_PERSISTENT_DIR}/checked-out/${o.hash}.ext4` as const,
+    ]),
   );
   const gitObjectIdsAndProjectIds = Array.from(
     groupBy(
-      state2.keys(),
-      (key) => key.gitObjectId,
-      (key) => key.projectId,
+      prebuildEvents,
+      (e) => e.gitObjectId,
+      (e) => e.projectId,
     ).entries(),
   )
     .map(
@@ -164,52 +145,60 @@ export async function runBuildfsAndPrebuilds(
     }),
   );
 
-  const state3 = state2 as BFSPWorkflowState<typeof BFSPWorkflowPhase.AFTER_CHECKOUT>;
+  const prebuildEventsWithInspection: (typeof prebuildEvents[0] & {
+    inspection: CheckoutAndInspectResult;
+  })[] = [];
   for (const [
     gitObjectIdIdx,
     [gitObjectId, gitObjectProjectIds],
   ] of gitObjectIdsAndProjectIds.entries()) {
     for (const [projectIdIdx, projectId] of gitObjectProjectIds.entries()) {
       const checkoutResult = checkedOutResults[gitObjectIdIdx][projectIdIdx];
-      const stateElement = unwrap(state3.get({ projectId, gitObjectId }));
-      stateElement.inspection = checkoutResult;
+      const prebuildEvent = unwrap(
+        projectAndGitObjectIdToPrebuildEvent.get({ projectId, gitObjectId }),
+      );
+      prebuildEventsWithInspection.push({
+        ...prebuildEvent,
+        inspection: checkoutResult,
+      });
     }
   }
+  prebuildEventsWithInspection.sort((a, b) => numericSort(a.id, b.id));
 
   const buildfsEventsArgs = filterNull(
-    state3.sortedValues().map((stateElement) => {
-      const { inspection, gitObject, project } = stateElement;
+    prebuildEventsWithInspection.map(({ inspection, id, gitObjectId, project }) => {
       if (inspection === null) {
         return null;
       }
       return {
+        prebuildEventId: id,
         projectId: project.id,
-        gitObjectId: gitObject.id,
         contextPath: inspection.projectConfig.image.buildContext,
         dockerfilePath: inspection.projectConfig.image.file,
         cacheHash: inspection.imageFileHash,
         outputFilePath: `${HOST_PERSISTENT_DIR}/buildfs/${uuid4()}.ext4` as const,
-        projectFilePath: unwrap(gitObjectIdToCheckOutPath.get(gitObject.id)),
+        projectFilePath: unwrap(gitObjectIdToCheckOutPath.get(gitObjectId)),
       };
     }),
   );
 
   const buildfsEvents = await getOrCreateBuildfsEvents(buildfsEventsArgs);
-  const state4 = state3 as BFSPWorkflowState<typeof BFSPWorkflowPhase.AFTER_BUILDFS_EVENTS>;
-  for (const [idx, args] of buildfsEventsArgs.entries()) {
-    const stateElement = unwrap(
-      state4.get({ projectId: args.projectId, gitObjectId: args.gitObjectId }),
-    );
-    stateElement.buildfsEvent = buildfsEvents[idx];
-  }
+  const buildfsEventByPrebuildEventId = new Map(
+    Array.from(buildfsEventsArgs.entries()).map(([idx, e]) => [
+      e.prebuildEventId,
+      buildfsEvents[idx],
+    ]),
+  );
 
-  const prebuildEventsArgs = state4.sortedValues().map((stateElement) => {
-    const { inspection, gitObject, project, buildfsEvent, gitBranchIds } = stateElement;
+  const prebuildEventsArgs = prebuildEventsWithInspection.map((prebuildEvent) => {
+    const { inspection, project } = prebuildEvent;
+    const buildfsEvent = buildfsEventByPrebuildEventId.get(prebuildEvent.id);
+
     const [buildfsEventId, tasks, workspaceTasks] =
       inspection === null
         ? [null, [], []]
         : [
-            unwrap(buildfsEvent).event.id,
+            buildfsEvent?.event.id ?? null,
             inspection.projectConfig.tasks.map((task) => ({
               command: task.init,
               cwd: path.join(PREBUILD_REPOSITORY_DIR, project.rootDirectoryPath),
@@ -220,39 +209,30 @@ export async function runBuildfsAndPrebuilds(
             })),
           ];
     return {
-      projectId: project.id,
-      gitObjectId: gitObject.id,
+      prebuildEventId: prebuildEvent.id,
       buildfsEventId,
-      sourceProjectDrivePath: unwrap(gitObjectIdToCheckOutPath.get(gitObject.id)),
-      gitBranchIds,
       tasks,
       workspaceTasks,
     };
   });
 
-  const prebuildEvents = await createPrebuildEvents(prebuildEventsArgs);
-  const state5 = state4 as BFSPWorkflowState<typeof BFSPWorkflowPhase.AFTER_PREBUILD_EVENTS>;
-  for (const [idx, args] of prebuildEventsArgs.entries()) {
-    const stateElement = unwrap(
-      state5.get({ projectId: args.projectId, gitObjectId: args.gitObjectId }),
-    );
-    stateElement.prebuildEvent = prebuildEvents[idx];
-    stateElement.sourceProjectDrivePath = args.sourceProjectDrivePath;
-  }
-
-  const buildfsEventsToStateElements = Array.from(
+  const updatedPrebuildEvents = (await initPrebuildEvents(prebuildEventsArgs)).map((e) => ({
+    ...e,
+    sourceProjectDrivePath: unwrap(gitObjectIdToCheckOutPath.get(e.gitObjectId)),
+  }));
+  const buildfsEventIdAndPrebuilds = Array.from(
     groupBy(
-      state5.sortedValues(),
-      (e) => e.buildfsEvent?.event.id ?? null,
+      updatedPrebuildEvents,
+      (e) => e.buildfsEventId,
       (e) => e,
     ).entries(),
-  ).sort(([a, _1], [b, _2]) => numericOrNullSort(a, b));
+  ).sort(([a], [b]) => numericOrNullSort(a, b));
 
   await waitForPromisesWorkflow(
-    buildfsEventsToStateElements.map(async ([buildfsEventId, stateElements]) => {
+    buildfsEventIdAndPrebuilds.map(async ([buildfsEventId, innerPrebuildEvents]) => {
       await waitForPromisesWorkflow(
-        stateElements.map((e) =>
-          changePrebuildEventStatus(e.prebuildEvent.id, "PREBUILD_EVENT_STATUS_RUNNING"),
+        innerPrebuildEvents.map((e) =>
+          changePrebuildEventStatus(e.id, "PREBUILD_EVENT_STATUS_RUNNING"),
         ),
       );
       if (buildfsEventId != null) {
@@ -260,14 +240,14 @@ export async function runBuildfsAndPrebuilds(
         // also wait for buildfs event to be completed if it's already running
         const buildfsResult = await executeChild(runBuildfs, { args: [buildfsEventId] });
         if (!buildfsResult.buildSuccessful) {
-          await cancelPrebuilds(stateElements.map((e) => e.prebuildEvent.id));
+          await cancelPrebuilds(innerPrebuildEvents.map((e) => e.id));
           return;
         }
       }
       await waitForPromisesWorkflow(
-        stateElements.map(async (e) =>
+        innerPrebuildEvents.map(async (e) =>
           executeChild(runPrebuild, {
-            args: [e.prebuildEvent.id, unwrap(e.sourceProjectDrivePath)],
+            args: [e.id, unwrap(e.sourceProjectDrivePath)],
           }),
         ),
       );
@@ -367,19 +347,22 @@ export async function runSyncGitRepository(
       if (newProjects.length > 0) {
         const defaultBranch = await getDefaultBranch(gitRepositoryId);
         if (defaultBranch !== null) {
+          // TODO: we do it sequentially here instead of batching because there is a bug
+          // in the runBuildfsAndPrebuilds that doesn't allow us to run multiple
+          // workflows of this kind in parallel
           for (const p of newProjects) {
-            await executeChild(runBuildfsAndPrebuilds, {
-              args: [
-                [
-                  {
-                    projectId: p.id,
-                    branches: [
-                      { gitBranchId: defaultBranch.id, gitObjectId: defaultBranch.gitObjectId },
-                    ],
-                  },
-                ],
+            const prebuildEvents = await getOrCreatePrebuildEvents({
+              projectId: p.id,
+              git: [
+                {
+                  objectId: defaultBranch.gitObjectId,
+                  branchIds: [defaultBranch.id],
+                },
               ],
-              parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+            });
+            const prebuildEvent = prebuildEvents.created[0];
+            await executeChild(runBuildfsAndPrebuilds, {
+              args: [[prebuildEvent.id]],
             });
           }
           for (const p of newProjects) {

@@ -162,7 +162,8 @@ export class ProjectService {
       WHERE x."r" = 1 AND x."status" IN (
         'PREBUILD_EVENT_STATUS_SUCCESS'::"PrebuildEventStatus",
         'PREBUILD_EVENT_STATUS_RUNNING'::"PrebuildEventStatus",
-        'PREBUILD_EVENT_STATUS_PENDING'::"PrebuildEventStatus"
+        'PREBUILD_EVENT_STATUS_PENDING_INIT'::"PrebuildEventStatus",
+        'PREBUILD_EVENT_STATUS_PENDING_READY'::"PrebuildEventStatus"
       )
     `;
     const prebuildEvents = await db.prebuildEvent.findMany({
@@ -193,7 +194,8 @@ export class ProjectService {
       const finishedPrebuild = prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS] ?? null;
       const ongoingPrebuild =
         prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_RUNNING] ??
-        prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING] ??
+        prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT] ??
+        prebuilds[PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_READY] ??
         null;
       return { branch, finishedPrebuild, ongoingPrebuild };
     });
