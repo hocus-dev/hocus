@@ -5,6 +5,7 @@ import type { Config as NameGeneratorConfig } from "unique-names-generator";
 import type { Config } from "~/config";
 import { HttpError } from "~/http-error.server";
 import { Token } from "~/token";
+import { formatBranchName } from "~/utils.shared";
 
 export interface WorkspaceInfo {
   status: WorkspaceStatus;
@@ -68,7 +69,7 @@ export class WorkspaceService {
       externalId: workspace.externalId,
       status: workspace.status,
       name: workspace.name,
-      branchName: workspace.gitBranch.name,
+      branchName: formatBranchName(workspace.gitBranch.name),
       commitHash: workspace.prebuildEvent.gitObject.hash,
       project: {
         externalId: workspace.prebuildEvent.project.externalId,

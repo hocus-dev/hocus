@@ -115,3 +115,7 @@ export const sleep = (ms: number): Promise<void> => {
 export const max = (a: number, b: number): number => {
   return a > b ? a : b;
 };
+
+export const formatBranchName = (name: string): string => {
+  return name.replace(/^refs\/heads\//, "");
+};

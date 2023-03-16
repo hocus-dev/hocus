@@ -15,7 +15,7 @@ import { HttpError } from "~/http-error.server";
 import { getPrebuildLogsPath, getPrebuildPath, ProjectPathTabId } from "~/page-paths.shared";
 import { PrebuildQueryValidator } from "~/schema/prebuild-query.validator.server";
 import { UuidValidator } from "~/schema/uuid.validator.server";
-import { numericSort } from "~/utils.shared";
+import { formatBranchName, numericSort } from "~/utils.shared";
 
 export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   const { success, value: prebuildExternalId } = UuidValidator.SafeParse(
@@ -99,7 +99,9 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
     },
     prebuild: {
       externalId: prebuildEvent.externalId,
-      branches: prebuildEvent.gitBranchLinks.map((link) => link.gitBranch.name).sort(),
+      branches: prebuildEvent.gitBranchLinks
+        .map((link) => formatBranchName(link.gitBranch.name))
+        .sort(),
       gitHash: prebuildEvent.gitObject.hash,
       createdAt: prebuildEvent.createdAt.getTime(),
       status: prebuildEvent.status,

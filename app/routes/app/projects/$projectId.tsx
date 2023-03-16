@@ -17,7 +17,7 @@ import { HttpError } from "~/http-error.server";
 import { getNewWorkspacePath, PagePaths, ProjectPathTabId } from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
 import { Token } from "~/token";
-import { unwrap } from "~/utils.shared";
+import { formatBranchName, unwrap } from "~/utils.shared";
 
 export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) => {
   const { success, value: projectExternalId } = UuidValidator.SafeParse(
@@ -106,7 +106,10 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
     },
     prebuildEvents: project.prebuildEvents.map((e) => ({
       branches: e.gitBranchLinks
-        .map((b) => ({ name: b.gitBranch.name, externalId: b.gitBranch.externalId }))
+        .map((b) => ({
+          name: formatBranchName(b.gitBranch.name),
+          externalId: b.gitBranch.externalId,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name)),
       commitHash: e.gitObject.hash.substring(0, 8),
       createdAt: e.createdAt.getTime(),
@@ -121,7 +124,7 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
         createdAt: w.createdAt.getTime(),
         name: w.name,
         lastOpenedAt: w.lastOpenedAt.getTime(),
-        branchName: w.gitBranch.name,
+        branchName: formatBranchName(w.gitBranch.name),
         commitHash: w.prebuildEvent.gitObject.hash,
         agentHostname: config.agentHostname,
         workspaceHostname: w.activeInstance?.vmIp,
