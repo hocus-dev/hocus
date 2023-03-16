@@ -111,10 +111,11 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
   const gitObjectsById = new Map(prebuildEvents.map((e) => [e.gitObjectId, e.gitObject]));
   const projectsById = new Map(prebuildEvents.map((e) => [e.projectId, e.project]));
 
+  const checkoutId = uuid4();
   const gitObjectIdToCheckOutPath = new Map(
     Array.from(gitObjectsById.values()).map((o) => [
       o.id,
-      `${HOST_PERSISTENT_DIR}/checked-out/${o.hash}.ext4` as const,
+      `${HOST_PERSISTENT_DIR}/checked-out/${checkoutId}-${o.id}.ext4` as const,
     ]),
   );
   const gitObjectIdsAndProjectIds = Array.from(
@@ -358,9 +359,6 @@ export async function runSyncGitRepository(
       if (newProjects.length > 0) {
         const defaultBranch = await getDefaultBranch(gitRepositoryId);
         if (defaultBranch !== null) {
-          // TODO: we do it sequentially here instead of batching because there is a bug
-          // in the runBuildfsAndPrebuilds that doesn't allow us to run multiple
-          // workflows of this kind in parallel
           for (const p of newProjects) {
             const prebuildEvents = await getOrCreatePrebuildEvents({
               projectId: p.id,
@@ -372,8 +370,9 @@ export async function runSyncGitRepository(
               ],
             });
             const prebuildEvent = prebuildEvents.created[0];
-            await executeChild(runBuildfsAndPrebuilds, {
+            await startChild(runBuildfsAndPrebuilds, {
               args: [[prebuildEvent.id]],
+              parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
             });
           }
           for (const p of newProjects) {
@@ -415,8 +414,9 @@ export async function runSyncGitRepository(
         const prebuildArgs = allPrebuildEvents.flatMap((prebuildEvents) =>
           prebuildEvents.created.map((e) => e.id),
         );
-        await executeChild(runBuildfsAndPrebuilds, {
+        await startChild(runBuildfsAndPrebuilds, {
           args: [prebuildArgs],
+          parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
         });
       }
     } catch (err) {

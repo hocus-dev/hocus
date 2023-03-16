@@ -148,23 +148,26 @@ export class AgentGitService {
     db: Prisma.NonTransactionClient,
     gitRepositoryId: bigint,
   ): Promise<UpdateBranchesResult> {
-    const gitRepository = await db.gitRepository.findUniqueOrThrow({
-      where: { id: gitRepositoryId },
-      include: {
-        sshKeyPair: true,
-        gitBranches: {
-          include: {
-            gitObject: true,
+    const getGitRepo = (innerDb: Prisma.Client) =>
+      innerDb.gitRepository.findUniqueOrThrow({
+        where: { id: gitRepositoryId },
+        include: {
+          sshKeyPair: true,
+          gitBranches: {
+            include: {
+              gitObject: true,
+            },
           },
         },
-      },
-    });
+      });
+    let gitRepository = await getGitRepo(db);
     const newRemotes = await this.getRemotes(
       gitRepository.url,
       gitRepository.sshKeyPair.privateKey,
     ).then((rs) => rs.filter((remote) => this.branchRefRegex.test(remote.name)));
     return await db.$transaction(async (tdb) => {
       await tdb.$executeRaw`SELECT id FROM "GitRepository" WHERE id = ${gitRepositoryId} FOR UPDATE`;
+      gitRepository = await getGitRepo(tdb);
       const currentRemotes: GitRemoteInfo[] = gitRepository.gitBranches.map((b) => ({
         name: b.name,
         hash: b.gitObject.hash,
