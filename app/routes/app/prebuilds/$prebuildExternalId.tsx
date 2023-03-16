@@ -148,9 +148,9 @@ export default function PrebuildRoute(): JSX.Element {
           </p>
         </div>
       </div>
-      <div className="grow min-h-[30rem] max-h-[100rem] w-full mt-6 rounded-lg border border-gray-700">
-        <div className="h-full flex">
-          <div className="w-[14rem] h-full border-r border-gray-700 shrink-0">
+      <div className="flex flex-col grow min-h-[30rem] max-h-[100rem] w-full mt-6 rounded-lg border border-gray-700">
+        <div className="grow flex">
+          <div className="w-[14rem] flex flex-col grow border-r border-gray-700 shrink-0">
             <h1 className="h-16 font-bold text-lg p-4 border-b border-gray-700 flex flex-col justify-center">
               <span>Tasks</span>
             </h1>
@@ -167,7 +167,7 @@ export default function PrebuildRoute(): JSX.Element {
               </a>
             ))}
           </div>
-          <div className="h-full flex flex-col" style={{ width: "calc(100% - 14rem)" }}>
+          <div className="flex flex-col grow" style={{ width: "calc(100% - 14rem)" }}>
             {activeTask ? (
               <>
                 <div className="border-b border-gray-700 flex">
