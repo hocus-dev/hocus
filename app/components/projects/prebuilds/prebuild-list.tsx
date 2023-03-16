@@ -12,17 +12,19 @@ export function PrebuildList(props: { elements: PrebuildListElementProps[] }): J
     </div>
   );
   return (
-    <div className="grid grid-cols-1">
-      {props.elements.length === 0 && noElementsView}
-      {props.elements.map((element, idx) => (
-        <PrebuildListElement {...element} key={idx} />
-      ))}
+    <>
+      <div className="grid grid-cols-[fit-content(200px)_fit-content(500px)_minmax(0,_1fr)] gap-4">
+        {props.elements.length === 0 && noElementsView}
+        {props.elements.map((element, idx) => (
+          <PrebuildListElement {...element} key={idx} />
+        ))}
+      </div>
       {props.elements.length > 0 && (
         <div className="mt-8 text-center text-gray-400 text-sm">
           <i className="fa-solid fa-circle-info mr-2"></i>
           <span>Push commits to the repository to trigger new prebuilds.</span>
         </div>
       )}
-    </div>
+    </>
   );
 }

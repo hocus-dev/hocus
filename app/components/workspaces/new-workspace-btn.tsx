@@ -15,7 +15,12 @@ export function NewWorkspaceButton(props: {
       <CsrfInput />
       <input type="hidden" name="gitBranchId" value={props.externalGitBranchId} />
       <input type="hidden" name="prebuildEventId" value={props.externalPrebuildEventId} />
-      <Button size={props.btnSize} type="submit" color="success" className="transition-all">
+      <Button
+        size={props.btnSize}
+        type="submit"
+        color="success"
+        className="transition-all whitespace-nowrap"
+      >
         {props.content ?? (
           <>
             <i className="fa-solid fa-circle-plus mr-2"></i>
