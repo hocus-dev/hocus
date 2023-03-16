@@ -8,3 +8,4 @@
 # Short-Description: Setups /etc/resolv.conf
 ### END INIT INFO
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
+echo "127.0.0.1       localhost" >> /etc/hosts
