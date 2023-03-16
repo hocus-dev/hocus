@@ -46,6 +46,7 @@ import type { StartWorkspaceActivity } from "./start-workspace";
 import { startWorkspace } from "./start-workspace";
 import type { StopWorkspaceActivity } from "./stop-workspace";
 import { stopWorkspace } from "./stop-workspace";
+import type { CreateActivity } from "./types";
 import type { UpdateGitBranchesAndObjectsActivity } from "./update-git-branches-and-objects";
 import { updateGitBranchesAndObjects } from "./update-git-branches-and-objects";
 import type { WaitForBuildfsActivity } from "./wait-for-buildfs";
@@ -84,7 +85,7 @@ export interface ActivityArgs {
 }
 
 export type ActivitiesCreateFns = {
-  [K in keyof Activities]: (args: ActivityArgs) => Activities[K];
+  [K in keyof Activities]: CreateActivity<Activities[K]>;
 };
 
 export const createActivities = async (

@@ -15,8 +15,8 @@ import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
 import { groupBy, unwrap, waitForPromises } from "~/utils.shared";
 
-import type { Activities } from "./activities";
-import { createActivities } from "./activities";
+import type { Activities } from "./activities/list";
+import { createActivities } from "./activities/list";
 import type { AgentInjector } from "./agent-injector";
 import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";

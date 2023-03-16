@@ -22,8 +22,8 @@ import {
   displayError,
 } from "~/utils.shared";
 
-import type { Activities } from "./activities";
 import type { CheckoutAndInspectResult } from "./activities-types";
+import type { Activities } from "./activities/list";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
 import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
