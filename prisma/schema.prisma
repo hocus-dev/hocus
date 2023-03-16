@@ -60,6 +60,7 @@ enum PrebuildEventStatus {
   PREBUILD_EVENT_STATUS_SUCCESS
   PREBUILD_EVENT_STATUS_ERROR
   PREBUILD_EVENT_STATUS_CANCELLED
+  PREBUILD_EVENT_STATUS_ARCHIVED
 }
 
 model PrebuildEvent {
@@ -79,9 +80,10 @@ model PrebuildEvent {
   workspaceTasksCommand String[]
   workspaceTasksShell   String[]
 
-  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  createdAt          DateTime                   @default(now()) @db.Timestamptz(3)
   prebuildEventFiles PrebuildEventFiles[]
   workspaces         Workspace[]
+  reservations       PrebuildEventReservation[]
 }
 
 model PrebuildEventFiles {
@@ -121,6 +123,21 @@ model PrebuildEventTask {
   vmTask          VmTask        @relation(fields: [vmTaskId], references: [id])
   vmTaskId        BigInt
   originalCommand String
+}
+
+enum PrebuildEventReservationType {
+  PREBUILD_EVENT_RESERVATION_TYPE_CREATE_WORKSPACE
+  PREBUILD_EVENT_RESERVATION_TYPE_ARCHIVE_PREBUILD
+}
+
+model PrebuildEventReservation {
+  id              BigInt                       @id @default(autoincrement())
+  externalId      String                       @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  prebuildEvent   PrebuildEvent                @relation(fields: [prebuildEventId], references: [id])
+  prebuildEventId BigInt
+  validUntil      DateTime                     @db.Timestamptz(3)
+  createdAt       DateTime                     @default(now()) @db.Timestamptz(3)
+  type            PrebuildEventReservationType
 }
 
 enum VmTaskStatus {

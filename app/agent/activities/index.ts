@@ -38,6 +38,10 @@ import type { LinkGitBranchesActivity } from "./link-git-branches";
 import { linkGitBranches } from "./link-git-branches";
 import type { PrebuildActivity } from "./prebuild";
 import { prebuild } from "./prebuild";
+import type { RemovePrebuildEventReservationActivity } from "./remove-prebuild-event-reservation";
+import { removePrebuildEventReservation } from "./remove-prebuild-event-reservation";
+import type { ReservePrebuildEventActivity } from "./reserve-prebuild-event";
+import { reservePrebuildEvent } from "./reserve-prebuild-event";
 import type { StartWorkspaceActivity } from "./start-workspace";
 import { startWorkspace } from "./start-workspace";
 import type { StopWorkspaceActivity } from "./stop-workspace";
@@ -70,6 +74,8 @@ export interface Activities {
   getPrebuildEvents: GetPrebuildEventsActivity;
   linkGitBranches: LinkGitBranchesActivity;
   waitForBuildfs: WaitForBuildfsActivity;
+  reservePrebuildEvent: ReservePrebuildEventActivity;
+  removePrebuildEventReservation: RemovePrebuildEventReservationActivity;
 }
 
 export interface ActivityArgs {
@@ -108,6 +114,8 @@ export const createActivities = async (
     getPrebuildEvents,
     linkGitBranches,
     waitForBuildfs,
+    reservePrebuildEvent,
+    removePrebuildEventReservation,
   };
 
   return Object.fromEntries(

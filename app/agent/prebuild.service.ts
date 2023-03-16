@@ -1,7 +1,13 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { PrebuildEvent, PrebuildEventFiles, Prisma } from "@prisma/client";
+import type {
+  PrebuildEvent,
+  PrebuildEventFiles,
+  PrebuildEventReservation,
+  Prisma,
+} from "@prisma/client";
+import { PrebuildEventReservationType } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
@@ -403,6 +409,38 @@ export class PrebuildService {
         id: { in: taskIds },
       },
       data: { status: VmTaskStatus.VM_TASK_STATUS_CANCELLED },
+    });
+  }
+
+  async reservePrebuildEvent(
+    db: Prisma.TransactionClient,
+    prebuildEventId: bigint,
+    reservationType: PrebuildEventReservationType,
+    validUntil: Date,
+    reservationExternalId?: string,
+  ): Promise<PrebuildEventReservation> {
+    await db.$executeRaw`SELECT id FROM "PrebuildEventReservation" WHERE id = ${prebuildEventId} FOR UPDATE`;
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: prebuildEventId },
+      include: {
+        reservations: {
+          where: {
+            type: PrebuildEventReservationType.PREBUILD_EVENT_RESERVATION_TYPE_ARCHIVE_PREBUILD,
+            validUntil: { gt: new Date() },
+          },
+        },
+      },
+    });
+    if (prebuildEvent.reservations.length > 0) {
+      throw new Error(`Prebuild event ${prebuildEventId} has an archive prebuild reservation`);
+    }
+    return await db.prebuildEventReservation.create({
+      data: {
+        type: reservationType,
+        externalId: reservationExternalId,
+        validUntil,
+        prebuildEventId,
+      },
     });
   }
 }
