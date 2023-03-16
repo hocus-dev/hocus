@@ -133,19 +133,27 @@ export default function PrebuildRoute(): JSX.Element {
         new changes.
       </h3>
       <div className="grid grid-cols-2 gap-16 mt-4 max-w-xl">
-        <div className="grid grid-cols-3 gap-4">
-          <h3 className="text-gray-400 col-span-1">{branchTitle}:</h3>
-          <p className="font-bold col-span-2">{branchValues}</p>
-          <h3 className="text-gray-400 col-span-1">Commit:</h3>
-          <p className="font-bold col-span-2">{prebuild.gitHash.substring(0, 8)}</p>
+        <div className="flex flex-col justify-between gap-4">
+          <div className="flex gap-2">
+            <h3 className="text-gray-400">{branchTitle}:</h3>
+            <p className="font-bold">{branchValues}</p>
+          </div>
+          <div className="flex gap-2">
+            <h3 className="text-gray-400">Commit:</h3>
+            <p className="font-bold">{prebuild.gitHash.substring(0, 8)}</p>
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
-          <h3 className="text-gray-400 col-span-1">Created:</h3>
-          <p className="font-bold col-span-2">{createdAt}</p>
-          <h3 className="text-gray-400 col-span-1">Status:</h3>
-          <p className="font-bold col-span-2">
-            <PrebuildStatus status={prebuild.status} />
-          </p>
+        <div className="flex flex-col justify-between gap-4">
+          <div className="flex gap-2">
+            <h3 className="text-gray-400">Created:</h3>
+            <p className="font-bold">{createdAt}</p>
+          </div>
+          <div className="flex gap-2">
+            <h3 className="text-gray-400">Status:</h3>
+            <p className="font-bold">
+              <PrebuildStatus status={prebuild.status} />
+            </p>
+          </div>
         </div>
       </div>
       <div className="flex flex-col grow min-h-[30rem] max-h-[100rem] w-full mt-6 rounded-lg border border-gray-700">
