@@ -133,6 +133,9 @@ services:
       - 8080:8080
 
   hocus-ui:
+    depends_on:
+      db:
+        condition: service_healthy
     build:
       dockerfile: ops/docker/hocus-ui.Dockerfile
       context: ${REPO_DIR}
@@ -145,6 +148,7 @@ services:
       - OIDC_POST_LOGOUT_REDIRECT=http://setup1.hedgehog-hen.ts.net:3000/
       - TEMPORAL_SERVER_URL=temporal:7233
       - PRISMA_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms?schema=public
+      - GRAPHILE_WORKER_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms
     ports:
       - 3000:3000
     networks:
