@@ -1,13 +1,17 @@
 version: "3"
 volumes:
   db_data:
+  db_init:
   agent_data:
 services:
-  build-fs:
+  setup-vm-images:
+    # We need to mount images and have access to the docker daemon
+    # TODO: build images in kaniko end export tarballs using virt-make-fs
     privileged: true
     build:
-      dockerfile: ops/docker/build-fs.Dockerfile
+      dockerfile: ops/docker/setup.Dockerfile
       context: ${REPO_DIR}
+    restart: "no"
     command: |
       bash -c "
       mkdir -pv /agent_data/firecracker
@@ -16,10 +20,88 @@ services:
       ops/bin/buildfs.sh resources/docker/default-workspace.Dockerfile /agent_data/resources/default-workspace.ext4 resources/ 1500 
       ops/bin/buildfs.sh resources/docker/buildfs.Dockerfile /agent_data/resources/buildfs.ext4 resources/ 1000
       ops/bin/buildfs.sh resources/docker/fetchrepo.Dockerfile /agent_data/resources/fetchrepo.ext4 resources 2500
-      wget -O /agent_data/resources/vmlinux-5.6-x86_64.bin https://github.com/hocus-dev/linux-kernel/releases/download/0.0.2/vmlinux
+      curl https://github.com/hocus-dev/linux-kernel/releases/download/0.0.2/vmlinux -z /agent_data/resources/vmlinux-5.6-x86_64.bin -o /agent_data/resources/vmlinux-5.6-x86_64.bin --location
       "
-    restart: "no"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/localtime:/etc/localtime:ro
       - agent_data:/agent_data:rw
+
+  setup-keycloak:
+    build:
+      dockerfile: ops/docker/setup.Dockerfile
+      context: ${REPO_DIR}
+    restart: "no"
+    command: >
+      bash -c '
+        cp ops/docker/resources/keycloak-setup.sh /db_init/keycloak-setup.sh && \
+        sed -i -e "/-- SQL_DB_DUMP_GOES_HERE/r resources/keycloak-db-dump.sql" /db_init/keycloak-setup.sh && \
+        sed -i \
+          "s/github_client_secret_goes_here/${GITHUB_APP_HOCUS_DEV_CLIENT_SECRET}/g" \
+          /db_init/keycloak-setup.sh
+      '
+    volumes:
+      - db_init:/db_init:rw
+
+  db:
+    image: "postgres:15.2-alpine"
+    restart: unless-stopped
+    depends_on:
+      setup-keycloak:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: rooms
+      PGDATA: /data
+    volumes:
+      - db_init:/docker-entrypoint-initdb.d/:ro
+      - db_data:/data:rw
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 1s
+      timeout: 10s
+      retries: 30
+
+  keycloak:
+    depends_on:
+      db:
+        condition: service_healthy
+    command: "start"
+    build:
+      dockerfile: keycloak-dev.Dockerfile
+    ports:
+      - "4200:8080"
+    restart: unless-stopped
+
+  temporal:
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_SEEDS=db
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development_es.yaml
+    image: temporalio/auto-setup:1.20.0
+
+  temporal-admin-tools:
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    image: temporalio/admin-tools:1.20.0
+    stdin_open: true
+    tty: true
+
+  temporal-web:
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_GRPC_ENDPOINT=temporal:7233
+      - TEMPORAL_PERMIT_WRITE_API=true
+    image: temporalio/web:1.20.0
+    ports:
+      - 8088:8088
