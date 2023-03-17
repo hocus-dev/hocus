@@ -11,7 +11,7 @@
     "dev:graphile-worker": "NODE_ENV=development ts-node entrypoints/graphile-worker.server.ts",
     "dev-prebuild": "run-p \"dev-prebuild:*\"",
     "dev-prebuild:css": "tailwindcss -i ./styles/app.css -o app/styles/app.css",
-    "start": "cross-env NODE_ENV=production ts-node entrypoints/server.ts",
+    "start": "c NODE_ENV=production ts-node entrypoints/server.ts",
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

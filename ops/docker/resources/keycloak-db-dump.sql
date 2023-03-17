@@ -1687,7 +1687,7 @@ ad5a10c6-c1c6-4f54-8b86-c0ffa7df772c	+	post.logout.redirect.uris
 a16f9d56-89da-4707-8e7b-8e351372e3d3	+	post.logout.redirect.uris
 a16f9d56-89da-4707-8e7b-8e351372e3d3	S256	pkce.code.challenge.method
 ade0aace-88fa-4e18-90ae-a7d816a349e6	1664023100	client.secret.creation.time
-ade0aace-88fa-4e18-90ae-a7d816a349e6	http://localhost:3000/	post.logout.redirect.uris
+ade0aace-88fa-4e18-90ae-a7d816a349e6	hocus_logout_redirect_url_goes_here	post.logout.redirect.uris
 ade0aace-88fa-4e18-90ae-a7d816a349e6	false	oauth2.device.authorization.grant.enabled
 ade0aace-88fa-4e18-90ae-a7d816a349e6	false	use.jwks.url
 ade0aace-88fa-4e18-90ae-a7d816a349e6	false	backchannel.logout.revoke.offline.tokens
@@ -2999,8 +2999,8 @@ f0b4fabc-ab56-4c40-9358-bce0db238c9a	String	jsonType.label
 --
 
 COPY public.realm (id, access_code_lifespan, user_action_lifespan, access_token_lifespan, account_theme, admin_theme, email_theme, enabled, events_enabled, events_expiration, login_theme, name, not_before, password_policy, registration_allowed, remember_me, reset_password_allowed, social, ssl_required, sso_idle_timeout, sso_max_lifespan, update_profile_on_soc_login, verify_email, master_admin_client, login_lifespan, internationalization_enabled, default_locale, reg_email_as_username, admin_events_enabled, admin_events_details_enabled, edit_username_allowed, otp_policy_counter, otp_policy_window, otp_policy_period, otp_policy_digits, otp_policy_alg, otp_policy_type, browser_flow, registration_flow, direct_grant_flow, reset_credentials_flow, client_auth_flow, offline_session_idle_timeout, revoke_refresh_token, access_token_life_implicit, login_with_email_allowed, duplicate_emails_allowed, docker_auth_flow, refresh_token_max_reuse, allow_user_managed_access, sso_max_lifespan_remember_me, sso_idle_timeout_remember_me, default_role) FROM stdin;
-65e9a13f-13e5-431c-8500-c136a2014a70	60	300	60	\N	\N	\N	t	f	0	\N	master	0	\N	f	f	f	f	EXTERNAL	1800	36000	f	f	852e20a2-bc82-4a22-bd43-3d09702452fa	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	fe605ee4-a865-4142-8ad5-2ff12a1816d1	89e71be5-0fce-4c06-a542-6b6f8952444d	04e8e7ab-6450-4440-9a6f-6e0edafe5589	3c8babf4-e626-45a8-9fa2-35c503e7a05b	7bcb46cd-c5c1-4f5b-8333-82449cfa5b13	2592000	f	900	t	f	9f04ad5f-f308-4f56-82ac-2e96fc0aa0bb	0	f	0	0	c3729e00-622c-4432-b7c4-30929326b88f
-8ce1928e-b671-44b2-ab2f-ba0a2fc46762	60	300	300				t	f	0	keycloak	hocus	0	\N	t	f	f	f	EXTERNAL	1800	36000	f	f	7c83487d-a523-408e-ad85-666f44f21031	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	6b950abd-0602-4993-9837-c2a4e0d72f35	d9619104-b36e-46f2-bc36-92d2cd74fbd4	77c83491-af58-412d-97eb-1490ae30a233	9badc312-6bac-4212-a42a-26b329c8d75b	3fe1323e-b3b4-43a0-b8c8-b084d05b3c39	2592000	f	900	t	f	4034bbd9-d9b2-4ea7-a860-4da8a1dac0ee	0	f	0	0	e8c01625-cda6-4510-a2d6-29214855ce90
+65e9a13f-13e5-431c-8500-c136a2014a70	60	300	60	\N	\N	\N	t	f	0	\N	master	0	\N	f	f	f	f	NONE	1800	36000	f	f	852e20a2-bc82-4a22-bd43-3d09702452fa	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	fe605ee4-a865-4142-8ad5-2ff12a1816d1	89e71be5-0fce-4c06-a542-6b6f8952444d	04e8e7ab-6450-4440-9a6f-6e0edafe5589	3c8babf4-e626-45a8-9fa2-35c503e7a05b	7bcb46cd-c5c1-4f5b-8333-82449cfa5b13	2592000	f	900	t	f	9f04ad5f-f308-4f56-82ac-2e96fc0aa0bb	0	f	0	0	c3729e00-622c-4432-b7c4-30929326b88f
+8ce1928e-b671-44b2-ab2f-ba0a2fc46762	60	300	300				t	f	0	keycloak	hocus	0	\N	t	f	f	f	NONE	1800	36000	f	f	7c83487d-a523-408e-ad85-666f44f21031	1800	f	\N	f	f	f	f	0	1	30	6	HmacSHA1	totp	6b950abd-0602-4993-9837-c2a4e0d72f35	d9619104-b36e-46f2-bc36-92d2cd74fbd4	77c83491-af58-412d-97eb-1490ae30a233	9badc312-6bac-4212-a42a-26b329c8d75b	3fe1323e-b3b4-43a0-b8c8-b084d05b3c39	2592000	f	900	t	f	4034bbd9-d9b2-4ea7-a860-4da8a1dac0ee	0	f	0	0	e8c01625-cda6-4510-a2d6-29214855ce90
 \.
 
 
@@ -3154,7 +3154,7 @@ e6857f1f-a8d7-4fe0-bdf8-b7dd7685d50f	/admin/master/console/*
 fecc6bc0-e452-4102-8c7c-f8364d65a61a	/realms/hocus/account/*
 024e7161-fb12-44a1-bc21-b2d03e26d3ee	/admin/hocus/console/*
 a16f9d56-89da-4707-8e7b-8e351372e3d3	/realms/hocus/account/*
-ade0aace-88fa-4e18-90ae-a7d816a349e6	http://localhost:3000/app/callback
+ade0aace-88fa-4e18-90ae-a7d816a349e6	hocus_callback_url_goes_here
 \.
 
 

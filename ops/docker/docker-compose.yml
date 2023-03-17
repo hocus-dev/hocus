@@ -11,7 +11,13 @@ services:
         sed -i -e "/-- SQL_DB_DUMP_GOES_HERE/r resources/keycloak-db-dump.sql" db-init/keycloak-setup.sh && \
         sed -i \
           "s/github_client_secret_goes_here/${GITHUB_APP_HOCUS_DEV_CLIENT_SECRET}/g" \
-          db-init/keycloak-setup.sh
+          /db_init/keycloak-setup.sh && \
+        sed -i \
+          "s/hocus_callback_url_goes_here/http:\/\/localhost:3000\/app\/callback/g" \
+          db-init/keycloak-setup.sh && \
+        sed -i \
+          "s/hocus_logout_redirect_url_goes_here/http:\/\/localhost:3000\//g" \
+          /db_init/keycloak-setup.sh
       '
   db:
     image: "postgres:alpine"

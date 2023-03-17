@@ -1,9 +1,11 @@
 node_modules
 
 /.cache
+.yarn-cache/
 /build
 /public/build
 *.log
 core*
 app/styles
 .git
+extensions
