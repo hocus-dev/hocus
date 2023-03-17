@@ -53,6 +53,8 @@ const {
   initPrebuildEvents,
   linkGitBranches,
   waitForBuildfs,
+  reservePrebuildEvent,
+  removePrebuildEventReservation,
 } = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -300,7 +302,25 @@ export async function runCreateWorkspace(args: {
   externalId: string;
   startWorkspace: boolean;
 }): Promise<Workspace> {
-  const workspace = await createWorkspace(args);
+  const workspace = await (async () => {
+    const reservationExternalId = uuid4();
+    const now = Date.now();
+    try {
+      const fifteenMinutes = 1000 * 60 * 15;
+      await reservePrebuildEvent({
+        prebuildEventId: args.prebuildEventId,
+        reservationType: "PREBUILD_EVENT_RESERVATION_TYPE_CREATE_WORKSPACE",
+        reservationExternalId,
+        validUntil: new Date(now + fifteenMinutes),
+      });
+      return await createWorkspace(args);
+    } finally {
+      await retryWorkflow(() => removePrebuildEventReservation(reservationExternalId), {
+        maxRetries: 5,
+        retryIntervalMs: 1000,
+      });
+    }
+  })();
   if (args.startWorkspace) {
     await startChild(runStartWorkspace, {
       args: [workspace.id],
