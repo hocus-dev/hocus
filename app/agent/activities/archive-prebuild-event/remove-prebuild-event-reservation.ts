@@ -1,4 +1,4 @@
-import type { CreateActivity } from "./types";
+import type { CreateActivity } from "../types";
 
 export type RemovePrebuildEventReservationActivity = (
   reservationExternalId: string,
