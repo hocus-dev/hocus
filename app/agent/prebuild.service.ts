@@ -271,6 +271,25 @@ export class PrebuildService {
     );
   }
 
+  /** Does not throw if files don't exist. */
+  async removeLocalPrebuildEventFiles(args: {
+    projectDrivePath: string;
+    fsDrivePath: string;
+  }): Promise<void> {
+    const files = [args.projectDrivePath, args.fsDrivePath];
+    await waitForPromises(
+      files.map((f) =>
+        fs.unlink(f).catch((err) => {
+          if (err?.code === "ENOENT") {
+            this.logger.warn(`File ${f} does not exist`);
+          } else {
+            throw err;
+          }
+        }),
+      ),
+    );
+  }
+
   /**
    * Copies the contents of `repositoryDrivePath` into `outputDrivePath`, and checks
    * out the given branch there.

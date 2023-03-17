@@ -4,10 +4,16 @@ import type { AgentInjector } from "../agent-injector";
 
 import type { AddProjectAndRepositoryActivity } from "./add-project-and-repository";
 import { addProjectAndRepository } from "./add-project-and-repository";
+import { deleteLocalPrebuildEventFiles } from "./archive-prebuild-event/delete-local-prebuild-event-files";
+import type { DeleteLocalPrebuildEventFilesActivity } from "./archive-prebuild-event/delete-local-prebuild-event-files";
+import type { MarkPrebuildEventAsArchivedActivity } from "./archive-prebuild-event/mark-prebuild-event-as-archived";
+import { markPrebuildEventAsArchived } from "./archive-prebuild-event/mark-prebuild-event-as-archived";
 import type { RemovePrebuildEventReservationActivity } from "./archive-prebuild-event/remove-prebuild-event-reservation";
 import { removePrebuildEventReservation } from "./archive-prebuild-event/remove-prebuild-event-reservation";
 import type { ReservePrebuildEventActivity } from "./archive-prebuild-event/reserve-prebuild-event";
 import { reservePrebuildEvent } from "./archive-prebuild-event/reserve-prebuild-event";
+import type { WaitForPrebuildEventReservationsActivity } from "./archive-prebuild-event/wait-for-prebuild-event-reservations";
+import { waitForPrebuildEventReservations } from "./archive-prebuild-event/wait-for-prebuild-event-reservations";
 import type { BuildfsActivity } from "./buildfs";
 import { buildfs } from "./buildfs";
 import type { CancelPrebuildsActivity } from "./cancel-prebuilds";
@@ -77,6 +83,9 @@ export interface Activities {
   waitForBuildfs: WaitForBuildfsActivity;
   reservePrebuildEvent: ReservePrebuildEventActivity;
   removePrebuildEventReservation: RemovePrebuildEventReservationActivity;
+  waitForPrebuildEventReservations: WaitForPrebuildEventReservationsActivity;
+  markPrebuildEventAsArchived: MarkPrebuildEventAsArchivedActivity;
+  deleteLocalPrebuildEventFiles: DeleteLocalPrebuildEventFilesActivity;
 }
 
 export interface ActivityArgs {
@@ -117,6 +126,9 @@ export const createActivities = async (
     waitForBuildfs,
     reservePrebuildEvent,
     removePrebuildEventReservation,
+    waitForPrebuildEventReservations,
+    markPrebuildEventAsArchived,
+    deleteLocalPrebuildEventFiles,
   };
 
   return Object.fromEntries(

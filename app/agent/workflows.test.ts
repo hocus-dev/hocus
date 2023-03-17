@@ -29,6 +29,7 @@ import {
   runStartWorkspace,
   runStopWorkspace,
   runDeleteWorkspace,
+  runArchivePrebuild,
 } from "./workflows";
 
 const provideActivities = (
@@ -404,6 +405,44 @@ test.concurrent(
         },
       });
       expect(workspaceAfterDelete).toBeNull();
+
+      const successfulPrebuildEvents = await db.prebuildEvent.findMany({
+        where: {
+          status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS,
+        },
+        include: {
+          prebuildEventFiles: {
+            include: {
+              projectFile: true,
+              fsFile: true,
+            },
+          },
+        },
+      });
+      await waitForPromises(
+        successfulPrebuildEvents.map(async (e) => {
+          const doPrebuildFilesExist: () => Promise<boolean[]> = () =>
+            waitForPromises(
+              [e.prebuildEventFiles[0].projectFile, e.prebuildEventFiles[0].fsFile].map((f) =>
+                doesFileExist(f.path),
+              ),
+            );
+          expect(await doPrebuildFilesExist()).toEqual([true, true]);
+          await client.workflow.execute(runArchivePrebuild, {
+            workflowId: uuidv4(),
+            taskQueue: "test",
+            retry: { maximumAttempts: 1 },
+            args: [{ prebuildEventId: e.id }],
+          });
+          expect(await doPrebuildFilesExist()).toEqual([false, false]);
+          const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+            where: {
+              id: e.id,
+            },
+          });
+          expect(prebuildEvent.status).toBe(PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED);
+        }),
+      );
     });
   }),
 );

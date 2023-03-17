@@ -55,6 +55,9 @@ const {
   waitForBuildfs,
   reservePrebuildEvent,
   removePrebuildEventReservation,
+  waitForPrebuildEventReservations,
+  markPrebuildEventAsArchived,
+  deleteLocalPrebuildEventFiles,
 } = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -467,4 +470,33 @@ export async function runAddProjectAndRepository(args: {
 
 export async function runDeleteWorkspace(args: { workspaceId: bigint }): Promise<void> {
   await deleteWorkspace(args.workspaceId);
+}
+
+/**
+ * Here's what this workflow does:
+ * 1. Reserve prebuild for archival
+ * 2. Wait for other reservations to be removed
+ * 3. Delete prebuild files from disk
+ * 4. Mark prebuild as archived and remove reservation
+ */
+export async function runArchivePrebuild(args: { prebuildEventId: bigint }): Promise<void> {
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  const twentyFourHours = 24 * oneHour;
+  const retry = <T>(fn: () => Promise<T>) =>
+    retryWorkflow(fn, { maxRetries: 10, retryIntervalMs: 1000 });
+
+  await reservePrebuildEvent({
+    prebuildEventId: args.prebuildEventId,
+    reservationType: "PREBUILD_EVENT_RESERVATION_TYPE_ARCHIVE_PREBUILD",
+    validUntil: new Date(now + twentyFourHours),
+  });
+  await retry(() =>
+    waitForPrebuildEventReservations({
+      prebuildEventId: args.prebuildEventId,
+      timeoutMs: oneHour,
+    }),
+  );
+  await retry(() => deleteLocalPrebuildEventFiles({ prebuildEventId: args.prebuildEventId }));
+  await retry(() => markPrebuildEventAsArchived({ prebuildEventId: args.prebuildEventId }));
 }
