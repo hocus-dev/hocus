@@ -1,22 +1,25 @@
 version: "3"
 volumes:
   db_data:
-  agent_resources:
+  agent_data:
 services:
   build-fs:
     privileged: true
-    cap_add:
-      - SYS_ADMIN
     build:
       dockerfile: ops/docker/build-fs.Dockerfile
       context: ${REPO_DIR}
     command: |
-      ops/bin/buildfs.sh resources/docker/checkout-and-inspect.Dockerfile /hocus_resources/checkout-and-inspect.ext4 resources/ 500 \
-      && ops/bin/buildfs.sh resources/docker/default-workspace.Dockerfile /hocus_resources/default-workspace.ext4 resources/ 1500 \
-      && ops/bin/buildfs.sh resources/docker/buildfs.Dockerfile /hocus_resources/buildfs.ext4 resources/ 1000 \
-      && ops/bin/buildfs.sh resources/docker/fetchrepo.Dockerfile /hocus_resources/fetchrepo.ext4 resources 2500
+      bash -c "
+      mkdir -pv /agent_data/firecracker
+      mkdir -pv /agent_data/resources
+      ops/bin/buildfs.sh resources/docker/checkout-and-inspect.Dockerfile /agent_data/resources/checkout-and-inspect.ext4 resources/ 500 
+      ops/bin/buildfs.sh resources/docker/default-workspace.Dockerfile /agent_data/resources/default-workspace.ext4 resources/ 1500 
+      ops/bin/buildfs.sh resources/docker/buildfs.Dockerfile /agent_data/resources/buildfs.ext4 resources/ 1000
+      ops/bin/buildfs.sh resources/docker/fetchrepo.Dockerfile /agent_data/resources/fetchrepo.ext4 resources 2500
+      wget -O /agent_data/resources/vmlinux-5.6-x86_64.bin https://github.com/hocus-dev/linux-kernel/releases/download/0.0.2/vmlinux
+      "
     restart: "no"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/localtime:/etc/localtime:ro
-      - agent_resources:/hocus_resources:rw
+      - agent_data:/agent_data:rw
