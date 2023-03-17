@@ -13,7 +13,6 @@ RUN mkdir node_modules/@hocus-workaround
 RUN npx esbuild app/temporal/data-converter.ts --outfile=node_modules/@hocus-workaround/data-converter.js --platform=node --format=cjs --bundle
 RUN sed -i 's|"~/temporal/data-converter"|"@hocus-workaround/data-converter.js"|g' build/index.js
 
-
 FROM node:16-bullseye AS deps
 ENV NODE_ENV production
 WORKDIR /build
