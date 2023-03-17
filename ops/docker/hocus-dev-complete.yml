@@ -96,12 +96,14 @@ services:
     stdin_open: true
     tty: true
 
-  temporal-web:
+  temporal-ui:
     depends_on:
       - temporal
     environment:
       - TEMPORAL_GRPC_ENDPOINT=temporal:7233
       - TEMPORAL_PERMIT_WRITE_API=true
-    image: temporalio/web:1.20.0
+      - TEMPORAL_UI_ENABLED=true
+      - TEMPORAL_OPENAPI_ENABLED=true
+    image: temporalio/ui:2.11.2
     ports:
-      - 8088:8088
+      - 8080:8080
