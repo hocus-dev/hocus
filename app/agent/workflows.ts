@@ -416,6 +416,7 @@ export async function runSyncGitRepository(
         const branchesByGitObjectIdArray = Array.from(branchesByGitObjectId.entries()).sort(
           ([a], [b]) => numericSort(a, b),
         );
+        // TODO: HOC-123 - fix race condition in prebuild archival
         const allPrebuildEvents = await waitForPromisesWorkflow(
           seenProjects.map((p) =>
             getOrCreatePrebuildEvents({
@@ -500,3 +501,8 @@ export async function runArchivePrebuild(args: { prebuildEventId: bigint }): Pro
   await retry(() => deleteLocalPrebuildEventFiles({ prebuildEventId: args.prebuildEventId }));
   await retry(() => markPrebuildEventAsArchived({ prebuildEventId: args.prebuildEventId }));
 }
+
+export async function runMonitorPrebuilds(args: {
+  projectId: bigint;
+  recentlyArchivedPrebuildEventIds: { id: bigint; archivedAt: number }[];
+}): Promise<void> {}

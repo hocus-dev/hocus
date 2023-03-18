@@ -462,4 +462,64 @@ export class PrebuildService {
       },
     });
   }
+
+  /**
+   * Returns all prebuild events that are older than the latest successful prebuild event for the same branch,
+   * except that if a prebuild event is the latest on one branch, but not on another, it will not be returned.
+   */
+  async getArchivablePrebuildEvents(
+    db: Prisma.Client,
+    projectId: bigint,
+  ): Promise<PrebuildEvent[]> {
+    const prebuildEventIds = await db.$queryRaw<{ r: bigint; prebuildEventId: bigint }[]>`
+      SELECT x."r", x."prebuildEventId"
+      FROM (
+        SELECT
+          ROW_NUMBER() OVER (PARTITION BY t."gitBranchId" ORDER BY t."createdAt" DESC) AS r,
+          t.*
+        FROM (
+          SELECT *
+          FROM "PrebuildEventToGitBranch" AS p2b
+          INNER JOIN "PrebuildEvent" AS p ON p2b."prebuildEventId" = p.id
+          WHERE p."projectId" = ${projectId} AND p."status" = 'PREBUILD_EVENT_STATUS_SUCCESS'::"PrebuildEventStatus"
+          ORDER BY p."createdAt" DESC
+        ) AS t
+      ) AS x;
+    `;
+    const latestPrebuildEventIds = new Set(
+      prebuildEventIds.filter((e) => e.r === BigInt(1)).map((e) => e.prebuildEventId),
+    );
+    const prebuildEventIdsToArchive = prebuildEventIds
+      .filter((e) => !latestPrebuildEventIds.has(e.prebuildEventId))
+      .map((e) => e.prebuildEventId);
+    const prebuildEvents = await db.prebuildEvent.findMany({
+      where: { id: { in: prebuildEventIdsToArchive } },
+    });
+    return prebuildEvents;
+  }
+
+  /** Returns all archived prebuild events that have no workspaces associated with them and are at least 48 hours old. */
+  async getRemovablePrebuildEvents(
+    db: Prisma.Client,
+    projectId: bigint,
+    now: Date,
+  ): Promise<PrebuildEvent[]> {
+    const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    return await db.prebuildEvent.findMany({
+      where: {
+        projectId,
+        status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED,
+        createdAt: { lt: fortyEightHoursAgo },
+        // This filter can only work if there are no workspaces for that prebuild event.
+        workspaces: {
+          every: {
+            id: BigInt(0),
+          },
+          none: {
+            id: BigInt(0),
+          },
+        },
+      },
+    });
+  }
 }

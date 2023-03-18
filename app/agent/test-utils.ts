@@ -11,6 +11,7 @@ import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 
 import { createAgentInjector } from "./agent-injector";
+import type { AgentInjector } from "./agent-injector";
 import type { FirecrackerService } from "./firecracker.service";
 import { SSH_PROXY_IP } from "./test-constants";
 import { execCmd } from "./utils";
@@ -44,10 +45,7 @@ export const withTestMount = async <T>(
 };
 
 export const provideInjector = (
-  testFn: (args: {
-    injector: ReturnType<typeof createAgentInjector>;
-    runId: string;
-  }) => Promise<void>,
+  testFn: (args: { injector: AgentInjector; runId: string }) => Promise<void>,
 ): (() => Promise<void>) => {
   const injector = createAgentInjector({
     [Token.Logger]: function () {
@@ -58,10 +56,7 @@ export const provideInjector = (
 };
 
 export const provideInjectorAndDb = (
-  testFn: (args: {
-    injector: ReturnType<typeof createAgentInjector>;
-    db: Prisma.NonTransactionClient;
-  }) => Promise<void>,
+  testFn: (args: { injector: AgentInjector; db: Prisma.NonTransactionClient }) => Promise<void>,
 ): (() => Promise<void>) => {
   return provideInjector(({ injector }) => provideDb((db) => testFn({ injector, db }))());
 };
