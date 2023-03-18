@@ -3,7 +3,7 @@ import { PrebuildListElement } from "./prebuild-list-element";
 
 export function PrebuildList(props: { elements: PrebuildListElementProps[] }): JSX.Element {
   const noElementsView = (
-    <div className="flex flex-col items-center justify-center h-full mt-16">
+    <div className="flex flex-col col-span-3 items-center justify-center h-full mt-16">
       <i className="fa-solid fa-ship text-5xl text-gray-400"></i>
       <p className="text-gray-400 mt-4">
         No prebuilds yet. It usually takes a minute after a project is added before the first
@@ -13,13 +13,7 @@ export function PrebuildList(props: { elements: PrebuildListElementProps[] }): J
   );
   return (
     <>
-      <div
-        className={
-          props.elements.length === 0
-            ? "grid grid-cols-1"
-            : "grid grid-cols-[fit-content(200px)_fit-content(500px)_minmax(0,_1fr)] gap-4"
-        }
-      >
+      <div className="grid grid-cols-[fit-content(200px)_fit-content(500px)_minmax(0,_1fr)] gap-4">
         {props.elements.length === 0 && noElementsView}
         {props.elements.map((element, idx) => (
           <PrebuildListElement {...element} key={idx} />
