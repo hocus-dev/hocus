@@ -517,4 +517,37 @@ export class PrebuildService {
       },
     });
   }
+
+  async removePrebuildEventFromDb(
+    db: Prisma.TransactionClient,
+    prebuildEventId: bigint,
+  ): Promise<void> {
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: prebuildEventId },
+      include: {
+        tasks: {
+          include: {
+            vmTask: true,
+          },
+        },
+      },
+    });
+    if (prebuildEvent.status !== PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED) {
+      throw new Error(`Prebuild event ${prebuildEventId} is not archived`);
+    }
+    const logGroupIds = prebuildEvent.tasks.map((t) => t.vmTask.logGroupId);
+    await db.log.deleteMany({
+      where: { logGroupId: { in: logGroupIds } },
+    });
+    await db.logGroup.deleteMany({
+      where: { id: { in: logGroupIds } },
+    });
+    await db.prebuildEventToGitBranch.deleteMany({
+      where: { prebuildEventId },
+    });
+    await db.prebuildEventTask.deleteMany({
+      where: { prebuildEventId },
+    });
+    await db.prebuildEvent.delete({ where: { id: prebuildEventId } });
+  }
 }
