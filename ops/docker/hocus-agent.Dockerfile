@@ -1,0 +1,44 @@
+FROM node:16-bullseye AS builder
+WORKDIR /build
+COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
+COPY deps deps
+COPY package.json yarn.lock ./
+RUN yarn
+COPY . .
+RUN yarn run regen
+RUN mkdir agent-build
+RUN npx esbuild entrypoints/agent.ts --outfile=agent-build/agent.js --platform=node --format=cjs --bundle --packages=external
+RUN npx esbuild app/agent/activities/index.ts --outfile=agent-build/activities.js --platform=node --format=cjs --bundle --packages=external
+RUN sed -i 's|"~/agent/activities"|"./activities.js"|g' agent-build/agent.js
+
+FROM node:16-bullseye AS deps
+ENV NODE_ENV production
+WORKDIR /build
+COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
+COPY deps deps
+COPY package.json yarn.lock ./
+RUN yarn install --production
+COPY . .
+RUN yarn run regen
+
+
+FROM node:16-bullseye AS runner
+
+RUN wget -q https://github.com/firecracker-microvm/firecracker/releases/download/v1.3.1/firecracker-v1.3.1-x86_64.tgz && \
+    tar -xf firecracker-v1.3.1-x86_64.tgz && \
+    mv release-v1.3.1-x86_64/firecracker-v1.3.1-x86_64 /usr/local/bin/firecracker && \
+    mv release-v1.3.1-x86_64/jailer-v1.3.1-x86_64 /usr/local/bin/jailer
+RUN apt-get update && apt-get install -y net-tools iproute2 iptables psmisc
+RUN apt-get update && apt-get install -y socat openssh-server
+RUN apt-get update && apt-get install -y iputils-ping
+RUN test -f /usr/sbin/nologin && useradd -ms /usr/sbin/nologin sshgateway
+COPY --chown=root:root --chmod=0644 ops/docker/resources/sshd_config /etc/ssh/sshd_config
+
+WORKDIR /app
+COPY --from=deps /build/node_modules /app/node_modules
+COPY --from=builder /build/package.json /app/package.json
+COPY --from=builder /build/agent-build/agent.js /app/agent.js
+COPY --from=builder /build/agent-build/activities.js /app/activities.js
+COPY prisma prisma
+
+CMD [ "bash", "-c", "node agent.js" ]

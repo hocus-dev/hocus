@@ -8,7 +8,7 @@ volumes:
 services:
   setup-vm-images:
     # We need to mount images and have access to the docker daemon
-    # TODO: build images in kaniko end export tarballs using virt-make-fs
+    # TODO: build images in kaniko and export tarballs using virt-make-fs
     privileged: true
     build:
       dockerfile: ops/docker/setup.Dockerfile
@@ -88,9 +88,17 @@ services:
       - hocus_net
     environment:
       - KC_HOSTNAME=setup1.hedgehog-hen.ts.net:4200
+      - KC_DB_URL=jdbc:postgresql://db:5432/keycloak
+      - KC_DB_USERNAME=${POSTGRES_USER}
+      - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
     ports:
       - "4200:8080"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 3
 
   temporal:
     depends_on:
@@ -102,6 +110,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PWD=${POSTGRES_PASSWORD}
       - POSTGRES_SEEDS=db
+      - POSTGRES_DB=temporal
       #- DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development_es.yaml
     image: temporalio/auto-setup:1.20.0
     networks:
@@ -136,6 +145,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
     build:
       dockerfile: ops/docker/hocus-ui.Dockerfile
       context: ${REPO_DIR}
@@ -153,3 +164,22 @@ services:
       - 3000:3000
     networks:
       - hocus_net
+
+  hocus-agent:
+    depends_on:
+      db:
+        condition: service_healthy
+      setup-vm-images:
+        condition: service_completed_successfully
+    build:
+      dockerfile: ops/docker/hocus-agent.Dockerfile
+      context: ${REPO_DIR}
+    networks:
+      - hocus_net
+    restart: "no"
+    privileged: true
+    ports:
+      - 8822:22
+    volumes:
+      - "agent_data:/srv/jailer:rw"
+      - /dev/kvm:/dev/kvm

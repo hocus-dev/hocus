@@ -59,6 +59,7 @@
     "yaml": "^2.1.3"
   },
   "devDependencies": {
+    "esbuild": "v0.17.12",
     "@remix-run/dev": "^1.11.0",
     "@remix-run/eslint-config": "^1.11.0",
     "@swc/core": "^1.2.241",

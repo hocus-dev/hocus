@@ -12,7 +12,7 @@ export HOCUS_RESOURCES_DIR="$(realpath ${REPO_DIR}/../hocus-resources)"
 cd "$SCRIPT_DIR"
 
 echo "🔄 Starting Docker build..."
-docker build -t worker-dev -f "$REPO_DIR/ops/docker/worker.Dockerfile" "$REPO_DIR/ops/docker"
+docker build -t worker-dev -f "$REPO_DIR/ops/docker/hocus-agent-dev.Dockerfile" "$REPO_DIR/ops/docker"
 echo "✅ Docker build complete"
 docker-compose -p agentdev -f "$REPO_DIR/ops/docker/agent-dev.docker-compose.yml" up -d
 
