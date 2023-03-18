@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { NativeConnection, Worker } from "@temporalio/worker";
 import { createActivities } from "~/agent/activities";
 import { createAgentInjector } from "~/agent/agent-injector";
+import { generateTemporalCodeBundle } from "~/temporal/bundle";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
 import { Token } from "~/token";
 
@@ -12,9 +13,16 @@ async function run() {
   const db = new PrismaClient({ datasources: { db: { url: agentConfig.databaseUrl } } });
   const activities = await createActivities(injector, db);
 
+  const workflowBundle =
+    process.env.NODE_ENV === "production"
+      ? {
+          codePath: require.resolve("./workflow-bundle.js"),
+        }
+      : await generateTemporalCodeBundle();
+
   const worker = await Worker.create({
     connection: await NativeConnection.connect({ address: agentConfig.temporalAddress }),
-    workflowsPath: require.resolve("~/agent/workflows"),
+    workflowBundle,
     activities,
     taskQueue: MAIN_TEMPORAL_QUEUE,
     dataConverter: {

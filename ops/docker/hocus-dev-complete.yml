@@ -97,8 +97,8 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl --fail http://localhost:8080/health"]
       interval: 5s
-      timeout: 10s
-      retries: 3
+      timeout: 60s
+      retries: 10
 
   temporal:
     depends_on:
@@ -157,6 +157,7 @@ services:
       - OIDC_CLIENT_SECRET=dev-client-secret
       - OIDC_SECRET=LONG_RANDOM_VALUE
       - OIDC_POST_LOGOUT_REDIRECT=http://setup1.hedgehog-hen.ts.net:3000/
+      - CONTROL_PLANE_AGENT_HOSTNAME=setup1.hedgehog-hen.ts.net
       - TEMPORAL_SERVER_URL=temporal:7233
       - PRISMA_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms?schema=public
       - GRAPHILE_WORKER_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms
@@ -174,6 +175,12 @@ services:
     build:
       dockerfile: ops/docker/hocus-agent.Dockerfile
       context: ${REPO_DIR}
+    environment:
+      - AGENT_TEMPORAL_ADDRESS=temporal:7233
+      - AGENT_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms?schema=public
+      - AGENT_KERNEL_PATH=/srv/jailer/resources/vmlinux-5.6-x86_64.bin
+      - AGENT_HOST_BUILDFS_RESOURCES_DIR=/app/resources
+      - AGENT_BUILDFS_ROOTFS=/srv/jailer/resources/buildfs.ext4
     networks:
       - hocus_net
     restart: "no"

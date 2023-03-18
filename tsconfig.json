@@ -13,6 +13,12 @@
     "allowJs": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
+    "rootDir": ".",
+    // WARNING, touching the aliases means that you also need to change the aliases in:
+    // ./app/temporal/bundle.ts - the webpack config for temporal which doesn't automatically parse aliases from tsconfig.json
+    // ./ops/docker/hocus-ui.Dockerfile - until https://github.com/evanw/esbuild/issues/3003 gets fixed
+    // ./ops/docker/hocus-agent.Dockerfile - until https://github.com/evanw/esbuild/issues/3003 gets fixed
+    // ./remix.config.js - remix does a good job of resolving aliases but if that resolution fails then you may override it here
     "paths": {
       "~/*": ["./app/*"]
     },

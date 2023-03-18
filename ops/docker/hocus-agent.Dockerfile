@@ -7,9 +7,11 @@ RUN yarn
 COPY . .
 RUN yarn run regen
 RUN mkdir agent-build
-RUN npx esbuild entrypoints/agent.ts --outfile=agent-build/agent.js --platform=node --format=cjs --bundle --packages=external
-RUN npx esbuild app/agent/activities/index.ts --outfile=agent-build/activities.js --platform=node --format=cjs --bundle --packages=external
-RUN sed -i 's|"~/agent/activities"|"./activities.js"|g' agent-build/agent.js
+RUN npx esbuild entrypoints/agent.ts --outfile=agent-build/agent.js --platform=node --format=cjs --bundle --packages=external --alias:~=./app
+# Generate worker bundles 
+RUN npx ts-node -r tsconfig-paths/register entrypoints/bundle-workflows.ts
+RUN npx esbuild app/temporal/data-converter.ts --outfile=agent-build/data-converter.js --platform=browser --format=cjs --bundle --alias:~=./app
+RUN sed -i 's|"~/temporal/data-converter"|"./data-converter.js"|g' agent-build/agent.js
 
 FROM node:16-bullseye AS deps
 ENV NODE_ENV production
@@ -35,10 +37,10 @@ RUN test -f /usr/sbin/nologin && useradd -ms /usr/sbin/nologin sshgateway
 COPY --chown=root:root --chmod=0644 ops/docker/resources/sshd_config /etc/ssh/sshd_config
 
 WORKDIR /app
+ENV NODE_ENV production
 COPY --from=deps /build/node_modules /app/node_modules
-COPY --from=builder /build/package.json /app/package.json
 COPY --from=builder /build/agent-build/agent.js /app/agent.js
-COPY --from=builder /build/agent-build/activities.js /app/activities.js
-COPY prisma prisma
-
+COPY --from=builder /build/agent-build/workflow-bundle.js /app/workflow-bundle.js
+COPY --from=builder /build/agent-build/data-converter.js /app/data-converter.js
+COPY resources resources
 CMD [ "bash", "-c", "node agent.js" ]
