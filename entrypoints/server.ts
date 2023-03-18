@@ -3,8 +3,6 @@ import path from "path";
 
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
-// Workaround for this bug: https://github.com/remix-run/remix/issues/3032
-import * as build from "@remix-run/dev/server-build";
 import { createRequestHandler } from "@remix-run/express";
 import type { LoaderArgs } from "@remix-run/node";
 import bodyParser from "body-parser";
@@ -54,7 +52,7 @@ app.all("*", async (req, res, next) => {
       build:
         process.env.NODE_ENV === "production"
           ? // Workaround for this bug: https://github.com/remix-run/remix/issues/3032
-            build
+            await import("@remix-run/dev/server-build")
           : require(BUILD_DIR),
       mode: process.env.NODE_ENV,
       getLoadContext: (): LoaderArgs["context"] => ({

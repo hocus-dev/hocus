@@ -4,6 +4,6 @@ module.exports = {
   appDirectory: "app",
   assetsBuildDirectory: "public/build",
   serverBuildPath: "build/index.js",
-  server: "entrypoints/server.ts",
+  server: process.env.NODE_ENV === "production" ? "entrypoints/server.ts" : void 0,
   publicPath: "/build/",
 };
