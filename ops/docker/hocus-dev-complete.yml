@@ -35,8 +35,8 @@ services:
       context: ${REPO_DIR}
     restart: "no"
     environment:
-      - OIDC_CALLBACK_URL=http://setup1.hedgehog-hen.ts.net:3000/app/callback
-      - OIDC_POST_LOGOUT_REDIRECT=http://setup1.hedgehog-hen.ts.net:3000/
+      - OIDC_CALLBACK_URL=http://${HOCUS_HOSTNAME}:3000/app/callback
+      - OIDC_POST_LOGOUT_REDIRECT=http://${HOCUS_HOSTNAME}:3000/
     command: >
       bash -c '
         cp ops/docker/resources/keycloak-setup.sh /db_init/keycloak-setup.sh && \
@@ -87,7 +87,7 @@ services:
     networks:
       - hocus_net
     environment:
-      - KC_HOSTNAME=setup1.hedgehog-hen.ts.net:4200
+      - KC_HOSTNAME=${HOCUS_HOSTNAME}:4200
       - KC_DB_URL=jdbc:postgresql://db:5432/keycloak
       - KC_DB_USERNAME=${POSTGRES_USER}
       - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
@@ -161,12 +161,12 @@ services:
       context: ${REPO_DIR}
     environment:
       - OIDC_ISSUER_BASE_URL=http://keycloak:8080/realms/hocus
-      - OIDC_BASE_URL=http://setup1.hedgehog-hen.ts.net:3000/app
+      - OIDC_BASE_URL=http://${HOCUS_HOSTNAME}:3000/app
       - OIDC_CLIENT_ID=hocus
       - OIDC_CLIENT_SECRET=dev-client-secret
       - OIDC_SECRET=LONG_RANDOM_VALUE
-      - OIDC_POST_LOGOUT_REDIRECT=http://setup1.hedgehog-hen.ts.net:3000/
-      - CONTROL_PLANE_AGENT_HOSTNAME=setup1.hedgehog-hen.ts.net
+      - OIDC_POST_LOGOUT_REDIRECT=http://${HOCUS_HOSTNAME}:3000/
+      - CONTROL_PLANE_AGENT_HOSTNAME=${HOCUS_HOSTNAME}
       - TEMPORAL_SERVER_URL=temporal:7233
       - PRISMA_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms?schema=public
       - GRAPHILE_WORKER_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms

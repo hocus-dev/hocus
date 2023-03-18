@@ -3,6 +3,15 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+if [[ ! -v HOCUS_HOSTNAME ]]; then
+  echo "HOCUS_HOSTNAME was not set. Set it to a domain where you may reach this machine."
+  echo "If running locally then set to localhost, if via tailscale then set it to the MagicDNS domain of the machine."
+  echo "HOCUS_HOSTNAME=localhost ./ops/bin/hocus-dev-start.sh"
+  echo "If you need to change the domain please delete the data first ./ops/bin/hocus-dev-delete-data.sh"
+  echo "If you want to migrate inplace without deleting data then you need to modify the Hocus keycloak realm!"
+  exit 1
+fi
+
 export DOCKER_BUILDKIT=1
 
 SCRIPT_DIR="$(dirname "$0")"
