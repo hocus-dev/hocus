@@ -510,14 +510,9 @@ export class PrebuildService {
         projectId,
         status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED,
         createdAt: { lt: fortyEightHoursAgo },
-        // This filter can only work if there are no workspaces for that prebuild event.
         workspaces: {
-          every: {
-            id: BigInt(0),
-          },
-          none: {
-            id: BigInt(0),
-          },
+          // This filter ensures that the prebuild event has no workspaces associated with it.
+          none: {},
         },
       },
     });
