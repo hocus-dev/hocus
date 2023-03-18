@@ -13,7 +13,13 @@ export function PrebuildList(props: { elements: PrebuildListElementProps[] }): J
   );
   return (
     <>
-      <div className="grid grid-cols-[fit-content(200px)_fit-content(500px)_minmax(0,_1fr)] gap-4">
+      <div
+        className={
+          props.elements.length === 0
+            ? "grid grid-cols-1"
+            : "grid grid-cols-[fit-content(200px)_fit-content(500px)_minmax(0,_1fr)] gap-4"
+        }
+      >
         {props.elements.length === 0 && noElementsView}
         {props.elements.map((element, idx) => (
           <PrebuildListElement {...element} key={idx} />
