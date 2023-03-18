@@ -72,7 +72,7 @@ services:
       - db_init:/docker-entrypoint-initdb.d/:ro
       - db_data:/data:rw
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "psql -U ${POSTGRES_USER} -lqt | cut -d \\| -f 1 | grep -qw temporal"]
       interval: 1s
       timeout: 10s
       retries: 30
@@ -96,8 +96,8 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl --fail http://localhost:8080/health"]
-      interval: 5s
-      timeout: 60s
+      interval: 10s
+      timeout: 1m
       retries: 10
 
   temporal:
@@ -115,10 +115,16 @@ services:
     image: temporalio/auto-setup:1.20.0
     networks:
       - hocus_net
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "h"]
+      interval: 10s
+      timeout: 1m
+      retries: 10
 
   temporal-admin-tools:
     depends_on:
-      - temporal
+      temporal:
+        condition: service_healthy
     environment:
       - TEMPORAL_CLI_ADDRESS=temporal:7233
     networks:
@@ -129,7 +135,8 @@ services:
 
   temporal-ui:
     depends_on:
-      - temporal
+      temporal:
+        condition: service_healthy
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_PERMIT_WRITE_API=true
@@ -144,6 +151,8 @@ services:
   hocus-ui:
     depends_on:
       db:
+        condition: service_healthy
+      temporal:
         condition: service_healthy
       keycloak:
         condition: service_healthy
@@ -169,6 +178,8 @@ services:
   hocus-agent:
     depends_on:
       db:
+        condition: service_healthy
+      temporal:
         condition: service_healthy
       setup-vm-images:
         condition: service_completed_successfully
