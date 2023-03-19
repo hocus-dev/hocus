@@ -6,7 +6,6 @@ import fs from "fs";
 import { Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
-import { runMigrations } from "graphile-worker";
 import { Client as PgClient } from "pg";
 import * as build from "prisma/build";
 import { v4 as uuidv4 } from "uuid";
@@ -56,7 +55,6 @@ export const provideDb = (
 
     migrate.stop();
 
-    await runMigrations({ connectionString: dbUrl });
     await changeSequenceNumbers(db);
 
     let error = null;

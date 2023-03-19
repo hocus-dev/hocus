@@ -16,5 +16,5 @@ cd "$PROJECT_DIR""/ops/docker" &&
 # postgres needs a second to start up
 sleep 1
 cd "$PROJECT_DIR" && \
-    yarn prisma migrate deploy && \
-    yarn graphile-worker --schema-only --connection "postgresql://postgres:pass@localhost:5432/rooms"
+    yarn prisma migrate deploy
+    

@@ -32,4 +32,4 @@ COPY --from=builder /build/public /app/public
 COPY --from=builder /build/package.json /app/package.json
 COPY --from=builder /build/node_modules/@hocus-workaround /app/node_modules/@hocus-workaround
 COPY prisma prisma
-CMD [ "bash", "-c", "npx prisma migrate deploy && npx graphile-worker --schema-only --connection $GRAPHILE_WORKER_DATABASE_URL && node build/index.js" ]
+CMD [ "bash", "-c", "npx prisma migrate deploy && node build/index.js" ]

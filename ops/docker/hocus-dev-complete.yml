@@ -169,7 +169,6 @@ services:
       - CONTROL_PLANE_AGENT_HOSTNAME=${HOCUS_HOSTNAME}
       - TEMPORAL_SERVER_URL=temporal:7233
       - PRISMA_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms?schema=public
-      - GRAPHILE_WORKER_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms
     ports:
       - 3000:3000
     networks:

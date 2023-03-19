@@ -18,18 +18,6 @@ export const config = makeConfig()({
     routes: { postLogoutRedirect: get("OIDC_POST_LOGOUT_REDIRECT", "http://localhost:3000/") },
     idpLogout: true,
   }),
-  graphileWorker: () => ({
-    connectionString: get(
-      "GRAPHILE_WORKER_CONNECTION_URL",
-      "postgres://postgres:pass@localhost:5432/rooms",
-    ),
-  }),
-  googleAnalytics: () => ({
-    clientId: get("GOOGLE_ANALYTICS_CLIENT_ID", "server"),
-    measurementId: get("GOOGLE_ANALYTICS_MEASUREMENT_ID", "G-XXXXXXXXXX"),
-    apiSecret: get("GOOGLE_ANALYTICS_API_SECRET", "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"),
-    url: get("GOOGLE_ANALYTICS_URL", "https://www.google-analytics.com/debug"),
-  }),
   controlPlane: () => ({
     agentHostname: get("CONTROL_PLANE_AGENT_HOSTNAME", "localhost"),
   }),
