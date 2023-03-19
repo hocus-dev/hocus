@@ -30,9 +30,11 @@ tasks:
       ops/bin/up.sh
       ops/bin/temporal-up.sh
       npm run dev
-  - name: Extension dev-env setup
+  - name: Temporal codec server
     init: |
-      cd vscode_extension/ && yarn
+      yarn install
+      ops/bin/link.sh
+      PORT=1337 npx ts-node entrypoints/codec-server.ts
   - name: Terminal
     init: sleep 0.01
 # Ports to expose on workspace startup
