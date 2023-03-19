@@ -7,9 +7,17 @@ import { generateTemporalCodeBundle } from "~/temporal/bundle";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
 import { Token } from "~/token";
 
+import { setupHocusDevEnv } from "./utils/setup-hocus-dev-env";
+
 async function run() {
   const injector = createAgentInjector();
   const agentConfig = injector.resolve(Token.Config).agent();
+
+  if (agentConfig.setupHocusDevEnv) {
+    // eslint-disable-next-line no-console
+    void setupHocusDevEnv().catch(console.error);
+  }
+
   const db = new PrismaClient({ datasources: { db: { url: agentConfig.databaseUrl } } });
   const activities = await createActivities(injector, db);
 

@@ -9,6 +9,7 @@ import { DEV_USER_EXTERNAL_ID, DEV_USER_SSH_PUBLIC_KEY } from "~/dev/constants";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
 import { HOCUS_REPO_URL, TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
 async function addDevRepo(
   client: Client,
@@ -24,7 +25,7 @@ async function addDevRepo(
   console.log(result);
 }
 
-async function run() {
+export async function setupHocusDevEnv() {
   const injector = createAppInjector();
   const agentConfig = injector.resolve(Token.Config).agent();
   const agentDevConfig = injector.resolve(Token.Config).agentDev();
@@ -57,31 +58,28 @@ async function run() {
         SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
       );
 
-      await addDevRepo(client, {
-        gitRepositoryUrl: HOCUS_REPO_URL,
-        projectName: "Hocus Vscode Workspace Extension",
-        projectWorkspaceRoot: "/extensions/vscode_workspace",
-        sshKeyPairId: hocusRepoKeyPair.id,
-      });
+      await waitForPromises([
+        addDevRepo(client, {
+          gitRepositoryUrl: HOCUS_REPO_URL,
+          projectName: "Hocus Vscode Workspace Extension",
+          projectWorkspaceRoot: "/extensions/vscode_workspace",
+          sshKeyPairId: hocusRepoKeyPair.id,
+        }),
 
-      await addDevRepo(client, {
-        gitRepositoryUrl: HOCUS_REPO_URL,
-        projectName: "Hocus Vscode UI Extension",
-        projectWorkspaceRoot: "/extensions/vscode_ui",
-        sshKeyPairId: hocusRepoKeyPair.id,
-      });
+        addDevRepo(client, {
+          gitRepositoryUrl: HOCUS_REPO_URL,
+          projectName: "Hocus Vscode UI Extension",
+          projectWorkspaceRoot: "/extensions/vscode_ui",
+          sshKeyPairId: hocusRepoKeyPair.id,
+        }),
 
-      await addDevRepo(client, {
-        gitRepositoryUrl: HOCUS_REPO_URL,
-        projectName: "Hocus Agent+CP",
-        projectWorkspaceRoot: "/",
-        sshKeyPairId: hocusRepoKeyPair.id,
-      });
+        addDevRepo(client, {
+          gitRepositoryUrl: HOCUS_REPO_URL,
+          projectName: "Hocus Agent+CP",
+          projectWorkspaceRoot: "/",
+          sshKeyPairId: hocusRepoKeyPair.id,
+        }),
+      ]);
     }
   });
 }
-
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});

@@ -40,6 +40,8 @@ export const config = makeConfig()({
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:
       process.env.AGENT_PREBUILD_SSH_PRIVATE_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PRIVATE,
+    // If set then the agent will setup a dev env for hocus when starting
+    setupHocusDevEnv: (process.env.AGENT_SETUP_HOCUS_DEV_ENV ?? "false") === "true",
   }),
   agentDev: () => ({
     hocusRepoPrivateKey: get("HOCUS_REPO_PRIVATE_KEY", ""),
