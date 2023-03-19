@@ -142,11 +142,23 @@ services:
       - TEMPORAL_PERMIT_WRITE_API=true
       - TEMPORAL_UI_ENABLED=true
       - TEMPORAL_OPENAPI_ENABLED=true
+      - TEMPORAL_CODEC_ENDPOINT=http://${HOCUS_HOSTNAME}:8081
     image: temporalio/ui:2.11.2
     networks:
       - hocus_net
     ports:
       - 8080:8080
+
+  temporal-hocus-codec:
+    build:
+      dockerfile: ops/docker/hocus-temporal-codec.Dockerfile
+      context: ${REPO_DIR}
+    environment:
+      - PORT=8081
+    networks:
+      - hocus_net
+    ports:
+      - 8081:8081
 
   hocus-ui:
     depends_on:

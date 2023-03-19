@@ -59,6 +59,7 @@ async function run() {
   const app = express();
   app.use(cors({ allowedHeaders: ["x-namespace", "content-type"] }));
   app.use(express.json());
+  app.options("*", cors());
 
   const codec = new CborXDataConverter();
 
