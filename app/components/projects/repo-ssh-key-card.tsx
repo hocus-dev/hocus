@@ -3,10 +3,38 @@ import { useState } from "react";
 
 export const RepoSshKeyCard = (props: { publicKey: string }): JSX.Element => {
   const [isCopied, setIsCopied] = useState(false);
+  const [isCopyError, setIsCopyError] = useState(false);
 
   const copyPublicKeyToClipboard = async () => {
-    await navigator.clipboard.writeText(props.publicKey);
-    setIsCopied(true);
+    try {
+      // navigator.clipboard only works via https
+      // https://stackoverflow.com/questions/51805395/navigator-clipboard-is-undefined
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(props.publicKey);
+      } else {
+        // Use the 'out of viewport hidden text area' trick
+        const textArea = document.createElement("textarea");
+        textArea.value = props.publicKey;
+
+        // Move textarea out of the viewport so it's not visible
+        textArea.style.position = "absolute";
+        textArea.style.left = "-999999px";
+
+        document.body.prepend(textArea);
+        textArea.select();
+        try {
+          document.execCommand("copy");
+        } catch (e) {
+          throw e;
+        } finally {
+          textArea.remove();
+        }
+      }
+      setIsCopied(true);
+    } catch (e) {
+      console.error(e);
+      setIsCopyError(true);
+    }
   };
 
   return (
@@ -41,6 +69,11 @@ export const RepoSshKeyCard = (props: { publicKey: string }): JSX.Element => {
         {isCopied && (
           <p className="font-sans text-xs text-green-400">
             Copied to clipboard!<i className="fa-solid fa-check ml-2"></i>
+          </p>
+        )}
+        {isCopyError && (
+          <p className="font-sans text-xs text-red-400">
+            Failed to copy to clipboard!<i className="fa-solid fa-exclamation-triangle ml-2"></i>
           </p>
         )}
       </Card>
