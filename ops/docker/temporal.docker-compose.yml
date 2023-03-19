@@ -1,4 +1,6 @@
 version: "3.5"
+networks:
+  hocus_dev_net:
 services:
   postgresql:
     container_name: temporal-postgresql
@@ -7,6 +9,8 @@ services:
       POSTGRES_PASSWORD: temporal
       POSTGRES_USER: temporal
     image: postgres:13-alpine
+    networks:
+      - hocus_dev_net
     ports:
       - 6432:5432
   temporal:
@@ -19,8 +23,10 @@ services:
       - POSTGRES_USER=temporal
       - POSTGRES_PWD=temporal
       - POSTGRES_SEEDS=postgresql
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development_es.yaml
-    image: temporalio/auto-setup:1.13.4
+      #- DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development_es.yaml
+    networks:
+      - hocus_dev_net
+    image: temporalio/auto-setup:1.20.0
     ports:
       - 7233:7233
   temporal-admin-tools:
@@ -29,16 +35,21 @@ services:
       - temporal
     environment:
       - TEMPORAL_CLI_ADDRESS=temporal:7233
-    image: temporalio/admin-tools:1.13.4
+    networks:
+      - hocus_dev_net
+    image: temporalio/admin-tools:1.20.0
     stdin_open: true
     tty: true
-  temporal-web:
-    container_name: temporal-web
+  temporal-ui:
     depends_on:
       - temporal
     environment:
-      - TEMPORAL_GRPC_ENDPOINT=temporal:7233
+      - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_PERMIT_WRITE_API=true
-    image: temporalio/web:1.13.0
+      - TEMPORAL_UI_ENABLED=true
+      - TEMPORAL_OPENAPI_ENABLED=true
+    image: temporalio/ui:2.11.2
+    networks:
+      - hocus_dev_net
     ports:
-      - 8088:8088
+      - 8080:8080
