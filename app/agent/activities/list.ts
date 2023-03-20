@@ -8,6 +8,8 @@ import { deleteLocalPrebuildEventFiles } from "./archive-prebuild-event/delete-l
 import type { DeleteLocalPrebuildEventFilesActivity } from "./archive-prebuild-event/delete-local-prebuild-event-files";
 import type { DeleteRemovablePrebuildEventsActivity } from "./archive-prebuild-event/delete-removable-prebuild-events";
 import { deleteRemovablePrebuildEvents } from "./archive-prebuild-event/delete-removable-prebuild-events";
+import type { GetArchivablePrebuildEventsActivity } from "./archive-prebuild-event/get-archivable-prebuild-events";
+import { getArchivablePrebuildEvents } from "./archive-prebuild-event/get-archivable-prebuild-events";
 import type { MarkPrebuildEventAsArchivedActivity } from "./archive-prebuild-event/mark-prebuild-event-as-archived";
 import { markPrebuildEventAsArchived } from "./archive-prebuild-event/mark-prebuild-event-as-archived";
 import type { RemovePrebuildEventReservationActivity } from "./archive-prebuild-event/remove-prebuild-event-reservation";
@@ -89,6 +91,7 @@ export interface Activities {
   markPrebuildEventAsArchived: MarkPrebuildEventAsArchivedActivity;
   deleteLocalPrebuildEventFiles: DeleteLocalPrebuildEventFilesActivity;
   deleteRemovablePrebuildEvents: DeleteRemovablePrebuildEventsActivity;
+  getArchivablePrebuildEvents: GetArchivablePrebuildEventsActivity;
 }
 
 export interface ActivityArgs {
@@ -133,6 +136,7 @@ export const createActivities = async (
     markPrebuildEventAsArchived,
     deleteLocalPrebuildEventFiles,
     deleteRemovablePrebuildEvents,
+    getArchivablePrebuildEvents,
   };
 
   return Object.fromEntries(

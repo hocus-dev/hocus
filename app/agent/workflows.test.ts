@@ -30,6 +30,7 @@ import {
   runStopWorkspace,
   runDeleteWorkspace,
   runArchivePrebuild,
+  runDeleteRemovablePrebuilds,
 } from "./workflows";
 
 const provideActivities = (
@@ -443,6 +444,34 @@ test.concurrent(
           expect(prebuildEvent.status).toBe(PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED);
         }),
       );
+      await db.prebuildEvent.updateMany({
+        where: {
+          id: {
+            in: successfulPrebuildEvents.map((e) => e.id),
+          },
+        },
+        data: {
+          createdAt: new Date(0),
+        },
+      });
+      await waitForPromises(
+        projects.map((p) =>
+          client.workflow.execute(runDeleteRemovablePrebuilds, {
+            workflowId: uuidv4(),
+            taskQueue: "test",
+            retry: { maximumAttempts: 1 },
+            args: [p.id],
+          }),
+        ),
+      );
+      const successfulPrebuildEventsAfterDelete = await db.prebuildEvent.findMany({
+        where: {
+          id: {
+            in: successfulPrebuildEvents.map((e) => e.id),
+          },
+        },
+      });
+      expect(successfulPrebuildEventsAfterDelete).toEqual([]);
     });
   }),
 );

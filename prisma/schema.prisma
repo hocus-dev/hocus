@@ -269,15 +269,16 @@ model GitObject {
 }
 
 model Project {
-  id                       BigInt                 @id @default(autoincrement())
-  externalId               String                 @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  name                     String
-  gitRepository            GitRepository          @relation(fields: [gitRepositoryId], references: [id])
-  gitRepositoryId          BigInt
+  id                                      BigInt                 @id @default(autoincrement())
+  externalId                              String                 @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                                    String
+  gitRepository                           GitRepository          @relation(fields: [gitRepositoryId], references: [id])
+  gitRepositoryId                         BigInt
   /// relative path to the directory where the `hocus.yml` file is located
-  rootDirectoryPath        String
-  environmentVariableSetId BigInt
-  environmentVariableSet   EnvironmentVariableSet @relation(fields: [environmentVariableSetId], references: [id])
+  rootDirectoryPath                       String
+  environmentVariableSetId                BigInt
+  environmentVariableSet                  EnvironmentVariableSet @relation(fields: [environmentVariableSetId], references: [id])
+  archivablePrebuildsMonitoringWorkflowId String                 @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
 
   createdAt                         DateTime                            @default(now()) @db.Timestamptz(3)
   prebuildEvents                    PrebuildEvent[]

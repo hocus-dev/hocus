@@ -539,14 +539,17 @@ export class PrebuildService {
     await db.log.deleteMany({
       where: { logGroupId: { in: logGroupIds } },
     });
-    await db.logGroup.deleteMany({
-      where: { id: { in: logGroupIds } },
-    });
     await db.prebuildEventToGitBranch.deleteMany({
       where: { prebuildEventId },
     });
     await db.prebuildEventTask.deleteMany({
       where: { prebuildEventId },
+    });
+    await db.vmTask.deleteMany({
+      where: { id: { in: prebuildEvent.tasks.map((t) => t.vmTaskId) } },
+    });
+    await db.logGroup.deleteMany({
+      where: { id: { in: logGroupIds } },
     });
     await db.prebuildEvent.delete({ where: { id: prebuildEventId } });
   }

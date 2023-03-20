@@ -58,6 +58,8 @@ const {
   waitForPrebuildEventReservations,
   markPrebuildEventAsArchived,
   deleteLocalPrebuildEventFiles,
+  deleteRemovablePrebuildEvents,
+  getArchivablePrebuildEvents,
 } = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -466,6 +468,11 @@ export async function runAddProjectAndRepository(args: {
       parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
     });
   }
+  await startChild(runMonitorArchivablePrebuilds, {
+    workflowId: result.project.archivablePrebuildsMonitoringWorkflowId,
+    args: [{ projectId: result.project.id, recentlyArchivedPrebuildEventIds: new Map() }],
+    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+  });
   return result;
 }
 
@@ -502,7 +509,51 @@ export async function runArchivePrebuild(args: { prebuildEventId: bigint }): Pro
   await retry(() => markPrebuildEventAsArchived({ prebuildEventId: args.prebuildEventId }));
 }
 
-export async function runMonitorPrebuilds(args: {
+export async function runDeleteRemovablePrebuilds(projectId: bigint): Promise<void> {
+  await deleteRemovablePrebuildEvents(projectId);
+}
+
+/**
+ * Here's what this workflow does in a loop:
+ *
+ * 1. Get a list of archivable prebuilds
+ * 2. Schedule workflows to archive these prebuilds
+ * 3. Schedule a workflow to remove archived, removable prebuilds
+ */
+export async function runMonitorArchivablePrebuilds(args: {
   projectId: bigint;
-  recentlyArchivedPrebuildEventIds: { id: bigint; archivedAt: number }[];
-}): Promise<void> {}
+  recentlyArchivedPrebuildEventIds: Map<bigint, number>;
+}): Promise<void> {
+  for (let i = 0; i < 1000; i++) {
+    try {
+      const archivablePrebuildEvents = await getArchivablePrebuildEvents(args.projectId);
+      const prebuildEventIdsToArchive = archivablePrebuildEvents
+        .map((e) => e.id)
+        .filter((id) => !args.recentlyArchivedPrebuildEventIds.has(id));
+      const now = Date.now();
+      for (const prebuildEventId of prebuildEventIdsToArchive) {
+        await startChild(runArchivePrebuild, {
+          args: [{ prebuildEventId }],
+          parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+        });
+        args.recentlyArchivedPrebuildEventIds.set(prebuildEventId, now);
+      }
+      const oneHour = 60 * 60 * 1000;
+      args.recentlyArchivedPrebuildEventIds = new Map(
+        Array.from(args.recentlyArchivedPrebuildEventIds.entries()).filter(([_, timestamp]) => {
+          return now - timestamp <= oneHour;
+        }),
+      );
+      await startChild(runDeleteRemovablePrebuilds, {
+        args: [args.projectId],
+        parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+    }
+    const fifteeenSeconds = 15 * 1000;
+    await sleep(fifteeenSeconds);
+  }
+  await continueAsNew<typeof runMonitorArchivablePrebuilds>(args);
+}
