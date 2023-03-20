@@ -18,6 +18,11 @@ SCRIPT_DIR="$(dirname "$0")"
 export REPO_DIR="$(realpath "${SCRIPT_DIR}/../..")"
 export HOCUS_RESOURCES_DIR="$(realpath ${REPO_DIR}/../hocus-resources)"
 
+if [[ $(file --mime-type -b ${REPO_DIR}/public/user-icon.jpg) == text/plain ]]; then
+  echo "You forgot to checkout the assets in LFS. Running it for you..."
+  git lfs fetch --all
+fi
+
 cd "$SCRIPT_DIR"
 
 docker-compose -p hocus-complete -f "$REPO_DIR/ops/docker/hocus-dev-complete.yml" up --build
