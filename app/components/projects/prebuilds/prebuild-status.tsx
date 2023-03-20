@@ -29,6 +29,11 @@ export function PrebuildStatus(props: { status: PrebuildEventStatus }): JSX.Elem
       "Cancelled",
       "text-gray-400",
     ])
+    .with("PREBUILD_EVENT_STATUS_PENDING_ARCHIVE", () => [
+      "fa-solid fa-box-archive",
+      "Pending Archive...",
+      "text-gray-400",
+    ])
     .with("PREBUILD_EVENT_STATUS_ARCHIVED", () => [
       "fa-solid fa-box-archive",
       "Archived",
