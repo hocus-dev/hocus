@@ -47,6 +47,7 @@ export const config = makeConfig()({
     hocusRepoPrivateKey: get("HOCUS_REPO_PRIVATE_KEY", ""),
   }),
   temporalConnection: () => ({
-    temporalServerUrl: process.env.TEMPORAL_SERVER_URL ?? "localhost:7233",
+    temporalServerUrl:
+      process.env.TEMPORAL_SERVER_URL ?? process.env.AGENT_TEMPORAL_ADDRESS ?? "localhost:7233",
   }),
 });

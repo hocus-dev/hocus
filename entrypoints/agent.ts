@@ -15,7 +15,10 @@ async function run() {
 
   if (agentConfig.setupHocusDevEnv) {
     // eslint-disable-next-line no-console
+    console.log("Setting up Hocus dev env");
     void setupHocusDevEnv().catch(console.error);
+  } else {
+    console.log("Not setting up Hocus dev env");
   }
 
   const db = new PrismaClient({ datasources: { db: { url: agentConfig.databaseUrl } } });

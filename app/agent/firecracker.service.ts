@@ -162,6 +162,7 @@ export class FirecrackerService {
 
     // Wait for the socket to be created
     try {
+      // TODO: use innotify for this
       await retry(async () => await fsAsync.stat(this.pathToSocket), 1000, 5);
     } catch (err) {
       this.logger.error(
@@ -296,6 +297,7 @@ export class FirecrackerService {
     const chrootKernelPath = "/kernel.bin";
     const chrootRootFsPath = "/rootfs.ext4";
 
+    const t1 = performance.now();
     this.linkToJailerChroot(cfg.kernelPath, chrootKernelPath);
     const shouldCopyRootFs = cfg.copyRootFs ?? false;
     if (shouldCopyRootFs) {
@@ -311,6 +313,7 @@ export class FirecrackerService {
         this.linkToJailerChroot(drive.pathOnHost, `/drive${idx}`);
       }
     }
+    this.logger.info(`Setting up the FS took ${(performance.now() - t1).toFixed(2)}`);
 
     await this.api.putGuestBootSource({
       body: {
@@ -438,7 +441,12 @@ export class FirecrackerService {
     const shouldPoweroff = config.shouldPoweroff ?? true;
     let vmStarted = false;
     const extraDrives = config.extraDrives ?? [];
+    const t1 = performance.now();
     const fcPid = await this.startFirecrackerInstance();
+    const t2 = performance.now();
+    this.logger.info(
+      `Starting firecracker process with pid ${fcPid} took: ${(t2 - t1).toFixed(2)} ms`,
+    );
     let ipBlockId: null | number = null;
     try {
       ipBlockId = await this.getFreeIpBlockId();
@@ -466,6 +474,12 @@ export class FirecrackerService {
         })),
       });
       vmStarted = true;
+      const t3 = performance.now();
+      this.logger.info(
+        `Booting firecracker VM with pid ${fcPid} took: ${(t3 - t2).toFixed(2)} ms, TOTAL: ${(
+          t3 - t1
+        ).toFixed(2)} ms`,
+      );
       await this.writeVmInfoFile({ pid: fcPid, ipBlockId });
       const sshConfig = { ...config.ssh, host: vmIp };
       return await withSsh(sshConfig, async (ssh) => {

@@ -203,6 +203,8 @@ services:
       - AGENT_KERNEL_PATH=/srv/jailer/resources/vmlinux-5.6-x86_64.bin
       - AGENT_HOST_BUILDFS_RESOURCES_DIR=/app/resources
       - AGENT_BUILDFS_ROOTFS=/srv/jailer/resources/buildfs.ext4
+      - AGENT_SETUP_HOCUS_DEV_ENV=${AGENT_SETUP_HOCUS_DEV_ENV}
+      - HOCUS_REPO_PRIVATE_KEY=${HOCUS_REPO_PRIVATE_KEY}
     networks:
       - hocus_net
     restart: "no"
@@ -210,5 +212,5 @@ services:
     ports:
       - 8822:22
     volumes:
-      - "agent_data:/srv/jailer:rw"
+      - agent_data:/srv/jailer:rw
       - /dev/kvm:/dev/kvm

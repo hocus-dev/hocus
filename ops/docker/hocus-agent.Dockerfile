@@ -26,10 +26,10 @@ RUN yarn run regen
 
 FROM node:16-bullseye AS runner
 
-RUN wget -q https://github.com/firecracker-microvm/firecracker/releases/download/v1.3.1/firecracker-v1.3.1-x86_64.tgz && \
-    tar -xf firecracker-v1.3.1-x86_64.tgz && \
-    mv release-v1.3.1-x86_64/firecracker-v1.3.1-x86_64 /usr/local/bin/firecracker && \
-    mv release-v1.3.1-x86_64/jailer-v1.3.1-x86_64 /usr/local/bin/jailer
+RUN wget -q https://github.com/firecracker-microvm/firecracker/releases/download/v1.1.2/firecracker-v1.1.2-x86_64.tgz && \
+    tar -xf firecracker-v1.1.2-x86_64.tgz && \
+    mv release-v1.1.2-x86_64/firecracker-v1.1.2-x86_64 /usr/local/bin/firecracker && \
+    mv release-v1.1.2-x86_64/jailer-v1.1.2-x86_64 /usr/local/bin/jailer
 RUN apt-get update && apt-get install -y net-tools iproute2 iptables psmisc
 RUN apt-get update && apt-get install -y socat openssh-server
 RUN apt-get update && apt-get install -y iputils-ping
@@ -43,4 +43,7 @@ COPY --from=builder /build/agent-build/agent.js /app/agent.js
 COPY --from=builder /build/agent-build/workflow-bundle.js /app/workflow-bundle.js
 COPY --from=builder /build/agent-build/data-converter.js /app/data-converter.js
 COPY resources resources
-CMD [ "bash", "-c", "node agent.js" ]
+COPY ops/docker/resources/setup-network.sh setup-network.sh
+CMD [ "bash", "-c", " \
+    ./setup-network.sh && \
+    node agent.js" ]
