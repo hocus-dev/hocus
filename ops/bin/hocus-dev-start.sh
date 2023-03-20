@@ -21,6 +21,7 @@ export HOCUS_RESOURCES_DIR="$(realpath ${REPO_DIR}/../hocus-resources)"
 if [[ $(file --mime-type -b ${REPO_DIR}/public/user-icon.jpg) == text/plain ]]; then
   echo "You forgot to checkout the assets in LFS. Running it for you..."
   git lfs fetch --all
+  git lfs pull
 fi
 
 cd "$SCRIPT_DIR"
