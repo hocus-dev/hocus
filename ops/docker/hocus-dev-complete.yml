@@ -185,6 +185,11 @@ services:
       - 3000:3000
     networks:
       - hocus_net
+    healthcheck:
+      test: ["CMD-SHELL", "curlm --head --fail localhost:3000 || exit 1"]
+      interval: 1s
+      timeout: 10s
+      retries: 30
 
   hocus-agent:
     depends_on:
@@ -195,7 +200,7 @@ services:
       setup-vm-images:
         condition: service_completed_successfully
       hocus-ui:
-        condition: service_started
+        condition: service_healthy
     build:
       dockerfile: ops/docker/hocus-agent.Dockerfile
       context: ${REPO_DIR}
