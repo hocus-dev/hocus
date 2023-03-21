@@ -23,10 +23,14 @@ RUN useradd hocus -m -s /bin/bash && \
     echo "hocus ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     chown -R hocus:hocus /home/hocus
 COPY ./docker/ssh/sshd_config /etc/ssh/sshd_config
-RUN mkdir -p /home/hocus/.ssh && \
+
+RUN mkdir -p /home/hocus/.ssh && touch /home/hocus/.ssh/known_hosts && \
+    ## This adds github.com as a known host - TODO: this is vulnerable to MITM but good enough for now
+    ssh-keyscan -H github.com >> /home/hocus/.ssh/known_hosts && \
     # this public key is automatically removed when a workspace starts
     echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKk+DZs+E2GlmqUNqTCU9/R0kT/zzBjwBqbPaBtGv3MA hocus@prebuild" >> /home/hocus/.ssh/authorized_keys && \
     chown -R hocus:hocus /home/hocus/.ssh && \
     chmod 700 /home/hocus/.ssh && \
-    chmod 600 /home/hocus/.ssh/authorized_keys
+    chmod 600 /home/hocus/.ssh/authorized_keys && \
+    chmod 600 /home/hocus/.ssh/known_hosts
 RUN git lfs install
