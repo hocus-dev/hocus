@@ -197,19 +197,22 @@ export class WorkspaceAgentService {
         cwd: WORKSPACE_REPOSITORY_DIR,
         execOptions: { env: { BRANCH: branch } as any },
       };
+      const removeIndex = () => execSshCmd({ ssh, opts }, ["rm", "-f", ".git/index.lock"]);
       await execSshCmd({ ssh, opts }, [
         "bash",
         "-c",
         'git update-ref "refs/heads/$BRANCH" "$(git rev-parse HEAD)"',
       ]);
+      await removeIndex();
       await execSshCmd({ ssh, opts }, ["git", "checkout", branch]);
+      await removeIndex();
       await execSshCmd({ ssh, opts }, [
         "git",
         "branch",
         `--set-upstream-to=origin/${branch}`,
         branch,
       ]);
-      await execSshCmd({ ssh, opts }, ["rm", "-f", ".git/index.lock"]);
+      await removeIndex();
     });
   }
 

@@ -1,4 +1,4 @@
-import type { Prisma, User, UserSSHPublicKey } from "@prisma/client";
+import type { Prisma, User, UserGitConfig, UserSSHPublicKey } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 
 import { TEST_USER_PUBLIC_SSH_KEY } from "./test-constants";
@@ -8,6 +8,7 @@ export const createTestUser = async (
 ): Promise<
   User & {
     sshPublicKeys: UserSSHPublicKey[];
+    gitConfig: UserGitConfig;
   }
 > => {
   return await db.user.create({
@@ -28,6 +29,7 @@ export const createTestUser = async (
     },
     include: {
       sshPublicKeys: true,
+      gitConfig: true,
     },
   });
 };

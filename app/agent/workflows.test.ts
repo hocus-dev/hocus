@@ -13,7 +13,7 @@ import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
-import { groupBy, unwrap, waitForPromises } from "~/utils.shared";
+import { groupBy, unwrap, waitForPromises, formatBranchName } from "~/utils.shared";
 
 import type { Activities } from "./activities/list";
 import { createActivities } from "./activities/list";
@@ -316,12 +316,31 @@ test.concurrent(
         });
 
       const workspaceInstance1 = await startWorkspace();
-      const sshOutput = await execSshCmdThroughProxy({
-        vmIp: workspaceInstance1.vmIp,
-        privateKey: TEST_USER_PRIVATE_SSH_KEY,
-        cmd: `cat /home/hocus/dev/project/proxy-test.txt`,
-      });
+      const execInInstance1 = async (cmd: string) => {
+        const cmdBash = `bash -c '${cmd}'`;
+        return await execSshCmdThroughProxy({
+          vmIp: workspaceInstance1.vmIp,
+          privateKey: TEST_USER_PRIVATE_SSH_KEY,
+          cmd: cmdBash,
+        });
+      };
+      const sshOutput = await execInInstance1("cat /home/hocus/dev/project/proxy-test.txt");
       expect(sshOutput.stdout.toString()).toEqual("hello from the tests repository!\n");
+      const cdRepo = "cd /home/hocus/dev/project &&";
+      const [gitName, gitEmail] = await waitForPromises(
+        ["user.name", "user.email"].map((item) =>
+          execInInstance1(`${cdRepo} git config --global ${item}`).then((o) =>
+            o.stdout.toString().trim(),
+          ),
+        ),
+      );
+      expect(gitName).toEqual(testUser.gitConfig.gitUsername);
+      expect(gitEmail).toEqual(testUser.gitConfig.gitEmail);
+      const gitBranchName = await execInInstance1(`${cdRepo} git branch --show-current`).then((o) =>
+        o.stdout.toString().trim(),
+      );
+      expect(gitBranchName).toEqual(formatBranchName(testBranches[0].name));
+
       await stopWorkspace();
 
       const workspaceInstance2 = await startWorkspace();
