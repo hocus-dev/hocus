@@ -55,7 +55,7 @@ export const SshKey = (props: {
           <span>Delete</span>
         </Button>
       </div>
-      <p className="font-mono text-sm text-gray-300 p-2 border border-gray-700 bg-gray-700 rounded-lg">
+      <p className="font-mono text-sm text-gray-300 p-2 border border-gray-700 bg-gray-700 rounded-lg overflow-auto">
         {props.publicKey}
       </p>
     </div>

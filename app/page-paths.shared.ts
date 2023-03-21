@@ -75,3 +75,11 @@ export const getPrebuildPath = (prebuildExternalId: string, taskIdx?: number) =>
   `/app/prebuilds/${prebuildExternalId}${taskIdx != null ? `?task=${taskIdx}` : ""}` as const;
 export const getPrebuildLogsPath = (prebuildExternalId: string, taskExternalId: string) =>
   `/app/prebuilds/logs?prebuildExternalId=${prebuildExternalId}&taskExternalId=${taskExternalId}` as const;
+
+export type SettingsPageTab = valueof<typeof SettingsPageTab>;
+export const SettingsPageTab = {
+  SshKeys: "ssh-keys",
+  Git: "git",
+} as const;
+
+export const getUserSettingsPath = (tab: SettingsPageTab) => `/app/user/settings/${tab}` as const;
