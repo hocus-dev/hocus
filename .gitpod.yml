@@ -33,6 +33,7 @@ tasks:
   - name: Temporal codec server
     init: |
       yarn install
+    command: |
       ops/bin/link.sh
       PORT=1337 npx ts-node entrypoints/codec-server.ts
   - name: Terminal
