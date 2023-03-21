@@ -294,7 +294,7 @@ export class WorkspaceAgentService {
           const shellName = task.commandShell;
 
           await this.writeUserGitConfig(ssh, args.userGitConfig);
-          await this.checkoutToBranch(ssh, args.branchName);
+          // await this.checkoutToBranch(ssh, args.branchName);
           await execSshCmd({ ssh }, ["mkdir", "-p", WORKSPACE_SCRIPTS_DIR]);
           await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
           await this.agentUtilService.writeFile(ssh, taskInputPath, taskInput);
