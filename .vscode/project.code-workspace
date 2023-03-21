@@ -37,9 +37,9 @@
         "remotePort": 6432
       },
       {
-        "localPort": 8088,
-        "name": "temporal-web",
-        "remotePort": 8088
+        "localPort": 8080,
+        "name": "temporal-ui",
+        "remotePort": 8080
       }
     ],
     "emeraldwalk.runonsave": {
@@ -51,6 +51,6 @@
       ]
     },
     "excalidraw.theme": "dark",
-    "typescript.tsdk": "./node_modules/typescript/lib",
+    "typescript.tsdk": "./node_modules/typescript/lib"
   }
 }
