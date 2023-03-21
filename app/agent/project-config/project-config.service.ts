@@ -11,8 +11,8 @@ import { ProjectConfigValidator } from "./validator";
 
 export class ProjectConfigService {
   /**
-   * Returns `[ProjectConfig, string]` for the given repository if a hocus config file is present.
-   * Otherwise, returns `null`.
+   * Returns `[ProjectConfig, projectConfigPath]` for the given repository
+   * if a hocus config file is present. Otherwise, returns `null`.
    */
   async getConfig(
     ssh: NodeSSH,
