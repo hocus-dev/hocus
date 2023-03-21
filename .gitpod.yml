@@ -24,7 +24,7 @@ tasks:
       echo "export HOCUS_REPO_PRIVATE_KEY=\"\$(echo -n $REPO_PRIVATE_KEY_BASE64 | base64 -d)\"" >> ops/resources/gitpod-ip.sh
       ops/bin/rsync.sh
   - name: Agent+CP dev-env setup
-    init: yarn install && npm run dev-prebuild && ops/bin/prepare.sh
+    init: yarn install && npm run dev-prebuild && git lfs pull && ops/bin/prepare.sh
     command: |
       ops/bin/link.sh
       ops/bin/up.sh
