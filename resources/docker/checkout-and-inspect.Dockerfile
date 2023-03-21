@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     sudo \
     util-linux \
     git \
+    git-lfs \
     vim
 RUN systemctl enable ssh
 COPY ./docker/dnssetup /etc/init.d/dnssetup
@@ -28,3 +29,4 @@ RUN mkdir -p /home/hocus/.ssh && \
     chown -R hocus:hocus /home/hocus/.ssh && \
     chmod 700 /home/hocus/.ssh && \
     chmod 600 /home/hocus/.ssh/authorized_keys
+RUN git lfs install
