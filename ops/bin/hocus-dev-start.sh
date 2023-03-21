@@ -27,4 +27,4 @@ fi
 
 cd "$SCRIPT_DIR"
 
-docker-compose -p hocus-complete -f "$REPO_DIR/ops/docker/hocus-dev-complete.yml" up --build
+docker compose -p hocus-complete -f "$REPO_DIR/ops/docker/hocus-dev-complete.yml" up --build

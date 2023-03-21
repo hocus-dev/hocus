@@ -31,6 +31,8 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs \
     && npm install --global yarn \
     && { curl https://get.docker.com/ | bash -; } \
+    # Symlink docker-compose for compatibility
+    && ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose \
     && rm -rf /var/lib/apt/lists/*
 RUN systemctl enable ssh docker
 COPY ./docker/dnssetup /etc/init.d/dnssetup
