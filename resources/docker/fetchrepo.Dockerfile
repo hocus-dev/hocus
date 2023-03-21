@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     sudo \
     util-linux \
     git \
+    git-lfs \
     vim
 RUN systemctl enable ssh
 COPY ./docker/dnssetup /etc/init.d/dnssetup
@@ -23,3 +24,4 @@ RUN useradd hocus -m -s /bin/bash && \
     echo 'hocus:hocus' | chpasswd
 RUN sed -i 's/#PermitUserEnvironment no/PermitUserEnvironment yes/g' /etc/ssh/sshd_config
 RUN sed -i 's/AcceptEnv .*/AcceptEnv */g' /etc/ssh/sshd_config
+RUN git lfs install

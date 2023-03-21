@@ -334,6 +334,14 @@ export class AgentGitService {
               ["git", "clone", "--no-checkout", repository.url, repositoryDir],
             );
           }
+
+          // TODO: This is a PITA as LFS might span TB's of data .-. we need to revisit this in the future
+          await execSshCmd({ ssh, logFilePath, opts: { ...sshOpts, cwd: repositoryDir } }, [
+            "git",
+            "lfs",
+            "fetch",
+            "--all",
+          ]);
         },
       );
     });
