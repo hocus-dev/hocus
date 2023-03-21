@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 import fs from "fs";
 import fsAsync from "fs/promises";
+import os from "os";
 import path from "path";
 
 import type { DefaultLogger } from "@temporalio/worker";
@@ -342,8 +343,10 @@ export class FirecrackerService {
     });
     await this.api.putMachineConfiguration({
       body: {
-        vcpuCount: 2,
-        memSizeMib: 4096,
+        // TODO: Make this configurable depending on the job, for now use all the cores
+        vcpuCount: os.cpus().length,
+        // And up to 80% of the RAM
+        memSizeMib: +((os.totalmem() / 1024 / 1024) * 0.8).toFixed(0),
         smt: true,
       },
     });

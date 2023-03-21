@@ -13,12 +13,13 @@ async function run() {
   const injector = createAgentInjector();
   const agentConfig = injector.resolve(Token.Config).agent();
 
-  if (agentConfig.setupHocusDevEnv) {
+  if (agentConfig.createHocusProjects || agentConfig.createDevelopementProjects) {
     // eslint-disable-next-line no-console
-    console.log("Setting up Hocus dev env");
+    console.log("Setting up projects automatically");
     void setupHocusDevEnv().catch(console.error);
   } else {
-    console.log("Not setting up Hocus dev env");
+    // eslint-disable-next-line no-console
+    console.log("Not setting up any projects");
   }
 
   const db = new PrismaClient({ datasources: { db: { url: agentConfig.databaseUrl } } });

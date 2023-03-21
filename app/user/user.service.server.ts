@@ -12,9 +12,10 @@ export class UserService {
     args: {
       externalId: string;
       gitEmail: string;
+      gitName?: string;
     },
   ): Promise<User> {
-    const { externalId, gitEmail } = args;
+    const { externalId, gitEmail, gitName } = args;
     let user = await db.user.findUnique({ where: { externalId } });
     if (user != null) {
       return user;
@@ -35,7 +36,7 @@ export class UserService {
           gitConfig: {
             create: {
               gitEmail,
-              gitUsername: this.gitService.getGitUsernameFromEmail(gitEmail),
+              gitUsername: gitName ?? this.gitService.getGitUsernameFromEmail(gitEmail),
             },
           },
         },

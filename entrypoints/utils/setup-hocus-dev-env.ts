@@ -4,6 +4,7 @@ import { PrismaClient, SshKeyPairType } from "@prisma/client";
 import type { Client } from "@temporalio/client";
 import { nanoid } from "nanoid";
 import { runAddProjectAndRepository } from "~/agent/workflows";
+import type { AppInjector } from "~/app-injector.server";
 import { createAppInjector } from "~/app-injector.server";
 import { DEV_USER_EXTERNAL_ID, DEV_USER_SSH_PUBLIC_KEY } from "~/dev/constants";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
@@ -25,64 +26,88 @@ async function addDevRepo(
   console.log(result);
 }
 
-export async function setupHocusDevEnv() {
-  const injector = createAppInjector();
-  const agentConfig = injector.resolve(Token.Config).agent();
+async function setupDevUser(db: PrismaClient, injector: AppInjector) {
   const agentDevConfig = injector.resolve(Token.Config).agentDev();
-  const db = new PrismaClient({ datasources: { db: { url: agentConfig.databaseUrl } } });
   const sshKeyService = injector.resolve(Token.SshKeyService);
   const userService = injector.resolve(Token.UserService);
+  console.log("Setting up dev@example.com user");
+  const devUser = await userService.getOrCreateUser(db, {
+    externalId: DEV_USER_EXTERNAL_ID,
+    gitEmail: agentDevConfig.gitEmail,
+    gitName: agentDevConfig.gitName,
+  });
+  await db.$transaction(async (tdb) => {
+    await sshKeyService.createPublicSshKeyForUser(tdb, devUser.id, DEV_USER_SSH_PUBLIC_KEY, "Dev");
+  });
+}
+
+async function setupDevelopementProjects(db: PrismaClient, client: Client, injector: AppInjector) {
+  const sshKeyService = injector.resolve(Token.SshKeyService);
+  console.log("Creating projects for Hocus developement");
+
   const testsKeyPair = await sshKeyService.createSshKeyPair(
     db,
     TESTS_PRIVATE_SSH_KEY,
     SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
   );
-  const devUser = await userService.getOrCreateUser(db, {
-    externalId: DEV_USER_EXTERNAL_ID,
-    gitEmail: "dev@example.com",
+  await addDevRepo(client, {
+    gitRepositoryUrl: TESTS_REPO_URL,
+    projectName: "Hocus Tests",
+    projectWorkspaceRoot: "/",
+    sshKeyPairId: testsKeyPair.id,
   });
-  await db.$transaction(async (tdb) => {
-    await sshKeyService.createPublicSshKeyForUser(tdb, devUser.id, DEV_USER_SSH_PUBLIC_KEY, "Dev");
-  });
+}
+
+async function setupHocusProjects(db: PrismaClient, client: Client, injector: AppInjector) {
+  const sshKeyService = injector.resolve(Token.SshKeyService);
+  const repoAccess = injector.resolve(Token.Config).hocusRepoAccess();
+  console.log("Creating projects for Hocus in Hocus");
+
+  const hocusRepoKeyPair = await sshKeyService.createSshKeyPair(
+    db,
+    repoAccess.hocusRepoPrivateKey,
+    SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
+  );
+  await waitForPromises([
+    addDevRepo(client, {
+      gitRepositoryUrl: HOCUS_REPO_URL,
+      projectName: "Hocus Vscode Workspace Extension",
+      projectWorkspaceRoot: "/extensions/vscode_workspace",
+      sshKeyPairId: hocusRepoKeyPair.id,
+    }),
+
+    addDevRepo(client, {
+      gitRepositoryUrl: HOCUS_REPO_URL,
+      projectName: "Hocus Vscode UI Extension",
+      projectWorkspaceRoot: "/extensions/vscode_ui",
+      sshKeyPairId: hocusRepoKeyPair.id,
+    }),
+
+    addDevRepo(client, {
+      gitRepositoryUrl: HOCUS_REPO_URL,
+      projectName: "Hocus Agent+CP",
+      projectWorkspaceRoot: "/",
+      sshKeyPairId: hocusRepoKeyPair.id,
+    }),
+  ]);
+}
+
+export async function setupHocusDevEnv() {
+  const injector = createAppInjector();
+  const agentConfig = injector.resolve(Token.Config).agent();
+  const db = new PrismaClient({ datasources: { db: { url: agentConfig.databaseUrl } } });
+
+  await setupDevUser(db, injector);
 
   const withClient = injector.resolve(Token.TemporalClient);
   await withClient(async (client) => {
-    await addDevRepo(client, {
-      gitRepositoryUrl: TESTS_REPO_URL,
-      projectName: "Hocus Tests",
-      projectWorkspaceRoot: "/",
-      sshKeyPairId: testsKeyPair.id,
-    });
-
-    if (agentDevConfig.hocusRepoPrivateKey !== "") {
-      const hocusRepoKeyPair = await sshKeyService.createSshKeyPair(
-        db,
-        agentDevConfig.hocusRepoPrivateKey,
-        SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
-      );
-
-      await waitForPromises([
-        addDevRepo(client, {
-          gitRepositoryUrl: HOCUS_REPO_URL,
-          projectName: "Hocus Vscode Workspace Extension",
-          projectWorkspaceRoot: "/extensions/vscode_workspace",
-          sshKeyPairId: hocusRepoKeyPair.id,
-        }),
-
-        addDevRepo(client, {
-          gitRepositoryUrl: HOCUS_REPO_URL,
-          projectName: "Hocus Vscode UI Extension",
-          projectWorkspaceRoot: "/extensions/vscode_ui",
-          sshKeyPairId: hocusRepoKeyPair.id,
-        }),
-
-        addDevRepo(client, {
-          gitRepositoryUrl: HOCUS_REPO_URL,
-          projectName: "Hocus Agent+CP",
-          projectWorkspaceRoot: "/",
-          sshKeyPairId: hocusRepoKeyPair.id,
-        }),
-      ]);
-    }
+    await waitForPromises([
+      !agentConfig.createDevelopementProjects
+        ? Promise.resolve()
+        : setupDevelopementProjects(db, client, injector),
+      !agentConfig.createHocusProjects
+        ? Promise.resolve()
+        : setupHocusProjects(db, client, injector),
+    ]);
   });
 }

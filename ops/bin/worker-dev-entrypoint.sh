@@ -12,6 +12,6 @@ export AGENT_TEMPORAL_ADDRESS="$GITPOD_IP:7233"
 export TEMPORAL_SERVER_URL="$GITPOD_IP:7233"
 export AGENT_DATABASE_URL="postgres://postgres:pass@$GITPOD_IP:5432/rooms"
 
-tmux new -d -s agent 'NODE_ENV=development AGENT_SETUP_HOCUS_DEV_ENV=true yarn ts-node -r tsconfig-paths/register entrypoints/agent.ts || true && /bin/bash'
+tmux new -d -s agent 'NODE_ENV=development AGENT_DEV_CREATE_DEVELOPEMENT_PROJECTS=true yarn ts-node -r tsconfig-paths/register entrypoints/agent.ts || true && /bin/bash'
 
 /bin/bash

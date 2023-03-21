@@ -40,11 +40,27 @@ export const config = makeConfig()({
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:
       process.env.AGENT_PREBUILD_SSH_PRIVATE_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PRIVATE,
-    // If set then the agent will setup a dev env for hocus when starting
-    setupHocusDevEnv: (process.env.AGENT_SETUP_HOCUS_DEV_ENV ?? "false") === "true",
+
+    // If set then the agent will setup projects for running hocus in hocus when starting
+    createHocusProjects: (process.env.AGENT_DEV_CREATE_HOCUS_PROJECTS ?? "false") === "true",
+    // If set then the agent will setup projects for hocus developement
+    // Those projects should be used for developing Hocus
+    // For now those projects are private and we hardcoded a private key in the codebase
+    // They will be public soon anyway :)
+    createDevelopementProjects:
+      (process.env.AGENT_DEV_CREATE_DEVELOPEMENT_PROJECTS ?? "false") === "true",
   }),
-  agentDev: () => ({
+  hocusRepoAccess: () => ({
+    // Temporarily the Hocus repo is private :P Will be removed soon.
+    // Sets a deploy key in the agent which has access to the Hocus repo
     hocusRepoPrivateKey: get("HOCUS_REPO_PRIVATE_KEY", ""),
+  }),
+  // Environment variables for the hocus dev env
+  agentDev: () => ({
+    // Normally the gitUsername/gitEmail is set to the email&name from OIDC or set in the UI by the user
+    // In the dev env we have a user dev/dev, this overrides the git settings for that user
+    gitName: process.env.HOCUS_DEV_GIT_NAME ?? "dev",
+    gitEmail: process.env.HOCUS_DEV_GIT_EMAIL ?? "dev@example.com",
   }),
   temporalConnection: () => ({
     temporalServerUrl:

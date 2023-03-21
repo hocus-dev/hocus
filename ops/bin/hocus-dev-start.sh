@@ -25,6 +25,9 @@ if [[ $(file --mime-type -b ${REPO_DIR}/public/user-icon.jpg) == text/plain ]]; 
   git lfs pull
 fi
 
+export HOCUS_DEV_GIT_NAME=$(git config --get user.name)
+export HOCUS_DEV_GIT_EMAIL=$(git config --get user.email)
+
 cd "$SCRIPT_DIR"
 
 docker compose -p hocus-complete -f "$REPO_DIR/ops/docker/hocus-dev-complete.yml" up --build
