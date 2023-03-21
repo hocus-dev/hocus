@@ -4,7 +4,6 @@ import path from "path";
 import type { Workspace, WorkspaceInstance } from "@prisma/client";
 import { Prisma, WorkspaceStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
-import ini from "ini";
 import type { NodeSSH, SSHExecOptions } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
 import type { Config } from "~/config";
@@ -197,22 +196,18 @@ export class WorkspaceAgentService {
         cwd: WORKSPACE_REPOSITORY_DIR,
         execOptions: { env: { BRANCH: branch } as any },
       };
-      const removeIndex = () => execSshCmd({ ssh, opts }, ["rm", "-f", ".git/index.lock"]);
       await execSshCmd({ ssh, opts }, [
         "bash",
         "-c",
         'git update-ref "refs/heads/$BRANCH" "$(git rev-parse HEAD)"',
       ]);
-      await removeIndex();
       await execSshCmd({ ssh, opts }, ["git", "checkout", branch]);
-      await removeIndex();
       await execSshCmd({ ssh, opts }, [
         "git",
         "branch",
         `--set-upstream-to=origin/${branch}`,
         branch,
       ]);
-      await removeIndex();
     });
   }
 
@@ -221,19 +216,17 @@ export class WorkspaceAgentService {
     gitConfig: { username: string; email: string },
   ): Promise<void> {
     await this.oncePerWorkspace(ssh, WORKSPACE_GIT_CONFIGURED_MARKER_PATH, async () => {
-      // we parse the file instead of using `git config --global user.name ...` because
-      // it kept failing with "error: could not lock config file /home/hocus/.gitconfig: File exists"
-      const gitconfigPath = "/home/hocus/.gitconfig";
-      const gitconfigText = await this.agentUtilService
-        .readFile(ssh, gitconfigPath)
-        .catch((_) => "");
-      const gitconfig = ini.parse(gitconfigText);
-      if (gitconfig.user == null) {
-        gitconfig.user = {};
-      }
-      gitconfig.user.name = gitConfig.username;
-      gitconfig.user.email = gitConfig.email;
-      await this.agentUtilService.writeFile(ssh, gitconfigPath, ini.stringify(gitconfig));
+      const opts: SSHExecOptions = {
+        cwd: WORKSPACE_REPOSITORY_DIR,
+      };
+      await execSshCmd({ ssh, opts }, [
+        "git",
+        "config",
+        "--global",
+        "user.name",
+        gitConfig.username,
+      ]);
+      await execSshCmd({ ssh, opts }, ["git", "config", "--global", "user.email", gitConfig.email]);
     });
   }
 
@@ -296,8 +289,6 @@ export class WorkspaceAgentService {
 
           const shellName = task.commandShell;
 
-          await this.writeUserGitConfig(ssh, args.userGitConfig);
-          await this.checkoutToBranch(ssh, args.branchName);
           await execSshCmd({ ssh }, ["mkdir", "-p", WORKSPACE_SCRIPTS_DIR]);
           await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
           await this.agentUtilService.writeFile(ssh, taskInputPath, taskInput);
@@ -339,6 +330,8 @@ export class WorkspaceAgentService {
           "/home/hocus/.ssh/authorized_keys",
           authorizedKeys.join("\n") + "\n",
         );
+        await this.writeUserGitConfig(ssh, args.userGitConfig);
+        await this.checkoutToBranch(ssh, args.branchName);
         await Promise.all(args.tasks.map(taskFn));
         await fcService.changeVMNetworkVisibility(ipBlockId, "public");
         await this.sshGatewayService.addPublicKeysToAuthorizedKeys(authorizedKeys);
