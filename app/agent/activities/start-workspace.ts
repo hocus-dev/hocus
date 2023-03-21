@@ -13,7 +13,11 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
     const monitoringWorkflowId = uuidv4();
     const fcInstanceId = monitoringWorkflowId;
 
+    const t1 = performance.now();
     const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
+    const logger = injector.resolve(Token.Logger);
+    const t2 = performance.now();
+    logger.info(`Resolving dependencies took: ${(t2 - t1).toFixed(2)} ms`);
 
     await db.$transaction((tdb) =>
       workspaceAgentService.markWorkspaceAs(
@@ -77,6 +81,7 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
       new Map([...projectEnvVariables, ...userVariables]).entries(),
     ).map(([name, value]) => ({ name, value }));
 
+    const t3 = performance.now();
     const instanceInfo = await workspaceAgentService.startWorkspace({
       fcInstanceId,
       filesystemDrivePath: workspace.rootFsFile.path,
@@ -94,7 +99,10 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
       },
       branchName: formatBranchName(workspace.gitBranch.name),
     });
-    return await db.$transaction((tdb) =>
+    const t4 = performance.now();
+    logger.info(`Starting workspace took: ${(t4 - t3).toFixed(2)} ms`);
+
+    const r = await db.$transaction((tdb) =>
       workspaceAgentService.createWorkspaceInstanceInDb(tdb, {
         workspaceId,
         firecrackerInstanceId: fcInstanceId,
@@ -102,4 +110,8 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
         vmIp: instanceInfo.vmIp,
       }),
     );
+    const t5 = performance.now();
+    logger.info(`startWorkspaceActivity took: ${(t5 - t1).toFixed(2)} ms`);
+
+    return r;
   };
