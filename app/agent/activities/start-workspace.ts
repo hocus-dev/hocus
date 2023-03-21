@@ -2,6 +2,7 @@ import type { WorkspaceInstance } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { Token } from "~/token";
+import { formatBranchName } from "~/utils.shared";
 
 import type { CreateActivity } from "./types";
 
@@ -39,6 +40,7 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
             },
           },
         },
+        gitBranch: true,
         user: {
           include: {
             sshPublicKeys: true,
@@ -90,6 +92,7 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
         email: workspace.user.gitConfig.gitEmail,
         username: workspace.user.gitConfig.gitUsername,
       },
+      branchName: formatBranchName(workspace.gitBranch.name),
     });
     return await db.$transaction((tdb) =>
       workspaceAgentService.createWorkspaceInstanceInDb(tdb, {
