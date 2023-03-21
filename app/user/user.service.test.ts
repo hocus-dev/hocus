@@ -22,7 +22,13 @@ test.concurrent(
   provideUserService(async ({ db, userService }) => {
     const externalId = "123";
 
-    const user = await userService.getOrCreateUser(db, externalId, "github");
+    const user = await userService.getOrCreateUser(db, { externalId, gitEmail: "dev@example.com" });
+    const userWithExtras = await db.user.findUniqueOrThrow({
+      where: { id: user.id },
+      include: { gitConfig: true },
+    });
     expect(user.externalId).toEqual(externalId);
+    expect(userWithExtras.gitConfig.gitEmail).toEqual("dev@example.com");
+    expect(userWithExtras.gitConfig.gitUsername).toEqual("dev");
   }),
 );

@@ -19,6 +19,12 @@ export const createTestUser = async (
           publicKey: TEST_USER_PUBLIC_SSH_KEY,
         },
       },
+      gitConfig: {
+        create: {
+          gitEmail: "dev@example.com",
+          gitUsername: "dev",
+        },
+      },
     },
     include: {
       sshPublicKeys: true,

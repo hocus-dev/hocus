@@ -37,7 +37,10 @@ export async function setupHocusDevEnv() {
     TESTS_PRIVATE_SSH_KEY,
     SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
   );
-  const devUser = await userService.getOrCreateUser(db, DEV_USER_EXTERNAL_ID, "dev");
+  const devUser = await userService.getOrCreateUser(db, {
+    externalId: DEV_USER_EXTERNAL_ID,
+    gitEmail: "dev@example.com",
+  });
   await db.$transaction(async (tdb) => {
     await sshKeyService.createPublicSshKeyForUser(tdb, devUser.id, DEV_USER_SSH_PUBLIC_KEY, "Dev");
   });

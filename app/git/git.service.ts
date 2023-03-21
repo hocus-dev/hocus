@@ -75,4 +75,8 @@ export class GitService {
       wasCreated: true,
     };
   }
+
+  getGitUsernameFromEmail(email: string): string {
+    return email.split("@")[0];
+  }
 }

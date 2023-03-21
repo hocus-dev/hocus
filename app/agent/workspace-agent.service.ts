@@ -4,6 +4,7 @@ import path from "path";
 import type { Workspace, WorkspaceInstance } from "@prisma/client";
 import { Prisma, WorkspaceStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
+import type { NodeSSH, SSHExecOptions } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
 import type { Config } from "~/config";
 import { Token } from "~/token";
@@ -15,6 +16,8 @@ import {
   WORKSPACE_CONFIG_SYMLINK_PATH,
   WORKSPACE_DEV_DIR,
   WORKSPACE_ENV_SCRIPT_PATH,
+  WORKSPACE_GIT_CONFIGURED_MARKER_PATH,
+  WORKSPACE_GIT_DIR,
   WORKSPACE_REPOSITORY_DIR,
   WORKSPACE_SCRIPTS_DIR,
 } from "./constants";
@@ -168,6 +171,30 @@ export class WorkspaceAgentService {
     );
   }
 
+  async writeUserGitConfig(
+    ssh: NodeSSH,
+    gitConfig: { username: string; email: string },
+  ): Promise<void> {
+    const gitAlreadyConfigured = await this.agentUtilService
+      .readFile(ssh, WORKSPACE_GIT_CONFIGURED_MARKER_PATH)
+      .then(() => true)
+      .catch(() => false);
+    if (gitAlreadyConfigured) {
+      return;
+    }
+    const homeDir = "/home/hocus";
+    const opts: SSHExecOptions = {
+      execOptions: { env: { HOME: homeDir } as any },
+      cwd: homeDir,
+    };
+    await execSshCmd({ ssh, opts }, ["mkdir", "-p", WORKSPACE_GIT_DIR]);
+    await execSshCmd({ ssh, opts }, ["touch", `${homeDir}/.gitconfig`]);
+    await execSshCmd({ ssh, opts }, ["git", "config", "--global", "user.name", gitConfig.username]);
+    await execSshCmd({ ssh, opts }, ["git", "config", "--global", "user.email", gitConfig.email]);
+    await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_GIT_CONFIGURED_MARKER_PATH)]);
+    await this.agentUtilService.writeFile(ssh, WORKSPACE_GIT_CONFIGURED_MARKER_PATH, "1");
+  }
+
   async startWorkspace(args: {
     fcInstanceId: string;
     filesystemDrivePath: string;
@@ -176,6 +203,7 @@ export class WorkspaceAgentService {
     workspaceRoot: string;
     tasks: { command: string; commandShell: string }[];
     environmentVariables: { name: string; value: string }[];
+    userGitConfig: { username: string; email: string };
   }): Promise<{
     firecrackerProcessPid: number;
     vmIp: string;
@@ -224,6 +252,7 @@ export class WorkspaceAgentService {
 
           const shellName = task.commandShell;
 
+          await this.writeUserGitConfig(ssh, args.userGitConfig);
           await execSshCmd({ ssh }, ["mkdir", "-p", WORKSPACE_SCRIPTS_DIR]);
           await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
           await this.agentUtilService.writeFile(ssh, taskInputPath, taskInput);

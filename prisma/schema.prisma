@@ -14,6 +14,8 @@ model User {
   id            BigInt             @id @default(autoincrement())
   externalId    String             @unique
   gaUserId      String             @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  gitConfig     UserGitConfig      @relation(fields: [gitConfigId], references: [id])
+  gitConfigId   BigInt
   workspaces    Workspace[]
   sshPublicKeys UserSSHPublicKey[]
 
@@ -407,4 +409,15 @@ model UserProjectEnvironmentVariableSet {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@unique([userId, projectId])
+}
+
+model UserGitConfig {
+  id          BigInt @id @default(autoincrement())
+  gitUsername String
+  gitEmail    String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User[]
 }

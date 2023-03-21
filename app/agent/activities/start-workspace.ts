@@ -42,6 +42,7 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
         user: {
           include: {
             sshPublicKeys: true,
+            gitConfig: true,
           },
         },
       },
@@ -85,6 +86,10 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
         commandShell: workspace.prebuildEvent.workspaceTasksShell[idx],
       })),
       environmentVariables,
+      userGitConfig: {
+        email: workspace.user.gitConfig.gitEmail,
+        username: workspace.user.gitConfig.gitUsername,
+      },
     });
     return await db.$transaction((tdb) =>
       workspaceAgentService.createWorkspaceInstanceInDb(tdb, {

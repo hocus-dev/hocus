@@ -46,12 +46,18 @@ app.all("*", async (req, res, next) => {
 
     const oidcUser = req.oidc?.user != null ? OidcUserValidator.Parse(req.oidc.user) : void 0;
     const user =
-      oidcUser != null ? await userService.getOrCreateUser(db, oidcUser.sub, "github") : void 0;
+      oidcUser != null
+        ? await userService.getOrCreateUser(db, {
+            externalId: oidcUser.sub,
+            gitEmail: oidcUser.email,
+          })
+        : void 0;
 
     return createRequestHandler({
       build:
         process.env.NODE_ENV === "production"
           ? // Workaround for this bug: https://github.com/remix-run/remix/issues/3032
+            // @ts-expect-error
             await import("@remix-run/dev/server-build")
           : require(BUILD_DIR),
       mode: process.env.NODE_ENV,
