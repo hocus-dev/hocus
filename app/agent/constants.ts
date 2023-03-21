@@ -6,7 +6,6 @@ export const WORKSPACE_CONFIG_SYMLINK_PATH = `${WORKSPACE_ENV_DIR}/workspace-con
 export const WORKSPACE_SCRIPTS_DIR = `${WORKSPACE_DEV_DIR}/.hocus/command` as const;
 export const WORKSPACE_GIT_CONFIGURED_MARKER_PATH =
   `${WORKSPACE_DEV_DIR}/.hocus/git-configured` as const;
-export const WORKSPACE_GIT_DIR = `/home/hocus/.git` as const;
 
 export const PREBUILD_TASK_SCRIPT_TEMPLATE = (task: string) => `#!/bin/bash
 set -o errexit

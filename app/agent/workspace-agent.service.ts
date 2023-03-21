@@ -4,7 +4,8 @@ import path from "path";
 import type { Workspace, WorkspaceInstance } from "@prisma/client";
 import { Prisma, WorkspaceStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
-import type { NodeSSH, SSHExecOptions } from "node-ssh";
+import ini from "ini";
+import type { NodeSSH } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
 import type { Config } from "~/config";
 import { Token } from "~/token";
@@ -17,7 +18,6 @@ import {
   WORKSPACE_DEV_DIR,
   WORKSPACE_ENV_SCRIPT_PATH,
   WORKSPACE_GIT_CONFIGURED_MARKER_PATH,
-  WORKSPACE_GIT_DIR,
   WORKSPACE_REPOSITORY_DIR,
   WORKSPACE_SCRIPTS_DIR,
 } from "./constants";
@@ -182,15 +182,17 @@ export class WorkspaceAgentService {
     if (gitAlreadyConfigured) {
       return;
     }
-    const homeDir = "/home/hocus";
-    const opts: SSHExecOptions = {
-      execOptions: { env: { HOME: homeDir } as any },
-      cwd: homeDir,
-    };
-    await execSshCmd({ ssh, opts }, ["mkdir", "-p", WORKSPACE_GIT_DIR]);
-    await execSshCmd({ ssh, opts }, ["touch", `${homeDir}/.gitconfig`]);
-    await execSshCmd({ ssh, opts }, ["git", "config", "--global", "user.name", gitConfig.username]);
-    await execSshCmd({ ssh, opts }, ["git", "config", "--global", "user.email", gitConfig.email]);
+    // we parse the file instead of using `git config --global user.name ...` because
+    // it kept failing with "error: could not lock config file /home/hocus/.gitconfig: File exists"
+    const gitconfigPath = "/home/hocus/.gitconfig";
+    const gitconfigText = await this.agentUtilService.readFile(ssh, gitconfigPath).catch((_) => "");
+    const gitconfig = ini.parse(gitconfigText);
+    if (gitconfig.user == null) {
+      gitconfig.user = {};
+    }
+    gitconfig.user.name = gitConfig.username;
+    gitconfig.user.email = gitConfig.email;
+    await this.agentUtilService.writeFile(ssh, gitconfigPath, ini.stringify(gitconfig));
     await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_GIT_CONFIGURED_MARKER_PATH)]);
     await this.agentUtilService.writeFile(ssh, WORKSPACE_GIT_CONFIGURED_MARKER_PATH, "1");
   }
