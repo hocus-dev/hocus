@@ -15,7 +15,7 @@ tasks:
       npm run dev
   - name: Temporal codec server
     init: |
-      yarn install
+      sleep 0.01
     commandShell: fish
     command: |
       ops/bin/link.sh
