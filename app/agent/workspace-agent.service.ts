@@ -187,29 +187,29 @@ export class WorkspaceAgentService {
     await this.agentUtilService.writeFile(ssh, markerPath, "");
   }
 
-  async checkoutToBranch(ssh: NodeSSH, branch: string): Promise<void> {
+  async checkoutToBranch(
+    ssh: NodeSSH,
+    /** Without the `refs/heads/` prefix. */
+    branch: string,
+  ): Promise<void> {
     await this.oncePerWorkspace(ssh, WORKSPACE_GIT_CHECKED_OUT_MARKER_PATH, async () => {
-      const opts: SSHExecOptions = { cwd: WORKSPACE_REPOSITORY_DIR };
-      await execSshCmd({ ssh, opts, allowNonZeroExitCode: true }, [
-        "git",
-        "branch",
-        "--delete",
-        branch,
+      const opts: SSHExecOptions = {
+        cwd: WORKSPACE_REPOSITORY_DIR,
+        execOptions: { env: { BRANCH: branch } as any },
+      };
+      await execSshCmd({ ssh, opts }, [
+        "bash",
+        "-c",
+        'git update-ref "refs/heads/$BRANCH" "$(git rev-parse HEAD)"',
       ]);
-      await execSshCmd({ ssh, opts, allowNonZeroExitCode: true }, [
-        "git",
-        "update-ref",
-        "-d",
-        `refs/heads/${branch}`,
-      ]);
-      await execSshCmd({ ssh, opts }, ["git", "branch", "--force", branch]);
+      await execSshCmd({ ssh, opts }, ["git", "checkout", branch]);
       await execSshCmd({ ssh, opts }, [
         "git",
         "branch",
         `--set-upstream-to=origin/${branch}`,
         branch,
       ]);
-      await execSshCmd({ ssh, opts }, ["git", "checkout", branch]);
+      await execSshCmd({ ssh, opts }, ["rm", "-f", ".git/index.lock"]);
     });
   }
 
@@ -294,7 +294,7 @@ export class WorkspaceAgentService {
           const shellName = task.commandShell;
 
           await this.writeUserGitConfig(ssh, args.userGitConfig);
-          // await this.checkoutToBranch(ssh, args.branchName);
+          await this.checkoutToBranch(ssh, args.branchName);
           await execSshCmd({ ssh }, ["mkdir", "-p", WORKSPACE_SCRIPTS_DIR]);
           await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
           await this.agentUtilService.writeFile(ssh, taskInputPath, taskInput);
