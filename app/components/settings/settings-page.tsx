@@ -7,7 +7,7 @@ import { AppPage } from "../app-page";
 
 const SettingsPageTabNameIconOrder: Record<SettingsPageTab, [string, string, number]> = {
   [SettingsPageTab.SshKeys]: ["SSH Keys", "fa-solid fa-key", 0],
-  [SettingsPageTab.Git]: ["Git", "fa-solid fa-user", 1],
+  [SettingsPageTab.Git]: ["Git", "fa-solid fa-code-merge", 1],
 };
 
 export const SettingsPage = (props: {
