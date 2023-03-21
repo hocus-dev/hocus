@@ -1,7 +1,13 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { PrebuildEvent, PrebuildEventFiles, Prisma } from "@prisma/client";
+import type {
+  PrebuildEvent,
+  PrebuildEventFiles,
+  PrebuildEventReservation,
+  Prisma,
+} from "@prisma/client";
+import { PrebuildEventReservationType } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
@@ -265,6 +271,25 @@ export class PrebuildService {
     );
   }
 
+  /** Does not throw if files don't exist. */
+  async removeLocalPrebuildEventFiles(args: {
+    projectDrivePath: string;
+    fsDrivePath: string;
+  }): Promise<void> {
+    const files = [args.projectDrivePath, args.fsDrivePath];
+    await waitForPromises(
+      files.map((f) =>
+        fs.unlink(f).catch((err) => {
+          if (err?.code === "ENOENT") {
+            this.logger.warn(`File ${f} does not exist`);
+          } else {
+            throw err;
+          }
+        }),
+      ),
+    );
+  }
+
   /**
    * Copies the contents of `repositoryDrivePath` into `outputDrivePath`, and checks
    * out the given branch there.
@@ -404,5 +429,128 @@ export class PrebuildService {
       },
       data: { status: VmTaskStatus.VM_TASK_STATUS_CANCELLED },
     });
+  }
+
+  async reservePrebuildEvent(
+    db: Prisma.TransactionClient,
+    prebuildEventId: bigint,
+    reservationType: PrebuildEventReservationType,
+    validUntil: Date,
+    reservationExternalId?: string,
+  ): Promise<PrebuildEventReservation> {
+    await db.$executeRaw`SELECT id FROM "PrebuildEventReservation" WHERE id = ${prebuildEventId} FOR UPDATE`;
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: prebuildEventId },
+      include: {
+        reservations: {
+          where: {
+            type: PrebuildEventReservationType.PREBUILD_EVENT_RESERVATION_TYPE_ARCHIVE_PREBUILD,
+            validUntil: { gt: new Date() },
+          },
+        },
+      },
+    });
+    if (prebuildEvent.reservations.length > 0) {
+      throw new Error(`Prebuild event ${prebuildEventId} has an archive prebuild reservation`);
+    }
+    return await db.prebuildEventReservation.create({
+      data: {
+        type: reservationType,
+        externalId: reservationExternalId,
+        validUntil,
+        prebuildEventId,
+      },
+    });
+  }
+
+  /**
+   * Returns all prebuild events that are older than the latest successful prebuild event for the same branch,
+   * except that if a prebuild event is the latest on one branch, but not on another, it will not be returned.
+   */
+  async getArchivablePrebuildEvents(
+    db: Prisma.Client,
+    projectId: bigint,
+  ): Promise<PrebuildEvent[]> {
+    const prebuildEventIds = await db.$queryRaw<{ r: bigint; prebuildEventId: bigint }[]>`
+      SELECT x."r", x."prebuildEventId"
+      FROM (
+        SELECT
+          ROW_NUMBER() OVER (PARTITION BY t."gitBranchId" ORDER BY t."createdAt" DESC) AS r,
+          t.*
+        FROM (
+          SELECT *
+          FROM "PrebuildEventToGitBranch" AS p2b
+          INNER JOIN "PrebuildEvent" AS p ON p2b."prebuildEventId" = p.id
+          WHERE p."projectId" = ${projectId} AND p."status" = 'PREBUILD_EVENT_STATUS_SUCCESS'::"PrebuildEventStatus"
+          ORDER BY p."createdAt" DESC
+        ) AS t
+      ) AS x;
+    `;
+    const latestPrebuildEventIds = new Set(
+      prebuildEventIds.filter((e) => e.r === BigInt(1)).map((e) => e.prebuildEventId),
+    );
+    const prebuildEventIdsToArchive = prebuildEventIds
+      .filter((e) => !latestPrebuildEventIds.has(e.prebuildEventId))
+      .map((e) => e.prebuildEventId);
+    const prebuildEvents = await db.prebuildEvent.findMany({
+      where: { id: { in: prebuildEventIdsToArchive } },
+    });
+    return prebuildEvents;
+  }
+
+  /** Returns all archived prebuild events that have no workspaces associated with them and are at least 48 hours old. */
+  async getRemovablePrebuildEvents(
+    db: Prisma.Client,
+    projectId: bigint,
+    now: Date,
+  ): Promise<PrebuildEvent[]> {
+    const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    return await db.prebuildEvent.findMany({
+      where: {
+        projectId,
+        status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED,
+        createdAt: { lt: fortyEightHoursAgo },
+        workspaces: {
+          // This filter ensures that the prebuild event has no workspaces associated with it.
+          none: {},
+        },
+      },
+    });
+  }
+
+  async removePrebuildEventFromDb(
+    db: Prisma.TransactionClient,
+    prebuildEventId: bigint,
+  ): Promise<void> {
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: prebuildEventId },
+      include: {
+        tasks: {
+          include: {
+            vmTask: true,
+          },
+        },
+      },
+    });
+    if (prebuildEvent.status !== PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED) {
+      throw new Error(`Prebuild event ${prebuildEventId} is not archived`);
+    }
+    const logGroupIds = prebuildEvent.tasks.map((t) => t.vmTask.logGroupId);
+    await db.log.deleteMany({
+      where: { logGroupId: { in: logGroupIds } },
+    });
+    await db.prebuildEventToGitBranch.deleteMany({
+      where: { prebuildEventId },
+    });
+    await db.prebuildEventTask.deleteMany({
+      where: { prebuildEventId },
+    });
+    await db.vmTask.deleteMany({
+      where: { id: { in: prebuildEvent.tasks.map((t) => t.vmTaskId) } },
+    });
+    await db.logGroup.deleteMany({
+      where: { id: { in: logGroupIds } },
+    });
+    await db.prebuildEvent.delete({ where: { id: prebuildEventId } });
   }
 }

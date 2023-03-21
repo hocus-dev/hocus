@@ -12,7 +12,7 @@
     "dev-prebuild:css": "tailwindcss -i ./styles/app.css -o app/styles/app.css",
     "start": "c NODE_ENV=production ts-node entrypoints/server.ts",
     "test": "jest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p ./tsconfig.json",
     "lint": "eslint .",
     "postinstall": "ops/bin/override-prisma-types.sh",
     "migrate": "wrap () { set -o nounset; prisma migrate dev --name \"$1\" && yarn run postinstall; }; wrap",

@@ -22,8 +22,8 @@ import {
   displayError,
 } from "~/utils.shared";
 
-import type { Activities } from "./activities";
 import type { CheckoutAndInspectResult } from "./activities-types";
+import type { Activities } from "./activities/list";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
 import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
@@ -53,6 +53,13 @@ const {
   initPrebuildEvents,
   linkGitBranches,
   waitForBuildfs,
+  reservePrebuildEvent,
+  removePrebuildEventReservation,
+  waitForPrebuildEventReservations,
+  markPrebuildEventAsArchived,
+  deleteLocalPrebuildEventFiles,
+  deleteRemovablePrebuildEvents,
+  getArchivablePrebuildEvents,
 } = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -300,7 +307,25 @@ export async function runCreateWorkspace(args: {
   externalId: string;
   startWorkspace: boolean;
 }): Promise<Workspace> {
-  const workspace = await createWorkspace(args);
+  const workspace = await (async () => {
+    const reservationExternalId = uuid4();
+    const now = Date.now();
+    try {
+      const fifteenMinutes = 1000 * 60 * 15;
+      await reservePrebuildEvent({
+        prebuildEventId: args.prebuildEventId,
+        reservationType: "PREBUILD_EVENT_RESERVATION_TYPE_CREATE_WORKSPACE",
+        reservationExternalId,
+        validUntil: new Date(now + fifteenMinutes),
+      });
+      return await createWorkspace(args);
+    } finally {
+      await retryWorkflow(() => removePrebuildEventReservation(reservationExternalId), {
+        maxRetries: 5,
+        retryIntervalMs: 1000,
+      });
+    }
+  })();
   if (args.startWorkspace) {
     await startChild(runStartWorkspace, {
       args: [workspace.id],
@@ -393,6 +418,7 @@ export async function runSyncGitRepository(
         const branchesByGitObjectIdArray = Array.from(branchesByGitObjectId.entries()).sort(
           ([a], [b]) => numericSort(a, b),
         );
+        // TODO: HOC-123 - fix race condition in prebuild archival
         const allPrebuildEvents = await waitForPromisesWorkflow(
           seenProjects.map((p) =>
             getOrCreatePrebuildEvents({
@@ -442,9 +468,92 @@ export async function runAddProjectAndRepository(args: {
       parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
     });
   }
+  await startChild(runMonitorArchivablePrebuilds, {
+    workflowId: result.project.archivablePrebuildsMonitoringWorkflowId,
+    args: [{ projectId: result.project.id, recentlyArchivedPrebuildEventIds: new Map() }],
+    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+  });
   return result;
 }
 
 export async function runDeleteWorkspace(args: { workspaceId: bigint }): Promise<void> {
   await deleteWorkspace(args.workspaceId);
+}
+
+/**
+ * Here's what this workflow does:
+ * 1. Reserve prebuild for archival
+ * 2. Wait for other reservations to be removed
+ * 3. Delete prebuild files from disk
+ * 4. Mark prebuild as archived and remove reservation
+ */
+export async function runArchivePrebuild(args: { prebuildEventId: bigint }): Promise<void> {
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  const twentyFourHours = 24 * oneHour;
+  const retry = <T>(fn: () => Promise<T>) =>
+    retryWorkflow(fn, { maxRetries: 10, retryIntervalMs: 1000 });
+
+  await reservePrebuildEvent({
+    prebuildEventId: args.prebuildEventId,
+    reservationType: "PREBUILD_EVENT_RESERVATION_TYPE_ARCHIVE_PREBUILD",
+    validUntil: new Date(now + twentyFourHours),
+  });
+  await retry(() =>
+    waitForPrebuildEventReservations({
+      prebuildEventId: args.prebuildEventId,
+      timeoutMs: oneHour,
+    }),
+  );
+  await retry(() => deleteLocalPrebuildEventFiles({ prebuildEventId: args.prebuildEventId }));
+  await retry(() => markPrebuildEventAsArchived({ prebuildEventId: args.prebuildEventId }));
+}
+
+export async function runDeleteRemovablePrebuilds(projectId: bigint): Promise<void> {
+  await deleteRemovablePrebuildEvents(projectId);
+}
+
+/**
+ * Here's what this workflow does in a loop:
+ *
+ * 1. Get a list of archivable prebuilds
+ * 2. Schedule workflows to archive these prebuilds
+ * 3. Schedule a workflow to remove archived, removable prebuilds
+ */
+export async function runMonitorArchivablePrebuilds(args: {
+  projectId: bigint;
+  recentlyArchivedPrebuildEventIds: Map<bigint, number>;
+}): Promise<void> {
+  for (let i = 0; i < 1000; i++) {
+    try {
+      const archivablePrebuildEvents = await getArchivablePrebuildEvents(args.projectId);
+      const prebuildEventIdsToArchive = archivablePrebuildEvents
+        .map((e) => e.id)
+        .filter((id) => !args.recentlyArchivedPrebuildEventIds.has(id));
+      const now = Date.now();
+      for (const prebuildEventId of prebuildEventIdsToArchive) {
+        await startChild(runArchivePrebuild, {
+          args: [{ prebuildEventId }],
+          parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+        });
+        args.recentlyArchivedPrebuildEventIds.set(prebuildEventId, now);
+      }
+      const oneHour = 60 * 60 * 1000;
+      args.recentlyArchivedPrebuildEventIds = new Map(
+        Array.from(args.recentlyArchivedPrebuildEventIds.entries()).filter(([_, timestamp]) => {
+          return now - timestamp <= oneHour;
+        }),
+      );
+      await startChild(runDeleteRemovablePrebuilds, {
+        args: [args.projectId],
+        parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+    }
+    const fifteeenSeconds = 15 * 1000;
+    await sleep(fifteeenSeconds);
+  }
+  await continueAsNew<typeof runMonitorArchivablePrebuilds>(args);
 }

@@ -4,6 +4,20 @@ import type { AgentInjector } from "../agent-injector";
 
 import type { AddProjectAndRepositoryActivity } from "./add-project-and-repository";
 import { addProjectAndRepository } from "./add-project-and-repository";
+import { deleteLocalPrebuildEventFiles } from "./archive-prebuild-event/delete-local-prebuild-event-files";
+import type { DeleteLocalPrebuildEventFilesActivity } from "./archive-prebuild-event/delete-local-prebuild-event-files";
+import type { DeleteRemovablePrebuildEventsActivity } from "./archive-prebuild-event/delete-removable-prebuild-events";
+import { deleteRemovablePrebuildEvents } from "./archive-prebuild-event/delete-removable-prebuild-events";
+import type { GetArchivablePrebuildEventsActivity } from "./archive-prebuild-event/get-archivable-prebuild-events";
+import { getArchivablePrebuildEvents } from "./archive-prebuild-event/get-archivable-prebuild-events";
+import type { MarkPrebuildEventAsArchivedActivity } from "./archive-prebuild-event/mark-prebuild-event-as-archived";
+import { markPrebuildEventAsArchived } from "./archive-prebuild-event/mark-prebuild-event-as-archived";
+import type { RemovePrebuildEventReservationActivity } from "./archive-prebuild-event/remove-prebuild-event-reservation";
+import { removePrebuildEventReservation } from "./archive-prebuild-event/remove-prebuild-event-reservation";
+import type { ReservePrebuildEventActivity } from "./archive-prebuild-event/reserve-prebuild-event";
+import { reservePrebuildEvent } from "./archive-prebuild-event/reserve-prebuild-event";
+import type { WaitForPrebuildEventReservationsActivity } from "./archive-prebuild-event/wait-for-prebuild-event-reservations";
+import { waitForPrebuildEventReservations } from "./archive-prebuild-event/wait-for-prebuild-event-reservations";
 import type { BuildfsActivity } from "./buildfs";
 import { buildfs } from "./buildfs";
 import type { CancelPrebuildsActivity } from "./cancel-prebuilds";
@@ -42,6 +56,7 @@ import type { StartWorkspaceActivity } from "./start-workspace";
 import { startWorkspace } from "./start-workspace";
 import type { StopWorkspaceActivity } from "./stop-workspace";
 import { stopWorkspace } from "./stop-workspace";
+import type { CreateActivity } from "./types";
 import type { UpdateGitBranchesAndObjectsActivity } from "./update-git-branches-and-objects";
 import { updateGitBranchesAndObjects } from "./update-git-branches-and-objects";
 import type { WaitForBuildfsActivity } from "./wait-for-buildfs";
@@ -70,6 +85,13 @@ export interface Activities {
   getPrebuildEvents: GetPrebuildEventsActivity;
   linkGitBranches: LinkGitBranchesActivity;
   waitForBuildfs: WaitForBuildfsActivity;
+  reservePrebuildEvent: ReservePrebuildEventActivity;
+  removePrebuildEventReservation: RemovePrebuildEventReservationActivity;
+  waitForPrebuildEventReservations: WaitForPrebuildEventReservationsActivity;
+  markPrebuildEventAsArchived: MarkPrebuildEventAsArchivedActivity;
+  deleteLocalPrebuildEventFiles: DeleteLocalPrebuildEventFilesActivity;
+  deleteRemovablePrebuildEvents: DeleteRemovablePrebuildEventsActivity;
+  getArchivablePrebuildEvents: GetArchivablePrebuildEventsActivity;
 }
 
 export interface ActivityArgs {
@@ -78,7 +100,7 @@ export interface ActivityArgs {
 }
 
 export type ActivitiesCreateFns = {
-  [K in keyof Activities]: (args: ActivityArgs) => Activities[K];
+  [K in keyof Activities]: CreateActivity<Activities[K]>;
 };
 
 export const createActivities = async (
@@ -108,6 +130,13 @@ export const createActivities = async (
     getPrebuildEvents,
     linkGitBranches,
     waitForBuildfs,
+    reservePrebuildEvent,
+    removePrebuildEventReservation,
+    waitForPrebuildEventReservations,
+    markPrebuildEventAsArchived,
+    deleteLocalPrebuildEventFiles,
+    deleteRemovablePrebuildEvents,
+    getArchivablePrebuildEvents,
   };
 
   return Object.fromEntries(

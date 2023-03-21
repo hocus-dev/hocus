@@ -15,8 +15,8 @@ import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
 import { groupBy, unwrap, waitForPromises } from "~/utils.shared";
 
-import type { Activities } from "./activities";
-import { createActivities } from "./activities";
+import type { Activities } from "./activities/list";
+import { createActivities } from "./activities/list";
 import type { AgentInjector } from "./agent-injector";
 import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
@@ -29,6 +29,8 @@ import {
   runStartWorkspace,
   runStopWorkspace,
   runDeleteWorkspace,
+  runArchivePrebuild,
+  runDeleteRemovablePrebuilds,
 } from "./workflows";
 
 const provideActivities = (
@@ -404,6 +406,72 @@ test.concurrent(
         },
       });
       expect(workspaceAfterDelete).toBeNull();
+
+      const successfulPrebuildEvents = await db.prebuildEvent.findMany({
+        where: {
+          status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS,
+        },
+        include: {
+          prebuildEventFiles: {
+            include: {
+              projectFile: true,
+              fsFile: true,
+            },
+          },
+        },
+      });
+      await waitForPromises(
+        successfulPrebuildEvents.map(async (e) => {
+          const doPrebuildFilesExist: () => Promise<boolean[]> = () =>
+            waitForPromises(
+              [e.prebuildEventFiles[0].projectFile, e.prebuildEventFiles[0].fsFile].map((f) =>
+                doesFileExist(f.path),
+              ),
+            );
+          expect(await doPrebuildFilesExist()).toEqual([true, true]);
+          await client.workflow.execute(runArchivePrebuild, {
+            workflowId: uuidv4(),
+            taskQueue: "test",
+            retry: { maximumAttempts: 1 },
+            args: [{ prebuildEventId: e.id }],
+          });
+          expect(await doPrebuildFilesExist()).toEqual([false, false]);
+          const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+            where: {
+              id: e.id,
+            },
+          });
+          expect(prebuildEvent.status).toBe(PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED);
+        }),
+      );
+      await db.prebuildEvent.updateMany({
+        where: {
+          id: {
+            in: successfulPrebuildEvents.map((e) => e.id),
+          },
+        },
+        data: {
+          createdAt: new Date(0),
+        },
+      });
+      await waitForPromises(
+        projects.map((p) =>
+          client.workflow.execute(runDeleteRemovablePrebuilds, {
+            workflowId: uuidv4(),
+            taskQueue: "test",
+            retry: { maximumAttempts: 1 },
+            args: [p.id],
+          }),
+        ),
+      );
+      const successfulPrebuildEventsAfterDelete = await db.prebuildEvent.findMany({
+        where: {
+          id: {
+            in: successfulPrebuildEvents.map((e) => e.id),
+          },
+        },
+      });
+      expect(successfulPrebuildEventsAfterDelete).toEqual([]);
     });
   }),
 );

@@ -35,7 +35,7 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
   if (prebuildEvent.status !== PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS) {
     throw new HttpError(
       StatusCodes.BAD_REQUEST,
-      "Prebuild must be successful before a workspace can be created",
+      "Prebuild must be in the success state for a workspace to be created",
     );
   }
   const externalWorkspaceId = uuidv4();

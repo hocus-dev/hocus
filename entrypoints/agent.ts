@@ -1,7 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import { NativeConnection, Worker } from "@temporalio/worker";
-import { createActivities } from "~/agent/activities";
+import { createActivities } from "~/agent/activities/list";
 import { createAgentInjector } from "~/agent/agent-injector";
 import { generateTemporalCodeBundle } from "~/temporal/bundle";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
