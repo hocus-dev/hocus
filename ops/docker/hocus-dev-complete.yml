@@ -9,6 +9,7 @@ services:
   setup-vm-images:
     # We need to mount images and have access to the docker daemon
     # TODO: build images in kaniko and export tarballs using virt-make-fs
+    # TODO: This is 5.10 kernel, change the name
     privileged: true
     build:
       dockerfile: ops/docker/setup.Dockerfile
@@ -22,7 +23,7 @@ services:
       ops/bin/buildfs.sh resources/docker/default-workspace.Dockerfile /agent_data/resources/default-workspace.ext4 resources/ 1500 
       ops/bin/buildfs.sh resources/docker/buildfs.Dockerfile /agent_data/resources/buildfs.ext4 resources/ 1000
       ops/bin/buildfs.sh resources/docker/fetchrepo.Dockerfile /agent_data/resources/fetchrepo.ext4 resources 2500
-      curl https://github.com/hocus-dev/linux-kernel/releases/download/0.0.2/vmlinux -z /agent_data/resources/vmlinux-5.6-x86_64.bin -o /agent_data/resources/vmlinux-5.6-x86_64.bin --location
+      curl https://github.com/hocus-dev/linux-kernel/releases/download/0.0.3/vmlinux -z /agent_data/resources/vmlinux-5.6-x86_64.bin -o /agent_data/resources/vmlinux-5.6-x86_64.bin --location
       "
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
