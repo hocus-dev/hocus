@@ -6,13 +6,15 @@ import { LicenseValidator } from "~/schema/license.validator.server";
 import type { TimeService } from "~/time.service";
 import { Token } from "~/token";
 
+import { DEFAULT_SEATS_LIMIT } from "./constants";
+
 class UserMessageError extends Error {}
 
 export class LicenseService {
   static inject = [Token.Config, Token.Logger, Token.TimeService] as const;
   public readonly numSeats: number;
   constructor(config: Config, private readonly logger: Logger, timeService: TimeService) {
-    this.numSeats = 3;
+    this.numSeats = DEFAULT_SEATS_LIMIT;
     const { license: licenseText, licensePublicKey } = config.controlPlane();
     const license = (() => {
       try {

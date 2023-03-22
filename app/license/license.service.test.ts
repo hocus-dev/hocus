@@ -3,6 +3,7 @@ import type { Logger } from "winston";
 import { createAppInjector } from "~/app-injector.server";
 import { Token } from "~/token";
 
+import { DEFAULT_SEATS_LIMIT } from "./constants";
 import { LicenseService } from "./license.service";
 
 // https://github.com/auth0/node-jsonwebtoken/issues/862#issue-1506802337
@@ -73,9 +74,9 @@ test("LicenseService constructor", () => {
       [Token.Logger]: stubInterface<Logger>(),
     });
   const testInjector1 = createTestInjector(undefined);
-  expect(testInjector1.resolve(Token.LicenseService).numSeats).toEqual(3);
+  expect(testInjector1.resolve(Token.LicenseService).numSeats).toEqual(DEFAULT_SEATS_LIMIT);
   const testInjector2 = createTestInjector(VALID_LICENSE_TEXT);
   expect(testInjector2.resolve(Token.LicenseService).numSeats).toEqual(15);
   const testInjector3 = createTestInjector("invalid");
-  expect(testInjector3.resolve(Token.LicenseService).numSeats).toEqual(3);
+  expect(testInjector3.resolve(Token.LicenseService).numSeats).toEqual(DEFAULT_SEATS_LIMIT);
 });

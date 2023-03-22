@@ -1,11 +1,17 @@
 import type { User } from "@prisma/client";
 import { Prisma } from "@prisma/client";
+import { StatusCodes } from "http-status-codes";
 import type { GitService } from "~/git/git.service";
+import { HttpError } from "~/http-error.server";
+import type { LicenseService } from "~/license/license.service";
 import { Token } from "~/token";
 
 export class UserService {
-  static inject = [Token.GitService] as const;
-  constructor(private readonly gitService: GitService) {}
+  static inject = [Token.GitService, Token.LicenseService] as const;
+  constructor(
+    private readonly gitService: GitService,
+    private readonly licenseService: LicenseService,
+  ) {}
 
   async getOrCreateUser(
     db: Prisma.NonTransactionClient,
@@ -29,10 +35,21 @@ export class UserService {
       if (user != null) {
         return user;
       }
-
+      const activeUsersCount = await db.user.count({
+        where: {
+          active: true,
+        },
+      });
+      if (activeUsersCount >= this.licenseService.numSeats) {
+        throw new HttpError(
+          StatusCodes.FORBIDDEN,
+          `Too many active users. Please purchase a license with more seats. Current used seats: ${activeUsersCount}/${this.licenseService.numSeats}.`,
+        );
+      }
       user = await tdb.user.create({
         data: {
           externalId,
+          active: true,
           gitConfig: {
             create: {
               gitEmail,

@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { createAppInjector } from "~/app-injector.server";
+import { HttpError } from "~/http-error.server";
+import { DEFAULT_SEATS_LIMIT } from "~/license/constants";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 
@@ -30,5 +32,21 @@ test.concurrent(
     expect(user.externalId).toEqual(externalId);
     expect(userWithExtras.gitConfig.gitEmail).toEqual("dev@example.com");
     expect(userWithExtras.gitConfig.gitUsername).toEqual("dev");
+
+    for (let i = 0; i < DEFAULT_SEATS_LIMIT - 1; i++) {
+      await userService.getOrCreateUser(db, {
+        externalId: `abc${i}`,
+        gitEmail: `dev${i}@example.com`,
+      });
+    }
+    try {
+      await userService.getOrCreateUser(db, {
+        externalId: "toomany",
+        gitEmail: "toomany@example.com",
+      });
+      throw new Error("Should have thrown");
+    } catch (err) {
+      expect(err instanceof HttpError).toBe(true);
+    }
   }),
 );

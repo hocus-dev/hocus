@@ -18,6 +18,7 @@ model User {
   gitConfigId   BigInt
   workspaces    Workspace[]
   sshPublicKeys UserSSHPublicKey[]
+  active        Boolean
 
   createdAt                         DateTime                            @default(now()) @db.Timestamptz(3)
   UserProjectEnvironmentVariableSet UserProjectEnvironmentVariableSet[]
