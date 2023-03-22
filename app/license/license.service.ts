@@ -3,19 +3,20 @@ import type { Logger } from "winston";
 import type { Config } from "~/config";
 import type { License } from "~/schema/license.validator.server";
 import { LicenseValidator } from "~/schema/license.validator.server";
+import type { TimeService } from "~/time.service";
 import { Token } from "~/token";
 
 class UserMessageError extends Error {}
 
 export class LicenseService {
-  static inject = [Token.Config, Token.Logger] as const;
+  static inject = [Token.Config, Token.Logger, Token.TimeService] as const;
   public readonly numSeats: number;
-  constructor(config: Config, private readonly logger: Logger) {
+  constructor(config: Config, private readonly logger: Logger, timeService: TimeService) {
     this.numSeats = 3;
     const { license: licenseText, licensePublicKey } = config.controlPlane();
     const license = (() => {
       try {
-        return LicenseService.parseLicense(licensePublicKey, licenseText, new Date());
+        return LicenseService.parseLicense(licensePublicKey, licenseText, timeService.now());
       } catch (err) {
         if (err instanceof UserMessageError) {
           this.logger.warn(`Invalid license: ${err.message}`);
@@ -28,6 +29,7 @@ export class LicenseService {
       return;
     }
     const validUntil = new Date(license.validUntil).toISOString();
+    this.numSeats = license.numSeats;
     this.logger.info(
       `License loaded. Number of seats: ${license.numSeats}. Valid until: ${validUntil}`,
     );

@@ -29,4 +29,5 @@ export const Token = {
   SshKeyService: "SshKeyServiceT",
   GitService: "GitServiceT",
   LicenseService: "LicenseServiceT",
+  TimeService: "TimeServiceT",
 } as const;

@@ -1,4 +1,5 @@
 import { createInjector, Scope } from "typed-inject";
+import type { Logger } from "winston";
 import type { Config } from "~/config";
 import { config } from "~/config";
 import { newLogger } from "~/logger.server";
@@ -10,12 +11,24 @@ import { LicenseService } from "./license/license.service";
 import { ProjectService } from "./project/project.service";
 import { SshKeyService } from "./ssh-key/ssh-key.service";
 import { clientFactory } from "./temporal/client-factory";
+import { TimeService } from "./time.service";
 import { WorkspaceService } from "./workspace/workspace.service";
 
-export const createAppInjector = (overrides: { [Token.Config]?: Config } = {}) =>
+export const createAppInjector = (
+  overrides: {
+    [Token.Config]?: Config;
+    [Token.TimeService]?: typeof TimeService;
+    [Token.Logger]?: Logger;
+  } = {},
+) =>
   createInjector()
     .provideValue(Token.Config, overrides[Token.Config] ?? config)
-    .provideFactory(Token.Logger, newLogger, Scope.Transient)
+    .provideClass(Token.TimeService, overrides[Token.TimeService] ?? TimeService)
+    .provideFactory(
+      Token.Logger,
+      overrides[Token.Logger] !== void 0 ? (): Logger => overrides[Token.Logger] as any : newLogger,
+      Scope.Transient,
+    )
     .provideClass(Token.LicenseService, LicenseService)
     .provideClass(Token.SshKeyService, SshKeyService)
     .provideClass(Token.GitService, GitService)
