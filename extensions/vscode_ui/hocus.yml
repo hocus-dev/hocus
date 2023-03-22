@@ -1,10 +1,22 @@
 image:
   file: ../../hocus.Dockerfile
-  buildContext: ../../tmp_resources
+  buildContext: ../../
 tasks:
-  - name: hello world
-    init: sleep 0.1
-    command: sleep 0.1
-  - name: second task
-    init: sleep 0.1
-    command: sleep 0.1
+  - name: Terminal
+    init: sleep 0.01
+    commandShell: fish
+    command: yarn
+vscode:
+  extensions:
+    - Prisma.prisma
+    - esbenp.prettier-vscode
+    - dbaeumer.vscode-eslint
+    - eamodio.gitlens
+    - GitHub.copilot
+    - firsttris.vscode-jest-runner
+    - dcortes92.FreeMarker
+    - AntonLilleby.xp-freemarker-formatter
+    - emeraldwalk.RunOnSave
+    - pomdtr.excalidraw-editor
+    - bierner.markdown-mermaid
+    - ms-azuretools.vscode-docker

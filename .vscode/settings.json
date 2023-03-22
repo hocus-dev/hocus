@@ -6,7 +6,8 @@
     ".cache/": true,
     "node_modules/": true,
     "build/": true,
-    "extensions": true
+    "extensions": true,
+    "hocus-workspace": true
   },
   "[prisma]": {
     "editor.defaultFormatter": "Prisma.prisma"
@@ -47,5 +48,5 @@
     ]
   },
   "excalidraw.theme": "dark",
-  "typescript.tsdk": "./node_modules/typescript/lib",
+  "typescript.tsdk": "./node_modules/typescript/lib"
 }

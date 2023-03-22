@@ -1,13 +1,9 @@
 image:
   file: ../../hocus.Dockerfile
-  buildContext: ../../tmp_resources
+  buildContext: ../../
 tasks:
-  - name: Setup git
-    init: |
-      yarn global add @vscode/vsce
-      fish -c "set -U fish_user_paths \$fish_user_paths ~/.yarn/bin"
-      git config --global --add user.email gorbak25@gmail.com && 
-      git config --global --add user.name "Grzegorz Uriasz"
+  - name: Terminal
+    init: sleep 0.01
     commandShell: fish
     command: yarn
 vscode:

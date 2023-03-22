@@ -1,6 +1,6 @@
 image:
   file: hocus.Dockerfile
-  buildContext: ./tmp_resources
+  buildContext: ./
 tasks:
   - name: Agent+CP dev-env setup
     init: |
@@ -21,9 +21,7 @@ tasks:
       ops/bin/link.sh
       PORT=1337 npx ts-node entrypoints/codec-server.ts
   - name: Terminal
-    init: |
-      git config --global --add user.email gorbak25@gmail.com && 
-      git config --global --add user.name "Grzegorz Uriasz"
+    init: sleep 0.01
     commandShell: fish
     command: sleep 0.01
 vscode:

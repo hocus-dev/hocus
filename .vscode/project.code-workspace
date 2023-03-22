@@ -11,6 +11,10 @@
     {
       "name": "VSCode Workspace Extension",
       "path": "../extensions/vscode_workspace"
+    },
+    {
+      "name": "Hocus Workspace Image",
+      "path": "../hocus-workspace"
     }
   ],
   "settings": {
