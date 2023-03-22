@@ -56,7 +56,7 @@ export const config = makeConfig()({
   hocusRepoAccess: () => ({
     // Temporarily the Hocus repo is private :P Will be removed soon.
     // Sets a deploy key in the agent which has access to the Hocus repo
-    hocusRepoPrivateKey: process.env.HOCUS_REPO_PRIVATE_KEY ?? "",
+    hocusRepoPrivateKey: get("HOCUS_REPO_PRIVATE_KEY", ""),
   }),
   // Environment variables for the hocus dev env
   agentDev: () => ({
