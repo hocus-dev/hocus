@@ -43,7 +43,7 @@ export class UserService {
       if (activeUsersCount >= this.licenseService.numSeats) {
         throw new HttpError(
           StatusCodes.FORBIDDEN,
-          `Too many active users. Please purchase a license with more seats. Current used seats: ${activeUsersCount}/${this.licenseService.numSeats}.`,
+          `Too many active users. Please obtain a license with more seats. Currently used seats: ${activeUsersCount}/${this.licenseService.numSeats}.`,
         );
       }
       user = await tdb.user.create({

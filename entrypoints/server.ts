@@ -11,6 +11,7 @@ import csrf from "csurf";
 import express from "express";
 import { auth } from "express-openid-connect";
 import { createAppInjector } from "~/app-injector.server";
+import { HttpError } from "~/http-error.server";
 import { OidcUserValidator } from "~/schema/oidc-user.validator.server";
 import { Token } from "~/token";
 
@@ -71,7 +72,28 @@ app.all("*", async (req, res, next) => {
       }),
     })(req, res, next);
   } catch (err) {
-    next(err);
+    if (err instanceof HttpError) {
+      return createRequestHandler({
+        build:
+          process.env.NODE_ENV === "production"
+            ? // Workaround for this bug: https://github.com/remix-run/remix/issues/3032
+              // @ts-expect-error
+              await import("@remix-run/dev/server-build")
+            : require(BUILD_DIR),
+        mode: process.env.NODE_ENV,
+        getLoadContext: (): LoaderArgs["context"] => ({
+          db,
+          req,
+          res,
+          app: appInjector,
+          user: void 0,
+          oidcUser: void 0,
+          expressError: err as any,
+        }),
+      })(req, res, next);
+    } else {
+      next(err);
+    }
   }
 });
 

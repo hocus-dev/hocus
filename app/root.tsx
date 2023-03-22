@@ -35,6 +35,9 @@ export const links: LinksFunction = () => {
 };
 
 export const loader = async (args: LoaderArgs) => {
+  if (args.context.expressError != null) {
+    throw args.context.expressError;
+  }
   return json({
     csrfToken: args.context.req.csrfToken(),
     gaUserId: args.context.user?.gaUserId,
