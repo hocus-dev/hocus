@@ -2,6 +2,7 @@ import {
   DEFAULT_PREBUILD_SSH_KEY_PRIVATE,
   DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
 } from "~/agent/constants";
+import { HOCUS_LICENSE_PUBLIC_KEY } from "~/license/constants";
 
 import { makeConfig, get, getEnv } from "./utils.server";
 
@@ -20,6 +21,8 @@ export const config = makeConfig()({
   }),
   controlPlane: () => ({
     agentHostname: get("CONTROL_PLANE_AGENT_HOSTNAME", "localhost"),
+    license: process.env.HOCUS_LICENSE ?? void 0,
+    licensePublicKey: HOCUS_LICENSE_PUBLIC_KEY,
   }),
   agent: () => ({
     temporalAddress: get("AGENT_TEMPORAL_ADDRESS", "localhost:7233"),
