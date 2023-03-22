@@ -1,2 +1,5 @@
-export const HOCUS_LICENSE_PUBLIC_KEY = `todo`;
+export const HOCUS_LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEnLXaxZ04+42uo2znK43cJdpNu0bf
+Wh0RlmlcbJcOvUKNoulBz0Iqo7WAAfCO8QplQDl4PwB3tA+0TSmuaIdyzg==
+-----END PUBLIC KEY-----`;
 export const DEFAULT_SEATS_LIMIT = 3;
