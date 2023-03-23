@@ -152,5 +152,5 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-$REPO_DIR/ops/bin/local-cmd.sh up 2> /dev/null
+$REPO_DIR/ops/bin/local-cmd.sh up #2> /dev/null
 # TODO: POLL THE STATUS OF THE SERVICES EVERY 1000ms/100ms

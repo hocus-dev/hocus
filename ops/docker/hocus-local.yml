@@ -173,6 +173,7 @@ services:
       dockerfile: ops/docker/hocus-ui.Dockerfile
       context: ${REPO_DIR}
     environment:
+      - LOG_LEVEL=info
       - OIDC_ISSUER_BASE_URL=http://keycloak:8080/realms/hocus
       - OIDC_BASE_URL=http://${HOCUS_HOSTNAME}:3000/app
       - OIDC_CLIENT_ID=hocus
