@@ -166,4 +166,4 @@ cp -R ../my-old-remix-app/app app
 
 ### License
 
-This repository's code is licensed under the Elastic License v2.0, except for the `extensions` directory and its subdirectories, which are licensed under MIT.
+This repository's code is licensed under the Elastic License v2.0, unless stated otherwise. The `extensions` directory and its subdirectories are licensed under MIT.
