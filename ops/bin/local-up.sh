@@ -129,7 +129,7 @@ build_service () {
   fi 
 }
 
-# Images to build
+# Buidling images
 echo "Building docker images 👷"
 build_service setup-vm-images vm-builder
 build_service setup-keycloak db-autosetup
@@ -138,6 +138,7 @@ build_service temporal-hocus-codec temporal-codec
 build_service hocus-ui ui
 build_service hocus-agent agent
 
+# Pulling images
 echo -n "Pulling docker images 📥"
 $REPO_DIR/ops/bin/local-cmd.sh pull --ignore-buildable -q 2> /dev/null
 if ! [[ $? -eq 0 ]]; then
@@ -151,5 +152,5 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-$REPO_DIR/ops/bin/local-cmd.sh up --detach 2> /dev/null
+$REPO_DIR/ops/bin/local-cmd.sh up 2> /dev/null
 # TODO: POLL THE STATUS OF THE SERVICES EVERY 1000ms/100ms
