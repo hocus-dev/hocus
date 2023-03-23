@@ -207,6 +207,7 @@ services:
       dockerfile: ops/docker/hocus-agent.Dockerfile
       context: ${REPO_DIR}
     environment:
+      - LOG_LEVEL=info
       - AGENT_TEMPORAL_ADDRESS=temporal:7233
       - AGENT_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms?schema=public
       - AGENT_KERNEL_PATH=/srv/jailer/resources/vmlinux-5.6-x86_64.bin
@@ -217,6 +218,7 @@ services:
       - HOCUS_REPO_PRIVATE_KEY=${HOCUS_REPO_PRIVATE_KEY}
       - HOCUS_DEV_GIT_NAME=${HOCUS_DEV_GIT_NAME}
       - HOCUS_DEV_GIT_EMAIL=${HOCUS_DEV_GIT_EMAIL}
+      - CONTROL_PLANE_AGENT_HOSTNAME=${HOCUS_HOSTNAME}
     networks:
       - hocus_net
     restart: "no"
