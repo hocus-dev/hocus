@@ -69,4 +69,7 @@ export const config = makeConfig()({
     temporalServerUrl:
       process.env.TEMPORAL_SERVER_URL ?? process.env.AGENT_TEMPORAL_ADDRESS ?? "localhost:7233",
   }),
+  telemetry: () => ({
+    disabled: process.env.TELEMETRY_DISABLED != null,
+  }),
 });

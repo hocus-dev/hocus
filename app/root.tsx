@@ -16,6 +16,7 @@ import { getReasonPhrase, StatusCodes } from "http-status-codes";
 
 import { AppPagePure } from "./components/app-page";
 import { GlobalContext } from "./components/global-context.shared";
+import { TelemetryScript } from "./components/telemetry/script";
 import styles from "./styles/app.css";
 
 export const meta: MetaFunction = () => ({
@@ -45,17 +46,18 @@ export const loader = async (args: LoaderArgs) => {
   });
 };
 
-function App({ children }: { children: React.ReactNode }): JSX.Element {
+function App(props: { children: React.ReactNode }): JSX.Element {
   return (
     <html className="dark h-full" lang="en">
       <head>
         {/* Prevents a flash of unstyled content. Based on https://stackoverflow.com/a/43823506 */}
         <style>{"html { display: none; }"}</style>
+        <TelemetryScript />
         <Meta />
         <Links />
       </head>
       <body className="h-full flex flex-col dark:bg-gray-800 dark:text-white">
-        {children}
+        {props.children}
         <ScrollRestoration />
         <Scripts />
         <LiveReload />

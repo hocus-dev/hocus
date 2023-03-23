@@ -13,12 +13,14 @@ import { auth } from "express-openid-connect";
 import { createAppInjector } from "~/app-injector.server";
 import { HttpError } from "~/http-error.server";
 import { OidcUserValidator } from "~/schema/oidc-user.validator.server";
+import { TELEMETRY_DISABLED_COOKIE } from "~/telemetry/constants";
 import { Token } from "~/token";
 
 const db = new PrismaClient();
 const appInjector = createAppInjector();
 const config = appInjector.resolve(Token.Config);
 const userService = appInjector.resolve(Token.UserService);
+const telemetryConfig = config.telemetry();
 
 const BUILD_DIR = path.join(process.cwd(), "build");
 
@@ -43,6 +45,11 @@ app.all("*", async (req, res, next) => {
   try {
     if (process.env.NODE_ENV === "development") {
       purgeRequireCache();
+    }
+    if (telemetryConfig.disabled) {
+      res.cookie(TELEMETRY_DISABLED_COOKIE, "1");
+    } else {
+      res.clearCookie(TELEMETRY_DISABLED_COOKIE);
     }
 
     const oidcUser = req.oidc?.user != null ? OidcUserValidator.Parse(req.oidc.user) : void 0;
