@@ -27,4 +27,4 @@ export HOCUS_DEV_GIT_NAME=$(git config --get user.name)
 export HOCUS_DEV_GIT_EMAIL=$(git config --get user.email)
 
 docker compose -p agentdev exec agent \
-  /bin/bash -c "HOCUS_DEV_GIT_NAME=$HOCUS_DEV_GIT_NAME HOCUS_DEV_GIT_EMAIL=$HOCUS_DEV_GIT_EMAIL ops/bin/worker-dev-entrypoint.sh"
+  /bin/bash -c "HOCUS_DEV_GIT_NAME=\"$HOCUS_DEV_GIT_NAME\" HOCUS_DEV_GIT_EMAIL=\"$HOCUS_DEV_GIT_EMAIL\" ops/bin/worker-dev-entrypoint.sh"
