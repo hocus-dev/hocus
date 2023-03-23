@@ -1,7 +1,26 @@
-# Auth
+<p align="center">
+  <img alt="hocus-gh-bg" src="https://user-images.githubusercontent.com/28019628/227353685-63f8e3bb-fbf9-446b-a6bd-f15fc53c9a52.png">
+</p>
 
-If gotrue is deployed on a different domain than the main app, its cookie domain must be configured.
-https://github.com/supabase/gotrue/blob/1c9a4dca45298eb534b03a2c2521603b6ee45728/conf/configuration.go#L205
+<p align="center">
+   <a href="https://hocus.dev">
+      <img alt="Website" src="https://img.shields.io/badge/website-hocus.dev-blue"/>
+   </a>
+   <img alt="Language" src="https://img.shields.io/badge/platform-linux-lightgrey"/>
+   <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/m/hocus-dev/hocus"/>
+<p>
+
+<p align="center">
+  <a href="https://hocus.dev/docs">Docs</a> - <a href="https://github.com/hocus-dev/hocus/issues/new?assignees=&labels=bug">Bug report</a>
+</p>
+
+## Hocus is a self-hosted alternative to Gitpod and Github Codespaces.
+
+- Spin up disposable development environments on servers that you manage
+- Save time with prebuilds - stop waiting for code to compile and dependencies to install
+- Specify your development environment setup as code
+- Onboard new team members faster
+- Develop on a powerful remote server rather than a laptop
 
 # Contributing
 
