@@ -10,5 +10,4 @@ export REPO_DIR="$(realpath "${SCRIPT_DIR}/../..")"
 export HOCUS_RESOURCES_DIR="$(realpath ${REPO_DIR}/../hocus-resources)"
 
 cd "$SCRIPT_DIR"
-
-docker compose -p hocus-complete -f "$REPO_DIR/ops/docker/hocus-dev-complete.yml" down -v
+$REPO_DIR/ops/bin/local-cmd.sh down -v

@@ -65,10 +65,6 @@ if ! [[ $? -eq 0 ]]; then
   exit 1
 fi
 
-set -o errexit
-set -o pipefail
-set -o nounset
-
 if [[ ! -v HOCUS_HOSTNAME ]]; then
   echo "HOCUS_HOSTNAME was not set. Set it to a domain where you may reach this machine."
   echo "If running locally then set to localhost, if via tailscale then set it to the MagicDNS domain of the machine."
@@ -90,4 +86,70 @@ export HOCUS_DEV_GIT_EMAIL=$(git config --get user.email)
 
 cd "$SCRIPT_DIR"
 
-docker compose -p hocus-complete -f "$REPO_DIR/ops/docker/hocus-dev-complete.yml" up --detach --build
+build_service () {
+  BUILD_OUTPUT=""
+  T0=$(date +%s%N | cut -b1-13)
+  # Stream the output of docker build line by line
+  while read docker_line;
+  do
+    # Buffer the whole docker build output
+    BUILD_OUTPUT+="$docker_line"$'\n'
+    # Check if the build failed
+    if grep -q -e "ERROR" -e "CANCELED" <<< "$docker_line"; then
+      ERROR_PRESENT="YES"
+    fi
+    # Display a custom progress indicator if there is no error
+    if [[ ! -v ERROR_PRESENT ]]; then
+      if grep -q -e "^#[0-9]*" <<< "$docker_line"; then
+        T1=$(date +%s%N | cut -b1-13)
+        DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+        STEP=$(grep -o -e "^#[0-9]*" <<< "$docker_line")
+        echo -en "\r\033[KBuilding $2 step $STEP eslapsed $DT s "
+      fi
+    fi
+  done < <($REPO_DIR/ops/bin/local-cmd.sh build --progress=plain $1 2> /dev/null)
+
+  # If an error in the build is present then display the whole log
+  if [[ -v ERROR_PRESENT ]]; then
+    T1=$(date +%s%N | cut -b1-13)
+    DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+    echo -e "\r\033[KBuilding $2 failed in $DT s ❌\n"
+
+    echo -e "$BUILD_OUTPUT" | grep --color -E '^|ERROR:.*'
+    echo "We were unable to build Hocus 😭"
+    echo "Above you will find the docker build logs with the errors highlighted"
+    echo -e "Please report this problem here"
+    echo -e "🙏🙏🙏 \033[0;32m https://github.com/hugodutka/rooms/issues/new \033[0m 🙏🙏🙏"
+    echo "We will get you a 🦝 to help you as quickly as possible"
+    exit 1
+  else
+    T1=$(date +%s%N | cut -b1-13)
+    DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+    echo -e "\r\033[KBuilding $2 done in $DT s ✅"
+  fi 
+}
+
+# Images to build
+echo "Building docker images 👷"
+build_service setup-vm-images vm-builder
+build_service setup-keycloak db-autosetup
+build_service keycloak keycloak
+build_service temporal-hocus-codec temporal-codec
+build_service hocus-ui ui
+build_service hocus-agent agent
+
+echo -n "Pulling docker images 📥"
+$REPO_DIR/ops/bin/local-cmd.sh pull --ignore-buildable -q 2> /dev/null
+if ! [[ $? -eq 0 ]]; then
+  echo -e "\r\033[KPulling docker images 📥 - ❌"
+  exit 1
+else
+  echo -e "\r\033[KPulling docker images 📥 - ✅"
+fi
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+$REPO_DIR/ops/bin/local-cmd.sh up --detach 2> /dev/null
+# TODO: POLL THE STATUS OF THE SERVICES EVERY 1000ms/100ms
