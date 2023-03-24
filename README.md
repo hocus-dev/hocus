@@ -14,19 +14,24 @@
   <a href="https://hocus.dev/docs">Docs</a> - <a href="https://github.com/hocus-dev/hocus/issues/new?assignees=&labels=bug">Bug report</a>
 </p>
 
-## Hocus is a self-hosted alternative to Gitpod and Github Codespaces.
+## Hocus is a self-hosted alternative to Gitpod and Github Codespaces
 
-- Spin up disposable development environments on servers that you manage
-- Save time with prebuilds - stop waiting for code to compile and dependencies to install
-- Specify your development environment setup as code
-- Onboard new team members faster
-- Develop on a powerful remote server rather than a laptop
+- Spin up disposable development environments on servers that you manage;
+- Save time with prebuilds - stop waiting for code to compile and dependencies to install;
+- Specify your development environment as code;
+- Onboard new team members faster;
+- Develop on a powerful server rather than a laptop.
 
 ## Features
 
+- **Workspaces** - disposable development environments, powered by [Firecracker](https://github.com/firecracker-microvm/firecracker) micro VMs;
+- **Prebuilds** - Hocus continuously builds your project like a CI system so you don't have to wait for dependencies to download and code to compile;
+- **Project Environment Variables** - declare shared environment variables for your entire team;
+- **VSCode Integration** - connect to workspaces over SSH automatically with your local VSCode editor;
+- **Full Root Access** - workspaces are full-fledged VMs rather than Docker containers, so you have full control over your environment. Use nested KVM, run [LocalStack](https://github.com/localstack/localstack), or even deploy [Kubernetes](https://github.com/kubernetes/kubernetes);
+- **Monorepo support** - create multiple projects in a single repository with different root directories.
+
 ![hocus-demo-2](https://user-images.githubusercontent.com/28019628/227571071-2f6b3c02-6bfc-48a3-913f-cbb226899f38.gif)
-
-
 
 # Contributing
 
