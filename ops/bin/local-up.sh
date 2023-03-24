@@ -224,4 +224,5 @@ echo -e "Keycloak: http://${HOCUS_HOSTNAME}:4200/ Creds: admin/admin"
 echo -e "Temporal: http://${HOCUS_HOSTNAME}:8080/" 
 
 echo -e "\nTo delete all data ./ops/bin/local-cleanup.sh"
-echo -e "To get debug logs: ./ops/bin/local-cmd.sh logs" 
+echo -e "To get debug logs: ./ops/bin/local-cmd.sh logs"
+echo -e "To stop the deploy: ./ops/bin/local-cmd.sh down"
