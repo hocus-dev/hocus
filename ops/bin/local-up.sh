@@ -86,6 +86,13 @@ export HOCUS_DEV_GIT_EMAIL=$(git config --get user.email)
 
 cd "$SCRIPT_DIR"
 
+fatal_error () {
+  echo -e "Please report this problem here"
+  echo -e "🙏🙏🙏 \033[0;32m https://github.com/hugodutka/rooms/issues/new \033[0m 🙏🙏🙏"
+  echo "We will get you a 🦝 to help you as quickly as possible"
+  exit 1
+}
+
 build_service () {
   BUILD_OUTPUT=""
   T0=$(date +%s%N | cut -b1-13)
@@ -118,10 +125,7 @@ build_service () {
     echo -e "$BUILD_OUTPUT" | grep --color -E '^|ERROR:.*'
     echo "We were unable to build Hocus 😭"
     echo "Above you will find the docker build logs with the errors highlighted"
-    echo -e "Please report this problem here"
-    echo -e "🙏🙏🙏 \033[0;32m https://github.com/hugodutka/rooms/issues/new \033[0m 🙏🙏🙏"
-    echo "We will get you a 🦝 to help you as quickly as possible"
-    exit 1
+    fatal_error
   else
     T1=$(date +%s%N | cut -b1-13)
     DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
@@ -140,17 +144,60 @@ build_service hocus-agent agent
 
 # Pulling images
 echo -n "Pulling docker images 📥"
+T0=$(date +%s%N | cut -b1-13)
 $REPO_DIR/ops/bin/local-cmd.sh pull --ignore-buildable -q 2> /dev/null
 if ! [[ $? -eq 0 ]]; then
-  echo -e "\r\033[KPulling docker images 📥 - ❌"
+  T1=$(date +%s%N | cut -b1-13)
+  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+  echo -e "\r\033[KPulling docker images 📥 - ❌ in $DT"
   exit 1
 else
-  echo -e "\r\033[KPulling docker images 📥 - ✅"
+  T1=$(date +%s%N | cut -b1-13)
+  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+  echo -e "\r\033[KPulling docker images 📥 - ✅ in $DT s"
 fi
+
+echo -n "Building MicroVM's 👷🗜🖥️"
+T0=$(date +%s%N | cut -b1-13)
+VM_BUILD_LOG=$($REPO_DIR/ops/bin/local-cmd.sh run --rm setup-vm-images 2>&1)
+if ! [[ $? -eq 0 ]]; then
+  T1=$(date +%s%N | cut -b1-13)
+  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+  echo -e "\r\033[KBuilding MicroVM's 👷🗜🖥️ - ❌ in $DT"
+
+  echo -e "$VM_BUILD_LOG" | grep --color -E '^|ERROR:.*'
+  echo -e "\nAbove you will find the vm build logs with the errors highlighted"
+  fatal_error
+else
+  T1=$(date +%s%N | cut -b1-13)
+  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+  echo -e "\r\033[KBuilding MicroVM's 👷🗜🖥️ - ✅ in $DT s"
+fi
+
+echo -n "Seeding the DB 🌱"
+T0=$(date +%s%N | cut -b1-13)
+SEED_LOG=$($REPO_DIR/ops/bin/local-cmd.sh run --rm setup-keycloak 2>&1)
+if ! [[ $? -eq 0 ]]; then
+  T1=$(date +%s%N | cut -b1-13)
+  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+  echo -e "\r\033[KSeeding the DB 🌱 - ❌ in $DT"
+
+  echo -e "$SEED_LOG"
+  echo -e "\nAbove you will find the logs"
+  fatal_error
+else
+  T1=$(date +%s%N | cut -b1-13)
+  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+  echo -e "\r\033[KSeeding the DB 🌱 - ✅ in $DT s"
+fi
+
+#$REPO_DIR/ops/bin/local-cmd.sh run setup-keycloak 2> /dev/null
+#if ! [[ $? -eq 0 ]]; then
+#fi
 
 set -o errexit
 set -o pipefail
 set -o nounset
 
-$REPO_DIR/ops/bin/local-cmd.sh up #2> /dev/null
+#$REPO_DIR/ops/bin/local-cmd.sh up #2> /dev/null
 # TODO: POLL THE STATUS OF THE SERVICES EVERY 1000ms/100ms

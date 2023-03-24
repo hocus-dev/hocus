@@ -23,7 +23,7 @@ MOUNT_PATH="/tmp/buildfs-${IMAGE_TAG}"
 ORIGINAL_PATH="$(pwd)"
 
 # Build the image - is instant if the image already exists :)
-docker build --tag "${IMAGE_NAME}" --file "${DOCKERFILE_PATH}" "${CONTEXT_DIR}"
+docker build --progress=plain --tag "${IMAGE_NAME}" --file "${DOCKERFILE_PATH}" "${CONTEXT_DIR}"
 FS_HASH=$(docker images --no-trunc --digests --quiet "${IMAGE_NAME}" | tr -d '\n' | tail -c16)
 
 # If the target image already exists
