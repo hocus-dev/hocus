@@ -28,10 +28,22 @@
 - **Prebuilds** - Hocus continuously builds your project like a CI system so you don't have to wait for dependencies to download and code to compile;
 - **Project Environment Variables** - declare shared environment variables for your entire team;
 - **VSCode Integration** - connect to workspaces over SSH automatically with your local VSCode editor;
-- **Full Root Access** - workspaces are full-fledged VMs rather than Docker containers, so you have full control over your environment. Use nested KVM, run [LocalStack](https://github.com/localstack/localstack), or even deploy [Kubernetes](https://github.com/kubernetes/kubernetes);
+- **Full Root Access** - workspaces are full-fledged VMs rather than Docker containers, so you have full control over your environment. Use Docker and nested KVM, run [LocalStack](https://github.com/localstack/localstack), or even deploy [Kubernetes](https://github.com/kubernetes/kubernetes);
 - **Monorepo support** - create multiple projects in a single repository with different root directories.
 
 ![hocus-demo-2](https://user-images.githubusercontent.com/28019628/227571071-2f6b3c02-6bfc-48a3-913f-cbb226899f38.gif)
+
+## Get Started
+
+The following commands will set up Hocus on your local machine with `docker-compose`. Only x86 Linux is supported.
+
+```bash
+git clone https://github.com/hocus-dev/hocus.git
+cd hocus && git checkout v0.1-alpha
+HOCUS_HOSTNAME="localhost" ops/bin/local-up.sh
+```
+
+Check out our [documentation](https://hocus.dev/docs/installation/quickstart) for more information about managing your deployment.
 
 # Contributing
 
