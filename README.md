@@ -6,7 +6,7 @@
    <a href="https://hocus.dev">
       <img alt="Website" src="https://img.shields.io/badge/website-hocus.dev-blue"/>
    </a>
-   <img alt="Language" src="https://img.shields.io/badge/platform-linux-lightgrey"/>
+   <img alt="Language" src="https://img.shields.io/badge/platform-linux-green"/>
    <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/m/hocus-dev/hocus"/>
 <p>
 
