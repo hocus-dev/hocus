@@ -195,15 +195,33 @@ else
   echo -e "\r\033[KSeeding the DB 🌱 - ✅ in $DT s"
 fi
 
-echo "Starting the DB 📙"
-$REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps db 2> /dev/null
-echo "Starting Keycloak 🔑"
-$REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps keycloak 2> /dev/null
-echo "Starting Temporal ☁️"
-$REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps temporal 2> /dev/null
-$REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps temporal-admin-tools 2> /dev/null
-$REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps temporal-ui 2> /dev/null
-$REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps temporal-hocus-codec 2> /dev/null
-echo "Starting Hocus 🧙🪄"
-$REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps hocus-ui 2> /dev/null
-$REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps hocus-agent 2> /dev/null
+start_service () {
+  echo -n "Starting $2"
+  T0=$(date +%s%N | cut -b1-13)
+  $REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps $1 2> /dev/null
+  if ! [[ $? -eq 0 ]]; then
+    T1=$(date +%s%N | cut -b1-13)
+    DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+    echo -e "\r\033[KStarting $2 - ❌ in $DT\n"
+
+    $REPO_DIR/ops/bin/local-cmd.sh logs $1 2> /dev/null
+    echo -e "\nAbove you will find the logs"
+    fatal_error
+  else
+    T1=$(date +%s%N | cut -b1-13)
+    DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+    echo -e "\r\033[KStarting $2 - ✅ in $DT s"
+  fi
+}
+
+start_service db "the DB 📙"
+start_service keycloak "Keycloak 🔑"
+start_service "temporal temporal-admin-tools temporal-ui temporal-hocus-codec" "Temporal ☁️ "
+start_service "hocus-ui hocus-agent" "Hocus 🧙🪄 "
+
+echo -e "\nYou may access Hocus here: http://${HOCUS_HOSTNAME}:3000/ Creds: dev/dev"
+echo -e "Keycloak: http://${HOCUS_HOSTNAME}:4200/ Creds: admin/admin"
+echo -e "Temporal: http://${HOCUS_HOSTNAME}:8080/" 
+
+echo -e "\nTo delete all data ./ops/bin/local-cleanup.sh"
+echo -e "To get debug logs: ./ops/bin/local-cmd.sh logs" 
