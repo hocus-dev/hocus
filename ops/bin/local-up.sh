@@ -65,6 +65,10 @@ if ! [[ $? -eq 0 ]]; then
   exit 1
 fi
 
+# TODO: ensure this is set
+export HOCUS_DEV_GIT_NAME=$(git config --get user.name || echo "dev")
+export HOCUS_DEV_GIT_EMAIL=$(git config --get user.email || echo "dev@example.com")
+
 if [[ ! -v HOCUS_HOSTNAME ]]; then
   echo "HOCUS_HOSTNAME was not set. Set it to a domain where you may reach this machine."
   echo "If running locally then set to localhost, if via tailscale then set it to the MagicDNS domain of the machine."
