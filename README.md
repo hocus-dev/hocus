@@ -24,6 +24,8 @@
 
 ## Features
 
+![hocus-demo-2](https://user-images.githubusercontent.com/28019628/227571071-2f6b3c02-6bfc-48a3-913f-cbb226899f38.gif)
+
 - **Workspaces** - disposable development environments, powered by [Firecracker](https://github.com/firecracker-microvm/firecracker) micro VMs;
 - **Prebuilds** - Hocus continuously builds your project like a CI system so you don't have to wait for dependencies to download and code to compile;
 - **Project Environment Variables** - declare shared environment variables for your entire team;
@@ -31,8 +33,6 @@
 - **Full Root Access** - workspaces are full-fledged VMs rather than Docker containers, so you have full control over your environment. Use Docker and nested KVM, run [LocalStack](https://github.com/localstack/localstack), or even deploy [Kubernetes](https://github.com/kubernetes/kubernetes);
 - **Support for any Git provider that uses the SSH protocol** - connect Hocus to Github, Gitlab, Bitbucket, Gitea, Gerrit, and others;
 - **Monorepo support** - create multiple projects in a single repository with different root directories.
-
-![hocus-demo-2](https://user-images.githubusercontent.com/28019628/227571071-2f6b3c02-6bfc-48a3-913f-cbb226899f38.gif)
 
 ## Get Started
 
