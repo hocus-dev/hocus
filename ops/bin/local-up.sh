@@ -191,13 +191,15 @@ else
   echo -e "\r\033[KSeeding the DB 🌱 - ✅ in $DT s"
 fi
 
-#$REPO_DIR/ops/bin/local-cmd.sh run setup-keycloak 2> /dev/null
-#if ! [[ $? -eq 0 ]]; then
-#fi
-
-set -o errexit
-set -o pipefail
-set -o nounset
-
-#$REPO_DIR/ops/bin/local-cmd.sh up #2> /dev/null
-# TODO: POLL THE STATUS OF THE SERVICES EVERY 1000ms/100ms
+echo "Starting the DB 📙"
+$REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps db 2> /dev/null
+echo "Starting Keycloak 🔑"
+$REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps keycloak 2> /dev/null
+echo "Starting Temporal ☁️"
+$REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps temporal 2> /dev/null
+$REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps temporal-admin-tools 2> /dev/null
+$REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps temporal-ui 2> /dev/null
+$REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps temporal-hocus-codec 2> /dev/null
+echo "Starting Hocus 🧙‍♂️🪄"
+$REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps hocus-ui 2> /dev/null
+$REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps hocus-agent 2> /dev/null
