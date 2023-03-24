@@ -210,7 +210,7 @@ services:
       - LOG_LEVEL=info
       - AGENT_TEMPORAL_ADDRESS=temporal:7233
       - AGENT_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms?schema=public
-      - AGENT_KERNEL_PATH=/srv/jailer/resources/vmlinux-5.6-x86_64.bin
+      - AGENT_KERNEL_PATH=/srv/jailer/resources/vmlinux-5.10-x86_64.bin
       - AGENT_HOST_BUILDFS_RESOURCES_DIR=/app/resources
       - AGENT_BUILDFS_ROOTFS=/srv/jailer/resources/buildfs.ext4
       - AGENT_DEV_CREATE_HOCUS_PROJECTS=${AGENT_DEV_CREATE_HOCUS_PROJECTS}
