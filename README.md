@@ -24,7 +24,8 @@
 
 ## Features
 
-![hocus-demo](https://user-images.githubusercontent.com/28019628/227544835-3bfd3c07-de53-4a57-9ad9-729aa5f5f7c6.gif)
+![hocus-demo-2](https://user-images.githubusercontent.com/28019628/227571071-2f6b3c02-6bfc-48a3-913f-cbb226899f38.gif)
+
 
 
 # Contributing
