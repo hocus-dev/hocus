@@ -59,7 +59,7 @@ if [[ KERNEL_MAJOR -lt 5 ]] || { [[ KERNEL_MAJOR -eq 5 ]] && [[ KERNEL_MINOR -lt
 fi
 
 # Now check if KVM is available
-KVM_DIAG=$(${REPO_DIR}/ops/bin/kvm-ok)
+KVM_DIAG=$(${REPO_DIR}/ops/bin/kvm-ok 2>/dev/null)
 if ! [[ $? -eq 0 ]]; then
   echo "😭 $KVM_DIAG"
   exit 1
