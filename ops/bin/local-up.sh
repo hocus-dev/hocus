@@ -68,8 +68,8 @@ fi
 if [[ ! -v HOCUS_HOSTNAME ]]; then
   echo "HOCUS_HOSTNAME was not set. Set it to a domain where you may reach this machine."
   echo "If running locally then set to localhost, if via tailscale then set it to the MagicDNS domain of the machine."
-  echo "HOCUS_HOSTNAME=localhost ./ops/bin/hocus-dev-start.sh"
-  echo "If you need to change the domain please delete the data first ./ops/bin/hocus-dev-delete-data.sh"
+  echo -e "\nHOCUS_HOSTNAME=localhost ./ops/bin/local-up.sh\n"
+  echo "If you need to change the domain please delete the data first ./ops/bin/local-cleanup.sh"
   echo "If you want to migrate to another hostname inplace without deleting the data then you need to modify the Hocus keycloak realm!"
   exit 1
 fi
@@ -111,7 +111,7 @@ build_service () {
         T1=$(date +%s%N | cut -b1-13)
         DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
         STEP=$(grep -o -e "^#[0-9]*" <<< "$docker_line")
-        echo -en "\r\033[KBuilding $2 step $STEP eslapsed $DT s "
+        echo -en "\r\033[KBuilding $2 step $STEP elapsed $DT s "
       fi
     fi
   done < <($REPO_DIR/ops/bin/local-cmd.sh build --progress=plain $1 2> /dev/null)
@@ -157,13 +157,13 @@ else
   echo -e "\r\033[KPulling docker images 📥 - ✅ in $DT s"
 fi
 
-echo -n "Building MicroVM's 👷🗜🖥️"
+echo -n "Building MicroVMs 👷🖥️ "
 T0=$(date +%s%N | cut -b1-13)
 VM_BUILD_LOG=$($REPO_DIR/ops/bin/local-cmd.sh run --rm setup-vm-images 2>&1)
 if ! [[ $? -eq 0 ]]; then
   T1=$(date +%s%N | cut -b1-13)
   DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KBuilding MicroVM's 👷🗜🖥️ - ❌ in $DT"
+  echo -e "\r\033[KBuilding MicroVMs 👷🖥️ - ❌ in $DT"
 
   echo -e "$VM_BUILD_LOG" | grep --color -E '^|ERROR:.*'
   echo -e "\nAbove you will find the vm build logs with the errors highlighted"
@@ -171,7 +171,7 @@ if ! [[ $? -eq 0 ]]; then
 else
   T1=$(date +%s%N | cut -b1-13)
   DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KBuilding MicroVM's 👷🗜🖥️ - ✅ in $DT s"
+  echo -e "\r\033[KBuilding MicroVMs 👷🖥️ - ✅ in $DT s"
 fi
 
 echo -n "Seeding the DB 🌱"
@@ -200,6 +200,7 @@ $REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps tempor
 $REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps temporal-admin-tools 2> /dev/null
 $REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps temporal-ui 2> /dev/null
 $REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps temporal-hocus-codec 2> /dev/null
-echo "Starting Hocus 🧙‍♂️🪄"
+echo "Starting Hocus 🧙🪄"
 $REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps hocus-ui 2> /dev/null
 $REPO_DIR/ops/bin/local-cmd.sh up --detach --no-recreate --wait --no-deps hocus-agent 2> /dev/null
+
