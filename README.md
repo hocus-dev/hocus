@@ -22,6 +22,11 @@
 - Onboard new team members faster
 - Develop on a powerful remote server rather than a laptop
 
+## Features
+
+![hocus-demo](https://user-images.githubusercontent.com/28019628/227544835-3bfd3c07-de53-4a57-9ad9-729aa5f5f7c6.gif)
+
+
 # Contributing
 
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/hugodutka/rooms)
