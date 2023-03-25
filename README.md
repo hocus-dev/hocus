@@ -24,7 +24,7 @@
 
 ## Features
 
-![hocus-demo-2](https://user-images.githubusercontent.com/28019628/227571071-2f6b3c02-6bfc-48a3-913f-cbb226899f38.gif)
+![hocus-demo-3](https://user-images.githubusercontent.com/28019628/227723898-09a9ac73-ab36-4fb2-a008-ce81e047bb7a.gif)
 
 - **Workspaces** - disposable development environments, powered by [Firecracker](https://github.com/firecracker-microvm/firecracker) micro VMs;
 - **Prebuilds** - Hocus continuously builds your project like a CI system so you don't have to wait for dependencies to download and code to compile;
