@@ -14,13 +14,13 @@
   <a href="https://hocus.dev/docs">Docs</a> - <a href="https://github.com/hocus-dev/hocus/issues/new?assignees=&labels=bug">Bug report</a>
 </p>
 
-## Hocus is a self-hosted alternative to Gitpod and Github Codespaces
+## Hocus lets you spin up disposable development environments on your own servers
 
-- Spin up disposable development environments on servers that you manage;
 - Save time with prebuilds - stop waiting for code to compile and dependencies to install;
 - Specify your development environment as code;
 - Onboard new team members faster;
-- Securely share a powerful machine among multiple users with ease.
+- Securely share a powerful machine among multiple users with ease;
+- Self-hosted alternative to Gitpod and Github Codespaces.
 
 ## Features
 
