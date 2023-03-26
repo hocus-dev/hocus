@@ -20,7 +20,7 @@
 - Save time with prebuilds - stop waiting for code to compile and dependencies to install;
 - Specify your development environment as code;
 - Onboard new team members faster;
-- Develop on a powerful server rather than a laptop.
+- Securely share a powerful machine among multiple users with ease.
 
 ## Features
 
