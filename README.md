@@ -26,13 +26,13 @@
 
 ![hocus-demo-3](https://user-images.githubusercontent.com/28019628/227723898-09a9ac73-ab36-4fb2-a008-ce81e047bb7a.gif)
 
-- **Workspaces** - disposable development environments, powered by [Firecracker](https://github.com/firecracker-microvm/firecracker) micro VMs;
-- **Prebuilds** - Hocus continuously builds your project like a CI system so you don't have to wait for dependencies to download and code to compile;
-- **Project Environment Variables** - declare shared environment variables for your entire team;
-- **VSCode Integration** - connect to workspaces over SSH automatically with your local VSCode editor;
-- **Full Root Access** - workspaces are full-fledged VMs rather than Docker containers, so you have full control over your environment. Use Docker and nested KVM, run [LocalStack](https://github.com/localstack/localstack), or even deploy [Kubernetes](https://github.com/kubernetes/kubernetes);
-- **Support for any Git provider that uses the SSH protocol** - connect Hocus to Github, Gitlab, Bitbucket, Gitea, Gerrit, and others;
-- **Monorepo support** - create multiple projects in a single repository with different root directories.
+- **Workspaces** - Say goodbye to messy local development environments! Hocus offers disposable development environments powered by [Firecracker](https://github.com/firecracker-microvm/firecracker) micro VMs, so you can have a consistent and clean setup every time.
+- **Prebuilds** - Waiting for dependencies to download and code to compile is a thing of the past. Hocus continuously builds your project like a CI system, so you can focus on coding rather than waiting.
+- **Project Environment Variables** - Declare shared environment variables for your entire team, making collaboration easier.
+- **VSCode Integration** - Connect to workspaces over SSH automatically with your local VSCode editor.
+- **Full Root Access** - Unlike Docker containers, Hocus workspaces are full-fledged VMs, giving you full control over your environment. You can use Docker and nested KVM, run [LocalStack](https://github.com/localstack/localstack), or even deploy [Kubernetes](https://github.com/kubernetes/kubernetes);
+- **Support for any Git provider that uses the SSH protocol** - Connect Hocus to Github, Gitlab, Bitbucket, Gitea, Gerrit, and others.
+- **Monorepo support** - Create multiple development environments for different projects in a single repository.
 
 ## Get Started
 
