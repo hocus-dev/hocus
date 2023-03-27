@@ -10,4 +10,4 @@ export REPO_DIR="$(realpath "${SCRIPT_DIR}/../..")"
 export HOCUS_RESOURCES_DIR="$(realpath ${REPO_DIR}/../hocus-resources)"
 
 cd "$SCRIPT_DIR"
-$REPO_DIR/ops/bin/local-cmd.sh down -v --remove-orphans
+"$REPO_DIR/ops/bin/local-cmd.sh" down -v --remove-orphans
