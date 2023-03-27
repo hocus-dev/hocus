@@ -40,7 +40,7 @@ The following commands will set up Hocus on your local machine with `docker-comp
 
 ```bash
 git clone https://github.com/hocus-dev/hocus.git
-cd hocus && git checkout v0.1-alpha
+cd hocus
 HOCUS_HOSTNAME="localhost" ops/bin/local-up.sh
 ```
 
