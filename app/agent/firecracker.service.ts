@@ -534,7 +534,7 @@ export class FirecrackerService {
         actionType: InstanceActionInfoActionTypeEnum.SendCtrlAltDel,
       },
     });
-    await watchFileUntilLineMatches(/reboot: Restarting system/, this.getVMLogsPath(), 10000);
+    await watchFileUntilLineMatches(/reboot: Restarting system/, this.getVMLogsPath(), 30000);
   }
 
   async releaseVmResources(ipBlockId: number): Promise<void> {
