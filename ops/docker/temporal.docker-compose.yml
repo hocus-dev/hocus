@@ -1,6 +1,8 @@
 version: "3.5"
 networks:
   hocus_dev_net:
+    name: hocus_dev_net
+
 services:
   postgresql:
     container_name: temporal-postgresql

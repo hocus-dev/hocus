@@ -1,0 +1,22 @@
+version: "3"
+networks:
+  hocus_dev_net:
+    name: hocus_dev_net
+services:
+  agent:
+    networks:
+      - hocus_dev_net
+    container_name: agent
+    image: worker-dev
+    restart: "no"
+    privileged: true
+    ports:
+      - 8822:22
+    volumes:
+      - "${AGENT_REPO_DIR}:/app"
+      - "${HOCUS_RESOURCES_DIR}:/srv/jailer"
+      - /dev/kvm:/dev/kvm
+    environment:
+      - "HOCUS_DEV_GIT_NAME=${HOCUS_DEV_GIT_NAME}"
+      - "HOCUS_DEV_GIT_EMAIL=${HOCUS_DEV_GIT_EMAIL}"
+    entrypoint: /app/ops/bin/worker-in-hocus-entrypoint.sh
