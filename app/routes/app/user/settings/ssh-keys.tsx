@@ -1,7 +1,7 @@
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { Button, Label, Textarea, TextInput } from "flowbite-react";
+import { Alert, Button, Label, Textarea, TextInput } from "flowbite-react";
 import { CsrfInput } from "~/components/csrf-input";
 import { SettingsPage } from "~/components/settings/settings-page";
 import { SshKey } from "~/components/settings/ssh-key";
@@ -46,10 +46,23 @@ export default function SshKeys(): JSX.Element {
           />
         ))}
         {publicKeys.length === 0 && (
-          <p className="text-gray-400 text-sm">
-            <i className="fa-solid fa-circle-info mr-2"></i>
-            <span>You don't have any SSH keys added to your account. Add one below.</span>
-          </p>
+          <Alert color="warning">
+            <p>
+              Before you create or start a workspace, add your SSH public key here. It will be used
+              to grant you access. You should use the one located at <code>~/.ssh/id_rsa.pub</code>{" "}
+              or <code>~/.ssh/id_ed25519.pub</code>. Otherwise you may have trouble connecting.
+            </p>
+            <p className="mt-4">
+              <a
+                href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent#generating-a-new-ssh-key"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                How to generate an SSH key?
+              </a>
+            </p>
+          </Alert>
         )}
       </div>
       <div className="mt-8">

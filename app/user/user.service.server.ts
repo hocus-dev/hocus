@@ -61,4 +61,15 @@ export class UserService {
       return user;
     });
   }
+
+  async isUserMissingSshKeys(db: Prisma.Client, userId: bigint): Promise<boolean> {
+    return db.user
+      .findUniqueOrThrow({
+        where: { id: userId },
+        include: {
+          sshPublicKeys: true,
+        },
+      })
+      .then((u) => u.sshPublicKeys.length === 0);
+  }
 }

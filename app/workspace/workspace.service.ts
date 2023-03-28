@@ -20,7 +20,6 @@ export interface WorkspaceInfo {
   };
   agentHostname: string;
   workspaceHostname?: string;
-  missingSshKeys: boolean;
   lastOpenedAt: number;
   createdAt: number;
 }
@@ -84,7 +83,6 @@ export class WorkspaceService {
       workspaceHostname: workspace.activeInstance?.vmIp,
       lastOpenedAt: workspace.lastOpenedAt.getTime(),
       createdAt: workspace.createdAt.getTime(),
-      missingSshKeys: workspace.user.sshPublicKeys.length === 0,
     };
   }
 }

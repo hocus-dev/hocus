@@ -19,7 +19,7 @@ export const SettingsPage = (props: {
   );
   return (
     <AppPage>
-      <h1 className="mt-8 mb-4 font-bold text-4xl">Settings</h1>
+      <h1 className="mt-8 mb-4 font-bold text-4xl">User Settings</h1>
       <div className="grow grid grid-cols-[12rem_minmax(0,_1fr)] border border-gray-700 rounded-lg">
         <Flowbite
           theme={{

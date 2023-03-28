@@ -5,7 +5,7 @@ import { StatusCodes } from "http-status-codes";
 import { v4 as uuidv4 } from "uuid";
 import { runCreateWorkspace } from "~/agent/workflows";
 import { HttpError } from "~/http-error.server";
-import { getWorkspacePath } from "~/page-paths.shared";
+import { getUserSettingsPath, getWorkspacePath, SettingsPageTab } from "~/page-paths.shared";
 import { CreateWorkspaceFormValidator } from "~/schema/create-workspace-form.validator.server";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
 import { Token } from "~/token";
@@ -14,6 +14,7 @@ import { unwrap } from "~/utils.shared";
 export const action = async ({ context: { app, db, req, user } }: ActionArgs) => {
   const withClient = app.resolve(Token.TemporalClient);
   const workspaceService = app.resolve(Token.WorkspaceService);
+  const userService = app.resolve(Token.UserService);
   const formData = req.body;
   const { success, value: workspaceInfo } = CreateWorkspaceFormValidator.SafeParse(formData);
   if (!success) {
@@ -38,6 +39,12 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
       "Prebuild must be in the success state for a workspace to be created",
     );
   }
+
+  const missingSshKeys = await userService.isUserMissingSshKeys(db, unwrap(user).id);
+  if (missingSshKeys) {
+    return redirect(getUserSettingsPath(SettingsPageTab.SshKeys));
+  }
+
   const externalWorkspaceId = uuidv4();
   const workspaceName = workspaceService.generateWorkspaceName();
 

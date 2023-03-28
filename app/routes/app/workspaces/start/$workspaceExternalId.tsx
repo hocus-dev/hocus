@@ -7,7 +7,7 @@ import { StatusCodes } from "http-status-codes";
 import { v4 as uuidv4 } from "uuid";
 import { runStartWorkspace } from "~/agent/workflows";
 import { HttpError } from "~/http-error.server";
-import { getWorkspacePath } from "~/page-paths.shared";
+import { getUserSettingsPath, getWorkspacePath, SettingsPageTab } from "~/page-paths.shared";
 import { UuidValidator } from "~/schema/uuid.validator.server";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
 import { Token } from "~/token";
@@ -15,6 +15,7 @@ import { unwrap } from "~/utils.shared";
 
 export const action = async ({ context: { app, db, req, user } }: ActionArgs) => {
   const withClient = app.resolve(Token.TemporalClient);
+  const userService = app.resolve(Token.UserService);
   const { success, value: workspaceExternalId } = UuidValidator.SafeParse(
     path.parse(req.params[0]).name,
   );
@@ -33,6 +34,10 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
   }
   if (workspace.status !== WorkspaceStatus.WORKSPACE_STATUS_STOPPED) {
     throw new HttpError(StatusCodes.BAD_REQUEST, "Workspace must be stopped before starting");
+  }
+  const missingSshKeys = await userService.isUserMissingSshKeys(db, unwrap(user).id);
+  if (missingSshKeys) {
+    return redirect(getUserSettingsPath(SettingsPageTab.SshKeys));
   }
 
   await withClient(async (client) => {
