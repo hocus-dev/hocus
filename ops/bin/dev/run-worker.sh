@@ -7,7 +7,7 @@ export DOCKER_BUILDKIT=1
 
 SCRIPT_DIR="$(dirname "$0")"
 export REPO_DIR="$(realpath "${SCRIPT_DIR}/../../..")"
-export AGENT_REPO_DIR="/home/hocus/dev/project-agent"
+export AGENT_REPO_DIR="/home/hocus/dev/agent-project"
 export HOCUS_RESOURCES_DIR="$(realpath ${REPO_DIR}/../hocus-resources)"
 export DOCKER_COMPOSE_FILE_PATH="${REPO_DIR}/ops/docker/agent-in-hocus.docker-compose.yml"
 
@@ -21,6 +21,6 @@ docker compose -p agent-in-hocus -f "$DOCKER_COMPOSE_FILE_PATH" down -t 1 2>/dev
 export HOCUS_DEV_GIT_NAME="$(git config --get user.name)"
 export HOCUS_DEV_GIT_EMAIL="$(git config --get user.email)"
 
-sudo ops/bin/setup-agent-repo-mirror.sh
+sudo "$REPO_DIR/ops/bin/dev/setup-agent-repo-mirror.sh"
 
 docker compose -p agent-in-hocus -f "$DOCKER_COMPOSE_FILE_PATH" up

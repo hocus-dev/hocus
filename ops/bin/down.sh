@@ -6,4 +6,4 @@ cd "$OPS_DIR""/docker" && \
 docker compose \
     -p rooms \
     down \
-    --remove-orphans
+    --remove-orphans || true

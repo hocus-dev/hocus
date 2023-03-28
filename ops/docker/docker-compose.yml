@@ -52,6 +52,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - hocus_dev_net
     command: "start"
     build:
       dockerfile: keycloak-dev.Dockerfile

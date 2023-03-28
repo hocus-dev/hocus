@@ -20,8 +20,7 @@ tasks:
     # too much space to fit in the prebuild image. should be moved to prebuild
     # once we make prebuild image size configurable
     command: |
-      sudo ops/bin/dev/setup-agent-dependencies.sh
-      ops/bin/dev/run-worker.sh
+      sudo ops/bin/dev/setup-agent-dependencies.sh && ops/bin/dev/run-worker.sh
   - name: Temporal codec server
     init: |
       sleep 0.01
