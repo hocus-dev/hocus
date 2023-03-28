@@ -32,6 +32,7 @@ export const RepoSshKeyCard = (props: { publicKey: string }): JSX.Element => {
       }
       setIsCopied(true);
     } catch (e) {
+      // eslint-disable-next-line no-console
       console.error(e);
       setIsCopyError(true);
     }
@@ -40,19 +41,18 @@ export const RepoSshKeyCard = (props: { publicKey: string }): JSX.Element => {
   return (
     <div className="text-gray-400 text-sm">
       <Card>
-        <h4>
-          <span>
-            If the repository requires authentication, please give the following public SSH key read
-            access. If the repository is public, the key must be made known to the provider.{" "}
-            <a
-              className="underline hover:text-gray-300"
-              target="_blank noopener noreferrer"
-              href="https://docs.github.com/en/developers/overview/managing-deploy-keys#deploy-keys"
-            >
-              On GitHub you can for example add it to another repository's deploy keys.
-            </a>
-          </span>
-        </h4>
+        <h2 className="text-white text-lg font-bold">Connect Git Repository</h2>
+        <p>
+          Please give the following public SSH key read access to the repository. If the repository
+          is public, the key must be made known to the provider.{" "}
+          <a
+            className="underline hover:text-gray-300"
+            target="_blank noopener noreferrer"
+            href="https://docs.github.com/en/developers/overview/managing-deploy-keys#deploy-keys"
+          >
+            On GitHub you can for example add it to another repository's deploy keys.
+          </a>
+        </p>
         <button
           onClick={copyPublicKeyToClipboard}
           tabIndex={-1}
