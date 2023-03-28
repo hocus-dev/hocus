@@ -15,8 +15,12 @@ tasks:
       npm run dev
   - name: Agent
     init: |
-      sudo ops/bin/dev/setup-agent-dependencies.sh
+      sleep 0.01
+    # we are setting up agent-dependencies in the workspace because they take up
+    # too much space to fit in the prebuild image. should be moved to prebuild
+    # once we make prebuild image size configurable
     command: |
+      sudo ops/bin/dev/setup-agent-dependencies.sh
       ops/bin/dev/run-worker.sh
   - name: Temporal codec server
     init: |
