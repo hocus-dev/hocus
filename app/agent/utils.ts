@@ -53,7 +53,7 @@ export const execCmdWithOpts = (
  * AcceptEnv *
  * ```
  *
- * See https://github.com/hugodutka/rooms/blob/3fad5769181f9117896d53885afa9b18af3146d0/resources/docker/fetchrepo.Dockerfile#L24-L25
+ * See https://github.com/hocus-dev/hocus/blob/3fad5769181f9117896d53885afa9b18af3146d0/resources/docker/fetchrepo.Dockerfile#L24-L25
  * for an example in a Dockerfile.
  */
 export const execSshCmd = async (
