@@ -8,6 +8,7 @@ import { createVSCodeURI } from "~/workspace/utils";
 import type { WorkspaceInfo } from "~/workspace/workspace.service";
 
 import { DeleteWorkspaceButton } from "./delete-workspace-btn";
+import { MissingPublicKeysMessage } from "./missing-public-keys-message";
 import { StartWorkspaceButton } from "./start-workspace-btn";
 import { StopWorkspaceButton } from "./stop-workspace-btn";
 import { WorkspaceStatusComponent } from "./workspace-status";
@@ -77,7 +78,7 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
       <Spinner size="lg" color={spinnerColor[status]} />
     </div>
   );
-  const lowerPart: Record<WorkspaceStatus, JSX.Element> = {
+  const lowerPartByStatus: Record<WorkspaceStatus, JSX.Element> = {
     WORKSPACE_STATUS_STARTED: (
       <>
         <div className="text-sm text-gray-400 text-center mt-6">
@@ -109,6 +110,11 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
     WORKSPACE_STATUS_PENDING_STOP: spinner,
     WORKSPACE_STATUS_PENDING_DELETE: spinner,
   };
+  const lowerPart = workspace.missingSshKeys ? (
+    <MissingPublicKeysMessage />
+  ) : (
+    lowerPartByStatus[status]
+  );
   return (
     <Card className="w-[28rem] max-w-xl">
       <div>
@@ -131,7 +137,7 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
             </div>
           ))}
         </div>
-        {lowerPart[status]}
+        {lowerPart}
       </div>
     </Card>
   );

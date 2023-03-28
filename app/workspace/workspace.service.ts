@@ -20,6 +20,7 @@ export interface WorkspaceInfo {
   };
   agentHostname: string;
   workspaceHostname?: string;
+  missingSshKeys: boolean;
   lastOpenedAt: number;
   createdAt: number;
 }
@@ -55,6 +56,9 @@ export class WorkspaceService {
         prebuildEvent: {
           include: { project: true, gitObject: true },
         },
+        user: {
+          include: { sshPublicKeys: true },
+        },
         gitBranch: true,
         activeInstance: true,
       },
@@ -80,6 +84,7 @@ export class WorkspaceService {
       workspaceHostname: workspace.activeInstance?.vmIp,
       lastOpenedAt: workspace.lastOpenedAt.getTime(),
       createdAt: workspace.createdAt.getTime(),
+      missingSshKeys: workspace.user.sshPublicKeys.length === 0,
     };
   }
 }
