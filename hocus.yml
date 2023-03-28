@@ -2,7 +2,7 @@ image:
   file: hocus.Dockerfile
   buildContext: ./
 tasks:
-  - name: Agent+CP dev-env setup
+  - name: Control Plane
     init: |
       yarn install
       npm run dev-prebuild
@@ -13,6 +13,11 @@ tasks:
       ops/bin/up.sh
       ops/bin/temporal-up.sh
       npm run dev
+  - name: Agent
+    init: |
+      sudo ops/bin/dev/setup-agent-dependencies.sh
+    command: |
+      ops/bin/dev/run-worker.sh
   - name: Temporal codec server
     init: |
       sleep 0.01
