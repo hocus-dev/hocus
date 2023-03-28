@@ -12,7 +12,7 @@ docker -v &>/dev/null
 if ! [[ $? -eq 0 ]]; then
   echo "Looks like docker is not installed 😭"
   echo "Try running one of the following commands to install it:"
-  echo "Ubuntu/Devian: curl https://get.docker.com/ | sudo bash -"
+  echo "Ubuntu/Debian: curl https://get.docker.com/ | sudo bash -"
   echo "Arch/Manjaro: sudo pacman -S docker"
   echo "Windows/macOS: buy/rent some 🐧🐧🐧"
   exit 1
