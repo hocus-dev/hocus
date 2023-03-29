@@ -210,12 +210,12 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
         : [
             buildfsEvent?.event.id ?? null,
             inspection.projectConfig.tasks.map((task) => ({
-              command: task.init,
+              command: task.prebuild,
               cwd: path.join(PREBUILD_REPOSITORY_DIR, project.rootDirectoryPath),
             })),
             inspection.projectConfig.tasks.map((task) => ({
-              commandShell: task.commandShell ?? "bash",
-              command: task.command,
+              commandShell: task.workspaceShell ?? "bash",
+              command: task.workspace,
             })),
           ];
     return {

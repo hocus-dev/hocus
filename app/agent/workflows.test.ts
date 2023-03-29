@@ -7,6 +7,7 @@ import type { LogEntry } from "@temporalio/worker";
 import { Worker, Runtime, DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "~/config";
+import { generateTemporalCodeBundle } from "~/temporal/bundle";
 import { printErrors } from "~/test-utils";
 import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { provideDb } from "~/test-utils/db.server";
@@ -58,7 +59,8 @@ const provideActivities = (
          * The tests will also work with a regular buildfs root fs,
          * but they will be slower.
          */
-        buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
+        // TODO: build it automatically in a Hocus prebuild
+        // buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
       }),
     },
   });
@@ -71,6 +73,7 @@ const provideActivities = (
 };
 
 let testEnv: TestWorkflowEnvironment;
+let workflowBundle: any;
 
 beforeAll(async () => {
   // Use console.log instead of console.error to avoid red output
@@ -98,6 +101,7 @@ beforeAll(async () => {
       },
     },
   });
+  workflowBundle = await generateTemporalCodeBundle();
 });
 
 afterAll(async () => {
@@ -131,6 +135,7 @@ test.concurrent(
       dataConverter: {
         payloadConverterPath: require.resolve("~/temporal/data-converter"),
       },
+      workflowBundle,
     });
 
     const gitService = injector.resolve(Token.GitService);
@@ -507,6 +512,7 @@ test.concurrent(
       dataConverter: {
         payloadConverterPath: require.resolve("~/temporal/data-converter"),
       },
+      workflowBundle,
     });
 
     await worker.runUntil(async () => {
