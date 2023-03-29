@@ -89,8 +89,8 @@ export class WorkspaceAgentService {
     await fs.copyFile(prebuildEventFiles.fsFile.path, workspace.rootFsFile.path);
     await fs.copyFile(prebuildEventFiles.projectFile.path, workspace.projectFile.path);
 
-    await this.agentUtilService.expandDriveImage(workspace.rootFsFile.path, 100000);
-    await this.agentUtilService.expandDriveImage(workspace.projectFile.path, 100000);
+    await this.agentUtilService.expandDriveImage(workspace.rootFsFile.path, 250000);
+    await this.agentUtilService.expandDriveImage(workspace.projectFile.path, 250000);
 
     await db.workspace.update({
       where: {
