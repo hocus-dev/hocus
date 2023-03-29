@@ -14,20 +14,16 @@
   <a href="https://hocus.dev/docs">Docs</a> - <a href="https://github.com/hocus-dev/hocus/issues/new?assignees=&labels=bug">Bug report</a>
 </p>
 
-## Hocus lets you spin up disposable development environments on your own servers
+**Hocus** is a self-hosted application that spins up ready-to-code, disposable development environments on your own servers in seconds. You define your dev environments as code and launch them instantly from your browser.
 
-- Save time with prebuilds - stop waiting for code to compile and dependencies to install;
-- Specify your development environment as code;
-- Onboard new team members faster;
-- Securely share a powerful machine among multiple users with ease;
-- Self-hosted alternative to Gitpod and Github Codespaces.
+Hocus is integrated with any Git provider that supports the SSH protocol, like GitHub, GitLab, BitBucket, or Gitea. It prebuilds dev environments on every commit for all branches like a CI system, enabling your team members to start coding with fresh, fully-configured dev environments instantly. Whether you're fixing a bug, building a new feature, or conducting a code review, Hocus has you covered.
 
 ## Features
 
 ![hocus-demo-3](https://user-images.githubusercontent.com/28019628/227723898-09a9ac73-ab36-4fb2-a008-ce81e047bb7a.gif)
 
-- **Workspaces** - Say goodbye to messy local development environments! Hocus offers disposable development environments powered by [Firecracker](https://github.com/firecracker-microvm/firecracker) micro VMs, so you can have a consistent and clean setup every time.
-- **Prebuilds** - Waiting for dependencies to download and code to compile is a thing of the past. Hocus continuously builds your project like a CI system, so you can focus on coding rather than waiting.
+- **Workspaces** - disposable, fully-configured development environments powered by [Firecracker](https://github.com/firecracker-microvm/firecracker) micro VMs, defined as code.
+- **Prebuilds** - Hocus continuously builds your project like a CI system, so you can spin up a fresh dev environment in seconds and focus on coding rather than waiting.
 - **Project Environment Variables** - Declare shared environment variables for your entire team, making collaboration easier.
 - **VSCode Integration** - Connect to workspaces over SSH automatically with your local VSCode editor.
 - **Full Root Access** - Unlike Docker containers, Hocus workspaces are full-fledged VMs, giving you full control over your environment. You can use Docker and nested KVM, run [LocalStack](https://github.com/localstack/localstack), or even deploy [Kubernetes](https://github.com/kubernetes/kubernetes);
