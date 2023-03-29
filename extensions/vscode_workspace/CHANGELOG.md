@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.5
+
+- Update the hocus.yml schema
+
 ## 0.0.4
 
 - Extensions are now installed via the Vscode CLI

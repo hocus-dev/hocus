@@ -1,19 +1,27 @@
 {
   "name": "hocus-remote",
   "publisher": "hocus",
-  "homepage": "https://hocus.dev",
   "maintainers": [
     "gorbak25"
   ],
-  "preview": true,
   "displayName": "Hocus Remote",
   "description": "Vscode Hocus integration",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "engines": {
     "vscode": "^1.75.0"
   },
   "pricing": "Free",
   "license": "MIT",
+  "homepage": "https://hocus.dev",
+  "bugs": {
+    "url": "https://github.com/hocus-dev/hocus/issues",
+    "email": "founders@hocus.dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hocus-dev/hocus.git",
+    "directory": "extensions/vscode_workspace"
+  },
   "categories": [
     "Other"
   ],
