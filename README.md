@@ -49,11 +49,11 @@ HOCUS_HOSTNAME="localhost" ops/bin/local-up.sh
 
 It will bring up:
 
-- the Hocus control plane, a [Remix](https://github.com/remix-run/remix) application
-- [Temporal](https://temporal.io/), which is a workflow engine
-- the Hocus agent, which is a Temporal worker
-- [Postgres](https://www.postgresql.org/)
-- [Keycloak](https://www.keycloak.org/), for authentication
+- the Hocus control plane, a [Remix](https://github.com/remix-run/remix) application;
+- [Temporal](https://temporal.io/), which is a workflow engine;
+- the Hocus agent, which is a Temporal worker;
+- [Postgres](https://www.postgresql.org/);
+- [Keycloak](https://www.keycloak.org/), for authentication.
 
 You can run `ops/bin/local-cleanup.sh` to remove Hocus from your system completely. Check out our [quickstart](https://hocus.dev/docs/installation/quickstart) for next steps and more information about managing your deployment.
 
