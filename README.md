@@ -32,7 +32,13 @@ Hocus is integrated with any Git provider that supports the SSH protocol, like G
 
 ## Get Started
 
-The following commands will set up Hocus on your local machine with `docker-compose`. Only x86_64 Linux is supported.
+### Requirements
+
+- x86_64 Linux
+- KVM support on the host
+- Docker, Docker Compose, and Buildx
+
+That's it! Hocus is fully containerized and won't install anything directly on your host system. The following script will check if your system meets the requirements, prompt you to install any missing dependencies, and set up Hocus with `docker-compose`.
 
 ```bash
 git clone https://github.com/hocus-dev/hocus.git
@@ -40,7 +46,15 @@ cd hocus
 HOCUS_HOSTNAME="localhost" ops/bin/local-up.sh
 ```
 
-Check out our [documentation](https://hocus.dev/docs/installation/quickstart) for more information about managing your deployment.
+It will bring up:
+
+- the Hocus control plane, a [Remix](https://github.com/remix-run/remix) application
+- [Temporal](https://temporal.io/), which is a workflow engine
+- the Hocus agent, which is a Temporal worker
+- [Postgres](https://www.postgresql.org/)
+- [Keycloak](https://www.keycloak.org/), for authentication
+
+You can run `ops/bin/local-cleanup.sh` to remove Hocus from your system completely. Check out our [quickstart](https://hocus.dev/docs/installation/quickstart) for next steps and more information about managing your deployment.
 
 ## Current State of Hocus
 - Hocus is currently in **alpha**, but it's already useful for personal use. We are using Hocus to develop Hocus, but we don't recommend you deploy it for your team at work yet.
