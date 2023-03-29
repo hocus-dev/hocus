@@ -32,7 +32,7 @@ Hocus is integrated with any Git provider that supports the SSH protocol, like G
 
 ## Get Started
 
-The following commands will set up Hocus on your local machine with `docker-compose`. Only x86 Linux is supported.
+The following commands will set up Hocus on your local machine with `docker-compose`. Only x86_64 Linux is supported.
 
 ```bash
 git clone https://github.com/hocus-dev/hocus.git
