@@ -2,17 +2,17 @@ import { Type as t } from "@sinclair/typebox";
 
 export const TaskSchema = t.Object({
   name: t.String({ minLength: 1, maxLength: 255, description: "Name of the task" }),
-  init: t.String({
+  prebuild: t.String({
     minLength: 1,
     description: "Shell command to run during the prebuild phase. For now always runs in bash",
   }),
-  commandShell: t.Optional(
+  workspaceShell: t.Optional(
     t.Union([t.Literal("bash"), t.Literal("zsh"), t.Literal("ash"), t.Literal("fish")], {
       default: "bash",
       description: "The shell the workspace command will be executed in",
     }),
   ),
-  command: t.String({
+  workspace: t.String({
     minLength: 1,
     description: "Shell command to run after the workspace is started",
   }),
