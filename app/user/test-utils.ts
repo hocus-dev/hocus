@@ -11,9 +11,10 @@ export const createTestUser = async (
     gitConfig: UserGitConfig;
   }
 > => {
-  return await db.user.create({
+  return db.user.create({
     data: {
       externalId: uuidv4(),
+      active: true,
       sshPublicKeys: {
         create: {
           name: "Test",
