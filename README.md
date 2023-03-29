@@ -36,6 +36,7 @@ Hocus is integrated with any Git provider that supports the SSH protocol, like G
 
 - x86_64 Linux
 - KVM support on the host
+- Git and Git LFS
 - Docker, Docker Compose, and Buildx
 
 That's it! Hocus is fully containerized and won't install anything directly on your host system. The following script will check if your system meets the requirements, prompt you to install any missing dependencies, and set up Hocus with `docker-compose`.
