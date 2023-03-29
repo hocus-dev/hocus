@@ -1,8 +1,9 @@
-import { METADATA_ENCODING_KEY, encodingKeys, encodingTypes } from "@temporalio/common";
+/* eslint-disable no-console */
+import { METADATA_ENCODING_KEY, encodingKeys } from "@temporalio/common";
 import type * as proto from "@temporalio/proto";
+import { EJSON } from "bson";
 import cors from "cors";
 import express from "express";
-import { EJSON } from "bson";
 import { CborXDataConverter } from "~/temporal/data-converter";
 
 type ProtoPayload = proto.temporal.api.common.v1.IPayload;
