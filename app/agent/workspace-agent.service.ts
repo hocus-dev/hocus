@@ -305,6 +305,9 @@ export class WorkspaceAgentService {
           }
           await execSshCmd({ ssh }, ["ln", "-sf", cfg[1], WORKSPACE_CONFIG_SYMLINK_PATH]);
 
+          // In case the VM gets OOM there will be a stale socket during startup
+          await execSshCmd({ ssh }, ["rm", "-fv", dtachSocketPath]);
+
           await execSshCmd({ ssh }, [
             "tmux",
             "new",
