@@ -61,6 +61,16 @@ if ! [[ $? -eq 0 ]]; then
   exit 1
 fi
 
+# Check if loop devices are available - otherwise building the base vm will fail!
+if ! { [[ -c "/dev/loop-control" ]] || [[ -c "/dev/loop" ]] || [[ -b "/dev/loop0" ]];  } then
+  echo "Looks like loop devices are not available on this machine 😭"
+  echo "Try running one of the following commands to enable them:"
+  echo "Ubuntu/Devian: sudo modprobe loop"
+  echo "Arch/Manjaro: sudo modprobe loop"
+  echo "Windows/macOS: buy/rent some 🐧🐧🐧"
+  exit 1
+fi
+
 # Check if the kernel is new enough
 KERNEL_SEMVER=$(uname -r)
 KERNEL_MAJOR=$(echo $KERNEL_SEMVER | cut -d. -f1)
