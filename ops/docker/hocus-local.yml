@@ -9,7 +9,6 @@ services:
   setup-vm-images:
     # We need to mount images and have access to the docker daemon
     # TODO: build images in kaniko and export tarballs using virt-make-fs
-    # TODO: This is 5.10 kernel, change the name
     privileged: true
     build:
       dockerfile: ops/docker/setup.Dockerfile
