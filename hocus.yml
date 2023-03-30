@@ -7,8 +7,8 @@ tasks:
       yarn install
       npm run dev-prebuild
       ops/bin/prepare.sh
-    commandShell: fish
-    command: |
+    workspaceShell: fish
+    workspace: |
       ops/bin/link.sh
       ops/bin/up.sh
       ops/bin/temporal-up.sh
@@ -19,21 +19,21 @@ tasks:
     # we are setting up agent-dependencies in the workspace because they take up
     # too much space to fit in the prebuild image. should be moved to prebuild
     # once we make prebuild image size configurable
-    commandShell: fish
-    command: |
+    workspaceShell: fish
+    workspace: |
       sudo ops/bin/dev/setup-agent-dependencies.sh
       ops/bin/dev/run-worker.sh
   - name: Temporal codec server
     prebuild: |
       sleep 0.01
-    commandShell: fish
-    command: |
+    workspaceShell: fish
+    workspace: |
       ops/bin/link.sh
       PORT=1337 npx ts-node entrypoints/codec-server.ts
   - name: Terminal
     prebuild: sleep 0.01
-    commandShell: fish
-    command: sleep 0.01
+    workspaceShell: fish
+    workspace: sleep 0.01
 vscode:
   extensions:
     - Prisma.prisma
