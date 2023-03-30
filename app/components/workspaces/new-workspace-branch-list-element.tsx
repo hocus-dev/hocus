@@ -1,4 +1,4 @@
-import { Flowbite, Tooltip } from "flowbite-react";
+import { Tooltip } from "flowbite-react";
 import { getPrebuildPath } from "~/page-paths.shared";
 import { unwrap } from "~/utils.shared";
 
@@ -39,11 +39,14 @@ export const NewWorkspaceBranchListElement = (props: {
       <p>{props.branch.name}</p>
       <div className="flex items-center gap-4">
         {isOngoingAndFinished && (
-          <Flowbite theme={{ theme: { tooltip: { target: "h-full" } } }}>
-            <Tooltip className="drop-shadow max-w-[14rem]" placement="top" content={tooltipText}>
-              {ongoingPrebuildText}
-            </Tooltip>
-          </Flowbite>
+          <Tooltip
+            theme={{ target: "h-full" }}
+            className="drop-shadow max-w-[14rem]"
+            placement="top"
+            content={tooltipText}
+          >
+            {ongoingPrebuildText}
+          </Tooltip>
         )}
         {isOngoingButNotFinished && ongoingPrebuildText}
         {props.finishedPrebuild && (

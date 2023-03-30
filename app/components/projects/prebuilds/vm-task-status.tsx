@@ -1,5 +1,5 @@
 import type { VmTaskStatus } from "@prisma/client";
-import { Flowbite, Tooltip } from "flowbite-react";
+import { Tooltip } from "flowbite-react";
 import { match } from "ts-pattern";
 
 export function VmTaskStatusComponent(props: { status: VmTaskStatus }): JSX.Element {
@@ -12,10 +12,8 @@ export function VmTaskStatusComponent(props: { status: VmTaskStatus }): JSX.Elem
     .exhaustive();
 
   return (
-    <Flowbite theme={{ theme: { tooltip: { target: "inline" } } }}>
-      <Tooltip content={text}>
-        <i className={`${color} ${icon}`}></i>
-      </Tooltip>
-    </Flowbite>
+    <Tooltip theme={{ target: "inline" }} content={text}>
+      <i className={`${color} ${icon}`}></i>
+    </Tooltip>
   );
 }

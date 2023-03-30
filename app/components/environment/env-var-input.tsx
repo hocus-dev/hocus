@@ -1,4 +1,4 @@
-import { TextInput, Button, Tooltip, Flowbite } from "flowbite-react";
+import { TextInput, Button, Tooltip } from "flowbite-react";
 import React, { useEffect } from "react";
 import { useCallback, useState } from "react";
 import {
@@ -82,18 +82,21 @@ const EnvVarInputComponent = (props: {
         />
         {edited && !deleted && (
           <div className="h-full flex justify-center items-center ml-4">
-            <Flowbite theme={{ theme: { tooltip: { target: "h-full" } } }}>
-              <Tooltip className="drop-shadow" placement="top" content="Reset">
-                <Button
-                  onClick={onReset}
-                  aria-label="reset variable"
-                  color="gray"
-                  className="min-h-full"
-                >
-                  <i className="fa-solid fa-eraser"></i>
-                </Button>
-              </Tooltip>
-            </Flowbite>
+            <Tooltip
+              theme={{ target: "h-full" }}
+              className="drop-shadow"
+              placement="top"
+              content="Reset"
+            >
+              <Button
+                onClick={onReset}
+                aria-label="reset variable"
+                color="gray"
+                className="min-h-full"
+              >
+                <i className="fa-solid fa-eraser"></i>
+              </Button>
+            </Tooltip>
           </div>
         )}
       </div>
