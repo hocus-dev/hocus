@@ -3,9 +3,9 @@ image:
   buildContext: ../../
 tasks:
   - name: Terminal
-    init: sleep 0.01
-    commandShell: fish
-    command: yarn
+    prebuild: sleep 0.01
+    workspaceShell: fish
+    workspace: yarn
 vscode:
   extensions:
     - Prisma.prisma

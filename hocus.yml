@@ -3,7 +3,7 @@ image:
   buildContext: ./
 tasks:
   - name: Control Plane
-    init: |
+    prebuild: |
       yarn install
       npm run dev-prebuild
       ops/bin/prepare.sh
@@ -14,7 +14,7 @@ tasks:
       ops/bin/temporal-up.sh
       npm run dev
   - name: Agent
-    init: |
+    prebuild: |
       sleep 0.01
     # we are setting up agent-dependencies in the workspace because they take up
     # too much space to fit in the prebuild image. should be moved to prebuild
@@ -24,14 +24,14 @@ tasks:
       sudo ops/bin/dev/setup-agent-dependencies.sh
       ops/bin/dev/run-worker.sh
   - name: Temporal codec server
-    init: |
+    prebuild: |
       sleep 0.01
     commandShell: fish
     command: |
       ops/bin/link.sh
       PORT=1337 npx ts-node entrypoints/codec-server.ts
   - name: Terminal
-    init: sleep 0.01
+    prebuild: sleep 0.01
     commandShell: fish
     command: sleep 0.01
 vscode:
