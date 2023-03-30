@@ -37,6 +37,11 @@
       "localPort": 8080,
       "name": "temporal-ui",
       "remotePort": 8080
+    },
+    {
+      "localPort": 8822,
+      "name": "hocus-agent-ssh",
+      "remotePort": 8822
     }
   ],
   "emeraldwalk.runonsave": {
