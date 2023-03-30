@@ -50,6 +50,17 @@ if ! [[ $? -eq 0 ]]; then
   exit 1
 fi
 
+# Check if git lfs is installed on the platform :)
+git lfs &>/dev/null
+if ! [[ $? -eq 0 ]]; then
+  echo "Looks like git lfs is not installed 😭"
+  echo "Try running one of the following commands to install it:"
+  echo "Ubuntu/Devian: sudo apt-get install git-lfs"
+  echo "Arch/Manjaro: sudo pacman -S git-lfs"
+  echo "Windows/macOS: buy/rent some 🐧🐧🐧"
+  exit 1
+fi
+
 # Check if the kernel is new enough
 KERNEL_SEMVER=$(uname -r)
 KERNEL_MAJOR=$(echo $KERNEL_SEMVER | cut -d. -f1)
@@ -79,7 +90,7 @@ if [[ ! -v HOCUS_HOSTNAME ]]; then
 fi
 
 if [[ $(file --mime-type -b ${REPO_DIR}/public/user-icon.jpg) == text/plain ]]; then
-  echo "You forgot to checkout the assets in LFS. Running it for you..."
+  echo "Checking out Git LFS assets"
   git lfs install
   git lfs fetch --all
   git lfs pull
