@@ -33,7 +33,7 @@ docker buildx version &>/dev/null
 if ! [[ $? -eq 0 ]]; then
   echo "Looks like buildx is not installed 😭"
   echo "Try running one of the following commands to install it:"
-  echo "Ubuntu/Devian: sudo apt-get install docker-buildx-plugin"
+  echo "Ubuntu/Debian: sudo apt-get install docker-buildx-plugin"
   echo "Arch/Manjaro: sudo pacman -S docker-buildx"
   echo "Windows/macOS: buy/rent some 🐧🐧🐧"
   exit 1
@@ -44,7 +44,7 @@ docker compose version &>/dev/null
 if ! [[ $? -eq 0 ]]; then
   echo "Looks like docker compose is not installed 😭"
   echo "Try running one of the following commands to install it:"
-  echo "Ubuntu/Devian: sudo apt-get install docker-compose-plugin"
+  echo "Ubuntu/Debian: sudo apt-get install docker-compose-plugin"
   echo "Arch/Manjaro: sudo pacman -S docker-compose"
   echo "Windows/macOS: buy/rent some 🐧🐧🐧"
   exit 1
@@ -55,7 +55,7 @@ git lfs &>/dev/null
 if ! [[ $? -eq 0 ]]; then
   echo "Looks like git lfs is not installed 😭"
   echo "Try running one of the following commands to install it:"
-  echo "Ubuntu/Devian: sudo apt-get install git-lfs"
+  echo "Ubuntu/Debian: sudo apt-get install git-lfs"
   echo "Arch/Manjaro: sudo pacman -S git-lfs"
   echo "Windows/macOS: buy/rent some 🐧🐧🐧"
   exit 1
@@ -65,7 +65,7 @@ fi
 if ! { [[ -c "/dev/loop-control" ]] || [[ -c "/dev/loop" ]] || [[ -b "/dev/loop0" ]];  } then
   echo "Looks like loop devices are not available on this machine 😭"
   echo "Try running one of the following commands to enable them:"
-  echo "Ubuntu/Devian: sudo modprobe loop"
+  echo "Ubuntu/Debian: sudo modprobe loop"
   echo "Arch/Manjaro: sudo modprobe loop"
   echo "Windows/macOS: buy/rent some 🐧🐧🐧"
   exit 1
