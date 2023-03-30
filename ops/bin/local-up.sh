@@ -219,12 +219,13 @@ fi
 start_service () {
   echo -n "Starting $2"
   T0=$(date +%s%N | cut -b1-13)
-  $REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps $1 2> /dev/null
+  DOCKER_UP_LOGS=$($REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps $1 2>&1)
   if ! [[ $? -eq 0 ]]; then
     T1=$(date +%s%N | cut -b1-13)
     DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
     echo -e "\r\033[KStarting $2 - ❌ in $DT\n"
 
+    echo -e "$DOCKER_UP_LOGS" | grep -v "variable is not set" | grep --color -E '^|Bind for.*failed'
     $REPO_DIR/ops/bin/local-cmd.sh logs $1 2> /dev/null
     echo -e "\nAbove you will find the logs"
     fatal_error
