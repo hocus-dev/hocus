@@ -9,7 +9,7 @@ const HOCUS_PROJECT_LOCATION = "/home/hocus/dev/project";
 async function ensureSupportedPlatform() {
   const platform = os.platform();
 
-  if (platform !== "linux" && platform !== "darwin") {
+  if (platform !== "linux" && platform !== "darwin" && platform !== "win32") {
     vscode.window.showInformationMessage(`Unsupported platform ${platform} - TODO!`);
     throw new Error("Nope");
   }
@@ -186,7 +186,7 @@ Host ${workspaceName}.hocus.dev
         await
           vscode.commands.executeCommand(
             "vscode.openFolder",
-            vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev${path.join(HOCUS_PROJECT_LOCATION, workspaceRoot as string)}`),
+            vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev${path.posix.join(HOCUS_PROJECT_LOCATION, workspaceRoot as string)}`),
             { forceNewWindow: shouldOpenWorkspaceInNewWindow(), noRecentEntry: true }
           );
       })
