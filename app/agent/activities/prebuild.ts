@@ -71,6 +71,8 @@ export const prebuild: CreateActivity<PrebuildActivity> =
             guestMountPath: prebuildService.devDir,
           },
         ],
+        memSizeMib: prebuildEvent.project.maxPrebuildRamMib,
+        vcpuCount: prebuildEvent.project.maxPrebuildVCPUCount,
       },
       async ({ ssh, sshConfig }) => {
         const envScript = agentUtilService.generateEnvVarsScript(envVariables);

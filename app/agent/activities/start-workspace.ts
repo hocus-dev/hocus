@@ -98,6 +98,8 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
         username: workspace.user.gitConfig.gitUsername,
       },
       branchName: formatBranchName(workspace.gitBranch.name),
+      memSizeMib: workspace.prebuildEvent.project.maxWorkspaceRamMib,
+      vcpuCount: workspace.prebuildEvent.project.maxWorkspaceVCPUCount,
     });
     const t4 = performance.now();
     logger.info(`Starting workspace took: ${(t4 - t3).toFixed(2)} ms`);

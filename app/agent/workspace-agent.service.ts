@@ -162,6 +162,8 @@ export class WorkspaceAgentService {
         rootFsPath: this.agentConfig.checkoutAndInspectRootFs,
         copyRootFs: true,
         extraDrives: [{ pathOnHost: filesystemDrivePath, guestMountPath: workdir }],
+        memSizeMib: 2048,
+        vcpuCount: 2,
       },
       async ({ ssh }) => {
         await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
@@ -241,6 +243,8 @@ export class WorkspaceAgentService {
     userGitConfig: { username: string; email: string };
     /** Without the `refs/heads/` prefix. */
     branchName: string;
+    memSizeMib: number;
+    vcpuCount: number;
   }): Promise<{
     firecrackerProcessPid: number;
     vmIp: string;
@@ -262,6 +266,8 @@ export class WorkspaceAgentService {
         rootFsPath: args.filesystemDrivePath,
         extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: WORKSPACE_DEV_DIR }],
         shouldPoweroff: false,
+        memSizeMib: args.memSizeMib,
+        vcpuCount: args.vcpuCount,
       },
       async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
         const taskFn = async (

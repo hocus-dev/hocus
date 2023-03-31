@@ -1,7 +1,6 @@
 import { spawn } from "child_process";
 import fs from "fs";
 import fsAsync from "fs/promises";
-import os from "os";
 import path from "path";
 
 import type { DefaultLogger } from "@temporalio/worker";
@@ -291,6 +290,8 @@ export class FirecrackerService {
      * If set to to `true`, the root fs will be copied instead.
      * */
     copyRootFs?: boolean;
+    memSizeMib: number;
+    vcpuCount: number;
   }): Promise<FullVmConfiguration> {
     const mask = new Netmask(`255.255.255.255/${cfg.tapDeviceCidr}`).mask;
     const ipArg = `ip=${cfg.vmIp}::${cfg.tapDeviceIp}:${mask}::eth0:off`;
@@ -343,10 +344,8 @@ export class FirecrackerService {
     });
     await this.api.putMachineConfiguration({
       body: {
-        // TODO: Make this configurable depending on the job, for now use all the cores
-        vcpuCount: os.cpus().length,
-        // And up to 80% of the RAM
-        memSizeMib: +((os.totalmem() / 1024 / 1024) * 0.8).toFixed(0),
+        vcpuCount: cfg.vcpuCount,
+        memSizeMib: cfg.memSizeMib,
         smt: true,
       },
     });
@@ -431,6 +430,8 @@ export class FirecrackerService {
       shouldPoweroff?: boolean;
       /** Defaults to true. */
       removeVmDirAfterPoweroff?: boolean;
+      memSizeMib: number;
+      vcpuCount: number;
     },
     fn: (args: {
       ssh: NodeSSH;
@@ -475,6 +476,8 @@ export class FirecrackerService {
           isReadOnly: false,
           isRootDevice: false,
         })),
+        memSizeMib: config.memSizeMib,
+        vcpuCount: config.vcpuCount,
       });
       vmStarted = true;
       const t3 = performance.now();

@@ -33,6 +33,14 @@ export class ProjectService {
         rootDirectoryPath: args.rootDirectoryPath,
         environmentVariableSetId: environmentVariableSet.id,
         name: args.name,
+        maxPrebuildRamMib: 4096,
+        maxPrebuildVCPUCount: 4,
+        maxWorkspaceRamMib: 8192,
+        maxWorkspaceVCPUCount: 8,
+        maxWorkspaceProjectDriveSizeMib: 256000,
+        maxWorkspaceRootDriveSizeMib: 256000,
+        maxPrebuildProjectDriveSizeMib: 4096,
+        maxPrebuildRootDriveSizeMib: 4096,
       },
     });
   }

@@ -330,6 +330,8 @@ export class PrebuildService {
           rootFsPath: this.agentConfig.checkoutAndInspectRootFs,
           copyRootFs: true,
           extraDrives: [{ pathOnHost: args.outputDrivePath, guestMountPath: workdir }],
+          memSizeMib: 4096,
+          vcpuCount: 2,
         },
         async ({ ssh }) => {
           const repoPath = `${workdir}/project`;

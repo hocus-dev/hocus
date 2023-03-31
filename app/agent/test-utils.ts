@@ -37,6 +37,8 @@ export const withTestMount = async <T>(
           guestMountPath: mountPath,
         },
       ],
+      memSizeMib: 1024,
+      vcpuCount: 1,
     },
     async ({ ssh }) => {
       return await fn(ssh, mountPath);

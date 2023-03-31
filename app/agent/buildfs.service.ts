@@ -296,6 +296,8 @@ export class BuildfsService {
             { pathOnHost: outputFile.path, guestMountPath: this.outputDir },
             { pathOnHost: projectFile.path, guestMountPath: this.inputDir },
           ],
+          memSizeMib: buildfsEvent.project.maxPrebuildRamMib,
+          vcpuCount: buildfsEvent.project.maxPrebuildVCPUCount,
         },
         async ({ ssh, sshConfig }) => {
           const workdir = "/tmp/workdir";

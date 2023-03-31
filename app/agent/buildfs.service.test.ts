@@ -90,6 +90,8 @@ test.concurrent(
         kernelPath: agentConfig.defaultKernel,
         rootFsPath: agentConfig.checkoutAndInspectRootFs,
         copyRootFs: true,
+        memSizeMib: 1024,
+        vcpuCount: 1,
       },
       async ({ ssh }) => {
         await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/foo"]);

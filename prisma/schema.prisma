@@ -283,6 +283,14 @@ model Project {
   environmentVariableSetId                BigInt
   environmentVariableSet                  EnvironmentVariableSet @relation(fields: [environmentVariableSetId], references: [id])
   archivablePrebuildsMonitoringWorkflowId String                 @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  maxPrebuildRamMib                       Int
+  maxPrebuildVCPUCount                    Int
+  maxWorkspaceRamMib                      Int
+  maxWorkspaceVCPUCount                   Int
+  maxWorkspaceProjectDriveSizeMib         Int
+  maxWorkspaceRootDriveSizeMib            Int
+  maxPrebuildProjectDriveSizeMib          Int
+  maxPrebuildRootDriveSizeMib             Int
 
   createdAt                         DateTime                            @default(now()) @db.Timestamptz(3)
   prebuildEvents                    PrebuildEvent[]

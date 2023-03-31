@@ -87,6 +87,8 @@ test.concurrent(
         rootFsPath: agentConfig.fetchRepositoryRootFs,
         copyRootFs: true,
         removeVmDirAfterPoweroff: false,
+        memSizeMib: 1024,
+        vcpuCount: 1,
       },
       async () => {
         return await fcService.getVMInfo();
