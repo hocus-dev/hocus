@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.5
+
+- Vscode on Windows may now connect to Hocus workspaces
+
 ## 0.0.4
 
 - Sideload the remote part of the extension on ssh connect
