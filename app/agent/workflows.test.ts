@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import type { PrebuildEvent, Prisma } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
@@ -14,7 +15,7 @@ import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
-import { groupBy, unwrap, waitForPromises, formatBranchName } from "~/utils.shared";
+import { groupBy, unwrap, waitForPromises, formatBranchName, numericSort } from "~/utils.shared";
 
 import type { Activities } from "./activities/list";
 import { createActivities } from "./activities/list";
@@ -94,7 +95,7 @@ beforeAll(async () => {
     }),
   });
 
-  testEnv = await TestWorkflowEnvironment.createTimeSkipping({
+  testEnv = await TestWorkflowEnvironment.createLocal({
     client: {
       dataConverter: {
         payloadConverterPath: require.resolve("~/temporal/data-converter"),
@@ -151,6 +152,7 @@ test.concurrent(
       gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
     );
     const updates = await agentGitService.updateBranches(db, repo.id);
+    console.log("branches updated");
     const projects = await db.$transaction((tdb) =>
       waitForPromises(
         [
@@ -232,6 +234,7 @@ test.concurrent(
         });
         prebuildEvents.push(...created);
       }
+      console.log("prebuild events created");
 
       await client.workflow.execute(runBuildfsAndPrebuilds, {
         workflowId: uuidv4(),
@@ -240,10 +243,15 @@ test.concurrent(
         args: [prebuildEvents.map((e) => e.id)],
       });
 
+      console.log("runBuildfsAndPrebuilds ended");
+
       for (const i of testBranches.keys()) {
         const branch = testBranches[i];
-        for (const { project, buildfsStatus, prebuildStatus } of testBranchExpectedResults[i]
-          .testCases) {
+        for (const {
+          project,
+          buildfsStatus,
+          prebuildStatus: expectedPrebuildStatus,
+        } of testBranchExpectedResults[i].testCases) {
           const prebuildEvents = await db.prebuildEvent.findMany({
             where: {
               gitObjectId: branch.gitObjectId,
@@ -259,7 +267,72 @@ test.concurrent(
           });
           expect(prebuildEvents.length).toBe(1);
           const prebuildEvent = prebuildEvents[0];
-          expect(prebuildEvent.status).toBe(prebuildStatus);
+          if (prebuildEvent.status !== expectedPrebuildStatus) {
+            const prebuildEventWithTasks = await db.prebuildEvent.findUniqueOrThrow({
+              where: {
+                id: prebuildEvent.id,
+              },
+              include: {
+                tasks: {
+                  include: {
+                    vmTask: {
+                      include: {
+                        logGroup: {
+                          include: {
+                            logs: {
+                              orderBy: {
+                                idx: "asc",
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            });
+            const vmTasks = prebuildEventWithTasks.tasks
+              .sort((a, b) => numericSort(a.idx, b.idx))
+              .map((t) => t.vmTask);
+            if (buildfsStatus != null) {
+              const buildfsEvent = await db.buildfsEvent.findUniqueOrThrow({
+                where: {
+                  id: unwrap(prebuildEvent.buildfsEventId),
+                },
+                include: {
+                  vmTask: {
+                    include: {
+                      logGroup: {
+                        include: {
+                          logs: {
+                            orderBy: {
+                              idx: "asc",
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              });
+              vmTasks.unshift(buildfsEvent.vmTask);
+            }
+            console.error(`Repository: ${repo.url}, root directory: ${project.rootDirectoryPath}`);
+            console.error(
+              `Expected prebuild event status ${expectedPrebuildStatus}, got ${prebuildEvent.status}`,
+            );
+            console.error(`Tasks:`);
+            for (const vmTask of vmTasks) {
+              console.error(`### ${vmTask.command} ###`);
+              console.error(`Status: ${vmTask.status}`);
+              if (vmTask.status === VmTaskStatus.VM_TASK_STATUS_ERROR) {
+                console.error(`Logs:`);
+                console.error(vmTask.logGroup.logs.map((l) => l.content).join());
+              }
+            }
+          }
+          expect(prebuildEvent.status).toBe(expectedPrebuildStatus);
           if (buildfsStatus != null) {
             expect(prebuildEvent.buildfsEvent?.vmTask?.status).toBe(buildfsStatus);
           } else {
@@ -290,6 +363,7 @@ test.concurrent(
         ),
       );
       const testUser = await createTestUser(db);
+      console.log("running create workspace");
       const workspace = await client.workflow.execute(runCreateWorkspace, {
         workflowId: uuidv4(),
         taskQueue: "test",
@@ -329,6 +403,7 @@ test.concurrent(
           cmd: cmdBash,
         });
       };
+      console.log("running workspace tests");
       const sshOutput = await execInInstance1("cat /home/hocus/dev/project/proxy-test.txt");
       expect(sshOutput.stdout.toString()).toEqual("hello from the tests repository!\n");
       const cdRepo = "cd /home/hocus/dev/project &&";
