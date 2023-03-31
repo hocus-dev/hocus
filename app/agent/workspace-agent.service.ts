@@ -61,6 +61,7 @@ export class WorkspaceAgentService {
         projectFile: true,
         prebuildEvent: {
           include: {
+            project: true,
             prebuildEventFiles: {
               include: {
                 projectFile: true,
@@ -89,8 +90,21 @@ export class WorkspaceAgentService {
     await fs.copyFile(prebuildEventFiles.fsFile.path, workspace.rootFsFile.path);
     await fs.copyFile(prebuildEventFiles.projectFile.path, workspace.projectFile.path);
 
-    await this.agentUtilService.expandDriveImage(workspace.rootFsFile.path, 250000);
-    await this.agentUtilService.expandDriveImage(workspace.projectFile.path, 250000);
+    const project = workspace.prebuildEvent.project;
+    const prevRootfsDriveSize = await this.agentUtilService.getFileSizeInMib(
+      workspace.rootFsFile.path,
+    );
+    const prevProjectDriveSize = await this.agentUtilService.getFileSizeInMib(
+      workspace.projectFile.path,
+    );
+    await this.agentUtilService.expandDriveImage(
+      workspace.rootFsFile.path,
+      Math.max(project.maxWorkspaceRootDriveSizeMib - prevRootfsDriveSize, 0),
+    );
+    await this.agentUtilService.expandDriveImage(
+      workspace.projectFile.path,
+      Math.max(project.maxWorkspaceProjectDriveSizeMib - prevProjectDriveSize, 0),
+    );
 
     await db.workspace.update({
       where: {

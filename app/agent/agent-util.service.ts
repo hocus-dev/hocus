@@ -1,4 +1,5 @@
 import fsSync from "fs";
+import fs from "fs/promises";
 import path from "path";
 
 import type { AgentInstance, Prisma, VmTask } from "@prisma/client";
@@ -312,5 +313,11 @@ export class AgentUtilService {
         externalId: SOLO_AGENT_INSTANCE_ID,
       },
     });
+  }
+
+  /** Rounds up. */
+  async getFileSizeInMib(filePath: string): Promise<number> {
+    const statOutput = await fs.stat(filePath);
+    return Math.ceil(statOutput.size / (1024 * 1024));
   }
 }

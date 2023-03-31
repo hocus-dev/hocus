@@ -255,7 +255,6 @@ export class BuildfsService {
     db: Prisma.NonTransactionClient;
     firecrackerService: FirecrackerService;
     buildfsEventId: bigint;
-    outputDriveMaxSizeMiB: number;
   }): Promise<{ buildSuccessful: boolean }> {
     const agentInstance = await args.db.$transaction((tdb) =>
       this.agentUtilService.getOrCreateSoloAgentInstance(tdb),
@@ -278,7 +277,11 @@ export class BuildfsService {
     const outputFile = files.outputFile;
     const projectFile = files.projectFile;
 
-    this.agentUtilService.createExt4Image(outputFile.path, args.outputDriveMaxSizeMiB, true);
+    this.agentUtilService.createExt4Image(
+      outputFile.path,
+      buildfsEvent.project.maxPrebuildRootDriveSizeMib,
+      true,
+    );
     const rootfsDrivePath = await this.getOrCreateRootFsDriveForProject(
       buildfsEvent.project.externalId,
     );

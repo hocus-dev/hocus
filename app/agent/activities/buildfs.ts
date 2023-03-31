@@ -5,7 +5,6 @@ import type { CreateActivity } from "./types";
 
 export type BuildfsActivity = (args: {
   buildfsEventId: bigint;
-  outputDriveMaxSizeMiB: number;
 }) => Promise<{ buildSuccessful: boolean }>;
 export const buildfs: CreateActivity<BuildfsActivity> =
   ({ injector, db }) =>

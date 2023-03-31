@@ -39,8 +39,7 @@ export class ProjectService {
         maxWorkspaceVCPUCount: 8,
         maxWorkspaceProjectDriveSizeMib: 256000,
         maxWorkspaceRootDriveSizeMib: 256000,
-        maxPrebuildProjectDriveSizeMib: 4096,
-        maxPrebuildRootDriveSizeMib: 4096,
+        maxPrebuildRootDriveSizeMib: 10000,
       },
     });
   }

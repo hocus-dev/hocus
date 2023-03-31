@@ -289,7 +289,6 @@ model Project {
   maxWorkspaceVCPUCount                   Int
   maxWorkspaceProjectDriveSizeMib         Int
   maxWorkspaceRootDriveSizeMib            Int
-  maxPrebuildProjectDriveSizeMib          Int
   maxPrebuildRootDriveSizeMib             Int
 
   createdAt                         DateTime                            @default(now()) @db.Timestamptz(3)

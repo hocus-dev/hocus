@@ -276,7 +276,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
 
 export async function runBuildfs(buildfsEventId: bigint): Promise<{ buildSuccessful: boolean }> {
   try {
-    return await buildfs({ buildfsEventId, outputDriveMaxSizeMiB: 10000 });
+    return await buildfs({ buildfsEventId });
   } catch (err) {
     logger.error(displayError(err));
     return { buildSuccessful: false };
