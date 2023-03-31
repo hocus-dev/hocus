@@ -6,4 +6,4 @@ RUN { curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --re
     && fish -c "set -U fish_user_paths \$fish_user_paths ~/.yarn/bin" \
     && sudo yarn global add @vscode/vsce yo generator-code ovsx
 RUN echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
-RUN curl -fsSL https://tailscale.com/install.sh | sh && systemctl enable tailscaled
+RUN curl -fsSL https://tailscale.com/install.sh | sh
