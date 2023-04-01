@@ -1,6 +1,6 @@
 ---
 name: "\U0001F44D User feedback"
-about: Say thanks or why you don't like
+about: Say thanks or what you don't like
 title: ""
 labels: ""
 assignees: ""
