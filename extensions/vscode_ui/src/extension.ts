@@ -1,3 +1,4 @@
+import * as child_process from "child_process";
 import * as fs from "fs-extra";
 import * as os from "os";
 import * as path from "path";
@@ -5,7 +6,6 @@ import * as vscode from "vscode";
 
 const HOCUS_PROJECT_LOCATION = "/home/hocus/dev/project";
 
-/* TODO: Windows support */
 async function ensureSupportedPlatform() {
   const platform = os.platform();
 
@@ -15,23 +15,111 @@ async function ensureSupportedPlatform() {
   }
 }
 
-/* TODO: Include statements are only supported from OpenSSH 7.3 released August 01, 2016 
-*  Inform the user if the SSH client is too old...
-*  Knowing debian users they surely will hit this case...
-*/
+async function waitForProcessOutput(command: string, args: string[]): Promise<{ stderr: string, stdout: string }> {
+  const cp = child_process.spawn(command, args, { timeout: 2_000, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = "";
+  let stderr = "";
+  let ends = 0;
+  await new Promise((resolve, reject) => {
+    const endF = () => { ends += 1; if (ends == 2) { resolve(void 0); } };
+    cp.on("error", (err) => reject(err));
+    cp.stdout.setEncoding('utf8');
+    cp.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    })
+    cp.stdout.on("end", endF);
+    cp.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    })
+    cp.stderr.on("end", endF);
+  });
+  return { stdout, stderr };
+}
+
+interface OpenSSHVersion {
+  major: number;
+  minor: number;
+}
+
+function mkSSHVersion(major: number, minor: number): OpenSSHVersion {
+  return { major, minor };
+}
+
+function sshVersionCmp(a: OpenSSHVersion, b: OpenSSHVersion): number {
+  const major = a.major - b.major;
+  const minor = a.minor - b.minor;
+  return major === 0 ? minor : major
+}
+
+interface SSHVersionSpec {
+  // Blacklisted SSH versions
+  blacklist: OpenSSHVersion[],
+  minimumVersion: OpenSSHVersion
+}
+
+// TODO: Perhaps this should be per vendor and not per platform? There are at least 2 vendors on Windows >.<
+type SupportedPlatforms = "win32" | "linux" | "darwin";
+const REQUIRED_SSH_VERSION: Record<SupportedPlatforms, SSHVersionSpec> = {
+  "win32": {
+    // For some reason the default version shipped on Windows is 8.6...
+    minimumVersion: mkSSHVersion(8, 9),
+    blacklist: []
+  },
+  linux: {
+    minimumVersion: mkSSHVersion(7, 3),
+    blacklist: []
+  },
+  darwin: {
+    minimumVersion: mkSSHVersion(7, 3),
+    blacklist: []
+  }
+};
+
+/* 
+  Include statements are only supported from OpenSSH 7.3 released August 01, 2016
+ * On Windows some OpenSSH_for_Windows versions get borked when the agent receives a request for SSH agent restriction .-.
+ */
 async function ensureSshNewEnough() {
+  // Example version strings:
   // ssh -V
-  // OpenSSH_9.2p1, OpenSSL 3.0.8 7 Feb 2023
+  // Archlinux:        OpenSSH_9.2p1, OpenSSL 3.0.8 7 Feb 2023
+  // Windows Git Bash: OpenSSH_9.2p1, OpenSSL 1.1.1t  7 Feb 2023
+  // Windows:          OpenSSH_for_Windows_9.2p1, LibreSSL 3.6.1
+  // Windows:          OpenSSH_for_Windows_8.6p1, LibreSSL 3.4.3
+  let out;
+  try {
+    out = await waitForProcessOutput("ssh", ["-V"]);
+  } catch (err) {
+    if ((err as any).code === "ENOENT") {
+      vscode.window.showInformationMessage(`Warning - SSH client not found!`);
+      return;
+    }
+    console.error(err)
+    vscode.window.showInformationMessage(`Warning - Could not detect SSH version!`);
+    return;
+  }
+
+  const matches = [...out.stderr.matchAll(/(OpenSSH_|OpenSSH_for_Windows_)(?<major>[0-9]+)\.(?<minor>[0-9]+)/ig)];
+  if (matches.length !== 1) {
+    vscode.window.showInformationMessage(`Warning - Unable to detect SSH version from ${out.stderr}!`);
+    console.log(out);
+    return;
+  }
+  const sshVersion = mkSSHVersion(+(matches[0].groups as any).major, +(matches[0].groups as any).minor);
+  const platformConfig = REQUIRED_SSH_VERSION[os.platform() as SupportedPlatforms];
+  if (sshVersionCmp(platformConfig.minimumVersion, sshVersion) > 0 || platformConfig.blacklist.find((x) => sshVersionCmp(x, sshVersion) === 0) !== void 0) {
+    vscode.window.showErrorMessage(`Detected an unsupported SSH version:\n${out.stderr}Please upgrade to at least OpenSSH ${platformConfig.minimumVersion.major}.${platformConfig.minimumVersion.minor}`, { modal: true });
+    throw new Error("Unsupported SSH version");
+  }
+  console.log("SSH Version ok")
   return;
 }
 
 async function getUserSshConfigDir() {
-  // TODO: Windows support
   return path.join(os.homedir(), ".ssh");
 }
 
 async function getHocusSshConfigPath() {
-  // TODO: Windows support
   return path.join(await getUserSshConfigDir(), "hocus", "config");
 }
 
@@ -94,6 +182,19 @@ async function ensureRemoteExtensionSideloading() {
   if (!defaultExtensions.includes('hocus.hocus-remote')) {
     defaultExtensions.unshift('hocus.hocus-remote');
     await remoteSSHconfig.update('defaultExtensions', defaultExtensions, vscode.ConfigurationTarget.Global);
+  }
+}
+
+// So we aren't prompted every time about the platform when connecting on Windows
+// TODO: Revisit this when https://github.com/microsoft/vscode-remote-release/issues/2997 gets closed
+// TODO: Should this be ran only on Windows?
+async function ensureRemotePlatformIsSet(workspaceHostname: string) {
+  const remoteSSHconfig = vscode.workspace.getConfiguration('remote.SSH');
+  const defaultExtConfigInfo = remoteSSHconfig.inspect<Record<string, string>>('remotePlatform');
+  const remotePlatforms = defaultExtConfigInfo?.globalValue ?? {};
+  if (!remotePlatforms[workspaceHostname]) {
+    remotePlatforms[workspaceHostname] = 'linux';
+    await remoteSSHconfig.update('remotePlatform', remotePlatforms, vscode.ConfigurationTarget.Global);
   }
 }
 
@@ -182,6 +283,7 @@ Host ${workspaceName}.hocus.dev
 `
         )
 
+        await ensureRemotePlatformIsSet(`${workspaceName}.hocus.dev`);
         await ensureRemoteExtensionSideloading();
         await
           vscode.commands.executeCommand(

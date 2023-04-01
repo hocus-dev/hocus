@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.0.6
+
+- Set the remote platform when connecting to a Hocus workspace, eliminates a prompt on Windows
+- Ensure the installed SSH version is new enough
+
 ## 0.0.5
 
 - Vscode on Windows may now connect to Hocus workspaces
