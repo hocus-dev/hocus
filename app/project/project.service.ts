@@ -224,15 +224,26 @@ export class ProjectService {
   async getProjectFromRequest(
     db: Prisma.Client,
     req: e.Request,
-  ): Promise<
-    Project & {
+  ): Promise<{
+    project: Project & {
       gitRepository: GitRepository & {
         sshKeyPair: {
           publicKey: string;
         };
       };
-    }
-  > {
+    };
+    projectPageProps: {
+      project: {
+        name: string;
+        externalId: string;
+        createdAt: number;
+      };
+      gitRepository: {
+        url: string;
+        publicKey: string;
+      };
+    };
+  }> {
     const { externalId } = this.parseProjectPath(req.params[0]);
     const project = await db.project.findUnique({
       where: { externalId },
@@ -247,6 +258,17 @@ export class ProjectService {
     if (project == null) {
       throw new HttpError(StatusCodes.NOT_FOUND, "Project not found");
     }
-    return project;
+    const projectPageProps = {
+      project: {
+        name: project.name,
+        externalId: project.externalId,
+        createdAt: project.createdAt.getTime(),
+      },
+      gitRepository: {
+        url: project.gitRepository.url,
+        publicKey: project.gitRepository.sshKeyPair.publicKey,
+      },
+    };
+    return { project, projectPageProps };
   }
 }

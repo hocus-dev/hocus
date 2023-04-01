@@ -9,7 +9,7 @@ import { unwrap } from "~/utils.shared";
 
 export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) => {
   const projectService = app.resolve(Token.ProjectService);
-  const project = await projectService.getProjectFromRequest(db, req);
+  const { project, projectPageProps } = await projectService.getProjectFromRequest(db, req);
   const projectVariableSet = await db.environmentVariableSet.findUniqueOrThrow({
     where: { id: project.environmentVariableSetId },
     include: {
@@ -38,15 +38,7 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
       externalId: v.externalId,
     })) ?? [];
   return json({
-    project: {
-      name: project.name,
-      externalId: project.externalId,
-      createdAt: project.createdAt.getTime(),
-    },
-    gitRepository: {
-      url: project.gitRepository.url,
-      publicKey: project.gitRepository.sshKeyPair.publicKey,
-    },
+    ...projectPageProps,
     userVariables,
     projectVariables: projectVariableSet.environmentVariables.map((v) => ({
       name: v.name,
