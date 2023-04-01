@@ -113,7 +113,7 @@ cd "$SCRIPT_DIR"
 
 fatal_error () {
   echo -e "Please report this problem here"
-  echo -e "🙏🙏🙏 \033[0;32m https://github.com/hocus-dev/hocus/issues/new \033[0m 🙏🙏🙏"
+  echo -e "🙏🙏🙏 \033[0;32m https://github.com/hocus-dev/hocus/issues/new/choose \033[0m 🙏🙏🙏"
   echo "We will get you a 🦝 to help you as quickly as possible"
   exit 1
 }
