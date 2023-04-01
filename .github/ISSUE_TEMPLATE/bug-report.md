@@ -12,6 +12,6 @@ about: Submit a bug report to help us improve Hocus
 
 ## Environment
 
-- Hokus version (commit hash)
+- Hocus version (commit hash)
 - OS and its version
-- Any other evironment information that may help
+- Any other environment information that may help
