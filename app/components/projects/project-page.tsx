@@ -1,5 +1,4 @@
-import type { TabsRef } from "flowbite-react";
-import { Button, Tabs } from "flowbite-react";
+import { Button } from "flowbite-react";
 import moment from "moment";
 import React, { useState } from "react";
 import type { Any } from "ts-toolbelt";
@@ -53,16 +52,6 @@ function ProjectPageComponent(props: {
   const createdAt = moment(project.createdAt).fromNow();
   const [showPublicKey, setShowPublicKey] = useState(false);
   const toggleShowPublicKey = React.useCallback(() => setShowPublicKey((v) => !v), []);
-  const tabsRef = React.useRef<TabsRef>(null);
-  const onActiveTabChange = React.useCallback(
-    (tabIdx: number) => {
-      const tabId = PROJECT_TAB_ORDER[tabIdx];
-      window.location.href = getProjectPath(project.externalId, tabId);
-      // we don't want to actually change the tab - we just want to change the URL
-      tabsRef.current?.setActiveTab(PROJECT_TAB_ORDER.indexOf(props.activeTab));
-    },
-    [project.externalId, props.activeTab],
-  );
   return (
     <AppPage>
       <div className="mt-8 mb-4">
@@ -126,24 +115,28 @@ function ProjectPageComponent(props: {
           </>
         )}
       </div>
-      <Tabs.Group
-        aria-label="Tabs with icons"
-        /* eslint-disable-next-line react/style-prop-object */
-        style="underline"
-        className="mt-4"
-        onActiveTabChange={onActiveTabChange}
-        ref={tabsRef}
-      >
-        {PROJECT_TAB_ORDER.map((tabId) => {
-          const title = PROJECT_TAB_TITLES[tabId];
-          const tabActive = props.activeTab === tabId;
-          return (
-            <Tabs.Item key={tabId} active={tabActive} title={title}>
-              {tabActive && props.content}
-            </Tabs.Item>
-          );
-        })}
-      </Tabs.Group>
+      <div className="mt-8 text-sm font-bold text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700">
+        <ul className="flex flex-wrap -mb-px">
+          {PROJECT_TAB_ORDER.map((tabId) => {
+            const isActive = tabId === props.activeTab;
+            const activeClasses =
+              "inline-block p-4 text-blue-600 border-b-2 border-blue-600 rounded-t-lg active dark:text-blue-500 dark:border-blue-500";
+            const inactiveClasses =
+              "inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300";
+            return (
+              <li key={tabId}>
+                <a
+                  href={getProjectPath(project.externalId, tabId)}
+                  className={isActive ? activeClasses : inactiveClasses}
+                >
+                  {PROJECT_TAB_TITLES[tabId]}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div className="mt-2 p-4">{props.content}</div>
     </AppPage>
   );
 }
