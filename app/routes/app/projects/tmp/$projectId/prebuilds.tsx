@@ -5,9 +5,9 @@ import { PrebuildList } from "~/components/projects/prebuilds/prebuild-list";
 import { ProjectPage } from "~/components/projects/project-page";
 import { ProjectPathTabId } from "~/page-paths.shared";
 import { Token } from "~/token";
-import { formatBranchName, unwrap } from "~/utils.shared";
+import { formatBranchName } from "~/utils.shared";
 
-export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) => {
+export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
   const projectService = app.resolve(Token.ProjectService);
   const { project, projectPageProps } = await projectService.getProjectFromRequest(db, req);
   const prebuildEvents = await db.prebuildEvent.findMany({
@@ -18,16 +18,6 @@ export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) =>
       gitObject: true,
       gitBranchLinks: {
         include: { gitBranch: true },
-      },
-      workspaces: {
-        where: { userId: unwrap(user).id },
-        orderBy: { createdAt: "desc" },
-        include: {
-          gitBranch: true,
-          prebuildEvent: { include: { gitObject: true } },
-          agentInstance: true,
-          activeInstance: true,
-        },
       },
     },
   });
