@@ -1,9 +1,13 @@
+import path from "path";
+
 import { PrebuildEventStatus } from "@prisma/client";
-import type { GitBranch, PrebuildEvent, Project, GitObject } from "@prisma/client";
+import type { GitBranch, PrebuildEvent, Project, GitObject, GitRepository } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
+import type e from "express";
 import { StatusCodes } from "http-status-codes";
 import { match } from "ts-pattern";
 import { HttpError } from "~/http-error.server";
+import { UuidValidator } from "~/schema/uuid.validator.server";
 import { groupBy, unwrap, waitForPromises } from "~/utils.shared";
 
 import { ENV_VAR_NAME_REGEX, UpdateEnvVarsTarget } from "./env-form.shared";
@@ -206,5 +210,43 @@ export class ProjectService {
         null;
       return { branch, finishedPrebuild, ongoingPrebuild };
     });
+  }
+
+  private parseProjectPath(projectPath: string): { externalId: string } {
+    const projectIdCandidate = path.parse(projectPath).dir.split("/").pop()?.trim();
+    const { success, value: externalId } = UuidValidator.SafeParse(projectIdCandidate);
+    if (!success) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Project id must be a UUID");
+    }
+    return { externalId };
+  }
+
+  async getProjectFromRequest(
+    db: Prisma.Client,
+    req: e.Request,
+  ): Promise<
+    Project & {
+      gitRepository: GitRepository & {
+        sshKeyPair: {
+          publicKey: string;
+        };
+      };
+    }
+  > {
+    const { externalId } = this.parseProjectPath(req.params[0]);
+    const project = await db.project.findUnique({
+      where: { externalId },
+      include: {
+        gitRepository: {
+          include: {
+            sshKeyPair: true,
+          },
+        },
+      },
+    });
+    if (project == null) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Project not found");
+    }
+    return project;
   }
 }

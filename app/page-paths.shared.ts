@@ -15,13 +15,13 @@ export const PagePaths = {
 
 export type ProjectPathTabId = valueof<typeof ProjectPathTabId>;
 export const ProjectPathTabId = {
-  WORKSPACES: 0,
-  PREBUILDS: 1,
-  ENVIRONMENT: 2,
+  WORKSPACES: "workspaces",
+  PREBUILDS: "prebuilds",
+  ENVIRONMENT: "environment",
 } as const;
 
 export const getProjectPath = (projectExternalId: string, tabId?: ProjectPathTabId) =>
-  `/app/projects/${projectExternalId}${tabId != null ? `?tabId=${tabId}` : ""}` as const;
+  `/app/projects/${projectExternalId}/${tabId ?? ProjectPathTabId.WORKSPACES}` as const;
 
 export const WorkspacePathParams = {
   JUST_CREATED: "justCreated",

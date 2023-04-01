@@ -19,6 +19,11 @@
       "remotePort": 3000
     },
     {
+      "localPort": 8002,
+      "name": "app-remix-dev-ws",
+      "remotePort": 8002
+    },
+    {
       "localPort": 4200,
       "name": "keycloak",
       "remotePort": 4200
