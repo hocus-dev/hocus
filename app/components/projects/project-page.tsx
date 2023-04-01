@@ -32,12 +32,19 @@ const PROJECT_TAB_TITLES: Record<ProjectPathTabId, React.ReactNode> = {
       <span className="font-bold">Environment</span>
     </>
   ),
+  [ProjectPathTabId.SETTINGS]: (
+    <>
+      <i className="fa-solid fa-gear mr-2"></i>
+      <span className="font-bold">Settings</span>
+    </>
+  ),
 };
 
 const PROJECT_TAB_ORDER = [
   ProjectPathTabId.WORKSPACES,
   ProjectPathTabId.PREBUILDS,
   ProjectPathTabId.ENVIRONMENT,
+  ProjectPathTabId.SETTINGS,
 ] as const;
 // enforces that PROJECT_TAB_ORDER contains all values of ProjectPathTabId
 const _typecheck: Any.Equals<typeof PROJECT_TAB_ORDER[number], ProjectPathTabId> = 1;

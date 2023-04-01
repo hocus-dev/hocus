@@ -18,6 +18,7 @@ export const ProjectPathTabId = {
   WORKSPACES: "workspaces",
   PREBUILDS: "prebuilds",
   ENVIRONMENT: "environment",
+  SETTINGS: "settings",
 } as const;
 
 export const getProjectPath = (projectExternalId: string, tabId?: ProjectPathTabId) =>

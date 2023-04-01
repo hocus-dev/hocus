@@ -1,0 +1,1 @@
+export const MAX_REPOSITORY_DRIVE_SIZE_MIB = 5000;

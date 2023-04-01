@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { MAX_REPOSITORY_DRIVE_SIZE_MIB } from "~/constants.shared";
 import { Token } from "~/token";
 
 import type { CreateActivity } from "./types";
@@ -25,7 +26,7 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
       firecrackerService,
       {
         pathOnHost: repoFile.file.path,
-        maxSizeMiB: 5000,
+        maxSizeMiB: MAX_REPOSITORY_DRIVE_SIZE_MIB,
       },
       {
         url: repo.url,
