@@ -1,118 +1,251 @@
-import * as child_process from "child_process";
 import * as fs from "fs-extra";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
+import { PLATFORM, isUnix, isWindows, mapenum, valueof, waitForProcessOutput } from "./utils";
 
+type SSH_VENDOR = valueof<typeof SSH_VENDOR>;
+const SSH_VENDOR = {
+  CORE_PORTABLE: "ssh_vendor_core_portable",
+  GIT_FOR_WINDOWS: "ssh_vendor_git_for_windows",
+  OPENSSH_FOR_WINDOWS: "ssh_vendor_openssh_for_windows"
+} as const;
+
+const BUG_REPORT_URL = "https://github.com/hocus-dev/hocus/issues/new/choose";
+const WINDOWS_SSH_INSTALL_URL = "https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse?tabs=powershell#install-openssh-for-windows";
 const HOCUS_PROJECT_LOCATION = "/home/hocus/dev/project";
 
-async function ensureSupportedPlatform() {
-  const platform = os.platform();
+const SSH_VENDOR_UPGRADE_LINK = mapenum<SSH_VENDOR>()({
+  // To be honest you are probably on some enterprise system
+  // I've checked that all current active LTS Ubuntu and Debian versions should have new enough SSH
+  [SSH_VENDOR.CORE_PORTABLE]: "https://askubuntu.com/questions/1189747/is-possible-to-upgrade-openssh-server-openssh-7-6p1-to-openssh-8-0p1",
+  [SSH_VENDOR.GIT_FOR_WINDOWS]: "https://gitforwindows.org/",
+  [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: "https://github.com/PowerShell/Win32-OpenSSH/wiki/Install-Win32-OpenSSH#install-using-winget"
+})
 
-  if (platform !== "linux" && platform !== "darwin" && platform !== "win32") {
-    vscode.window.showInformationMessage(`Unsupported platform ${platform} - TODO!`);
+async function tryOpenUrlInBrowser(url: string): Promise<void> {
+  try {
+    if (isWindows) {
+      await waitForProcessOutput("powershell", ["start", "", url])
+    } else {
+      try { await waitForProcessOutput("xdg-open", [url]); return; } catch (e) { }
+      try { await waitForProcessOutput("gio", ["open", url]); return; } catch (e) { }
+      try { await waitForProcessOutput("kde-open", [url]); return; } catch (e) { }
+      try { await waitForProcessOutput("gnome-open", [url]); return; } catch (e) { }
+      throw new Error("None of the methods worked .-.")
+    }
+  } catch (err) {
+    console.error(err);
+    vscode.window.showInformationMessage(`Please go to this URL: ${url}`);
+  }
+}
+
+async function ensureSupportedPlatform() {
+  if (!isUnix && !isWindows) {
+    vscode.window.showInformationMessage(`Unsupported platform ${PLATFORM} - TODO!`);
     throw new Error("Nope");
   }
 }
 
-async function waitForProcessOutput(command: string, args: string[]): Promise<{ stderr: string, stdout: string }> {
-  const cp = child_process.spawn(command, args, { timeout: 2_000, stdio: ['ignore', 'pipe', 'pipe'] });
-  let stdout = "";
-  let stderr = "";
-  let ends = 0;
-  await new Promise((resolve, reject) => {
-    const endF = () => { ends += 1; if (ends == 2) { resolve(void 0); } };
-    cp.on("error", (err) => reject(err));
-    cp.stdout.setEncoding('utf8');
-    cp.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    })
-    cp.stdout.on("end", endF);
-    cp.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    })
-    cp.stderr.on("end", endF);
-  });
-  return { stdout, stderr };
-}
-
-interface OpenSSHVersion {
+interface SSHVersion {
   major: number;
   minor: number;
 }
 
-function mkSSHVersion(major: number, minor: number): OpenSSHVersion {
+function mkSSHVersion(major: number, minor: number): SSHVersion {
   return { major, minor };
 }
 
-function sshVersionCmp(a: OpenSSHVersion, b: OpenSSHVersion): number {
+function sshVersionCmp(a: SSHVersion, b: SSHVersion): number {
   const major = a.major - b.major;
   const minor = a.minor - b.minor;
   return major === 0 ? minor : major
 }
 
-interface SSHVersionSpec {
-  // Blacklisted SSH versions
-  blacklist: OpenSSHVersion[],
-  minimumVersion: OpenSSHVersion
+interface SSHClient {
+  vendor: SSH_VENDOR,
+  fullVersionString: string,
+  version: SSHVersion
 }
 
-// TODO: Perhaps this should be per vendor and not per platform? There are at least 2 vendors on Windows >.<
-type SupportedPlatforms = "win32" | "linux" | "darwin";
-const REQUIRED_SSH_VERSION: Record<SupportedPlatforms, SSHVersionSpec> = {
-  "win32": {
-    // For some reason the default version shipped on Windows is 8.6...
-    minimumVersion: mkSSHVersion(8, 9),
-    blacklist: []
+// Set of constraints on the SSH client version
+interface SSHVersionConstraints {
+  // When a specific version is borked
+  blacklist: SSHVersion[],
+  // The minimum SSH version
+  minimumVersion: SSHVersion,
+}
+
+interface SSHVersionSpec {
+  // Hard limits - If we don't bail out NOW then we will leave the host in a broken state requiring manual intervention!!!
+  // For ex. After the extension activates ssh won't be able to parse the ssh config
+  hard?: SSHVersionConstraints,
+  // Soft limits - Nothing is permamentelly borked but u may have an degraded experience
+  // For ex. SSH agent forwarding is borked
+  soft?: SSHVersionConstraints,
+}
+
+// TODO: Setting up an weekly E2E test pipeline for testing the compatibility would be amazing >.<
+const REQUIRED_SSH_VERSION: Record<SSH_VENDOR, SSHVersionSpec> = {
+  [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: {
+    // 7.6 was the oldest i decided to manually test ¯\_(ツ)_/¯
+    hard: {
+      blacklist: [],
+      minimumVersion: mkSSHVersion(7, 6)
+    },
+    // Some OpenSSH_for_Windows versions get borked when the agent receives a request for the SSH agent restriction extension .-.
+    // You may connect to a workspace but agent forwarding won't work
+    // What is sad that Windows by default ships in their dev VM's 8.6 .-.
+    soft: {
+      blacklist: [],
+      minimumVersion: mkSSHVersion(8, 9),
+    }
   },
-  linux: {
-    minimumVersion: mkSSHVersion(7, 3),
-    blacklist: []
+  // Include and ProxyJump are only supported from OpenSSH 7.3 released August 01, 2016
+  [SSH_VENDOR.GIT_FOR_WINDOWS]: {
+    hard: {
+      minimumVersion: mkSSHVersion(7, 3),
+      blacklist: [],
+    }
   },
-  darwin: {
-    minimumVersion: mkSSHVersion(7, 3),
-    blacklist: []
+  [SSH_VENDOR.CORE_PORTABLE]: {
+    hard: {
+      minimumVersion: mkSSHVersion(7, 3),
+      blacklist: [],
+    }
   }
 };
 
-/* 
-  Include statements are only supported from OpenSSH 7.3 released August 01, 2016
- * On Windows some OpenSSH_for_Windows versions get borked when the agent receives a request for SSH agent restriction .-.
- */
-async function ensureSshNewEnough() {
+// Checks the output of ssh -V
+// Detects if the ssh binary exits and we may execute it :)
+async function discoverSshClientVersionString(): Promise<string> {
+  try {
+    return (await waitForProcessOutput("ssh", ["-V"])).stderr;
+  } catch (err) {
+    // Ok the binary was not found - Assume SSH Client is not available
+    if ((err as any).code === "ENOENT") {
+      const opt1 = "How to install it?"
+      const opt2 = "But I have it installed";
+      // Delibrate floating promise
+      void vscode.window.showErrorMessage(`SSH client not found. Please install OpenSSH`, { modal: true }, opt1, opt2).then(async (v) => {
+        if (v === opt1) {
+          if (isWindows) {
+            await tryOpenUrlInBrowser(WINDOWS_SSH_INSTALL_URL)
+          } else {
+            await vscode.window.showInformationMessage("Ubuntu/Debian: sudo apt-get install openssh-client\nArch/Manjaro: sudo pacman -S openssh", { modal: true });
+          }
+        } else if (v === opt2) {
+          await tryOpenUrlInBrowser(BUG_REPORT_URL);
+        }
+      });
+      throw Error("SSH Client not found")
+    }
+    // The SSH client exists but we got a generic error while probing the SSH version
+    // It's best to assume that we can't use this SSH client, for ex we don't have perms for executing the ssh binary
+    else {
+      console.error(err)
+      const opt1 = "Bug report";
+      // Delibrate floating promise
+      void vscode.window.showErrorMessage(`Unable to probe the SSH version`, { modal: true, detail: (err as Error).toString() }, opt1).then(async (v) => {
+        if (v === opt1) {
+          await tryOpenUrlInBrowser(BUG_REPORT_URL);
+        }
+      });
+      throw Error("Failed to retrieve the SSH version")
+    }
+  }
+}
+
+// Detects as much info about the SSH Client as possible
+// This may fail if the version slug is something very very very weird...
+// Like imagine BigCorp having their own build with their company name in the version slug .-.
+async function detectSshClient(): Promise<SSHClient> {
   // Example version strings:
   // ssh -V
   // Archlinux:        OpenSSH_9.2p1, OpenSSL 3.0.8 7 Feb 2023
   // Windows Git Bash: OpenSSH_9.2p1, OpenSSL 1.1.1t  7 Feb 2023
   // Windows:          OpenSSH_for_Windows_9.2p1, LibreSSL 3.6.1
   // Windows:          OpenSSH_for_Windows_8.6p1, LibreSSL 3.4.3
-  let out;
-  try {
-    out = await waitForProcessOutput("ssh", ["-V"]);
-  } catch (err) {
-    if ((err as any).code === "ENOENT") {
-      vscode.window.showInformationMessage(`Warning - SSH client not found!`);
-      return;
-    }
-    console.error(err)
-    vscode.window.showInformationMessage(`Warning - Could not detect SSH version!`);
-    return;
+  const sshVersionString = await discoverSshClientVersionString();
+
+  const matches = [...sshVersionString.matchAll(/(?<slug>OpenSSH_|OpenSSH_for_Windows_)(?<major>[0-9]+)\.(?<minor>[0-9]+)/ig)];
+  if (matches.length !== 1) {
+    const opt1 = "Bug report";
+    // Delibrate floating promise
+    void vscode.window.showErrorMessage(`Unable to parse the SSH version slug`, { modal: true, detail: `Please send us this string:\n${sshVersionString}` }, opt1).then(async (v) => {
+      if (v === opt1) {
+        await tryOpenUrlInBrowser(BUG_REPORT_URL);
+      }
+    });
+    throw Error("Failed to parse the SSH version slug")
+  }
+  const slug: string = (matches[0].groups as any).slug;
+  const sshVersion = mkSSHVersion(+(matches[0].groups as any).major, +(matches[0].groups as any).minor);
+
+  // By default assume it's the official portable version
+  let vendor: SSH_VENDOR = SSH_VENDOR.CORE_PORTABLE;
+  // This slug may mean only one thing
+  if (slug === "OpenSSH_for_Windows_") vendor = SSH_VENDOR.OPENSSH_FOR_WINDOWS;
+  // Perhaps we have GIT_FOR_WINDOWS ?
+  if (isWindows && vendor === SSH_VENDOR.CORE_PORTABLE) {
+    vendor = SSH_VENDOR.GIT_FOR_WINDOWS;
+
+    // If the next probe fails then assume we're runing GIT_FOR_WINDOWS
+    // We need more probes cause OPENSSH_FOR_WINDOWS didn't always use "OpenSSH_for_Windows_" for the slug .-.
+    try {
+      // This resolves the absolute path to the ssh binary.
+      const path = (await waitForProcessOutput("powershell", ["get-command ssh | Select -ExpandProperty Source"])).stdout;
+      console.log(`SSH binary path: ${path}`)
+      if (path.includes("\\usr\\bin\\")) {
+        console.log("Looks like Git for Windows")
+        vendor = SSH_VENDOR.GIT_FOR_WINDOWS
+      }
+      if (path.includes("\\OpenSSH\\")) {
+        console.log("Looks like OpenSSH for Windows")
+        vendor = SSH_VENDOR.OPENSSH_FOR_WINDOWS
+      }
+    } catch (e) { console.error(e) }
   }
 
-  const matches = [...out.stderr.matchAll(/(OpenSSH_|OpenSSH_for_Windows_)(?<major>[0-9]+)\.(?<minor>[0-9]+)/ig)];
-  if (matches.length !== 1) {
-    vscode.window.showInformationMessage(`Warning - Unable to detect SSH version from ${out.stderr}!`);
-    console.log(out);
-    return;
+  return {
+    vendor,
+    fullVersionString: sshVersionString,
+    version: sshVersion
   }
-  const sshVersion = mkSSHVersion(+(matches[0].groups as any).major, +(matches[0].groups as any).minor);
-  const platformConfig = REQUIRED_SSH_VERSION[os.platform() as SupportedPlatforms];
-  if (sshVersionCmp(platformConfig.minimumVersion, sshVersion) > 0 || platformConfig.blacklist.find((x) => sshVersionCmp(x, sshVersion) === 0) !== void 0) {
-    vscode.window.showErrorMessage(`Detected an unsupported SSH version:\n${out.stderr}Please upgrade to at least OpenSSH ${platformConfig.minimumVersion.major}.${platformConfig.minimumVersion.minor}`, { modal: true });
-    throw new Error("Unsupported SSH version");
+}
+
+async function ensureSshNewEnough(sshClient: SSHClient): Promise<void> {
+  const versionRequirements = REQUIRED_SSH_VERSION[sshClient.vendor];
+  // Check hard requirements
+  if (versionRequirements.hard !== void 0) {
+    const constraints = versionRequirements.hard;
+    if (sshVersionCmp(constraints.minimumVersion, sshClient.version) > 0 || constraints.blacklist.find((x) => sshVersionCmp(x, sshClient.version) === 0) !== void 0) {
+      const opt1 = "How to upgrade?";
+      // Delibrate floating promise
+      void vscode.window.showErrorMessage(`Unsupported SSH version :(`, { modal: true, detail: `Continuing with\n${sshClient.fullVersionString}would break the system, Aborting\nPlease upgrade to at least OpenSSH ${constraints.minimumVersion.major}.${constraints.minimumVersion.minor} in order to use Hocus` }, opt1).then(async (v) => {
+        if (v === opt1) {
+          await tryOpenUrlInBrowser(SSH_VENDOR_UPGRADE_LINK[sshClient.vendor]);
+        }
+      });
+      throw new Error("Unsupported SSH version");
+    }
   }
-  console.log("SSH Version ok")
-  return;
+  // Check soft requirements
+  if (versionRequirements.soft !== void 0) {
+    const constraints = versionRequirements.soft;
+    if (sshVersionCmp(constraints.minimumVersion, sshClient.version) > 0 || constraints.blacklist.find((x) => sshVersionCmp(x, sshClient.version) === 0) !== void 0) {
+      const opt1 = "How to upgrade?";
+      const opt2 = "I want to continue"
+      const r = await vscode.window.showWarningMessage(`SSH client might be buggy`, { modal: true, detail: `Continuing with\n${sshClient.fullVersionString}might cause issues\nIf continuing expect that some Hocus features won't work\nIn order to get the full Hocus experience please upgrade to at least OpenSSH ${constraints.minimumVersion.major}.${constraints.minimumVersion.minor}\nDo you want to continue with a possibly buggy experience?` }, opt1, opt2)
+      if (r === opt1) {
+        await tryOpenUrlInBrowser(SSH_VENDOR_UPGRADE_LINK[sshClient.vendor]);
+      } else if (r === opt2) {
+        vscode.window.showInformationMessage(`Continuing with possibly buggy SSH`);
+        return;
+      }
+      throw new Error("Unsupported SSH version");
+    }
+  }
 }
 
 async function getUserSshConfigDir() {
@@ -209,7 +342,8 @@ export async function activate(context: vscode.ExtensionContext) {
   console.log("Hocus Activated");
 
   await ensureSupportedPlatform();
-  await ensureSshNewEnough();
+  const sshClient = await detectSshClient();
+  await ensureSshNewEnough(sshClient);
   await ensureSshConfigSetUp();
   await ensureRemoteExtensionSideloading();
 

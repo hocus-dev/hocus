@@ -3,7 +3,8 @@
 ## 0.0.6
 
 - Set the remote platform when connecting to a Hocus workspace, eliminates a prompt on Windows
-- Ensure the installed SSH version is new enough
+- Ensure the installed SSH client will work with Hocus
+- In case of bugs the extension will open in the default browser the Hocus issue tracker
 
 ## 0.0.5
 
