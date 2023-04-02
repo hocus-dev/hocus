@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.0.6
+
+- Detect if there are keys in the forwarded ssh agent
+- Detect if the git repo may be accessed with the forwarded keys
+- Add logo
+
 ## 0.0.5
 
 - Update the hocus.yml schema

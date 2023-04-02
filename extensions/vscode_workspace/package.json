@@ -6,7 +6,7 @@
   ],
   "displayName": "Hocus Remote",
   "description": "Vscode Hocus integration",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "engines": {
     "vscode": "^1.75.0"
   },
@@ -25,6 +25,7 @@
   "categories": [
     "Other"
   ],
+  "icon": "images/hocus_256x256.png",
   "keywords": [
     "remote development",
     "remote"

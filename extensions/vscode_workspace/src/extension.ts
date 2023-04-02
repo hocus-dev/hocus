@@ -6,10 +6,12 @@ import * as path from "path";
 import * as vscode from "vscode";
 import * as yaml from "yaml";
 import { ProjectConfigValidator } from "./project-config/validator";
+import { waitForProcessOutput } from "./utils";
 
+const HOCUS_PROJECT_LOCATION = "/home/hocus/dev/project";
 const HOCUS_DIR = "/home/hocus/dev/.hocus";
-const HOCUS_WORKSPACE_TASKS_DIR = `${HOCUS_DIR}/command`
-const HOCUS_CONFIG_PATH = `${HOCUS_DIR}/workspace-config.yml`
+const HOCUS_WORKSPACE_TASKS_DIR = `${HOCUS_DIR}/command`;
+const HOCUS_CONFIG_PATH = `${HOCUS_DIR}/workspace-config.yml`;
 
 async function isHocusWorkspace(): Promise<boolean> {
   // No need to probe if running in the web or locally
@@ -153,6 +155,32 @@ async function setupTerminals(): Promise<void> {
   });
 }
 
+async function checkSSHAgentForwarding(): Promise<void> {
+  try {
+    // First try listing keys in the agent
+    const sshAgentProbe = await waitForProcessOutput("ssh-add", ["-l"]);
+    const nKeys = sshAgentProbe.stdout.split("\n").map((x) => x.trim()).filter(Boolean).length;
+    console.log(`Detected ${nKeys} forwarded ssh keys`);
+    console.log(sshAgentProbe)
+    if (nKeys === 0 || sshAgentProbe.exitCode !== 0) {
+      await vscode.window.showErrorMessage("SSH keys were not forwarded - git push/pull won't work!", { modal: true });
+      return;
+    }
+    // Now check if we actually have access to the repo
+    // There are windows ssh-agents which list the keys but get borked when we actually use them .-. 
+    // TODO: We may fix those agents by proxying the ssh-agent and hotfix the bug .-.
+    // The UI extension should auto add the decrypted key to the agent
+    const gitProbe = await waitForProcessOutput("git", ["ls-remote", "--heads"], { cwd: HOCUS_PROJECT_LOCATION, timeout: 60_000 });
+    if (gitProbe.exitCode !== 0) {
+      await vscode.window.showErrorMessage("SSH keys were forwarded but we were unable to access the git repo!", { modal: true });
+      return;
+    }
+  } catch (err) {
+    console.error(err);
+    await vscode.window.showWarningMessage("Unable to verify SSH agent forwarding", { modal: true, detail: (err as Error).toString() });
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   console.log("Hocus Workspace started activation");
 
@@ -166,6 +194,7 @@ export async function activate(context: vscode.ExtensionContext) {
   await waitForPromises([
     setupExtensions(),
     setupTerminals(),
+    checkSSHAgentForwarding(),
   ]);
 
   console.log("Hocus Workspace finished activation");
