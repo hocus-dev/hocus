@@ -11,7 +11,16 @@ const NavbarComponent = (props: { userEmail?: string }): JSX.Element => {
           Hocus
         </span>
       </FlowbiteNavbar.Brand>
-      <div className="flex md:order-2">
+      <div className="flex items-center gap-8 md:order-2">
+        <a
+          target="_blank"
+          rel="noreferrer"
+          href="https://hocus.dev/docs/installation/troubleshooting"
+          className="text-sm text-gray-400 hover:text-gray-200 transition-all"
+        >
+          <i className="fa-solid fa-wrench mr-2"></i>
+          <span>Troubleshooting</span>
+        </a>
         <Dropdown
           arrowIcon={true}
           inline={true}

@@ -78,8 +78,29 @@ export default function Root() {
 }
 
 function ErrorCard(props: { status: number; statusText: string }) {
+  let statusText: React.ReactNode = props.statusText;
   const originalStatusText = getReasonPhrase(props.status);
-  const extraText = originalStatusText !== props.statusText ? originalStatusText : void 0;
+  let extraText = originalStatusText !== props.statusText ? originalStatusText : void 0;
+  if (
+    props.status === StatusCodes.INTERNAL_SERVER_ERROR &&
+    originalStatusText === props.statusText
+  ) {
+    extraText = originalStatusText;
+    statusText = (
+      <span>
+        Please refer to the{" "}
+        <a
+          target="_blank"
+          rel="noreferrer"
+          href="https://hocus.dev/docs/installation/troubleshooting"
+          className="underline"
+        >
+          troubleshooting section
+        </a>{" "}
+        of the documentation.
+      </span>
+    );
+  }
   return (
     <App>
       <AppPagePure>
@@ -89,7 +110,7 @@ function ErrorCard(props: { status: number; statusText: string }) {
               <h1 className="text-4xl font-bold">{props.status}</h1>
               {extraText && <h2 className="text-xs text-gray-400 mt-2">{extraText}</h2>}
             </div>
-            <p className="text-gray-400">{props.statusText}</p>
+            <p className="text-gray-400">{statusText}</p>
           </Card>
         </div>
       </AppPagePure>
