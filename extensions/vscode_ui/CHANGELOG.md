@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.7
+
+- Add popup when connecting without ssh-agent
+
 ## 0.0.6
 
 - Set the remote platform when connecting to a Hocus workspace, eliminates a prompt on Windows

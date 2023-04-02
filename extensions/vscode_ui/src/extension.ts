@@ -94,7 +94,10 @@ interface SSHVersionSpec {
 // TODO: Setting up an weekly E2E test pipeline for testing the compatibility would be amazing >.<
 const REQUIRED_SSH_VERSION: Record<SSH_VENDOR, SSHVersionSpec> = {
   [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: {
-    // 7.6 was the oldest i decided to manually test ¯\_(ツ)_/¯
+    // What I tested manually ¯\_(ツ)_/¯ 
+    // 9.2.0.0, 9.1.0.0, 8.9.1.0 works out of the box
+    // 8.6.0.0 connected but the agent forwading was borked
+    // TODO: Test manually 8.9.0.0, 8.1.0.0, 8.0.0.0, 7.9.0.0, 7.7.2.0, 7.7.1.0, 7.7.0.0, 7.6.1.0, 7.6.0.1, 7.6.0.0
     hard: {
       blacklist: [],
       minimumVersion: mkSSHVersion(7, 6)
@@ -279,6 +282,7 @@ async function checkSSHAgentIsAvailable(sshClient: SSHClient): Promise<void> {
       await tryOpenUrlInBrowser(SSH_VENDOR_SETUP_AGENT_LINK[sshClient.vendor]);
       await vscode.window.showInformationMessage("Remember to FULLY restart Vscode after starting the ssh-agent! Also restart the terminal you used to launch Vscode with :)", { modal: true })
     } else if (r === opt2) {
+      vscode.window.showInformationMessage(`Continuing without SSH Agent`);
       return;
     }
     throw new Error("SSH Agent not available")
