@@ -26,7 +26,7 @@ const SSH_VENDOR_UPGRADE_LINK = mapenum<SSH_VENDOR>()({
 const SSH_VENDOR_SETUP_AGENT_LINK = mapenum<SSH_VENDOR>()({
   [SSH_VENDOR.CORE_PORTABLE]: "https://wiki.archlinux.org/title/SSH_keys#ssh-agent",
   [SSH_VENDOR.GIT_FOR_WINDOWS]: "https://gist.github.com/adojos/5aab5e1dcedc16957c465be0212ea099#a4-update-bashrc-file-inside-user-home-folder",
-  [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: "https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement#user-key-generation"
+  [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: "https://gist.github.com/gorbak25/fe90bc2f35afe394477db9d459e11a26"
 })
 
 async function tryOpenUrlInBrowser(url: string): Promise<void> {
@@ -265,7 +265,10 @@ async function checkSSHAgentIsAvailable(sshClient: SSHClient): Promise<void> {
   }
   else if (sshClient.vendor === SSH_VENDOR.OPENSSH_FOR_WINDOWS) {
     // The ssh agent is a global windows service
-    throw new Error("TODO");
+    const serviceStatus = (await waitForProcessOutput("powershell", ["Get-Service ssh-agent | Select -ExpandProperty Status"])).stdout;
+    if (serviceStatus.includes("Running")) {
+      agentAvailable = true;
+    }
   }
 
   if (!agentAvailable) {
@@ -274,7 +277,7 @@ async function checkSSHAgentIsAvailable(sshClient: SSHClient): Promise<void> {
     const r = await vscode.window.showWarningMessage("SSH Agent is not running", { modal: true, detail: "You may still connect to workspaces but you won't be able to push changes!\nDo you want to proceed anyway?" }, opt1, opt2);
     if (r === opt1) {
       await tryOpenUrlInBrowser(SSH_VENDOR_SETUP_AGENT_LINK[sshClient.vendor]);
-      await vscode.window.showInformationMessage("Remember to FULLY restart Vscode after starting the ssh-agent!", { modal: true })
+      await vscode.window.showInformationMessage("Remember to FULLY restart Vscode after starting the ssh-agent! Also restart the terminal you used to launch Vscode with :)", { modal: true })
     } else if (r === opt2) {
       return;
     }
