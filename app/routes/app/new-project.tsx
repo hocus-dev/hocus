@@ -1,17 +1,27 @@
 import type { ActionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
+import { StatusCodes } from "http-status-codes";
 import { v4 as uuidv4 } from "uuid";
 import { runAddProjectAndRepository } from "~/agent/workflows";
 import { AppPage } from "~/components/app-page";
 import { NewProjectForm } from "~/components/projects/new-project-form";
+import { HttpError } from "~/http-error.server";
 import { PagePaths } from "~/page-paths.shared";
 import { NewProjectFormValidator } from "~/schema/new-project-form.validator.server";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
 import { Token } from "~/token";
 
 export const action = async ({ context: { req, app } }: ActionArgs) => {
+  const gitService = app.resolve(Token.GitService);
   const formData = req.body;
-  const projectInfo = NewProjectFormValidator.Parse(formData);
+  const { success, value: projectInfo, error } = NewProjectFormValidator.SafeParse(formData);
+  if (!success) {
+    throw new HttpError(StatusCodes.BAD_REQUEST, error.message);
+  }
+  const repositoryUrl = projectInfo.repositoryUrl.trim();
+  if (!gitService.isGitSshUrl(repositoryUrl)) {
+    throw new HttpError(StatusCodes.BAD_REQUEST, `Invalid Git SSH URL: "${repositoryUrl}"`);
+  }
   let projectWorkspaceRoot = projectInfo.workspaceRootPath?.trim() ?? "/";
   if (projectWorkspaceRoot === "") {
     projectWorkspaceRoot = "/";
@@ -25,7 +35,7 @@ export const action = async ({ context: { req, app } }: ActionArgs) => {
       retry: { maximumAttempts: 1 },
       args: [
         {
-          gitRepositoryUrl: projectInfo.repositoryUrl.trim(),
+          gitRepositoryUrl: repositoryUrl,
           projectName: projectInfo.projectName.trim(),
           projectWorkspaceRoot: projectWorkspaceRoot,
         },
