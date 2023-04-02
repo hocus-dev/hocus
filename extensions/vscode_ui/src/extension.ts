@@ -2,7 +2,7 @@ import * as fs from "fs-extra";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
-import { PLATFORM, isUnix, isWindows, mapenum, valueof, waitForProcessOutput } from "./utils";
+import { isUnix, isWindows, mapenum, PLATFORM, valueof, waitForProcessOutput } from "./utils";
 
 type SSH_VENDOR = valueof<typeof SSH_VENDOR>;
 const SSH_VENDOR = {
@@ -21,6 +21,12 @@ const SSH_VENDOR_UPGRADE_LINK = mapenum<SSH_VENDOR>()({
   [SSH_VENDOR.CORE_PORTABLE]: "https://askubuntu.com/questions/1189747/is-possible-to-upgrade-openssh-server-openssh-7-6p1-to-openssh-8-0p1",
   [SSH_VENDOR.GIT_FOR_WINDOWS]: "https://gitforwindows.org/",
   [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: "https://github.com/PowerShell/Win32-OpenSSH/wiki/Install-Win32-OpenSSH#install-using-winget"
+})
+
+const SSH_VENDOR_SETUP_AGENT_LINK = mapenum<SSH_VENDOR>()({
+  [SSH_VENDOR.CORE_PORTABLE]: "https://wiki.archlinux.org/title/SSH_keys#ssh-agent",
+  [SSH_VENDOR.GIT_FOR_WINDOWS]: "https://gist.github.com/adojos/5aab5e1dcedc16957c465be0212ea099#a4-update-bashrc-file-inside-user-home-folder",
+  [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: "https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement#user-key-generation"
 })
 
 async function tryOpenUrlInBrowser(url: string): Promise<void> {
@@ -248,6 +254,34 @@ async function ensureSshNewEnough(sshClient: SSHClient): Promise<void> {
   }
 }
 
+// Checks if the SSH agent is available on the machine
+// If not then tells you how to set it up
+async function checkSSHAgentIsAvailable(sshClient: SSHClient): Promise<void> {
+  let agentAvailable = false
+  if (sshClient.vendor === SSH_VENDOR.CORE_PORTABLE || sshClient.vendor === SSH_VENDOR.GIT_FOR_WINDOWS) {
+    if (process.env.SSH_AUTH_SOCK !== void 0) {
+      agentAvailable = true;
+    }
+  }
+  else if (sshClient.vendor === SSH_VENDOR.OPENSSH_FOR_WINDOWS) {
+    // The ssh agent is a global windows service
+    throw new Error("TODO");
+  }
+
+  if (!agentAvailable) {
+    const opt1 = "How to fix this?";
+    const opt2 = "Proceed anyway!";
+    const r = await vscode.window.showWarningMessage("SSH Agent is not running", { modal: true, detail: "You may still connect to workspaces but you won't be able to push changes!\nDo you want to proceed anyway?" }, opt1, opt2);
+    if (r === opt1) {
+      await tryOpenUrlInBrowser(SSH_VENDOR_SETUP_AGENT_LINK[sshClient.vendor]);
+      await vscode.window.showInformationMessage("Remember to FULLY restart Vscode after starting the ssh-agent!", { modal: true })
+    } else if (r === opt2) {
+      return;
+    }
+    throw new Error("SSH Agent not available")
+  }
+}
+
 async function getUserSshConfigDir() {
   return path.join(os.homedir(), ".ssh");
 }
@@ -342,8 +376,10 @@ export async function activate(context: vscode.ExtensionContext) {
   console.log("Hocus Activated");
 
   await ensureSupportedPlatform();
+  // Assume the Client won't get upgraded while vscode is running :)
   const sshClient = await detectSshClient();
   await ensureSshNewEnough(sshClient);
+  await checkSSHAgentIsAvailable(sshClient);
   await ensureSshConfigSetUp();
   await ensureRemoteExtensionSideloading();
 

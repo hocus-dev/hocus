@@ -5,6 +5,7 @@
 - Set the remote platform when connecting to a Hocus workspace, eliminates a prompt on Windows
 - Ensure the installed SSH client will work with Hocus
 - In case of bugs the extension will open in the default browser the Hocus issue tracker
+- Detect whether SSH Agent is available and notify the user if there are problems with it
 
 ## 0.0.5
 
