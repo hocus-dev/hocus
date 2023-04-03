@@ -39,8 +39,6 @@ export const config = makeConfig()({
       "/srv/jailer/resources/checkout-and-inspect.ext4",
     defaultWorkspaceRootFs:
       process.env.DEFAULT_WORKSPACE_ROOTFS_PATH ?? "/srv/jailer/resources/default-workspace.ext4",
-    // DNS config which will be propagated to vm's
-    dnsConfigPath: process.env.AGENT_DNS_CONFIG_PATH ?? "/host/resolv.conf",
     prebuildSshPublicKey:
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:

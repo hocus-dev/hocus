@@ -228,4 +228,3 @@ services:
     volumes:
       - agent_data:/srv/jailer:rw
       - /dev/kvm:/dev/kvm
-      - /etc/resolv.conf:/host/resolv.conf:ro

@@ -30,5 +30,4 @@ services:
       - "${REPO_DIR}:/app"
       - "${HOCUS_RESOURCES_DIR}:/srv/jailer"
       - /dev/kvm:/dev/kvm
-      - /etc/resolv.conf:/host/resolv.conf:ro
     command: sleep infinity

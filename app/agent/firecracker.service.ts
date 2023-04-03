@@ -498,12 +498,6 @@ export class FirecrackerService {
             useSudo,
           );
         }
-        await this.agentUtilService.writeFile(
-          ssh,
-          "/etc/resolv.conf",
-          (await fsAsync.readFile(this.agentConfig.dnsConfigPath)).toString(),
-          useSudo,
-        );
         const r = await fn({
           ssh,
           sshConfig,
