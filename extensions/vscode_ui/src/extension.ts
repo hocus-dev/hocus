@@ -310,7 +310,7 @@ async function ensureSshDirsExists() {
 }
 
 // This also serves as a versioning string, If this changes the old config will be deleted
-const hocusSshConfigBaner = "# Don't edit this file - your changes WILL be overwritten!!!\n# Please perform customizations in the main config file under Host *.hocus.dev\n# This file is managed by Hocus\n# Hocus SSH Integration 0.0.3\n" as const;
+const hocusSshConfigBaner = "# Don't edit this file - your changes WILL be overwritten!!!\n# Please perform customizations in the main config file under Host *.hocus.dev\n# This file is managed by Hocus\n# Hocus SSH Integration 0.0.4\n" as const;
 
 async function ensureSshConfigSetUp(recursed?: boolean) {
   await ensureSshDirsExists();
@@ -326,11 +326,17 @@ async function ensureSshConfigSetUp(recursed?: boolean) {
     }
   }
 
-  // Ensure the Hocus config path is included
+  // Load the SSH config
   const userConfig = await fs.readFile(sshUserConfigPath);
+  // Ensure we ignore the new Apple's UseKeychain option on Windows/Linux/Old Macs
+  // This needs to be prepended to the config
+  if (!userConfig.includes("IgnoreUnknown UseKeychain")) {
+    console.log(`Injecting compatibility snippet to ssh config`);
+    await fs.writeFile(sshUserConfigPath, Buffer.concat([Buffer.from("Host *\n    IgnoreUnknown UseKeychain\n\n", "utf-8"), userConfig]))
+  }
+  // Ensure the Hocus config path is included
   if (!userConfig.includes("Include hocus/config")) {
     console.log(`Installing integration into ssh config`);
-
     fs.appendFile(sshUserConfigPath, "\n\n# Beginning of Hocus Vscode integration\nHost *.hocus.dev\n    Include hocus/config\n# End of Hocus Vscode integration\n")
   }
 
@@ -456,6 +462,7 @@ Host ${workspaceName}.hocus.dev
     StrictHostKeyChecking no
     ForwardAgent yes
     AddKeysToAgent yes
+    UseKeychain yes
 #</${workspaceName}>
 `
         )

@@ -9,15 +9,17 @@ export const mapenum =
 export const PLATFORM = process.platform;
 export const isUnix = PLATFORM === "linux" || PLATFORM === "darwin";
 export const isWindows = PLATFORM === "win32";
+export const isMac = PLATFORM === "darwin";
 
-export async function waitForProcessOutput(command: string, args: string[]): Promise<{ stderr: string, stdout: string }> {
-    const cp = child_process.spawn(command, args, { timeout: 2_000, stdio: ['ignore', 'pipe', 'pipe'] });
+export async function waitForProcessOutput(command: string, args: string[], opts?: Omit<child_process.SpawnOptions, "stdio">): Promise<{ stderr: string, stdout: string, exitCode: number }> {
+    const cp = child_process.spawn(command, args, { timeout: 2_000, ...opts, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = "";
     let stderr = "";
     let ends = 0;
     await new Promise((resolve, reject) => {
-        const endF = () => { ends += 1; if (ends == 2) { resolve(void 0); } };
+        const endF = () => { ends += 1; if (ends === 3) { resolve(void 0); } };
         cp.on("error", (err) => reject(err));
+        cp.on("exit", endF);
         cp.stdout.setEncoding('utf8');
         cp.stdout.on("data", (chunk) => {
             stdout += chunk.toString();
@@ -28,5 +30,5 @@ export async function waitForProcessOutput(command: string, args: string[]): Pro
         })
         cp.stderr.on("end", endF);
     });
-    return { stdout, stderr };
+    return { stdout, stderr, exitCode: cp.exitCode! };
 }

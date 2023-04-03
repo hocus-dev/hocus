@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.8
+
+- Add UseKeychain option to the ssh config
+
 ## 0.0.7
 
 - Add popup when connecting without ssh-agent
