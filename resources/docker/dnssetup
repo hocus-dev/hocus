@@ -5,7 +5,6 @@
 # Required-Stop:
 # Default-Start:     2 3 4 5
 # Default-Stop:
-# Short-Description: Setups /etc/resolv.conf
+# Short-Description: Setups /etc/hosts
 ### END INIT INFO
-echo "nameserver 8.8.8.8" > /etc/resolv.conf
 echo "127.0.0.1       localhost" >> /etc/hosts

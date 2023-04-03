@@ -92,7 +92,13 @@ export class AgentUtilService {
     }
   }
 
-  async writeFile(ssh: NodeSSH, path: string, content: string): Promise<void> {
+  async writeFile(
+    ssh: NodeSSH,
+    path: string,
+    content: string,
+    useSudo: boolean = false,
+  ): Promise<void> {
+    const cmdPrefix = useSudo ? ["sudo"] : [];
     // I don't use SFTP because I've found it to be unreliable, causing
     // untraceable errors.
     try {
@@ -100,14 +106,10 @@ export class AgentUtilService {
         {
           ssh,
           opts: {
-            execOptions: {
-              env: {
-                FILE_CONTENT: content,
-              } as any,
-            },
+            stdin: content,
           },
         },
-        ["bash", "-c", `echo -n "$FILE_CONTENT" > ${path}`],
+        [...cmdPrefix, "bash", "-c", `cat - > ${path}`],
       );
     } catch (err) {
       throw new Error(`Failed to write file "${path}": ${(err as any)?.message}`);

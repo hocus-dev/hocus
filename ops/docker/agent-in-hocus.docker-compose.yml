@@ -16,6 +16,7 @@ services:
       - "${AGENT_REPO_DIR}:/app"
       - "${HOCUS_RESOURCES_DIR}:/srv/jailer"
       - /dev/kvm:/dev/kvm
+      - /etc/resolv.conf:/host/resolv.conf:ro
     environment:
       - "HOCUS_DEV_GIT_NAME=${HOCUS_DEV_GIT_NAME}"
       - "HOCUS_DEV_GIT_EMAIL=${HOCUS_DEV_GIT_EMAIL}"
