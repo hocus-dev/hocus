@@ -11,14 +11,26 @@ export const PageFooter = (): JSX.Element => {
               © 2023<span className="ml-1">hocus.dev</span>
             </span>
           </a>
-          <div className="mt-4 flex space-x-6 sm:mt-0 sm:justify-center">
+          <div className="flex items-center gap-8">
             <a
-              className="text-2xl text-gray-400 hover:text-gray-200 transition-all"
-              href="https://github.com/hocus-dev/hocus"
-              target="_blank noreferrer noopener"
+              className="text-sm text-gray-400 hover:text-gray-200"
+              href="https://hocus.dev/newsletter"
+              target="_blank"
+              rel="noreferrer noopener"
             >
-              <i className="fa-brands fa-github"></i>
+              <i className="fa-solid fa-envelope mr-2"></i>
+              <span>Newsletter</span>
             </a>
+
+            <div className="mt-4 flex space-x-6 sm:mt-0 sm:justify-center">
+              <a
+                className="text-2xl text-gray-400 hover:text-gray-200 transition-all"
+                href="https://github.com/hocus-dev/hocus"
+                target="_blank noreferrer noopener"
+              >
+                <i className="fa-brands fa-github"></i>
+              </a>
+            </div>
           </div>
         </div>
       </div>
