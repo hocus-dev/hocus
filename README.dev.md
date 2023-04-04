@@ -4,8 +4,10 @@ This is a developer readme. It is not intended for end users.
 
 ## Running workflow tests
 
-Attach to the agent container and run:
+Inside a hocus workspace run:
 
 ```bash
-yarn jest 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
+sudo ./ops/bin/dev/run-agent-tests.sh
 ```
+
+This will build test VM's, attach to the running Hocus agent and start an E2E test suite using https://github.com/hocus-dev/tests

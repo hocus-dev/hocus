@@ -60,8 +60,7 @@ const provideActivities = (
          * The tests will also work with a regular buildfs root fs,
          * but they will be slower.
          */
-        // TODO: build it automatically in a Hocus prebuild
-        // buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
+        buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
       }),
     },
   });
