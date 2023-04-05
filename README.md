@@ -44,6 +44,9 @@ That's it! Hocus is fully containerized and won't install anything directly on y
 ```bash
 git clone https://github.com/hocus-dev/hocus.git
 cd hocus
+# HOCUS_HOSTNAME is the hostname of the machine where you are deploying Hocus
+# If you are running Hocus locally, set it to "localhost"
+# If you are running Hocus on a remote server, set it to the hostname of the server
 HOCUS_HOSTNAME="localhost" ops/bin/local-up.sh
 ```
 
