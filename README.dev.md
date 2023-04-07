@@ -20,5 +20,6 @@ cp resources/docker/buildkite-agent.cfg.example resources/docker/buildkite-agent
 vim resources/docker/buildkite-agent.cfg
 # This will build a new VM based on resources/docker/buildkite-agent.Dockerfile and start it in qemu.
 # 80% of host memory is passed to the VM as a balloon device with free page reporting enabled :)
-./ops/bin/dev/run-buildkite.sh
+# Half of the host cores are passed to the VM
+sudo ./ops/bin/dev/run-buildkite.sh
 ```

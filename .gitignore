@@ -10,3 +10,4 @@ app/styles
 ops/resources/gitpod-ip.sh
 buildkite.ext4
 buildkite.qcow2
+vmlinux-*.bin

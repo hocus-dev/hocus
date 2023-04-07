@@ -11,15 +11,20 @@ ops/bin/buildfs.sh "$DOCKERFILE_DIR/buildkite-agent.Dockerfile" "buildkite.ext4"
 qemu-img convert -f raw -O qcow2 buildkite.ext4 buildkite.qcow2
 qemu-img resize buildkite.qcow2 500G
 
+wget --continue --retry-connrefused --waitretry=1 --timeout=20 --tries=3 -O "./vmlinux-5.10-x86_64.bin" https://github.com/hocus-dev/linux-kernel/releases/download/0.0.3/vmlinux
+
+total_cores=$(nproc)
+allocated_cores=$((total_cores / 2))
 total_memory=$(free -b | awk '/^Mem:/{print $2}')
-allocated_memory=$(echo "scale=0; $total_memory * 0.8" | bc)
+allocated_memory=$((total_memory * 8 / 10 / 1024))
 qemu-system-x86_64 \
-        -m ${allocated_memory}B \
+        -m ${allocated_memory}K \
         -cpu host \
+	-smp ${allocated_cores} \
         -nographic \
         -enable-kvm \
-        -kernel ../hocus-resources/resources/vmlinux-5.10-x86_64.bin \
-        -drive file=../hocus-resources/resources/buildkite.qcow2,format=qcow2,if=virtio,media=disk \
+        -kernel ./vmlinux-5.10-x86_64.bin \
+        -drive file=./buildkite.qcow2,format=qcow2,if=virtio,media=disk \
         -append "root=/dev/vda console=ttyS0 ip=dhcp" \
         -netdev user,id=n1 \
         -device virtio-net-pci,netdev=n1 \

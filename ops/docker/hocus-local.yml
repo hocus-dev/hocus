@@ -66,6 +66,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: rooms
       PGDATA: /data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
     networks:
       - hocus_net
     volumes:
