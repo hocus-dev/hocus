@@ -1,0 +1,77 @@
+# The token from your Buildkite "Agents" page
+token="INSERT-YOUR-AGENT-TOKEN-HERE"
+
+# The name of the agent
+name="%hostname-%spawn"
+
+# The number of agents to spawn in parallel (default is "1")
+# spawn=1
+
+# The priority of the agent (higher priorities are assigned work first)
+# priority=1
+
+# Tags for the agent (default is "queue=default")
+# tags="key1=val2,key2=val2"
+
+# Include the host's EC2 meta-data as tags (instance-id, instance-type, and ami-id)
+# tags-from-ec2=true
+
+# Include the host's EC2 tags as tags
+# tags-from-ec2-tags=true
+
+# Include the host's Google Cloud instance meta-data as tags (instance-id, machine-type, preemptible, project-id, region, and zone)
+# tags-from-gcp=true
+
+# Include the host's Google Cloud instance labels as tags
+# tags-from-gcp-labels=true
+
+# Path to a custom bootstrap command to run. By default this is `buildkite-agent bootstrap`.
+# This allows you to override the entire execution of a job. Generally you should use hooks instead!
+# See https://buildkite.com/docs/agent/hooks
+# bootstrap-script=""
+
+# Path to where the builds will run from
+build-path="/var/lib/buildkite-agent/builds"
+
+# Directory where the hook scripts are found
+hooks-path="/etc/buildkite-agent/hooks"
+
+# When plugins are installed they will be saved to this path
+plugins-path="/etc/buildkite-agent/plugins"
+
+# Flags to pass to the `git clone` command
+# git-clone-flags=-v
+
+# Flags to pass to the `git clean` command
+# git-clean-flags=-ffxdq
+
+# Do not run jobs within a pseudo terminal
+# no-pty=true
+
+# Don't automatically verify SSH fingerprints
+# no-automatic-ssh-fingerprint-verification=true
+
+# Don't allow this agent to run arbitrary console commands
+# no-command-eval=true
+
+# Don't allow this agent to run plugins
+# no-plugins=true
+
+# Enable debug mode
+# debug=true
+
+# Don't show colors in logging
+# no-color=true
+
+# The next two options are relevant to the Datadog integration, available 3.7.0 and on
+# See https://forum.buildkite.community/t/about-our-datadog-integration/216 for details
+# Send metrics to DogStatsD running on metrics-datadog-host
+# metrics-datadog=true
+
+# Host to collect Buildkite metrics
+# datadog-agent will need to run DogStatsD, presumed on port 8125. 
+# Specify port below like my-host:8126 if not using 8125
+# metrics-datadog-host=127.0.0.1
+
+# If set and valid, the given tracing backend will be enabled. Eg: datadog
+# tracing-backend=""

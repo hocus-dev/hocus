@@ -8,3 +8,5 @@ core*
 app/styles
 .yarn-cache
 ops/resources/gitpod-ip.sh
+buildkite.ext4
+buildkite.qcow2
