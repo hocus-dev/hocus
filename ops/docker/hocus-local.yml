@@ -57,7 +57,6 @@ services:
 
   db:
     image: "postgres:15.2-alpine"
-    restart: unless-stopped
     depends_on:
       setup-keycloak:
         condition: service_completed_successfully
