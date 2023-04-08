@@ -39,6 +39,9 @@ hooks-path="/etc/buildkite-agent/hooks"
 # When plugins are installed they will be saved to this path
 plugins-path="/etc/buildkite-agent/plugins"
 
+experiment=git-mirrors,ansi-timestamps,normalised-upload-paths,resolve-commit-after-checkout
+git-mirrors-path=/var/lib/buildkite-agent/mirrors
+
 # Flags to pass to the `git clone` command
 # git-clone-flags=-v
 

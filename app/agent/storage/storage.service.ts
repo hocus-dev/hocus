@@ -11,7 +11,7 @@ import type { AgentStorage } from "./storage.validator";
 import { AgentStorageValidator } from "./storage.validator";
 
 /**
- * The lowlevel storage service is responsible for reading and writing the agent's storage file.
+ * The low level storage service is responsible for reading and writing the agent's storage file.
  *
  * It should not be constructed directly, instead use `StorageService`. This
  * ensures that the storage file is locked while it is being read or written.

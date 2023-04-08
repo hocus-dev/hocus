@@ -1,3 +1,7 @@
+# TODO: Auto publish this in https://www.schemastore.org/json/
+# If changed then to regenerate:
+# npx ts-node entrypoints/utils/generate-hocus-yml-json-schema.ts > hocus.yml.schema.json
+# yaml-language-server: $schema=hocus.yml.schema.json
 image:
   file: hocus.Dockerfile
   buildContext: ./
@@ -9,7 +13,7 @@ tasks:
       ops/bin/prepare.sh
     workspaceShell: fish
     workspace: |
-      ops/bin/link.sh
+      npx ts-node -r tsconfig-paths/register entrypoints/utils/generate-hocus-yml-json-schema.ts > hocus.yml.schema.json
       ops/bin/up.sh
       ops/bin/temporal-up.sh
       npm run dev
@@ -28,8 +32,7 @@ tasks:
       sleep 0.01
     workspaceShell: fish
     workspace: |
-      ops/bin/link.sh
-      PORT=1337 npx ts-node entrypoints/codec-server.ts
+      PORT=1337 npx ts-node -r tsconfig-paths/register entrypoints/codec-server.ts
   - name: Terminal
     prebuild: sleep 0.01
     workspaceShell: fish
@@ -48,3 +51,11 @@ vscode:
     - pomdtr.excalidraw-editor
     - bierner.markdown-mermaid
     - ms-azuretools.vscode-docker
+    # Code spell checking
+    - streetsidesoftware.code-spell-checker
+    # Dockerfile linter
+    - exiasr.hadolint
+    # Shell script linter
+    - timonwong.shellcheck
+    # Prose linter
+    - errata-ai.vale-server

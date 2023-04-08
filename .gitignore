@@ -11,3 +11,7 @@ ops/resources/gitpod-ip.sh
 buildkite.ext4
 buildkite.qcow2
 vmlinux-*.bin
+hocus.yml.schema.json
+.clinic
+agent-build
+prisma/tmp*.prisma

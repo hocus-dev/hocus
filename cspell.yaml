@@ -1,0 +1,167 @@
+useGitignore: true
+enableGlobDot: true
+dictionaries:
+  - en_US
+  - bash
+  - typescript
+  - docker
+  - npm
+  - lorem-ipsum
+  - html-symbol-entities
+import:
+  - "@cspell/dict-html-symbol-entities/cspell-ext.json"
+  - "@cspell/dict-lorem-ipsum/cspell-ext.json"
+  - "@cspell/dict-npm/cspell-ext.json"
+ignoreRegExpList:
+  # GH Advisories
+  - GHSA-[-\w]+
+  # SSH keys
+  - (["''`])ssh-ed25519.*?\1
+  # PGP keys
+  - /-----BEGIN OPENSSH PRIVATE KEY-----[\w\W]+?-----END OPENSSH PRIVATE KEY-----/m
+  # Posthog tokens
+  - (['"`])phc_\w+?\1
+  # flaky Imports
+  - ts-toolbelt
+  # Vscode extension id's in yamls
+  - \- [\w-]+.[\w-]+
+  # JWT's
+  - \"([a-zA-Z0-9_=]+)\.([a-zA-Z0-9_=]+)\.([a-zA-Z0-9_\\-\\+/=]*)\"
+  # Container names
+  - ([A-Za-z0-9\-]+)/[A-Za-z0-9\-]+:[A-Za-z0-9\-]+
+  # Networking
+  - \w+-hocusvm
+  # Command options
+  - --retry-connrefused
+  - --waitretry
+  - --dbname
+  - --outfile
+  - -maxdepth
+  - -nographic
+  - -genkey
+  - openssl ecparam
+  - -CAcreateserial
+overrides:
+  - filename: "**/sshd_config"
+    words:
+      - GSSAPI
+      - pubkey
+      - hostbased
+      - rhosts
+      - shosts
+      - anoncvs
+ignorePaths:
+  - .clinic
+  - cspell.yaml
+  - package.json
+  - node_modules
+  - public/font-awesome
+  - public/fonts
+  - ops/docker/resources/keycloak-db-dump.sql
+  - public/devicon.min.css
+  - "*.excalidraw"
+  - prisma/migrations
+  - .git
+  - .gitignore
+  - .linting
+  - .env
+  - .vscode
+  # External stuff which better to not modify
+  - deps/firecracker-client
+  - buildkite-agent.cfg.example
+  - ops/bin/kvm-ok
+words:
+  - typebox
+  - tailwindcss
+  - flowbite
+  - excalidraw
+  - posthog
+  - envlist
+  - prebuild
+  - prebuilds
+  - dnssetup
+  - usermod
+  - iputils
+  - resolv
+  - nameserver
+  - urandom
+  - buildfs
+  - netns
+  - veth
+  - vpeer
+  - keycloak
+  - esbuild
+  - socat
+  - mkfifo
+  - blkid
+  - hadolint
+  - dockerfiles
+  - oidc
+  - kaniko
+  - virt
+  - localtime
+  - Gitea
+  - Codespaces
+  - Gerrit
+  - Roadmap
+  - tmpfs
+  - pgtmpfs
+  - PGDATA
+  - isready
+  - NOPASSWD
+  - hocusdev
+  - vcpu
+  - entrypoints
+  - quickstart
+  - rootfs
+  - autoincrement
+  - Timestamptz
+  - dbgenerated
+  - permissioning
+  - archivable
+  - datasource
+  - temporalio
+  - EOSQL
+  - psql
+  - sshgateway
+  - pacman
+  - tailscale
+  - qcow
+  - vmlinux
+  - virtio
+  - netdev
+  - stty
+  - rootca
+  - dtach
+  - gorbak
+  - uuidv
+  - retriable
+  - bson
+  - distroless
+  - dynamicconfig
+  - tclt
+  - nologin
+  - psmisc
+  - POSTROUTING
+  - PREROUTING
+  - dnat
+  - dport
+  - keychain
+  - mapenum
+  - jdbc
+  - sideloading
+  - archlinux
+  - ejson
+  - cbor
+  - sshpk
+  - camelcase
+  - poweroff
+  - tailscaled
+  - preauthkey
+  - fetchrepo
+  - passwordless
+  - tctl
+  - ovsx
+  - upperdir
+  - lowerdir
+  - nproc

@@ -2,8 +2,8 @@
 
 set -e
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-PROJECT_DIR=$(dirname $(dirname "$SCRIPTPATH"))
+SCRIPT_PATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+PROJECT_DIR=$(dirname $(dirname "$SCRIPT_PATH"))
 
 # These env variables help with caching
 export COMPOSE_DOCKER_CLI_BUILD=1

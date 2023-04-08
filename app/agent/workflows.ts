@@ -568,8 +568,8 @@ export async function runMonitorArchivablePrebuilds(args: {
       // eslint-disable-next-line no-console
       console.error(err);
     }
-    const fifteeenSeconds = 15 * 1000;
-    await sleep(fifteeenSeconds);
+    const fifteenSeconds = 15 * 1000;
+    await sleep(fifteenSeconds);
   }
   await continueAsNew<typeof runMonitorArchivablePrebuilds>(args);
 }

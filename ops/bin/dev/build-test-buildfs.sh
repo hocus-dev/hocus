@@ -1,6 +1,13 @@
 #!/bin/bash
 set -o errexit
 set -o pipefail
+
+export OUTPUT_DIR="$1"
+if [ -z "$OUTPUT_DIR" ]; then
+    echo "Usage: $0 OUTPUT_DIR"
+    exit 1
+fi
+
 set -o nounset
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -9,8 +16,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 export SCRIPT_DIR="$(dirname "$0")"
-export REPO_DIR="$(realpath "${SCRIPT_DIR}/../../..")"
-export RESOURCES_DIR=$REPO_DIR/../hocus-resources/resources
+export RESOURCES_DIR=$OUTPUT_DIR
 
 # Set up the image for running tests
 cp $RESOURCES_DIR/buildfs.ext4 $RESOURCES_DIR/tmp-buildfs.ext4

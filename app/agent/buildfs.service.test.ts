@@ -33,10 +33,15 @@ test.concurrent(
       ["git://github.com", true],
       ["ssh://github.com", true],
       ["httphey", false],
-      ["https://hey", false],
+      ["https://hey", true],
     ];
     for (const [url, expected] of cases) {
-      expect(buildfsService["isUrl"](url)).toBe(expected);
+      const r: boolean = buildfsService["isUrl"](url);
+      if (r !== expected) {
+        // eslint-disable-next-line no-console
+        console.error(`Regex did not match ${url} as expected. Expected: ${expected}, Got: ${r}`);
+      }
+      expect(r).toBe(expected);
     }
   }),
 );

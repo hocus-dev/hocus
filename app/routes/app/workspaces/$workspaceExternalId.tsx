@@ -57,7 +57,7 @@ export default function ProjectRoute(): JSX.Element {
     void 0,
   );
   useEffect(() => {
-    const innerfn = async () => {
+    const innerFn = async () => {
       const intervalsMs: Record<WorkspaceStatus, number> = {
         WORKSPACE_STATUS_PENDING_CREATE: 1000,
         WORKSPACE_STATUS_PENDING_START: 1000,
@@ -91,7 +91,7 @@ export default function ProjectRoute(): JSX.Element {
     if (!fetchLoopStarted) {
       setFetchLoopStarted(true);
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      innerfn();
+      innerFn();
     }
   }, [loaderData, setFetchedData, fetchLoopStarted, setFetchLoopStarted]);
   const workspace = fetchedData?.workspace ?? loaderData.workspace;

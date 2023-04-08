@@ -89,7 +89,6 @@ While in **alpha**, every version change should be assumed to be **breaking**. T
 
 This repository's code is licensed under the Elastic License v2.0, unless stated otherwise. The `extensions` directory and its subdirectories are licensed under MIT.
 
-
 ## Newsletter
 
 You can get occasional updates about Hocus development by signing up to [our newsletter](https://hocus.dev/newsletter).
