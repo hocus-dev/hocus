@@ -28,3 +28,5 @@ RUN apt-get update && apt-get install -y buildkite-agent
 # Configure it
 COPY ./docker/buildkite-agent.cfg /etc/buildkite-agent/buildkite-agent.cfg
 RUN systemctl enable buildkite-agent
+RUN usermod -aG docker buildkite-agent
+
