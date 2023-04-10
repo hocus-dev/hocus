@@ -1,12 +1,14 @@
 import type { Project } from "@prisma/client";
-import { Badge, Button } from "flowbite-react";
+import { Alert, Badge, Button } from "flowbite-react";
 import React from "react";
 import type { Any } from "ts-toolbelt";
 import { MAX_REPOSITORY_DRIVE_SIZE_MIB } from "~/constants.shared";
+import type { EditProjectVmSettings } from "~/schema/edit-project-vm-settings.validator.server";
 
+import { CsrfInput } from "../csrf-input";
 import { TextInputAddonRight } from "../text-input-addon-right";
 
-const VmSettingsFields = [
+export const VmSettingsFields = [
   "maxPrebuildRamMib",
   "maxPrebuildVCPUCount",
   "maxWorkspaceRamMib",
@@ -18,7 +20,9 @@ const VmSettingsFields = [
 
 export type VmSettingsField = typeof VmSettingsFields[number];
 // enforce that VmSettingsField is a subset of Project fields
-const _typecheck: Any.Contains<VmSettingsField, keyof Project> = 1;
+const _typecheck1: Any.Contains<VmSettingsField, keyof Project> = 1;
+// enforce that VmSettingsField is a subset of EditProjectVmSettings fields
+const _typecheck2: Any.Contains<VmSettingsField, keyof EditProjectVmSettings> = 1;
 
 export const VmSettingsField = Object.fromEntries(
   VmSettingsFields.map((field) => [field, field]),
@@ -81,9 +85,11 @@ function InputFieldComponent(props: {
 const InputField = React.memo(InputFieldComponent);
 
 function SettingsTabComponent(props: {
-  [key in VmSettingsField]: number;
+  projectExternalId: string;
+  vmSettings: Record<VmSettingsField, number>;
+  showSuccess: boolean;
 }): JSX.Element {
-  const vmSettings = props;
+  const vmSettings = props.vmSettings;
   const [edited, setEdited] = React.useState(
     Object.fromEntries(VmSettingsFields.map((field) => [field, false])) as Record<
       VmSettingsField,
@@ -94,8 +100,15 @@ function SettingsTabComponent(props: {
 
   return (
     <InputContext.Provider value={{ initialValues: vmSettings, setEdited, edited }}>
-      <form>
+      <form method="POST">
+        <input type="hidden" name="projectExternalId" value={props.projectExternalId} />
+        <CsrfInput />
         <div className="flex flex-col gap-4">
+          {props.showSuccess && (
+            <Alert color="success">
+              <span>Changes saved successfully.</span>
+            </Alert>
+          )}
           <div className="flex gap-4 justify-between">
             <h1 className="font-bold text-xl mb-4">Project Settings</h1>
             {formEdited && <Badge color="gray">Unsaved changes</Badge>}
