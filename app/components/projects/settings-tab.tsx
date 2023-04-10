@@ -1,27 +1,41 @@
+import type { Project } from "@prisma/client";
 import { Button } from "flowbite-react";
 import React from "react";
+import type { Any } from "ts-toolbelt";
 import { MAX_REPOSITORY_DRIVE_SIZE_MIB } from "~/constants.shared";
 
 import { TextInputAddonRight } from "../text-input-addon-right";
 
+import type { valueof } from "~/types/utils";
+
 function InputFieldComponent(props: {
   title: React.ReactNode;
   unit: string;
+  inputName: string;
+  initialValue: number;
   inputExtraClassName?: string;
   inputProps?: React.DetailedHTMLProps<
     React.InputHTMLAttributes<HTMLInputElement>,
     HTMLInputElement
   >;
 }): JSX.Element {
+  const [value, setValue] = React.useState(props.initialValue);
+  const onChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.currentTarget.validity.valid) {
+      setValue(Number(e.currentTarget.value));
+    }
+  }, []);
   return (
-    <div className={`flex flex-col justify-end`}>
+    <div className="flex flex-col justify-end">
       <h3 className="text-sm text-gray-400 mb-2">{props.title}</h3>
       <TextInputAddonRight
         inputExtraClassName={props.inputExtraClassName ?? "max-w-[6rem]"}
         inputProps={{
           ...props.inputProps,
+          value,
+          name: props.inputName,
           type: "number",
-          onChange: () => {},
+          onChange,
         }}
         addon={<span>{props.unit}</span>}
       />
@@ -31,7 +45,27 @@ function InputFieldComponent(props: {
 
 const InputField = React.memo(InputFieldComponent);
 
-function SettingsTabComponent(props: { maxPrebuildRamMib: number }): JSX.Element {
+export type VmSettingsField = valueof<typeof VmSettingsField>;
+export const VmSettingsField = {
+  maxPrebuildRamMib: "maxPrebuildRamMib",
+  maxPrebuildVCPUCount: "maxPrebuildVCPUCount",
+  maxWorkspaceRamMib: "maxWorkspaceRamMib",
+  maxWorkspaceVCPUCount: "maxWorkspaceVCPUCount",
+  maxWorkspaceProjectDriveSizeMib: "maxWorkspaceProjectDriveSizeMib",
+  maxWorkspaceRootDriveSizeMib: "maxWorkspaceRootDriveSizeMib",
+  maxPrebuildRootDriveSizeMib: "maxPrebuildRootDriveSizeMib",
+} as const;
+
+type VmSettings = {
+  [key in VmSettingsField]: number;
+};
+
+// enforce that VmSettingsField is a subset of Project fields
+const _typecheck: Any.Contains<VmSettingsField, keyof Project> = 1;
+
+function SettingsTabComponent(props: VmSettings): JSX.Element {
+  const vmSettings = props;
+
   return (
     <form>
       <div className="flex flex-col gap-4">
@@ -42,31 +76,31 @@ function SettingsTabComponent(props: { maxPrebuildRamMib: number }): JSX.Element
             <InputField
               title="Virtual CPU Cores"
               inputProps={{
-                name: "prebuildVCPU",
-                defaultValue: 4,
                 min: 1,
               }}
               unit="VCPU"
               inputExtraClassName="max-w-[5rem]"
+              inputName={VmSettingsField.maxPrebuildVCPUCount}
+              initialValue={vmSettings.maxPrebuildVCPUCount}
             />
             <InputField
               title="RAM"
               inputProps={{
-                name: "workspaceRam",
-                defaultValue: 4096,
                 min: 1,
               }}
               unit="MiB"
+              inputName={VmSettingsField.maxPrebuildRamMib}
+              initialValue={vmSettings.maxPrebuildRamMib}
             />
             <InputField
               title="Max Root Filesystem Size"
               inputProps={{
-                name: "workspaceRootSize",
-                defaultValue: 10000,
                 min: 1,
               }}
               unit="MiB"
               inputExtraClassName="max-w-[10rem]"
+              inputName={VmSettingsField.maxPrebuildRootDriveSizeMib}
+              initialValue={vmSettings.maxPrebuildRootDriveSizeMib}
             />
             <div className="flex flex-col justify-end">
               <h3 className="text-sm text-gray-400 mb-2">Max Project Filesystem Size</h3>
@@ -88,41 +122,41 @@ function SettingsTabComponent(props: { maxPrebuildRamMib: number }): JSX.Element
             <InputField
               title="Virtual CPU Cores"
               inputProps={{
-                name: "prebuildVCPU",
-                defaultValue: 8,
                 min: 1,
               }}
               unit="VCPU"
               inputExtraClassName="max-w-[5rem]"
+              inputName={VmSettingsField.maxWorkspaceVCPUCount}
+              initialValue={vmSettings.maxWorkspaceVCPUCount}
             />
             <InputField
               title="RAM"
               inputProps={{
-                name: "workspaceRam",
-                defaultValue: 16192,
                 min: 1,
               }}
               unit="MiB"
+              inputName={VmSettingsField.maxWorkspaceRamMib}
+              initialValue={vmSettings.maxWorkspaceRamMib}
             />
             <InputField
               title="Max Root Filesystem Size"
               inputProps={{
-                name: "workspaceRootSize",
-                defaultValue: 250000,
                 min: 1,
               }}
               unit="MiB"
               inputExtraClassName="max-w-[10rem]"
+              inputName={VmSettingsField.maxWorkspaceRootDriveSizeMib}
+              initialValue={vmSettings.maxWorkspaceRootDriveSizeMib}
             />
             <InputField
               title="Max Root Project Size"
               inputProps={{
-                name: "workspaceRootSize",
-                defaultValue: 250000,
                 min: 1,
               }}
               unit="MiB"
               inputExtraClassName="max-w-[10rem]"
+              inputName={VmSettingsField.maxWorkspaceProjectDriveSizeMib}
+              initialValue={vmSettings.maxWorkspaceProjectDriveSizeMib}
             />
           </div>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
