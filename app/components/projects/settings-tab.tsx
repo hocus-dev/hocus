@@ -1,5 +1,5 @@
 import type { Project } from "@prisma/client";
-import { Button } from "flowbite-react";
+import { Badge, Button } from "flowbite-react";
 import React from "react";
 import type { Any } from "ts-toolbelt";
 import { MAX_REPOSITORY_DRIVE_SIZE_MIB } from "~/constants.shared";
@@ -51,13 +51,14 @@ function InputFieldComponent(props: {
       if (!e.currentTarget.validity.valid) {
         return;
       }
-      const value = Number(e.currentTarget.value);
-      setValue(value);
-      if (edited !== context.edited[props.inputName]) {
-        context.setEdited((prev) => ({ ...prev, [props.inputName]: edited }));
+      const newValue = Number(e.currentTarget.value);
+      const nowEdited = newValue !== initialValue;
+      setValue(newValue);
+      if (nowEdited !== context.edited[props.inputName]) {
+        context.setEdited((prev) => ({ ...prev, [props.inputName]: nowEdited }));
       }
     },
-    [context, props.inputName, edited],
+    [context, props.inputName, initialValue],
   );
   return (
     <div className="flex flex-col justify-end">
@@ -89,12 +90,16 @@ function SettingsTabComponent(props: {
       boolean
     >,
   );
+  const formEdited = Object.values(edited).some((v) => v);
 
   return (
     <InputContext.Provider value={{ initialValues: vmSettings, setEdited, edited }}>
       <form>
         <div className="flex flex-col gap-4">
-          <h1 className="font-bold text-xl mb-4">Project Settings</h1>
+          <div className="flex gap-4 justify-between">
+            <h1 className="font-bold text-xl mb-4">Project Settings</h1>
+            {formEdited && <Badge color="gray">Unsaved changes</Badge>}
+          </div>
           <div>
             <h2 className="font-bold text-lg mb-2">Prebuild Limits</h2>
             <div className="flex gap-4">
@@ -185,7 +190,7 @@ function SettingsTabComponent(props: {
           <div className="border-t border-gray-700"></div>
 
           <div className="flex justify-end">
-            <Button className="w-fit" type="submit" color="success">
+            <Button className="w-fit" type="submit" color="success" disabled={!formEdited}>
               <i className="fa-solid fa-floppy-disk mr-2"></i>
               <span>Save Changes</span>
             </Button>
