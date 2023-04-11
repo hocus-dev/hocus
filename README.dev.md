@@ -10,13 +10,13 @@ Inside a hocus workspace run:
 sudo ./ops/bin/dev/run-agent-tests.sh
 ```
 
-This will build test VM's, attach to the running Hocus agent and start an E2E test suite using https://github.com/hocus-dev/tests
-
-### Running workflow tests with a flamegraph
+You can set the following environment variable before running jest to see performance tracing:
 
 ```bash
-yarn clinic flame -- node node_modules/jest/bin/jest.js 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
+PERF_MONITORING_ENABLED=1
 ```
+
+This will build test VM's, attach to the running Hocus agent and start an E2E test suite using https://github.com/hocus-dev/tests
 
 ## To add another buildkite runner
 

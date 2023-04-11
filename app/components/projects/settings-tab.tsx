@@ -85,6 +85,7 @@ const InputField = React.memo(InputFieldComponent);
 
 function SettingsTabComponent(props: {
   projectExternalId: string;
+  maxRepositoryDriveSizeMib: number;
   vmSettings: Record<VmSettingsField, number>;
   showSuccess: boolean;
 }): JSX.Element {
@@ -145,7 +146,7 @@ function SettingsTabComponent(props: {
                 <h3 className="text-sm text-gray-400 mb-2">Max Project Filesystem Size</h3>
                 <TextInputAddonRight
                   inputExtraClassName="max-w-[10rem]"
-                  inputProps={{ disabled: true, value: MAX_REPOSITORY_DRIVE_SIZE_MIB }}
+                  inputProps={{ disabled: true, value: props.maxRepositoryDriveSizeMib }}
                   addon={<span>MiB</span>}
                 />
               </div>

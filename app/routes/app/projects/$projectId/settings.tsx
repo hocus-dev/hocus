@@ -11,6 +11,7 @@ import { Token } from "~/token";
 
 export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
   const projectService = app.resolve(Token.ProjectService);
+  const maxRepositoryDriveSizeMib = app.resolve(Token.Config).shared().maxRepositoryDriveSizeMib;
   const { projectPageProps, project } = await projectService.getProjectFromRequest(db, req);
   const vmSettings = Object.fromEntries(
     Array.from(Object.values(VmSettingsField)).map((field) => [field, project[field]] as const),
@@ -18,6 +19,7 @@ export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
   return json({
     ...projectPageProps,
     vmSettings,
+    maxRepositoryDriveSizeMib,
   });
 };
 
@@ -71,7 +73,8 @@ export const action = async ({ context: { db, req } }: ActionArgs) => {
 };
 
 export default function Settings() {
-  const { project, gitRepository, vmSettings } = useLoaderData<typeof loader>();
+  const { project, gitRepository, vmSettings, maxRepositoryDriveSizeMib } =
+    useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   return (
     <ProjectPage
@@ -83,6 +86,7 @@ export default function Settings() {
           projectExternalId={project.externalId}
           vmSettings={vmSettings}
           showSuccess={actionData != null}
+          maxRepositoryDriveSizeMib={maxRepositoryDriveSizeMib}
         />
       }
     />

@@ -61,9 +61,11 @@ const provideActivities = (
          * but they will be slower.
          */
         buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
+      }),
+      shared: () => ({
+        ...config.shared(),
         maxRepositoryDriveSizeMib: 100,
       }),
-      perfMonitoring: () => ({ enabled: true }),
     },
   });
   const runId = uuidv4();

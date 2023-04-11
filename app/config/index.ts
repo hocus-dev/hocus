@@ -35,6 +35,12 @@ export const config = makeConfig()({
     license: process.env.HOCUS_LICENSE ?? void 0,
     licensePublicKey: HOCUS_LICENSE_PUBLIC_KEY,
   }),
+  shared: () => ({
+    maxRepositoryDriveSizeMib: parseIntWithMin(
+      process.env.SHARED_MAX_REPOSITORY_DRIVE_SIZE_MIB ?? "5000",
+      10,
+    ),
+  }),
   agent: () => ({
     temporalAddress: get("AGENT_TEMPORAL_ADDRESS", "localhost:7233"),
     databaseUrl: get("AGENT_DATABASE_URL", "postgres://postgres:pass@localhost:5432/rooms"),
@@ -63,10 +69,6 @@ export const config = makeConfig()({
     // They will be public soon anyway :)
     createDevelopementProjects:
       (process.env.AGENT_DEV_CREATE_DEVELOPEMENT_PROJECTS ?? "false") === "true",
-    maxRepositoryDriveSizeMib: parseIntWithMin(
-      process.env.AGENT_MAX_REPOSITORY_DRIVE_SIZE_MIB ?? "5000",
-      10,
-    ),
   }),
   hocusRepoAccess: () => ({
     // Temporarily the Hocus repo is private :P Will be removed soon.

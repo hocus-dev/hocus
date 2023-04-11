@@ -12,7 +12,9 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
     const gitService = injector.resolve(Token.AgentGitService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const perfService = injector.resolve(Token.PerfService);
-    const agentConfig = injector.resolve(Token.Config).agent();
+    const maxRepositoryDriveSizeMib = injector
+      .resolve(Token.Config)
+      .shared().maxRepositoryDriveSizeMib;
     perfService.log("fetchRepository", "start", gitRepositoryId);
     const repo = await db.gitRepository.findUniqueOrThrow({
       where: { id: gitRepositoryId },
@@ -28,7 +30,7 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
       firecrackerService,
       {
         pathOnHost: repoFile.file.path,
-        maxSizeMiB: agentConfig.maxRepositoryDriveSizeMib,
+        maxSizeMiB: maxRepositoryDriveSizeMib,
       },
       {
         url: repo.url,
