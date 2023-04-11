@@ -12,6 +12,12 @@ sudo ./ops/bin/dev/run-agent-tests.sh
 
 This will build test VM's, attach to the running Hocus agent and start an E2E test suite using https://github.com/hocus-dev/tests
 
+### Running workflow tests with a flamegraph
+
+```bash
+yarn clinic flame -- node node_modules/jest/bin/jest.js 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
+```
+
 ## To add another buildkite runner
 
 ```bash

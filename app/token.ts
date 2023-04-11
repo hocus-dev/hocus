@@ -30,4 +30,5 @@ export const Token = {
   GitService: "GitServiceT",
   LicenseService: "LicenseServiceT",
   TimeService: "TimeServiceT",
+  PerfService: "PerfServiceT",
 } as const;

@@ -72,4 +72,7 @@ export const config = makeConfig()({
   telemetry: () => ({
     disabled: (process.env.TELEMETRY_DISABLED ?? "") !== "",
   }),
+  perfMonitoring: () => ({
+    enabled: (process.env.PERF_MONITORING_ENABLED ?? "") !== "",
+  }),
 });

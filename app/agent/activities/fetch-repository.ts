@@ -12,6 +12,8 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const gitService = injector.resolve(Token.AgentGitService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const perfService = injector.resolve(Token.PerfService);
+    perfService.log("fetchRepository", "start", gitRepositoryId);
     const repo = await db.gitRepository.findUniqueOrThrow({
       where: { id: gitRepositoryId },
       include: {
@@ -35,4 +37,5 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
         },
       },
     );
+    perfService.log("fetchRepository", "end", gitRepositoryId);
   };

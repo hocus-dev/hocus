@@ -27,8 +27,10 @@ export const prebuild: CreateActivity<PrebuildActivity> =
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const prebuildService = injector.resolve(Token.PrebuildService);
+    const perfService = injector.resolve(Token.PerfService);
     const agentConfig = injector.resolve(Token.Config).agent();
 
+    perfService.log("prebuild", "start", args.prebuildEventId);
     const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
       where: { id: args.prebuildEventId },
       include: {
@@ -57,7 +59,7 @@ export const prebuild: CreateActivity<PrebuildActivity> =
       }),
     );
     const tasks = prebuildEvent.tasks;
-    return await firecrackerService.withVM(
+    const result = await firecrackerService.withVM(
       {
         ssh: {
           username: "hocus",
@@ -96,4 +98,6 @@ export const prebuild: CreateActivity<PrebuildActivity> =
         );
       },
     );
+    perfService.log("prebuild", "end", args.prebuildEventId);
+    return result;
   };

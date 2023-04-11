@@ -62,6 +62,7 @@ const provideActivities = (
          */
         buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
       }),
+      perfMonitoring: () => ({ enabled: true }),
     },
   });
   const runId = uuidv4();
