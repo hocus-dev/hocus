@@ -6,9 +6,11 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+docker exec -it agent /bin/bash -c "
 rm -rf /srv/jailer/resources/project/*
 rm -rf /srv/jailer/resources/buildfs/*
 rm -rf /srv/jailer/resources/buildfs-drives/*
 rm -rf /srv/jailer/resources/repositories/*
 rm -rf /srv/jailer/resources/fs/*
 rm -rf /srv/jailer/resources/checked-out/*
+"
