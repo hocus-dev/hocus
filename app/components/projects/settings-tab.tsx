@@ -2,7 +2,6 @@ import type { Project } from "@prisma/client";
 import { Alert, Badge, Button } from "flowbite-react";
 import React from "react";
 import type { Any } from "ts-toolbelt";
-import { MAX_REPOSITORY_DRIVE_SIZE_MIB } from "~/constants.shared";
 import type { EditProjectVmSettings } from "~/schema/edit-project-vm-settings.validator.server";
 
 import { CsrfInput } from "../csrf-input";

@@ -6,6 +6,17 @@ import { HOCUS_LICENSE_PUBLIC_KEY } from "~/license/constants";
 
 import { makeConfig, get, getEnv } from "./utils.server";
 
+const parseIntWithMin = (value: string, min: number): number => {
+  const parsed = parseInt(value);
+  if (Number.isNaN(parsed)) {
+    throw new Error(`Value must be a number`);
+  }
+  if (parsed < min) {
+    throw new Error(`Value must be at least ${min}`);
+  }
+  return parsed;
+};
+
 export type Config = typeof config;
 export const config = makeConfig()({
   env: getEnv,
@@ -52,6 +63,10 @@ export const config = makeConfig()({
     // They will be public soon anyway :)
     createDevelopementProjects:
       (process.env.AGENT_DEV_CREATE_DEVELOPEMENT_PROJECTS ?? "false") === "true",
+    maxRepositoryDriveSizeMib: parseIntWithMin(
+      process.env.AGENT_MAX_REPOSITORY_DRIVE_SIZE_MIB ?? "5000",
+      10,
+    ),
   }),
   hocusRepoAccess: () => ({
     // Temporarily the Hocus repo is private :P Will be removed soon.

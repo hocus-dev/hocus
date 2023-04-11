@@ -61,6 +61,7 @@ const provideActivities = (
          * but they will be slower.
          */
         buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
+        maxRepositoryDriveSizeMib: 100,
       }),
       perfMonitoring: () => ({ enabled: true }),
     },
@@ -175,6 +176,7 @@ test.concurrent(
           maxPrebuildVCPUCount: 1,
           maxWorkspaceRamMib: 1024,
           maxWorkspaceVCPUCount: 1,
+          maxPrebuildRootDriveSizeMib: 1024,
         },
       });
     }
