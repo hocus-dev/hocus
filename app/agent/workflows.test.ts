@@ -166,6 +166,17 @@ test.concurrent(
         ),
       ),
     );
+    for (const project of projects) {
+      await db.project.update({
+        where: { id: project.id },
+        data: {
+          maxPrebuildRamMib: 1024,
+          maxPrebuildVCPUCount: 1,
+          maxWorkspaceRamMib: 1024,
+          maxWorkspaceVCPUCount: 1,
+        },
+      });
+    }
     const testBranchExpectedResults = [
       {
         testCases: [
