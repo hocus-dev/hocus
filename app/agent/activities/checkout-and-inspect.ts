@@ -36,6 +36,8 @@ export const checkoutAndInspect: CreateActivity<CheckoutAndInspectActivity> =
     const instanceId = `checkout-and-inspect-${randomString(8)}`;
     const fcService = injector.resolve(Token.FirecrackerService)(instanceId);
     const prebuildService = injector.resolve(Token.PrebuildService);
+    const perfService = injector.resolve(Token.PerfService);
+    perfService.log("checkoutAndInspect", "start", args.gitRepositoryId, args.targetBranch);
     const gitRepository = await db.gitRepository.findUniqueOrThrow({
       where: { id: args.gitRepositoryId },
       include: {
@@ -47,11 +49,13 @@ export const checkoutAndInspect: CreateActivity<CheckoutAndInspectActivity> =
         (f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
       ),
     );
-    return await prebuildService.checkoutAndInspect({
+    const result = await prebuildService.checkoutAndInspect({
       fcService,
       repositoryDrivePath: repoFile.file.path,
       targetBranch: args.targetBranch,
       outputDrivePath: args.outputDrivePath,
       projectConfigPaths: args.projectConfigPaths,
     });
+    perfService.log("checkoutAndInspect", "end", args.gitRepositoryId, args.targetBranch);
+    return result;
   };

@@ -41,8 +41,8 @@ expect \"root@\"
 
 # 120 seconds max for download
 set timeout 120
-send \"docker pull hocusdev/workspace\r\"
-expect \"Downloaded newer image for hocusdev/workspace:latest\"
+send \"docker pull hocusdev/workspace-base\r\"
+expect \"Downloaded newer image for hocusdev/workspace-base:latest\"
 expect \"root@\"
 
 # 12 seconds max for fsync

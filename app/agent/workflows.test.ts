@@ -62,6 +62,10 @@ const provideActivities = (
          */
         buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
       }),
+      shared: () => ({
+        ...config.shared(),
+        maxRepositoryDriveSizeMib: 100,
+      }),
     },
   });
   const runId = uuidv4();
@@ -174,6 +178,7 @@ test.concurrent(
           maxPrebuildVCPUCount: 1,
           maxWorkspaceRamMib: 1024,
           maxWorkspaceVCPUCount: 1,
+          maxPrebuildRootDriveSizeMib: 1024,
         },
       });
     }

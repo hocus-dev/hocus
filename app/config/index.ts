@@ -6,6 +6,17 @@ import { HOCUS_LICENSE_PUBLIC_KEY } from "~/license/constants";
 
 import { makeConfig, get, getEnv } from "./utils.server";
 
+const parseIntWithMin = (value: string, min: number): number => {
+  const parsed = parseInt(value);
+  if (Number.isNaN(parsed)) {
+    throw new Error(`Value must be a number`);
+  }
+  if (parsed < min) {
+    throw new Error(`Value must be at least ${min}`);
+  }
+  return parsed;
+};
+
 export type Config = typeof config;
 export const config = makeConfig()({
   env: getEnv,
@@ -23,6 +34,12 @@ export const config = makeConfig()({
     agentHostname: get("CONTROL_PLANE_AGENT_HOSTNAME", "localhost"),
     license: process.env.HOCUS_LICENSE ?? void 0,
     licensePublicKey: HOCUS_LICENSE_PUBLIC_KEY,
+  }),
+  shared: () => ({
+    maxRepositoryDriveSizeMib: parseIntWithMin(
+      process.env.SHARED_MAX_REPOSITORY_DRIVE_SIZE_MIB ?? "5000",
+      10,
+    ),
   }),
   agent: () => ({
     temporalAddress: get("AGENT_TEMPORAL_ADDRESS", "localhost:7233"),
@@ -71,5 +88,8 @@ export const config = makeConfig()({
   }),
   telemetry: () => ({
     disabled: (process.env.TELEMETRY_DISABLED ?? "") !== "",
+  }),
+  perfMonitoring: () => ({
+    enabled: (process.env.PERF_MONITORING_ENABLED ?? "") !== "",
   }),
 });

@@ -12,12 +12,17 @@ export const createPrebuildFiles: CreateActivity<CreatePrebuildFilesActivity> =
   async (args) => {
     const prebuildService = injector.resolve(Token.PrebuildService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const perfService = injector.resolve(Token.PerfService);
 
     const agentInstance = await db.$transaction(async (tdb) =>
       agentUtilService.getOrCreateSoloAgentInstance(tdb),
     );
-    return await prebuildService.createPrebuildEventFiles(db, {
+
+    perfService.log("createPrebuildFiles", "start", args);
+    const result = await prebuildService.createPrebuildEventFiles(db, {
       ...args,
       agentInstanceId: agentInstance.id,
     });
+    perfService.log("createPrebuildFiles", "end", args);
+    return result;
   };

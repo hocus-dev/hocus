@@ -13,6 +13,7 @@ import type { Config as SSHConfig, NodeSSH } from "node-ssh";
 import { match } from "ts-pattern";
 import { fetch, Agent } from "undici";
 import type { Config } from "~/config";
+import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
 import { displayError, numericSort, unwrap } from "~/utils.shared";
 
@@ -36,15 +37,24 @@ export function factoryFirecrackerService(
   agentUtilService: AgentUtilService,
   logger: DefaultLogger,
   config: Config,
+  perfService: PerfService,
 ): (instanceId: string) => FirecrackerService {
   return (instanceId: string) =>
-    new FirecrackerService(storageService, agentUtilService, logger, config, instanceId);
+    new FirecrackerService(
+      storageService,
+      agentUtilService,
+      logger,
+      config,
+      perfService,
+      instanceId,
+    );
 }
 factoryFirecrackerService.inject = [
   Token.StorageService,
   Token.AgentUtilService,
   Token.Logger,
   Token.Config,
+  Token.PerfService,
 ] as const;
 
 export class FirecrackerService {
@@ -60,6 +70,7 @@ export class FirecrackerService {
     private readonly agentUtilService: AgentUtilService,
     private readonly logger: DefaultLogger,
     private readonly config: Config,
+    private readonly perfService: PerfService,
     public readonly instanceId: string,
   ) {
     this.agentConfig = config.agent();
@@ -506,6 +517,7 @@ export class FirecrackerService {
           ipBlockId: unwrap(ipBlockId),
         });
 
+        this.perfService.log(fcPid, "withVM exit start");
         // Ensure the page cache is flushed before proceeding
         await execSshCmd({ ssh }, ["sync"]);
 
@@ -521,6 +533,7 @@ export class FirecrackerService {
       if (shouldPoweroff && config.removeVmDirAfterPoweroff !== false) {
         await this.tryDeleteVmDir();
       }
+      this.perfService.log(fcPid, "withVM exit end");
     }
   }
 

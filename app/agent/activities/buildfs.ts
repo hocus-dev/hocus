@@ -12,6 +12,11 @@ export const buildfs: CreateActivity<BuildfsActivity> =
     const instanceId = `buildfs-${uuidv4()}`;
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const buildfsService = injector.resolve(Token.BuildfsService);
+    const perfService = injector.resolve(Token.PerfService);
 
-    return await buildfsService.buildfs({ ...args, db, firecrackerService });
+    perfService.log("buildfs", "start", args.buildfsEventId);
+    const result = await buildfsService.buildfs({ ...args, db, firecrackerService });
+    perfService.log("buildfs", "end", args.buildfsEventId);
+
+    return result;
   };

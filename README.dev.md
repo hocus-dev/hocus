@@ -10,6 +10,12 @@ Inside a hocus workspace run:
 sudo ./ops/bin/dev/run-agent-tests.sh
 ```
 
+You can set the following environment variable before running jest to see performance tracing:
+
+```bash
+PERF_MONITORING_ENABLED=1
+```
+
 This will build test VM's, attach to the running Hocus agent and start an E2E test suite using https://github.com/hocus-dev/tests
 
 ## To add another buildkite runner

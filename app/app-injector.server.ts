@@ -8,6 +8,7 @@ import { UserService } from "~/user/user.service.server";
 
 import { GitService } from "./git/git.service";
 import { LicenseService } from "./license/license.service";
+import { PerfService } from "./perf.service.server";
 import { ProjectService } from "./project/project.service";
 import { SshKeyService } from "./ssh-key/ssh-key.service";
 import { clientFactory } from "./temporal/client-factory";
@@ -29,6 +30,7 @@ export const createAppInjector = (
       overrides[Token.Logger] !== void 0 ? (): Logger => overrides[Token.Logger] as any : newLogger,
       Scope.Transient,
     )
+    .provideClass(Token.PerfService, PerfService)
     .provideClass(Token.LicenseService, LicenseService)
     .provideClass(Token.SshKeyService, SshKeyService)
     .provideClass(Token.GitService, GitService)

@@ -11,5 +11,10 @@ export const updateGitBranchesAndObjects: CreateActivity<UpdateGitBranchesAndObj
   ({ injector, db }) =>
   async (gitRepositoryId) => {
     const gitService = injector.resolve(Token.AgentGitService);
-    return await gitService.updateBranches(db, gitRepositoryId);
+    const perfService = injector.resolve(Token.PerfService);
+
+    perfService.log("updateGitBranchesAndObjects", "start", gitRepositoryId);
+    const result = await gitService.updateBranches(db, gitRepositoryId);
+    perfService.log("updateGitBranchesAndObjects", "end", gitRepositoryId);
+    return result;
   };

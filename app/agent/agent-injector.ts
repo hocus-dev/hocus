@@ -2,6 +2,7 @@ import { DefaultLogger } from "@temporalio/worker";
 import { createInjector, Scope } from "typed-inject";
 import { config } from "~/config";
 import { GitService } from "~/git/git.service";
+import { PerfService } from "~/perf.service.server";
 import { ProjectService } from "~/project/project.service";
 import { SshKeyService } from "~/ssh-key/ssh-key.service";
 import { clientFactory } from "~/temporal/client-factory";
@@ -37,11 +38,13 @@ export const createAgentInjector = (
     [Token.WorkspaceAgentService]?: typeof WorkspaceAgentService;
     [Token.SshKeyService]?: typeof SshKeyService;
     [Token.TemporalClient]?: typeof clientFactory;
+    [Token.PerfService]?: typeof PerfService;
   } = {},
 ) =>
   createInjector()
     .provideValue(Token.Config, overrides[Token.Config] ?? config)
     .provideClass(Token.Logger, overrides[Token.Logger] ?? DefaultLogger, Scope.Transient)
+    .provideClass(Token.PerfService, overrides[Token.PerfService] ?? PerfService)
     .provideClass(
       Token.LowLevelStorageService,
       overrides[Token.LowLevelStorageService] ?? LowLevelStorageService,

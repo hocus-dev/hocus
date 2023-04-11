@@ -1,5 +1,4 @@
 import { v4 as uuidv4 } from "uuid";
-import { MAX_REPOSITORY_DRIVE_SIZE_MIB } from "~/constants.shared";
 import { Token } from "~/token";
 
 import type { CreateActivity } from "./types";
@@ -12,6 +11,11 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const gitService = injector.resolve(Token.AgentGitService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const perfService = injector.resolve(Token.PerfService);
+    const maxRepositoryDriveSizeMib = injector
+      .resolve(Token.Config)
+      .shared().maxRepositoryDriveSizeMib;
+    perfService.log("fetchRepository", "start", gitRepositoryId);
     const repo = await db.gitRepository.findUniqueOrThrow({
       where: { id: gitRepositoryId },
       include: {
@@ -26,7 +30,7 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
       firecrackerService,
       {
         pathOnHost: repoFile.file.path,
-        maxSizeMiB: MAX_REPOSITORY_DRIVE_SIZE_MIB,
+        maxSizeMiB: maxRepositoryDriveSizeMib,
       },
       {
         url: repo.url,
@@ -35,4 +39,5 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
         },
       },
     );
+    perfService.log("fetchRepository", "end", gitRepositoryId);
   };
