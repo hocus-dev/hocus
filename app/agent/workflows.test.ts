@@ -222,9 +222,9 @@ test.concurrent(
       },
     ] as const;
     const testBranches = [
-      "refs/heads/run-buildfs-and-prebuilds-test-1",
-      "refs/heads/run-buildfs-and-prebuilds-test-2",
-      "refs/heads/run-buildfs-and-prebuilds-test-3-error",
+      "refs/heads/run-buildfs-and-prebuilds-test-1-tmp",
+      "refs/heads/run-buildfs-and-prebuilds-test-2-tmp",
+      "refs/heads/run-buildfs-and-prebuilds-test-3-error-tmp",
     ].map((name) => unwrap(updates.newGitBranches.find((b) => b.name === name)));
     await worker.runUntil(async () => {
       const branchesByGitObjectId = groupBy(

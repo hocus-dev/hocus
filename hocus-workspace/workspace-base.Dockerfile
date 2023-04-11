@@ -16,6 +16,7 @@ RUN apt-get update \
     sudo \
     util-linux \
     vim \
+    git \
     tmux && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
