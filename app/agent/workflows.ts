@@ -27,6 +27,7 @@ import type { Activities } from "./activities/list";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
 import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
+import { parseGitSyncError } from "./workflows-utils";
 
 const { defaultWorkflowLogger: logger } = proxySinks();
 
@@ -73,6 +74,7 @@ const {
   updateGitBranchesAndObjects,
   getOrCreatePrebuildEvents,
   getDefaultBranch,
+  saveGitRepoConnectionStatus,
 } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
   retry: {
@@ -453,9 +455,15 @@ export async function runSyncGitRepository(
           parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
         });
       }
+      await saveGitRepoConnectionStatus({ gitRepositoryId });
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);
+      await saveGitRepoConnectionStatus({ gitRepositoryId, error: parseGitSyncError(err) }).catch(
+        (err) =>
+          // eslint-disable-next-line no-console
+          console.error(err),
+      );
     }
 
     await sleep(5000);

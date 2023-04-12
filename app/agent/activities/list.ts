@@ -52,6 +52,8 @@ import type { LinkGitBranchesActivity } from "./link-git-branches";
 import { linkGitBranches } from "./link-git-branches";
 import type { PrebuildActivity } from "./prebuild";
 import { prebuild } from "./prebuild";
+import type { SaveGitRepoConnectionStatusActivity } from "./save-git-repo-connection-status";
+import { saveGitRepoConnectionStatus } from "./save-git-repo-connection-status";
 import type { StartWorkspaceActivity } from "./start-workspace";
 import { startWorkspace } from "./start-workspace";
 import type { StopWorkspaceActivity } from "./stop-workspace";
@@ -92,6 +94,7 @@ export interface Activities {
   deleteLocalPrebuildEventFiles: DeleteLocalPrebuildEventFilesActivity;
   deleteRemovablePrebuildEvents: DeleteRemovablePrebuildEventsActivity;
   getArchivablePrebuildEvents: GetArchivablePrebuildEventsActivity;
+  saveGitRepoConnectionStatus: SaveGitRepoConnectionStatusActivity;
 }
 
 export interface ActivityArgs {
@@ -137,6 +140,7 @@ export const createActivities = async (
     deleteLocalPrebuildEventFiles,
     deleteRemovablePrebuildEvents,
     getArchivablePrebuildEvents,
+    saveGitRepoConnectionStatus,
   };
 
   return Object.fromEntries(

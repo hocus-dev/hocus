@@ -6,6 +6,7 @@ import { PerfService } from "~/perf.service.server";
 import { ProjectService } from "~/project/project.service";
 import { SshKeyService } from "~/ssh-key/ssh-key.service";
 import { clientFactory } from "~/temporal/client-factory";
+import { TimeService } from "~/time.service";
 import { Token } from "~/token";
 import { WorkspaceService } from "~/workspace/workspace.service";
 
@@ -39,10 +40,12 @@ export const createAgentInjector = (
     [Token.SshKeyService]?: typeof SshKeyService;
     [Token.TemporalClient]?: typeof clientFactory;
     [Token.PerfService]?: typeof PerfService;
+    [Token.TimeService]?: typeof TimeService;
   } = {},
 ) =>
   createInjector()
     .provideValue(Token.Config, overrides[Token.Config] ?? config)
+    .provideClass(Token.TimeService, overrides[Token.TimeService] ?? TimeService)
     .provideClass(Token.Logger, overrides[Token.Logger] ?? DefaultLogger, Scope.Transient)
     .provideClass(Token.PerfService, overrides[Token.PerfService] ?? PerfService)
     .provideClass(
