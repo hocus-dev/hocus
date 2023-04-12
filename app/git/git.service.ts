@@ -20,6 +20,8 @@ export class GitService {
    * Modified to disallow the `https` protocol.
    */
   private gitUrlRegex = /(?:git|ssh|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|#[-\d\w._]+?)$/;
+  // overwritten in tests
+  private maxConnectionErrors = 100;
 
   isGitSshUrl(url: string): boolean {
     return this.gitUrlRegex.test(url);
@@ -103,17 +105,21 @@ export class GitService {
         data: {
           connectionStatusId: connectionStatus.id,
           error,
+          createdAt: now,
         },
       });
-      const tenMinutes = 1000 * 60 * 10;
-      await db.gitRepositoryConnectionError.deleteMany({
-        where: {
-          connectionStatusId: connectionStatus.id,
-          createdAt: {
-            lt: new Date(now.getTime() - tenMinutes),
-          },
-        },
-      });
+      await db.$executeRaw`
+        DELETE FROM "GitRepositoryConnectionError" AS x
+        WHERE
+          x."connectionStatusId" = ${connectionStatus.id} AND
+          x."id" NOT IN (
+            SELECT t."id"
+            FROM "GitRepositoryConnectionError" AS t
+            WHERE t."connectionStatusId" = ${connectionStatus.id}
+            ORDER BY t."createdAt" DESC
+            LIMIT ${this.maxConnectionErrors}
+          );
+      `;
     } else {
       await db.gitRepositoryConnectionStatus.update({
         where: { gitRepositoryId },

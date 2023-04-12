@@ -41,10 +41,14 @@ test.concurrent(
   provideAppInjectorAndDb(async ({ injector, db }) => {
     const gitService = injector.resolve(Token.GitService);
 
-    const repo = await db.$transaction((tdb) => gitService.addGitRepository(tdb, TESTS_REPO_URL));
-    const getConnStatus = (db: Prisma.Client) =>
+    const [repo, repo2] = await db.$transaction(async (tdb) => {
+      const repo = gitService.addGitRepository(tdb, TESTS_REPO_URL);
+      const repo2 = gitService.addGitRepository(tdb, "git@github.com:hocus-dev/tests2.git");
+      return Promise.all([repo, repo2]);
+    });
+    const getConnStatus = (db: Prisma.Client, repoId?: bigint) =>
       db.gitRepositoryConnectionStatus.findUniqueOrThrow({
-        where: { gitRepositoryId: repo.id },
+        where: { gitRepositoryId: repoId ?? repo.id },
         include: {
           errors: {
             orderBy: { createdAt: "desc" },
@@ -54,19 +58,40 @@ test.concurrent(
     let connectionStatus = await getConnStatus(db);
     expect(connectionStatus.lastSuccessfulConnectionAt).toBeNull();
     await db.$transaction(async (tdb) => {
+      // verify that we can update connection status
       await gitService.updateConnectionStatus(tdb, repo.id);
       connectionStatus = await getConnStatus(tdb);
       expect(connectionStatus.lastSuccessfulConnectionAt).not.toBeNull();
-      expect(connectionStatus.errors.length).toBe(0);
+
       const errorsCount = 5;
-      for (let i = 0; i < errorsCount; i++) {
-        await gitService.updateConnectionStatus(tdb, repo.id, "failed to fetch repo");
+      for (const repoId of [repo.id, repo2.id]) {
+        let connStatus = await getConnStatus(db, repoId);
+
+        // verify that we can store connection errors
+        expect(connStatus.errors.length).toBe(0);
+        for (let i = 0; i < errorsCount; i++) {
+          await gitService.updateConnectionStatus(tdb, repoId, "failed to fetch repo");
+        }
+        connStatus = await getConnStatus(tdb);
+        expect(connStatus.errors.length).toBe(errorsCount);
       }
+
+      // verify that we don't store more than maxErrorsCount errors
+      const maxErrorsCount = 3;
+      gitService["maxConnectionErrors"] = maxErrorsCount;
+      await gitService.updateConnectionStatus(tdb, repo.id, "failed to fetch repo");
       connectionStatus = await getConnStatus(tdb);
-      expect(connectionStatus.errors.length).toBe(errorsCount);
+      expect(connectionStatus.errors.length).toBe(maxErrorsCount);
+
+      // verify that we can clear connection errors
       await gitService.updateConnectionStatus(tdb, repo.id);
       connectionStatus = await getConnStatus(tdb);
       expect(connectionStatus.errors.length).toBe(0);
+
+      // verify that other repo's status is not affected
+      const connectionStatus2 = await getConnStatus(tdb, repo2.id);
+      expect(connectionStatus2.errors.length).toBe(errorsCount);
+      expect(connectionStatus2.lastSuccessfulConnectionAt).toBeNull();
     });
   }),
 );
