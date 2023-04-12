@@ -222,10 +222,11 @@ model GitRepository {
   sshKeyPairId BigInt
   gitBranches  GitBranch[]
 
-  lastBranchUpdateAt DateTime            @default(now()) @db.Timestamptz(3)
-  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
-  Project            Project[]
-  gitRepositoryFiles GitRepositoryFile[]
+  lastBranchUpdateAt            DateTime                        @default(now()) @db.Timestamptz(3)
+  createdAt                     DateTime                        @default(now()) @db.Timestamptz(3)
+  Project                       Project[]
+  gitRepositoryFiles            GitRepositoryFile[]
+  GitRepositoryConnectionStatus GitRepositoryConnectionStatus[]
 }
 
 model GitRepositoryFile {
@@ -244,6 +245,27 @@ model GitRepositoryFile {
 
   @@unique([gitRepositoryId, fileId])
   @@unique([gitRepositoryId, agentInstanceId])
+}
+
+model GitRepositoryConnectionStatus {
+  id                         BigInt        @id @default(autoincrement())
+  gitRepositoryId            BigInt        @unique
+  gitRepository              GitRepository @relation(fields: [gitRepositoryId], references: [id])
+  lastSuccessfulConnectionAt DateTime?     @db.Timestamptz(3)
+
+  createdAt DateTime                       @default(now()) @db.Timestamptz(3)
+  errors    GitRepositoryConnectionError[]
+}
+
+model GitRepositoryConnectionError {
+  id                 BigInt                        @id @default(autoincrement())
+  connectionStatusId BigInt
+  connectionStatus   GitRepositoryConnectionStatus @relation(fields: [connectionStatusId], references: [id])
+  error              String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([connectionStatusId, createdAt])
 }
 
 model GitBranch {

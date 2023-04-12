@@ -2,14 +2,18 @@ import type { GitRepository } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
 import type { SshKeyService } from "~/ssh-key/ssh-key.service";
+import type { TimeService } from "~/time.service";
 import { Token } from "~/token";
 
 import { GitUrlError } from "./error";
 
 export class GitService {
-  static inject = [Token.SshKeyService] as const;
+  static inject = [Token.SshKeyService, Token.TimeService] as const;
 
-  constructor(private readonly sshKeyService: SshKeyService) {}
+  constructor(
+    private readonly sshKeyService: SshKeyService,
+    private readonly timeService: TimeService,
+  ) {}
 
   /**
    * Original source: https://github.com/jonschlinkert/is-git-url/blob/396965ffabf2f46656c8af4c47bef1d69f09292e/index.js#LL9C3-L9C88
@@ -46,6 +50,9 @@ export class GitService {
       data: {
         url: repositoryUrl,
         sshKeyPairId: keyPair.id,
+        GitRepositoryConnectionStatus: {
+          create: {},
+        },
       },
     });
   }
@@ -78,5 +85,47 @@ export class GitService {
 
   getGitUsernameFromEmail(email: string): string {
     return email.split("@")[0];
+  }
+
+  async updateConnectionStatus(
+    db: Prisma.TransactionClient,
+    gitRepositoryId: bigint,
+    error?: string,
+  ): Promise<void> {
+    const connectionStatus = await db.gitRepositoryConnectionStatus.findUniqueOrThrow({
+      where: { gitRepositoryId },
+    });
+    await db.$executeRaw`SELECT id FROM "GitRepositoryConnectionStatus" WHERE id = ${connectionStatus.id} FOR UPDATE`;
+    const now = this.timeService.now();
+
+    if (error != null) {
+      await db.gitRepositoryConnectionError.create({
+        data: {
+          connectionStatusId: connectionStatus.id,
+          error,
+        },
+      });
+      const tenMinutes = 1000 * 60 * 10;
+      await db.gitRepositoryConnectionError.deleteMany({
+        where: {
+          connectionStatusId: connectionStatus.id,
+          createdAt: {
+            lt: new Date(now.getTime() - tenMinutes),
+          },
+        },
+      });
+    } else {
+      await db.gitRepositoryConnectionStatus.update({
+        where: { gitRepositoryId },
+        data: {
+          lastSuccessfulConnectionAt: now,
+        },
+      });
+      await db.gitRepositoryConnectionError.deleteMany({
+        where: {
+          connectionStatusId: connectionStatus.id,
+        },
+      });
+    }
   }
 }

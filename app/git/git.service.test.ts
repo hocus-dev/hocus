@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
 import { provideAppInjector, provideAppInjectorAndDb } from "~/test-utils";
 import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
@@ -32,5 +33,40 @@ test.concurrent(
       ),
     ).toBe(false);
     expect(gitService.isGitSshUrl(TESTS_REPO_URL)).toBe(true);
+  }),
+);
+
+test.concurrent(
+  "updateConnectionStatus",
+  provideAppInjectorAndDb(async ({ injector, db }) => {
+    const gitService = injector.resolve(Token.GitService);
+
+    const repo = await db.$transaction((tdb) => gitService.addGitRepository(tdb, TESTS_REPO_URL));
+    const getConnStatus = (db: Prisma.Client) =>
+      db.gitRepositoryConnectionStatus.findUniqueOrThrow({
+        where: { gitRepositoryId: repo.id },
+        include: {
+          errors: {
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+    let connectionStatus = await getConnStatus(db);
+    expect(connectionStatus.lastSuccessfulConnectionAt).toBeNull();
+    await db.$transaction(async (tdb) => {
+      await gitService.updateConnectionStatus(tdb, repo.id);
+      connectionStatus = await getConnStatus(tdb);
+      expect(connectionStatus.lastSuccessfulConnectionAt).not.toBeNull();
+      expect(connectionStatus.errors.length).toBe(0);
+      const errorsCount = 5;
+      for (let i = 0; i < errorsCount; i++) {
+        await gitService.updateConnectionStatus(tdb, repo.id, "failed to fetch repo");
+      }
+      connectionStatus = await getConnStatus(tdb);
+      expect(connectionStatus.errors.length).toBe(errorsCount);
+      await gitService.updateConnectionStatus(tdb, repo.id);
+      connectionStatus = await getConnStatus(tdb);
+      expect(connectionStatus.errors.length).toBe(0);
+    });
   }),
 );
