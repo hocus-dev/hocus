@@ -97,6 +97,12 @@ export async function setupHocusDevEnv() {
   const agentConfig = injector.resolve(Token.Config).agent();
   const db = new PrismaClient({ datasources: { db: { url: agentConfig.databaseUrl } } });
 
+  const existingDevUser = await db.user.findUnique({ where: { externalId: DEV_USER_EXTERNAL_ID } });
+  if (existingDevUser) {
+    console.log("Dev user already exists, skipping setup");
+    return;
+  }
+
   await setupDevUser(db, injector);
 
   const withClient = injector.resolve(Token.TemporalClient);
