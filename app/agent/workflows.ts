@@ -34,7 +34,6 @@ const {
   checkoutAndInspect,
   fetchRepository,
   getOrCreateBuildfsEvents,
-  getOrCreatePrebuildEvents,
   getPrebuildEvents,
   buildfs,
   prebuild,
@@ -46,9 +45,6 @@ const {
   changePrebuildEventStatus,
   getWorkspaceInstanceStatus,
   addProjectAndRepository,
-  getRepositoryProjects,
-  updateGitBranchesAndObjects,
-  getDefaultBranch,
   deleteWorkspace,
   initPrebuildEvents,
   linkGitBranches,
@@ -67,6 +63,18 @@ const {
   // are running at the same time, it may take a long time for all of them
   // to finish.
   startToCloseTimeout: "24 hours",
+  retry: {
+    maximumAttempts: 1,
+  },
+});
+
+const {
+  getRepositoryProjects,
+  updateGitBranchesAndObjects,
+  getOrCreatePrebuildEvents,
+  getDefaultBranch,
+} = proxyActivities<Activities>({
+  startToCloseTimeout: "1 minute",
   retry: {
     maximumAttempts: 1,
   },
