@@ -134,4 +134,34 @@ export class GitService {
       });
     }
   }
+
+  async getConnectionStatus(
+    db: Prisma.Client,
+    gitRepositoryId: bigint,
+  ): Promise<
+    | { status: "connected"; lastConnectedAt: Date }
+    | { status: "disconnected"; error?: { message: string; occurredAt: Date } }
+  > {
+    const connectionStatus = await db.gitRepositoryConnectionStatus.findUniqueOrThrow({
+      where: { gitRepositoryId },
+      include: {
+        errors: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+    if (connectionStatus.errors.length > 0) {
+      const error = connectionStatus.errors[0];
+      return {
+        status: "disconnected",
+        error: { message: error.error, occurredAt: error.createdAt },
+      };
+    }
+    const lastConnectedAt = connectionStatus.lastSuccessfulConnectionAt;
+    if (lastConnectedAt == null) {
+      return { status: "disconnected" };
+    }
+    return { status: "connected", lastConnectedAt };
+  }
 }

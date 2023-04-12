@@ -37,7 +37,7 @@ test.concurrent(
 );
 
 test.concurrent(
-  "updateConnectionStatus",
+  "updateConnectionStatus and getConnectionStatus",
   provideAppInjectorAndDb(async ({ injector, db }) => {
     const gitService = injector.resolve(Token.GitService);
 
@@ -57,11 +57,20 @@ test.concurrent(
       });
     let connectionStatus = await getConnStatus(db);
     expect(connectionStatus.lastSuccessfulConnectionAt).toBeNull();
+    let processedStatus = await gitService.getConnectionStatus(db, repo.id);
+    expect(processedStatus).toStrictEqual({ status: "disconnected" });
+
+    const errorMsg = "failed to fetch repo";
     await db.$transaction(async (tdb) => {
       // verify that we can update connection status
       await gitService.updateConnectionStatus(tdb, repo.id);
       connectionStatus = await getConnStatus(tdb);
       expect(connectionStatus.lastSuccessfulConnectionAt).not.toBeNull();
+      processedStatus = await gitService.getConnectionStatus(tdb, repo.id);
+      expect(processedStatus).toStrictEqual({
+        status: "connected",
+        lastConnectedAt: connectionStatus.lastSuccessfulConnectionAt,
+      });
 
       const errorsCount = 5;
       for (const repoId of [repo.id, repo2.id]) {
@@ -70,16 +79,22 @@ test.concurrent(
         // verify that we can store connection errors
         expect(connStatus.errors.length).toBe(0);
         for (let i = 0; i < errorsCount; i++) {
-          await gitService.updateConnectionStatus(tdb, repoId, "failed to fetch repo");
+          await gitService.updateConnectionStatus(tdb, repoId, errorMsg);
         }
-        connStatus = await getConnStatus(tdb);
+        connStatus = await getConnStatus(tdb, repoId);
         expect(connStatus.errors.length).toBe(errorsCount);
+
+        processedStatus = await gitService.getConnectionStatus(tdb, repoId);
+        expect(processedStatus).toStrictEqual({
+          status: "disconnected",
+          error: { message: errorMsg, occurredAt: connStatus.errors[0].createdAt },
+        });
       }
 
       // verify that we don't store more than maxErrorsCount errors
       const maxErrorsCount = 3;
       gitService["maxConnectionErrors"] = maxErrorsCount;
-      await gitService.updateConnectionStatus(tdb, repo.id, "failed to fetch repo");
+      await gitService.updateConnectionStatus(tdb, repo.id, errorMsg);
       connectionStatus = await getConnStatus(tdb);
       expect(connectionStatus.errors.length).toBe(maxErrorsCount);
 
