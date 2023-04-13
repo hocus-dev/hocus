@@ -22,7 +22,7 @@ class Test1 {
 const testFactory = (d: string, e: string): string => `${e} ${d}`;
 testFactory.inject = [token.d, token.e] as const;
 
-test("injector", () => {
+test("injector happy paths", () => {
   const providers = [
     { token: token.a, provide: { value: 1 } },
     { token: token.b, provide: { factory: () => 2 as const } },
@@ -50,4 +50,15 @@ test("injector", () => {
   expect(f1).not.toBe(f2);
   expect(f1.startsWith(e1)).toBe(true);
   expect(f2.startsWith(e1)).toBe(true);
+});
+
+test("injector errors", () => {
+  const providers = [
+    { token: token.a, provide: { value: 1 } },
+    { token: token.c, provide: { class: Test1 } },
+  ] as const;
+  expect(() => new Injector(providers)).toThrowError("Missing dependency b for provider c");
+  const providers2 = [{ token: token.a, provide: { value: 1 } }];
+  const injector = new Injector(providers2);
+  expect(() => injector.resolve("b")).toThrowError("Missing provider for token b");
 });
