@@ -18,20 +18,25 @@ test.concurrent(
   "getRemotes",
   provideInjector(async ({ injector }) => {
     const gitService = injector.resolve(Token.AgentGitService);
-    const remotesLinux = await gitService.getRemotes(
+    const linux = await gitService.getRemotes(
       "git@github.com:torvalds/linux.git",
       TESTS_PRIVATE_SSH_KEY,
     );
-    const linuxMaster = remotesLinux.find((r) => r.name === "refs/heads/master");
+    const linuxMaster = linux.remotes.find((r) => r.name === "refs/heads/master");
     expect(linuxMaster).toBeDefined();
+    expect(linux.defaultBranch).toEqual("refs/heads/master");
 
-    const remotes = await gitService.getRemotes(TESTS_REPO_URL, TESTS_PRIVATE_SSH_KEY);
-    const testRemote = remotes.find(
+    const tests = await gitService.getRemotes(TESTS_REPO_URL, TESTS_PRIVATE_SSH_KEY);
+    const testRemote = tests.remotes.find(
       (r) =>
         r.name === "refs/heads/git-service-test" &&
         r.hash === "6aa1af1afb061b67d22e6bcd8a1d8d5bbec64987",
     );
     expect(testRemote).toBeDefined();
+    expect(tests.defaultBranch).toEqual("refs/heads/main");
+
+    const tests2 = await gitService.getRemotes(TESTS2_REPO_URL, TESTS_PRIVATE_SSH_KEY);
+    expect(tests.defaultBranch).toEqual("refs/heads/custom");
   }),
 );
 
