@@ -2,6 +2,7 @@ import fs from "fs/promises";
 
 import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
+import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
@@ -17,9 +18,14 @@ const provideInjector = (
   }) => Promise<void>,
 ): (() => Promise<void>) => {
   const injector = createAgentInjector({
-    [Token.Logger]: function () {
-      return new DefaultLogger("ERROR");
-    } as unknown as any,
+    [Token.Logger]: {
+      provide: {
+        factory: function () {
+          return new DefaultLogger("ERROR");
+        },
+      },
+      scope: Scope.Transient,
+    },
   });
   const runId = uuidv4();
   return printErrors(async () => {

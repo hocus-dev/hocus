@@ -16,6 +16,8 @@ export type Provide<V> =
   | { class: new (...args: any[]) => V; value?: undefined; factory?: undefined }
   | { factory: (...args: any[]) => V; value?: undefined; class?: undefined };
 
+export type ProviderValue<P> = P extends Provider<infer _, infer V> ? V : never;
+
 export type Provider<T extends string, V> = {
   token: T;
   scope?: Scope;
@@ -37,7 +39,7 @@ export type ProvidersFns<T> = T extends { [_1 in keyof T]: infer _2 }
   : never;
 
 export type ProvidersOverrides<T> = T extends { [_1 in keyof T]: Provider<infer _2, infer _3> }
-  ? { [K in keyof T & string as T[K]["token"]]?: Omit<T[K], "token"> }
+  ? { [K in keyof T & string as T[K]["token"]]?: Omit<Provider<"", ProviderValue<T[K]>>, "token"> }
   : never;
 
 type ResolveResult<T, K extends keyof T> = T extends { [_1 in keyof T]: infer _2 }
@@ -114,5 +116,9 @@ export class Injector<T, M extends GenericProviderMap<T>, P extends ProvidersFns
       throw new Error(`Missing provider for token ${String(token)}`);
     }
     return provider() as any;
+  }
+
+  dispose() {
+    // currently does nothing
   }
 }

@@ -44,28 +44,36 @@ const provideActivities = (
   }) => Promise<void>,
 ): (() => Promise<void>) => {
   const injector = createAgentInjector({
-    [Token.Logger]: function () {
-      return new DefaultLogger("ERROR");
-    } as unknown as any,
+    [Token.Logger]: {
+      provide: {
+        factory: function () {
+          return new DefaultLogger("ERROR");
+        },
+      },
+    },
     [Token.Config]: {
-      ...config,
-      agent: () => ({
-        ...config.agent(),
-        /**
-         * It's a regular buildfs root fs but with docker cache.
-         * I generated it manually, by executing a buildfs workflow
-         * with the regular buildfs root fs and then copying the
-         * resulting drive to the test-buildfs.ext4 file.
-         * I also shrank it with `resize2fs -M`.
-         * The tests will also work with a regular buildfs root fs,
-         * but they will be slower.
-         */
-        buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
-      }),
-      shared: () => ({
-        ...config.shared(),
-        maxRepositoryDriveSizeMib: 100,
-      }),
+      provide: {
+        value: {
+          ...config,
+          agent: () => ({
+            ...config.agent(),
+            /**
+             * It's a regular buildfs root fs but with docker cache.
+             * I generated it manually, by executing a buildfs workflow
+             * with the regular buildfs root fs and then copying the
+             * resulting drive to the test-buildfs.ext4 file.
+             * I also shrank it with `resize2fs -M`.
+             * The tests will also work with a regular buildfs root fs,
+             * but they will be slower.
+             */
+            buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
+          }),
+          shared: () => ({
+            ...config.shared(),
+            maxRepositoryDriveSizeMib: 100,
+          }),
+        },
+      },
     },
   });
   const runId = uuidv4();
