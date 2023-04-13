@@ -1,3 +1,7 @@
+// We have a custom injector because we used to use https://github.com/nicojs/typed-inject
+// and ran into insurmountable performance issues - https://github.com/nicojs/typed-inject/issues/50.
+// This injector is less type-safe, but much faster. It also has a similar API.
+
 import { match } from "ts-pattern";
 import type { Any } from "ts-toolbelt";
 
