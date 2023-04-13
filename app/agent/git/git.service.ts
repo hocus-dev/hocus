@@ -59,10 +59,12 @@ export class AgentGitService {
 
   private parseLsRemoteOutput(output: string): {
     remotes: GitRemoteInfo[];
+    defaultBranch: string;
     errors: ParseError[];
   } {
     const remotes: GitRemoteInfo[] = [];
     const errors: ParseError[] = [];
+    let defaultBranch = "";
 
     output
       .toString()
@@ -70,6 +72,12 @@ export class AgentGitService {
       .filter((line) => line.length > 0)
       .forEach((line) => {
         const words = line.split(/\s/);
+        if (words.length > 0 && words[0] === "ref:") {
+          if (words.length === 3 && words[2] === "HEAD") {
+            defaultBranch = words[1];
+          }
+          return;
+        }
         const result = RemoteInfoTupleValidator.SafeParse(words);
         if (result.success) {
           const value = result.value;
@@ -79,7 +87,7 @@ export class AgentGitService {
         }
       });
 
-    return { remotes, errors };
+    return { remotes, defaultBranch, errors };
   }
 
   private async writeKey(pathToPrivateKey: string, key: string): Promise<void> {
@@ -98,11 +106,14 @@ export class AgentGitService {
    * be a deploy key for a diffrerent repository. But GitHub must know
    * that it exists, otherwise it will reject the connection.
    */
-  async getRemotes(repositoryUrl: string, privateKey: string): Promise<GitRemoteInfo[]> {
+  async getRemotes(
+    repositoryUrl: string,
+    privateKey: string,
+  ): Promise<{ defaultBranch: string; remotes: GitRemoteInfo[] }> {
     const pathToPrivateKey = `/tmp/${uuidv4()}.key`;
     try {
       await this.writeKey(pathToPrivateKey, privateKey);
-      const output = await execCmdWithOpts(["git", "ls-remote", repositoryUrl], {
+      const output = await execCmdWithOpts(["git", "ls-remote", "--symref", repositoryUrl], {
         // TODO: allow the user to specify a known_hosts file.
         env: { GIT_SSH_COMMAND: `ssh -i "${pathToPrivateKey}" -o StrictHostKeyChecking=no` },
       });
@@ -112,7 +123,7 @@ export class AgentGitService {
           `Failed to parse git ls-remote output:\n${error.message}\nOffending value: "${value}"`,
         );
       }
-      return result.remotes;
+      return { remotes: result.remotes, defaultBranch: result.defaultBranch };
     } finally {
       await fs.unlink(pathToPrivateKey).catch((err) => {
         this.logger.warn(
@@ -161,10 +172,8 @@ export class AgentGitService {
         },
       });
     let gitRepository = await getGitRepo(db);
-    const newRemotes = await this.getRemotes(
-      gitRepository.url,
-      gitRepository.sshKeyPair.privateKey,
-    ).then((rs) => rs.filter((remote) => this.branchRefRegex.test(remote.name)));
+    const lsRemotes = await this.getRemotes(gitRepository.url, gitRepository.sshKeyPair.privateKey);
+    const newRemotes = lsRemotes.remotes.filter((remote) => this.branchRefRegex.test(remote.name));
     return await db.$transaction(async (tdb) => {
       await tdb.$executeRaw`SELECT id FROM "GitRepository" WHERE id = ${gitRepositoryId} FOR UPDATE`;
       gitRepository = await getGitRepo(tdb);
@@ -223,10 +232,14 @@ export class AgentGitService {
           }),
         ),
       );
-      if (newGitBranches.length + updatedGitBranches.length > 0) {
+      if (
+        newGitBranches.length + updatedGitBranches.length > 0 ||
+        gitRepository.defaultBranch !== lsRemotes.defaultBranch
+      ) {
         await tdb.gitRepository.update({
           where: { id: gitRepositoryId },
           data: {
+            defaultBranch: lsRemotes.defaultBranch,
             lastBranchUpdateAt: new Date(),
           },
         });

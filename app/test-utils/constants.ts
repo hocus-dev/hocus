@@ -8,4 +8,5 @@ W71TsDKa/ovAG6nXpmidAAAAF2hvY3VzLXRlc3RzQGV4YW1wbGUuY29tAQIDBAUG
 -----END OPENSSH PRIVATE KEY-----
 `;
 export const TESTS_REPO_URL = "git@github.com:hocus-dev/tests.git";
+export const TESTS2_REPO_URL = "git@github.com:hocus-dev/tests2.git";
 export const HOCUS_REPO_URL = "git@github.com:hocus-dev/hocus.git";

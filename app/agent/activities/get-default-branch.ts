@@ -6,6 +6,21 @@ export type GetDefaultBranchActivity = (gitRepositoryId: bigint) => Promise<GitB
 export const getDefaultBranch: CreateActivity<GetDefaultBranchActivity> =
   ({ db }) =>
   async (gitRepositoryId) => {
+    const repo = await db.gitRepository.findFirstOrThrow({
+      where: {
+        gitRepositoryId,
+      },
+      select: { defaultBranch: true },
+    });
+    const branch = await db.gitBranch.findFirst({
+      where: {
+        gitRepositoryId,
+        name: repo.defaultBranch,
+      },
+    });
+    if (branch !== null) return branch;
+
+    // If the remote ref is invalid then fallback to main or master
     const branches = await db.gitBranch.findMany({
       where: {
         gitRepositoryId,

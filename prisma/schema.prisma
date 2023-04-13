@@ -216,11 +216,12 @@ model SshKeyPair {
 }
 
 model GitRepository {
-  id           BigInt      @id @default(autoincrement())
-  url          String      @unique
-  sshKeyPair   SshKeyPair  @relation(fields: [sshKeyPairId], references: [id])
-  sshKeyPairId BigInt
-  gitBranches  GitBranch[]
+  id            BigInt      @id @default(autoincrement())
+  url           String      @unique
+  defaultBranch String      @default("")
+  sshKeyPair    SshKeyPair  @relation(fields: [sshKeyPairId], references: [id])
+  sshKeyPairId  BigInt
+  gitBranches   GitBranch[]
 
   lastBranchUpdateAt            DateTime                        @default(now()) @db.Timestamptz(3)
   createdAt                     DateTime                        @default(now()) @db.Timestamptz(3)
