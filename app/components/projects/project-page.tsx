@@ -59,7 +59,9 @@ function ProjectPageComponent(props: {
 }): JSX.Element {
   const { project, gitRepository } = props;
   const createdAt = moment(project.createdAt).fromNow();
-  const [showPublicKey, setShowPublicKey] = useState(false);
+  const [showPublicKey, setShowPublicKey] = useState(
+    props.gitRepository.connectionStatus.status === "disconnected",
+  );
   const toggleShowPublicKey = React.useCallback(() => setShowPublicKey((v) => !v), []);
   return (
     <AppPage>
