@@ -14,7 +14,7 @@ export const Scope = {
 export type Provide<V> =
   | { value: V; class?: undefined; factory?: undefined }
   | { class: new (...args: any[]) => V; value?: undefined; factory?: undefined }
-  | { factory: () => V; value?: undefined; class?: undefined };
+  | { factory: (...args: any[]) => V; value?: undefined; class?: undefined };
 
 export type Provider<T extends string, V> = {
   token: T;
@@ -22,7 +22,7 @@ export type Provider<T extends string, V> = {
   provide: Provide<V>;
 };
 
-type GenericProviderMap<T> = T extends {
+export type GenericProviderMap<T> = T extends {
   [key in keyof T]: Provider<infer _1, infer _2>;
 }
   ? {
@@ -32,8 +32,12 @@ type GenericProviderMap<T> = T extends {
     }
   : never;
 
-type Providers<T> = T extends { [_1 in keyof T]: infer _2 }
+export type ProvidersFns<T> = T extends { [_1 in keyof T]: infer _2 }
   ? { [K in keyof T]: () => T[K] }
+  : never;
+
+export type ProvidersOverrides<T> = T extends { [_1 in keyof T]: Provider<infer _2, infer _3> }
+  ? { [K in keyof T & string as T[K]["token"]]?: Omit<T[K], "token"> }
   : never;
 
 type ResolveResult<T, K extends keyof T> = T extends { [_1 in keyof T]: infer _2 }
@@ -42,7 +46,7 @@ type ResolveResult<T, K extends keyof T> = T extends { [_1 in keyof T]: infer _2
     : never
   : never;
 
-export class Injector<T, M extends GenericProviderMap<T>, P extends Providers<M>> {
+export class Injector<T, M extends GenericProviderMap<T>, P extends ProvidersFns<M>> {
   private providers: P;
 
   private getInject<Tn extends string, Val>(provider: Provider<Tn, Val>): string[] | undefined {
