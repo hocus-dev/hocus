@@ -1,11 +1,14 @@
 import { DefaultLogger } from "@temporalio/worker";
-import { createInjector, Scope } from "typed-inject";
 import { config } from "~/config";
+import type { GenericProviderMap, ProvidersFns, ProvidersOverrides } from "~/di/injector.server";
+import { Injector, Scope } from "~/di/injector.server";
+import { overrideProviders } from "~/di/utils.server";
 import { GitService } from "~/git/git.service";
 import { PerfService } from "~/perf.service.server";
 import { ProjectService } from "~/project/project.service";
 import { SshKeyService } from "~/ssh-key/ssh-key.service";
 import { clientFactory } from "~/temporal/client-factory";
+import { TimeService } from "~/time.service";
 import { Token } from "~/token";
 import { WorkspaceService } from "~/workspace/workspace.service";
 
@@ -19,57 +22,35 @@ import { SSHGatewayService } from "./ssh-gateway.service";
 import { LowLevelStorageService, StorageService } from "./storage/storage.service";
 import { WorkspaceAgentService } from "./workspace-agent.service";
 
-export const createAgentInjector = (
-  overrides: {
-    [Token.Config]?: typeof config;
-    [Token.Logger]?: typeof DefaultLogger;
-    [Token.LowLevelStorageService]?: typeof LowLevelStorageService;
-    [Token.StorageService]?: typeof StorageService;
-    [Token.PrebuildService]?: typeof PrebuildService;
-    [Token.AgentUtilService]?: typeof AgentUtilService;
-    [Token.FirecrackerService]?: typeof factoryFirecrackerService;
-    [Token.ProjectConfigService]?: typeof ProjectConfigService;
-    [Token.SSHGatewayService]?: typeof SSHGatewayService;
-    [Token.BuildfsService]?: typeof BuildfsService;
-    [Token.GitService]?: typeof GitService;
-    [Token.AgentGitService]?: typeof AgentGitService;
-    [Token.ProjectService]?: typeof ProjectService;
-    [Token.WorkspaceService]?: typeof WorkspaceService;
-    [Token.WorkspaceAgentService]?: typeof WorkspaceAgentService;
-    [Token.SshKeyService]?: typeof SshKeyService;
-    [Token.TemporalClient]?: typeof clientFactory;
-    [Token.PerfService]?: typeof PerfService;
-  } = {},
-) =>
-  createInjector()
-    .provideValue(Token.Config, overrides[Token.Config] ?? config)
-    .provideClass(Token.Logger, overrides[Token.Logger] ?? DefaultLogger, Scope.Transient)
-    .provideClass(Token.PerfService, overrides[Token.PerfService] ?? PerfService)
-    .provideClass(
-      Token.LowLevelStorageService,
-      overrides[Token.LowLevelStorageService] ?? LowLevelStorageService,
-    )
-    .provideClass(Token.StorageService, overrides[Token.StorageService] ?? StorageService)
-    .provideClass(Token.AgentUtilService, overrides[Token.AgentUtilService] ?? AgentUtilService)
-    .provideClass(Token.WorkspaceService, overrides[Token.WorkspaceService] ?? WorkspaceService)
-    .provideClass(Token.SshKeyService, overrides[Token.SshKeyService] ?? SshKeyService)
-    .provideClass(Token.GitService, overrides[Token.GitService] ?? GitService)
-    .provideClass(Token.AgentGitService, overrides[Token.AgentGitService] ?? AgentGitService)
-    .provideClass(Token.ProjectService, overrides[Token.ProjectService] ?? ProjectService)
-    .provideClass(
-      Token.ProjectConfigService,
-      overrides[Token.ProjectConfigService] ?? ProjectConfigService,
-    )
-    .provideClass(Token.BuildfsService, overrides[Token.BuildfsService] ?? BuildfsService)
-    .provideClass(Token.PrebuildService, overrides[Token.PrebuildService] ?? PrebuildService)
-    .provideClass(Token.SSHGatewayService, overrides[Token.SSHGatewayService] ?? SSHGatewayService)
-    .provideFactory(
-      Token.FirecrackerService,
-      overrides[Token.FirecrackerService] ?? factoryFirecrackerService,
-    )
-    .provideClass(
-      Token.WorkspaceAgentService,
-      overrides[Token.WorkspaceAgentService] ?? WorkspaceAgentService,
-    )
-    .provideFactory(Token.TemporalClient, overrides[Token.TemporalClient] ?? clientFactory);
-export type AgentInjector = ReturnType<typeof createAgentInjector>;
+type Providers = typeof providers;
+type ProviderMap = GenericProviderMap<Providers>;
+type ProviderFnMap = ProvidersFns<ProviderMap>;
+type ProviderOverrides = ProvidersOverrides<Providers>;
+export type AgentInjector = Injector<Providers, ProviderMap, ProviderFnMap>;
+
+const providers = [
+  { token: Token.Config, provide: { value: config } },
+  { token: Token.TimeService, provide: { class: TimeService } },
+  { token: Token.Logger, provide: { class: DefaultLogger }, scope: Scope.Transient },
+  { token: Token.PerfService, provide: { class: PerfService } },
+  { token: Token.LowLevelStorageService, provide: { class: LowLevelStorageService } },
+  { token: Token.StorageService, provide: { class: StorageService } },
+  { token: Token.AgentUtilService, provide: { class: AgentUtilService } },
+  { token: Token.WorkspaceService, provide: { class: WorkspaceService } },
+  { token: Token.SshKeyService, provide: { class: SshKeyService } },
+  { token: Token.GitService, provide: { class: GitService } },
+  { token: Token.AgentGitService, provide: { class: AgentGitService } },
+  { token: Token.ProjectService, provide: { class: ProjectService } },
+  { token: Token.ProjectConfigService, provide: { class: ProjectConfigService } },
+  { token: Token.BuildfsService, provide: { class: BuildfsService } },
+  { token: Token.PrebuildService, provide: { class: PrebuildService } },
+  { token: Token.SSHGatewayService, provide: { class: SSHGatewayService } },
+  { token: Token.FirecrackerService, provide: { factory: factoryFirecrackerService } },
+  { token: Token.WorkspaceAgentService, provide: { class: WorkspaceAgentService } },
+  { token: Token.TemporalClient, provide: { factory: clientFactory } },
+] as const;
+
+export const createAgentInjector = (overrides?: ProviderOverrides): AgentInjector => {
+  const overriddenProviders = overrideProviders(providers, overrides ?? {});
+  return new Injector(overriddenProviders);
+};

@@ -59,19 +59,27 @@ test("LicenseService constructor", () => {
   const createTestInjector = (license: string | undefined) =>
     createAppInjector({
       [Token.Config]: {
-        ...config,
-        controlPlane: () => ({
-          ...config.controlPlane(),
-          license,
-          licensePublicKey: TEST_LICENSE_PUBLIC_KEY,
-        }),
+        provide: {
+          value: {
+            ...config,
+            controlPlane: () => ({
+              ...config.controlPlane(),
+              license,
+              licensePublicKey: TEST_LICENSE_PUBLIC_KEY,
+            }),
+          },
+        },
       },
-      [Token.TimeService]: class {
-        now() {
-          return pastDate;
-        }
+      [Token.TimeService]: {
+        provide: {
+          class: class {
+            now() {
+              return pastDate;
+            }
+          },
+        },
       },
-      [Token.Logger]: stubInterface<Logger>(),
+      [Token.Logger]: { provide: { value: stubInterface<Logger>() } },
     });
   const testInjector1 = createTestInjector(undefined);
   expect(testInjector1.resolve(Token.LicenseService).numSeats).toEqual(DEFAULT_SEATS_LIMIT);

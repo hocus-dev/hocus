@@ -6,6 +6,7 @@ import { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
 import type { Config } from "~/config";
+import { Scope } from "~/di/injector.server";
 import { printErrors, provideRunId } from "~/test-utils";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
@@ -50,9 +51,14 @@ export const provideInjector = (
   testFn: (args: { injector: AgentInjector; runId: string }) => Promise<void>,
 ): (() => Promise<void>) => {
   const injector = createAgentInjector({
-    [Token.Logger]: function () {
-      return new DefaultLogger("ERROR");
-    } as unknown as any,
+    [Token.Logger]: {
+      provide: {
+        factory: function () {
+          return new DefaultLogger("ERROR");
+        },
+      },
+      scope: Scope.Transient,
+    },
   });
   return printErrors(provideRunId(async ({ runId }) => await testFn({ injector, runId })));
 };
