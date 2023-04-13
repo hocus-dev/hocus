@@ -6,6 +6,7 @@ import type { TimeService } from "~/time.service";
 import { Token } from "~/token";
 
 import { GitUrlError } from "./error";
+import type { GitRepoConnectionStatus } from "./types.shared";
 
 export class GitService {
   static inject = [Token.SshKeyService, Token.TimeService] as const;
@@ -138,10 +139,7 @@ export class GitService {
   async getConnectionStatus(
     db: Prisma.Client,
     gitRepositoryId: bigint,
-  ): Promise<
-    | { status: "connected"; lastConnectedAt: Date }
-    | { status: "disconnected"; error?: { message: string; occurredAt: Date } }
-  > {
+  ): Promise<GitRepoConnectionStatus> {
     const connectionStatus = await db.gitRepositoryConnectionStatus.findUniqueOrThrow({
       where: { gitRepositoryId },
       include: {
@@ -155,10 +153,10 @@ export class GitService {
       const error = connectionStatus.errors[0];
       return {
         status: "disconnected",
-        error: { message: error.error, occurredAt: error.createdAt },
+        error: { message: error.error, occurredAt: error.createdAt.getTime() },
       };
     }
-    const lastConnectedAt = connectionStatus.lastSuccessfulConnectionAt;
+    const lastConnectedAt = connectionStatus.lastSuccessfulConnectionAt?.getTime();
     if (lastConnectedAt == null) {
       return { status: "disconnected" };
     }

@@ -2,6 +2,7 @@ import { Button } from "flowbite-react";
 import moment from "moment";
 import React, { useState } from "react";
 import type { Any } from "ts-toolbelt";
+import type { GitRepoConnectionStatus } from "~/git/types.shared";
 import {
   PagePaths,
   ProjectPathTabId,
@@ -11,6 +12,7 @@ import {
 
 import { AppPage } from "../app-page";
 
+import { GitRepoConnectionStatusBadge } from "./repo-connection-status-badge";
 import { RepoSshKeyCard } from "./repo-ssh-key-card";
 
 const PROJECT_TAB_TITLES: Record<ProjectPathTabId, React.ReactNode> = {
@@ -51,7 +53,7 @@ const _typecheck: Any.Equals<typeof PROJECT_TAB_ORDER[number], ProjectPathTabId>
 
 function ProjectPageComponent(props: {
   project: { name: string; externalId: string; createdAt: number };
-  gitRepository: { url: string; publicKey: string };
+  gitRepository: { url: string; publicKey: string; connectionStatus: GitRepoConnectionStatus };
   activeTab: ProjectPathTabId;
   content: React.ReactNode;
 }): JSX.Element {
@@ -82,13 +84,14 @@ function ProjectPageComponent(props: {
         </Button>
       </div>
       <div className="flex flex-col gap-2">
-        <p>
+        <div className="flex gap-2">
           <span className="text-gray-400">
             <i className="w-6 fa-solid fa-link mr-2"></i>
             <span>Repository URL: </span>
           </span>
           <span className="font-bold">{gitRepository.url}</span>
-        </p>
+          <GitRepoConnectionStatusBadge status={props.gitRepository.connectionStatus} />
+        </div>
         <p className="flex items-center gap-2">
           <span className="text-gray-400">
             <i className="w-6 fa-solid fa-key mr-2"></i>
