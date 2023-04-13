@@ -69,7 +69,7 @@ test.concurrent(
       processedStatus = await gitService.getConnectionStatus(tdb, repo.id);
       expect(processedStatus).toStrictEqual({
         status: "connected",
-        lastConnectedAt: connectionStatus.lastSuccessfulConnectionAt,
+        lastConnectedAt: connectionStatus.lastSuccessfulConnectionAt?.getTime(),
       });
 
       const errorsCount = 5;
@@ -87,7 +87,7 @@ test.concurrent(
         processedStatus = await gitService.getConnectionStatus(tdb, repoId);
         expect(processedStatus).toStrictEqual({
           status: "disconnected",
-          error: { message: errorMsg, occurredAt: connStatus.errors[0].createdAt },
+          error: { message: errorMsg, occurredAt: connStatus.errors[0].createdAt?.getTime() },
         });
       }
 

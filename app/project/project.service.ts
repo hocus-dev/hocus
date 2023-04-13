@@ -6,8 +6,11 @@ import type { Prisma } from "@prisma/client";
 import type e from "express";
 import { StatusCodes } from "http-status-codes";
 import { match } from "ts-pattern";
+import type { GitService } from "~/git/git.service";
+import type { GitRepoConnectionStatus } from "~/git/types.shared";
 import { HttpError } from "~/http-error.server";
 import { UuidValidator } from "~/schema/uuid.validator.server";
+import { Token } from "~/token";
 import { groupBy, unwrap, waitForPromises } from "~/utils.shared";
 
 import { ENV_VAR_NAME_REGEX, UpdateEnvVarsTarget } from "./env-form.shared";
@@ -22,6 +25,10 @@ export interface UpdateEnvVarsArgs {
 }
 
 export class ProjectService {
+  static inject = [Token.GitService] as const;
+
+  constructor(private readonly gitService: GitService) {}
+
   async createProject(
     db: Prisma.TransactionClient,
     args: {
@@ -241,6 +248,7 @@ export class ProjectService {
       gitRepository: {
         url: string;
         publicKey: string;
+        connectionStatus: GitRepoConnectionStatus;
       };
     };
   }> {
@@ -258,6 +266,10 @@ export class ProjectService {
     if (project == null) {
       throw new HttpError(StatusCodes.NOT_FOUND, "Project not found");
     }
+    const connectionStatus = await this.gitService.getConnectionStatus(
+      db,
+      project.gitRepository.id,
+    );
     const projectPageProps = {
       project: {
         name: project.name,
@@ -267,6 +279,7 @@ export class ProjectService {
       gitRepository: {
         url: project.gitRepository.url,
         publicKey: project.gitRepository.sshKeyPair.publicKey,
+        connectionStatus,
       },
     };
     return { project, projectPageProps };
