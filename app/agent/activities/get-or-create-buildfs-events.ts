@@ -1,10 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
-import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
 
 import type { GetOrCreateBuildfsEventsReturnType } from "../buildfs.service";
 
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
 export type GetOrCreateBuildfsEventsActivity = (
   args: {

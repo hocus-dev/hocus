@@ -175,7 +175,8 @@ swap:
   restricted to a wheelchair: uses a wheelchair
   retard: silly|dullard|person with Down Syndrome|person with developmental disabilities|delay|hold
     back
-  retarded: silly|dullard|person with Down Syndrome|person with developmental disabilities|delay|hold
+  retarded:
+    silly|dullard|person with Down Syndrome|person with developmental disabilities|delay|hold
     back
   retards: "sillies|dullards|people with developmental disabilities|people with Down\u2019\
     s Syndrome|delays|holds back"
@@ -184,7 +185,8 @@ swap:
   schizo: person with schizophrenia
   schizophrenic: person with schizophrenia
   senile: person with dementia
-  short bus: silly|dullard|person with Down Syndrome|person with developmental disabilities|delay|hold
+  short bus:
+    silly|dullard|person with Down Syndrome|person with developmental disabilities|delay|hold
     back
   simpleton: foolish|ludicrous|unintelligent
   small person: person with dwarfism|little person|little people|LP|person of short

@@ -1,12 +1,13 @@
 import jwt from "jsonwebtoken";
 import type { Logger } from "winston";
+
+import { DEFAULT_SEATS_LIMIT } from "./constants";
+
 import type { Config } from "~/config";
 import type { License } from "~/schema/license.validator.server";
 import { LicenseValidator } from "~/schema/license.validator.server";
 import type { TimeService } from "~/time.service";
 import { Token } from "~/token";
-
-import { DEFAULT_SEATS_LIMIT } from "./constants";
 
 class UserMessageError extends Error {}
 

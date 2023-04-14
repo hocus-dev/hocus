@@ -2,14 +2,15 @@ import fs from "fs/promises";
 
 import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
-import { Scope } from "~/di/injector.server";
-import { printErrors } from "~/test-utils";
-import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
 
 import { createAgentInjector } from "./agent-injector";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import { execCmd, sleep } from "./utils";
+
+import { Scope } from "~/di/injector.server";
+import { printErrors } from "~/test-utils";
+import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
 const provideInjector = (
   testFn: (args: {

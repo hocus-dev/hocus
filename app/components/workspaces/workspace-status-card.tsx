@@ -2,15 +2,16 @@ import type { WorkspaceStatus } from "@prisma/client";
 import { useSearchParams } from "@remix-run/react";
 import { Card, Button, Spinner } from "flowbite-react";
 import { useEffect } from "react";
-import { WorkspacePathParams } from "~/page-paths.shared";
-import { unwrap } from "~/utils.shared";
-import { createVSCodeURI } from "~/workspace/utils";
-import type { WorkspaceInfo } from "~/workspace/workspace.service";
 
 import { DeleteWorkspaceButton } from "./delete-workspace-btn";
 import { StartWorkspaceButton } from "./start-workspace-btn";
 import { StopWorkspaceButton } from "./stop-workspace-btn";
 import { WorkspaceStatusComponent } from "./workspace-status";
+
+import { WorkspacePathParams } from "~/page-paths.shared";
+import { unwrap } from "~/utils.shared";
+import { createVSCodeURI } from "~/workspace/utils";
+import type { WorkspaceInfo } from "~/workspace/workspace.service";
 
 export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.Element {
   const { workspace } = props;

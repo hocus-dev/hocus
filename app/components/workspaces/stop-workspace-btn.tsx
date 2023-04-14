@@ -1,7 +1,8 @@
 import { Button } from "flowbite-react";
-import { getWorkspaceStopPath } from "~/page-paths.shared";
 
 import { CsrfInput } from "../csrf-input";
+
+import { getWorkspaceStopPath } from "~/page-paths.shared";
 
 export function StopWorkspaceButton(props: {
   workspaceExternalId: string;

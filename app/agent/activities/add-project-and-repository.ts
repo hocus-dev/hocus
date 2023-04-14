@@ -1,7 +1,8 @@
 import type { Project, GitRepository } from "@prisma/client";
-import { Token } from "~/token";
 
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
 
 export type AddProjectAndRepositoryActivity = (args: {
   gitRepositoryUrl: string;

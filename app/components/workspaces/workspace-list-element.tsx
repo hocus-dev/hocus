@@ -1,11 +1,12 @@
 import type { WorkspaceStatus } from "@prisma/client";
 import { Button } from "flowbite-react";
 import moment from "moment";
-import { getWorkspacePath } from "~/page-paths.shared";
 
 import { StartWorkspaceButton } from "./start-workspace-btn";
 import { StopWorkspaceButton } from "./stop-workspace-btn";
 import { WorkspaceStatusComponent } from "./workspace-status";
+
+import { getWorkspacePath } from "~/page-paths.shared";
 
 export interface WorkspaceListElementProps {
   externalId: string;

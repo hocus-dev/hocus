@@ -1,7 +1,8 @@
 import type { PrebuildEvent } from "@prisma/client";
-import { Token } from "~/token";
 
 import type { CreateActivity } from "../types";
+
+import { Token } from "~/token";
 
 export type GetArchivablePrebuildEventsActivity = (projectId: bigint) => Promise<PrebuildEvent[]>;
 export const getArchivablePrebuildEvents: CreateActivity<GetArchivablePrebuildEventsActivity> =

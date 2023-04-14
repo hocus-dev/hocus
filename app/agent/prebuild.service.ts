@@ -11,9 +11,6 @@ import { PrebuildEventReservationType } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
-import type { Config } from "~/config";
-import { Token } from "~/token";
-import { displayError, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { BuildfsService } from "./buildfs.service";
@@ -27,6 +24,10 @@ import {
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
 import { doesFileExist, execSshCmd, sha256, withFileLock } from "./utils";
+
+import type { Config } from "~/config";
+import { Token } from "~/token";
+import { displayError, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
 export class PrebuildService {
   static inject = [

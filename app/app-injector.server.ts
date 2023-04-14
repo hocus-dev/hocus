@@ -1,8 +1,3 @@
-import { config } from "~/config";
-import { newLogger } from "~/logger.server";
-import { Token } from "~/token";
-import { UserService } from "~/user/user.service.server";
-
 import type { GenericProviderMap, ProvidersFns, ProvidersOverrides } from "./di/injector.server";
 import { Injector, Scope } from "./di/injector.server";
 import { overrideProviders } from "./di/utils.server";
@@ -14,6 +9,11 @@ import { SshKeyService } from "./ssh-key/ssh-key.service";
 import { clientFactory } from "./temporal/client-factory";
 import { TimeService } from "./time.service";
 import { WorkspaceService } from "./workspace/workspace.service";
+
+import { config } from "~/config";
+import { newLogger } from "~/logger.server";
+import { Token } from "~/token";
+import { UserService } from "~/user/user.service.server";
 
 type Providers = typeof providers;
 type ProviderMap = GenericProviderMap<Providers>;

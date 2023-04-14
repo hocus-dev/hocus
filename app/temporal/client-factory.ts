@@ -1,4 +1,5 @@
 import { Client, Connection } from "@temporalio/client";
+
 import type { Config } from "~/config";
 import { Token } from "~/token";
 

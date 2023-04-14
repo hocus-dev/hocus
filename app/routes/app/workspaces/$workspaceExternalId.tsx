@@ -6,6 +6,9 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams } from "@remix-run/react";
 import { StatusCodes } from "http-status-codes";
 import { useEffect, useState } from "react";
+
+import type { WorkspaceRouteLoaderData } from "./status/$workspaceExternalId";
+
 import { AppPage } from "~/components/app-page";
 import { BackToProjectLink } from "~/components/projects/back-to-project-link";
 import { WorkspaceStatusCard } from "~/components/workspaces/workspace-status-card";
@@ -20,8 +23,6 @@ import {
 import { UuidValidator } from "~/schema/uuid.validator.server";
 import { Token } from "~/token";
 import { max, sleep, unwrap } from "~/utils.shared";
-
-import type { WorkspaceRouteLoaderData } from "./status/$workspaceExternalId";
 
 export const loader = async ({ context: { db, req, user, app } }: LoaderArgs) => {
   const { success, value: workspaceExternalId } = UuidValidator.SafeParse(

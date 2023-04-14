@@ -1,5 +1,6 @@
 import type { Static } from "@sinclair/typebox";
 import type { Any } from "ts-toolbelt";
+
 import { CreateWorkspaceFormSchema } from "~/schema/create-workspace-form.schema.server";
 import { compileSchema } from "~/schema/utils.server";
 

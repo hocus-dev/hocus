@@ -1,4 +1,5 @@
 import { redirect } from "@remix-run/node";
+
 import { PagePaths } from "~/page-paths.shared";
 
 export const loader = async () => {

@@ -1,8 +1,9 @@
 import { Button, Modal } from "flowbite-react";
 import { useState } from "react";
-import { getWorkspaceDeletePath } from "~/page-paths.shared";
 
 import { CsrfInput } from "../csrf-input";
+
+import { getWorkspaceDeletePath } from "~/page-paths.shared";
 
 export function DeleteWorkspaceButton(props: {
   workspaceName: string;

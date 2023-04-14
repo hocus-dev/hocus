@@ -1,5 +1,6 @@
 import { Tooltip } from "flowbite-react";
 import React from "react";
+
 import type { GitRepoConnectionStatus } from "~/git/types.shared";
 
 function GitRepoConnectionStatusBadgeComponent(props: {

@@ -2,6 +2,7 @@ import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { Button } from "flowbite-react";
+
 import { AppPage } from "~/components/app-page";
 import NoProjectsView from "~/components/projects/no-projects-view";
 import { ProjectList } from "~/components/projects/project-list";

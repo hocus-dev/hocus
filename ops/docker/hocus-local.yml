@@ -18,8 +18,8 @@ services:
       bash -o errexit -o nounset -o pipefail -o xtrace -c "
         mkdir -pv /agent_data/firecracker
         mkdir -pv /agent_data/resources
-        ops/bin/buildfs.sh resources/docker/checkout-and-inspect.Dockerfile /agent_data/resources/checkout-and-inspect.ext4 resources/ 500 
-        ops/bin/buildfs.sh resources/docker/default-workspace.Dockerfile /agent_data/resources/default-workspace.ext4 resources/ 1500 
+        ops/bin/buildfs.sh resources/docker/checkout-and-inspect.Dockerfile /agent_data/resources/checkout-and-inspect.ext4 resources/ 500
+        ops/bin/buildfs.sh resources/docker/default-workspace.Dockerfile /agent_data/resources/default-workspace.ext4 resources/ 1500
         ops/bin/buildfs.sh resources/docker/buildfs.Dockerfile /agent_data/resources/buildfs.ext4 resources/ 1000
         ops/bin/buildfs.sh resources/docker/fetchrepo.Dockerfile /agent_data/resources/fetchrepo.ext4 resources 2500
         curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 https://github.com/hocus-dev/linux-kernel/releases/download/0.0.3/vmlinux -z /agent_data/resources/vmlinux-5.10-x86_64.bin -o /agent_data/resources/vmlinux-5.10-x86_64.bin --location

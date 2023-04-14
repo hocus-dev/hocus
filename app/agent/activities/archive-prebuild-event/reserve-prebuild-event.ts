@@ -1,8 +1,9 @@
 import type { PrebuildEventReservation } from "@prisma/client";
 import { PrebuildEventReservationType, PrebuildEventStatus } from "@prisma/client";
-import { Token } from "~/token";
 
 import type { CreateActivity } from "../types";
+
+import { Token } from "~/token";
 
 export type ReservePrebuildEventActivity = (args: {
   prebuildEventId: bigint;

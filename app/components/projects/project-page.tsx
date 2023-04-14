@@ -2,6 +2,12 @@ import { Button } from "flowbite-react";
 import moment from "moment";
 import React, { useState } from "react";
 import type { Any } from "ts-toolbelt";
+
+import { AppPage } from "../app-page";
+
+import { GitRepoConnectionStatusBadge } from "./repo-connection-status-badge";
+import { RepoSshKeyCard } from "./repo-ssh-key-card";
+
 import type { GitRepoConnectionStatus } from "~/git/types.shared";
 import {
   PagePaths,
@@ -9,11 +15,6 @@ import {
   getNewWorkspacePath,
   getProjectPath,
 } from "~/page-paths.shared";
-
-import { AppPage } from "../app-page";
-
-import { GitRepoConnectionStatusBadge } from "./repo-connection-status-badge";
-import { RepoSshKeyCard } from "./repo-ssh-key-card";
 
 const PROJECT_TAB_TITLES: Record<ProjectPathTabId, React.ReactNode> = {
   [ProjectPathTabId.WORKSPACES]: (
@@ -49,7 +50,7 @@ const PROJECT_TAB_ORDER = [
   ProjectPathTabId.SETTINGS,
 ] as const;
 // enforces that PROJECT_TAB_ORDER contains all values of ProjectPathTabId
-const _typecheck: Any.Equals<typeof PROJECT_TAB_ORDER[number], ProjectPathTabId> = 1;
+const _typecheck: Any.Equals<(typeof PROJECT_TAB_ORDER)[number], ProjectPathTabId> = 1;
 
 function ProjectPageComponent(props: {
   project: { name: string; externalId: string; createdAt: number };

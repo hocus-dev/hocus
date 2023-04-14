@@ -17,4 +17,3 @@ cd "$PROJECT_DIR""/ops/docker" &&
 sleep 1
 cd "$PROJECT_DIR" && \
     yarn prisma migrate deploy
-    

@@ -1,10 +1,11 @@
 import { stubInterface } from "ts-sinon";
 import type { Logger } from "winston";
-import { createAppInjector } from "~/app-injector.server";
-import { Token } from "~/token";
 
 import { DEFAULT_SEATS_LIMIT } from "./constants";
 import { LicenseService } from "./license.service";
+
+import { createAppInjector } from "~/app-injector.server";
+import { Token } from "~/token";
 
 // https://github.com/auth0/node-jsonwebtoken/issues/862#issue-1506802337
 const TEST_LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----

@@ -7,11 +7,6 @@ import { LogGroupType } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, Config as SSHConfig } from "node-ssh";
-import type { Config } from "~/config";
-import { config } from "~/config";
-import { GroupError } from "~/group-error";
-import { Token } from "~/token";
-import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { VMTaskOutput } from "./agent-util.types";
 import {
@@ -21,6 +16,12 @@ import {
   ATTACH_TO_TASK_SCRIPT_TEMPLATE,
 } from "./constants";
 import { execCmd, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
+
+import type { Config } from "~/config";
+import { config } from "~/config";
+import { GroupError } from "~/group-error";
+import { Token } from "~/token";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
 export class AgentUtilService {
   static inject = [Token.Logger] as const;
@@ -187,7 +188,7 @@ export class AgentUtilService {
 
     let cleanupStarted = false;
     const taskSshHandles: NodeSSH[] = [];
-    const taskFn = async (args: typeof taskDefinitions[0]) => {
+    const taskFn = async (args: (typeof taskDefinitions)[0]) => {
       await withSsh(sshConfig, async (taskSsh) => {
         if (cleanupStarted) {
           throw new Error("cleanup already started");

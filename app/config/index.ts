@@ -1,10 +1,10 @@
+import { makeConfig, get, getEnv } from "./utils.server";
+
 import {
   DEFAULT_PREBUILD_SSH_KEY_PRIVATE,
   DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
 } from "~/agent/constants";
 import { HOCUS_LICENSE_PUBLIC_KEY } from "~/license/constants";
-
-import { makeConfig, get, getEnv } from "./utils.server";
 
 const parseIntWithMin = (value: string, min: number): number => {
   const parsed = parseInt(value);

@@ -1,6 +1,7 @@
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+
 import { ProjectPage } from "~/components/projects/project-page";
 import { WorkspaceList } from "~/components/workspaces/workspace-list";
 import { ProjectPathTabId } from "~/page-paths.shared";

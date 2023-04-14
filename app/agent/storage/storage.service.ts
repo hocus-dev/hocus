@@ -3,12 +3,13 @@ import os from "os";
 import path from "path";
 
 import yaml from "yaml";
-import { Token } from "~/token";
 
 import { withFileLock } from "../utils";
 
 import type { AgentStorage } from "./storage.validator";
 import { AgentStorageValidator } from "./storage.validator";
+
+import { Token } from "~/token";
 
 /**
  * The low level storage service is responsible for reading and writing the agent's storage file.

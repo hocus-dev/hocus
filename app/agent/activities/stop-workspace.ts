@@ -1,8 +1,9 @@
 import { WorkspaceStatus } from "@prisma/client";
-import { Token } from "~/token";
-import { unwrap } from "~/utils.shared";
 
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
+import { unwrap } from "~/utils.shared";
 
 export type StopWorkspaceActivity = (workspaceId: bigint) => Promise<void>;
 export const stopWorkspace: CreateActivity<StopWorkspaceActivity> =

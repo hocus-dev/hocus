@@ -2,6 +2,7 @@ import type { Prisma, WorkspaceStatus } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import { uniqueNamesGenerator, adjectives, animals } from "unique-names-generator";
 import type { Config as NameGeneratorConfig } from "unique-names-generator";
+
 import type { Config } from "~/config";
 import { HttpError } from "~/http-error.server";
 import { Token } from "~/token";

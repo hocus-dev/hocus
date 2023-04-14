@@ -1,8 +1,9 @@
 import type { ButtonSizes } from "flowbite-react";
 import { Button } from "flowbite-react";
-import { PagePaths } from "~/page-paths.shared";
 
 import { CsrfInput } from "../csrf-input";
+
+import { PagePaths } from "~/page-paths.shared";
 
 export function NewWorkspaceButton(props: {
   externalGitBranchId: string;

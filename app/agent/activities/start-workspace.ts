@@ -1,10 +1,11 @@
 import type { WorkspaceInstance } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
-import { Token } from "~/token";
-import { formatBranchName } from "~/utils.shared";
 
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
+import { formatBranchName } from "~/utils.shared";
 
 export type StartWorkspaceActivity = (workspaceId: bigint) => Promise<WorkspaceInstance>;
 export const startWorkspace: CreateActivity<StartWorkspaceActivity> =

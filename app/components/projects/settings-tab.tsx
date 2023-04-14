@@ -2,10 +2,11 @@ import type { Project } from "@prisma/client";
 import { Alert, Badge, Button } from "flowbite-react";
 import React from "react";
 import type { Any } from "ts-toolbelt";
-import type { EditProjectVmSettings } from "~/schema/edit-project-vm-settings.validator.server";
 
 import { CsrfInput } from "../csrf-input";
 import { TextInputAddonRight } from "../text-input-addon-right";
+
+import type { EditProjectVmSettings } from "~/schema/edit-project-vm-settings.validator.server";
 
 export const VmSettingsFields = [
   "maxPrebuildRamMib",
@@ -17,7 +18,7 @@ export const VmSettingsFields = [
   "maxPrebuildRootDriveSizeMib",
 ] as const;
 
-export type VmSettingsField = typeof VmSettingsFields[number];
+export type VmSettingsField = (typeof VmSettingsFields)[number];
 // enforce that VmSettingsField is a subset of Project fields
 const _typecheck1: Any.Contains<VmSettingsField, keyof Project> = 1;
 // enforce that VmSettingsField is a subset of EditProjectVmSettings fields

@@ -1,11 +1,11 @@
-import { Token } from "~/token";
-import { unwrap } from "~/utils.shared";
-
 import type { CheckoutAndInspectResult } from "../activities-types";
 import { SOLO_AGENT_INSTANCE_ID } from "../constants";
 import { randomString } from "../utils";
 
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
+import { unwrap } from "~/utils.shared";
 
 /**
  * Copies the contents of `repositoryDrivePath` into `outputDrivePath`, and checks

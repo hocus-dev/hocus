@@ -36,4 +36,3 @@ COPY ./buildkite/hooks/bk-check-disk-space ./buildkite/hooks/fix-buildkite-agent
 COPY ./buildkite/hooks/environment /etc/buildkite-agent/hooks/environment
 COPY ./buildkite/buildkite-agent.cfg /etc/buildkite-agent/buildkite-agent.cfg
 RUN systemctl enable buildkite-agent && usermod -aG docker buildkite-agent && echo "{}" > /etc/docker/daemon.json && echo "buildkite-agent ALL = (root) NOPASSWD: /usr/bin/fix-buildkite-agent-builds-permissions" >> /etc/sudoers
-

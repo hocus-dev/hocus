@@ -1,8 +1,8 @@
+import type { CreateActivity } from "../types";
+
 import { SOLO_AGENT_INSTANCE_ID } from "~/agent/constants";
 import { Token } from "~/token";
 import { unwrap } from "~/utils.shared";
-
-import type { CreateActivity } from "../types";
 
 export type DeleteLocalPrebuildEventFilesActivity = (args: {
   prebuildEventId: bigint;

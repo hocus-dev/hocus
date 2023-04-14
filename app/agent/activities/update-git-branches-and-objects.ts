@@ -1,8 +1,8 @@
-import { Token } from "~/token";
-
 import type { UpdateBranchesResult } from "../git/git.service";
 
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
 
 export type UpdateGitBranchesAndObjectsActivity = (
   gitRepositoryId: bigint,

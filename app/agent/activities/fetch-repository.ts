@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
-import { Token } from "~/token";
 
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
 
 export type FetchRepositoryActivity = (gitRepositoryId: bigint) => Promise<void>;
 export const fetchRepository: CreateActivity<FetchRepositoryActivity> =

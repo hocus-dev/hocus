@@ -12,6 +12,14 @@ import {
 } from "@temporalio/workflow";
 // the native path module is a restricted import in workflows
 import path from "path-browserify";
+
+import type { CheckoutAndInspectResult } from "./activities-types";
+import type { Activities } from "./activities/list";
+import { HOST_PERSISTENT_DIR } from "./constants";
+import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
+import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
+import { parseGitSyncError } from "./workflows-utils";
+
 import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
 import {
   numericOrNullSort,
@@ -21,13 +29,6 @@ import {
   groupBy,
   displayError,
 } from "~/utils.shared";
-
-import type { CheckoutAndInspectResult } from "./activities-types";
-import type { Activities } from "./activities/list";
-import { HOST_PERSISTENT_DIR } from "./constants";
-import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
-import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
-import { parseGitSyncError } from "./workflows-utils";
 
 const { defaultWorkflowLogger: logger } = proxySinks();
 
@@ -112,7 +113,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
   }
   const projectAndGitObjectIdToPrebuildEvent = new ArbitraryKeyMap<
     { projectId: bigint; gitObjectId: bigint },
-    typeof prebuildEvents[0]
+    (typeof prebuildEvents)[0]
   >(({ projectId, gitObjectId }) => `${projectId}-${gitObjectId}`);
   for (const prebuildEvent of prebuildEvents) {
     const key = { projectId: prebuildEvent.projectId, gitObjectId: prebuildEvent.gitObjectId };
@@ -165,7 +166,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
     }),
   );
 
-  const prebuildEventsWithInspection: (typeof prebuildEvents[0] & {
+  const prebuildEventsWithInspection: ((typeof prebuildEvents)[0] & {
     inspection: CheckoutAndInspectResult;
   })[] = [];
   for (const [

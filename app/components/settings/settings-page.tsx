@@ -1,9 +1,10 @@
 import { Sidebar } from "flowbite-react";
 import React from "react";
-import { getUserSettingsPath, SettingsPageTab } from "~/page-paths.shared";
-import { numericSort } from "~/utils.shared";
 
 import { AppPage } from "../app-page";
+
+import { getUserSettingsPath, SettingsPageTab } from "~/page-paths.shared";
+import { numericSort } from "~/utils.shared";
 
 const SettingsPageTabNameIconOrder: Record<SettingsPageTab, [string, string, number]> = {
   [SettingsPageTab.SshKeys]: ["SSH Keys", "fa-solid fa-key", 0],

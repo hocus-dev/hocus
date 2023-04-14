@@ -8,37 +8,54 @@ type SSH_VENDOR = valueof<typeof SSH_VENDOR>;
 const SSH_VENDOR = {
   CORE_PORTABLE: "ssh_vendor_core_portable",
   GIT_FOR_WINDOWS: "ssh_vendor_git_for_windows",
-  OPENSSH_FOR_WINDOWS: "ssh_vendor_openssh_for_windows"
+  OPENSSH_FOR_WINDOWS: "ssh_vendor_openssh_for_windows",
 } as const;
 
 const BUG_REPORT_URL = "https://github.com/hocus-dev/hocus/issues/new/choose";
-const WINDOWS_SSH_INSTALL_URL = "https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse?tabs=powershell#install-openssh-for-windows";
+const WINDOWS_SSH_INSTALL_URL =
+  "https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse?tabs=powershell#install-openssh-for-windows";
 const HOCUS_PROJECT_LOCATION = "/home/hocus/dev/project";
 
 const SSH_VENDOR_UPGRADE_LINK = mapenum<SSH_VENDOR>()({
   // To be honest you are probably on some enterprise system
   // I've checked that all current active LTS Ubuntu and Debian versions should have new enough SSH
-  [SSH_VENDOR.CORE_PORTABLE]: "https://askubuntu.com/questions/1189747/is-possible-to-upgrade-openssh-server-openssh-7-6p1-to-openssh-8-0p1",
+  [SSH_VENDOR.CORE_PORTABLE]:
+    "https://askubuntu.com/questions/1189747/is-possible-to-upgrade-openssh-server-openssh-7-6p1-to-openssh-8-0p1",
   [SSH_VENDOR.GIT_FOR_WINDOWS]: "https://gitforwindows.org/",
-  [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: "https://github.com/PowerShell/Win32-OpenSSH/wiki/Install-Win32-OpenSSH#install-using-winget"
-})
+  [SSH_VENDOR.OPENSSH_FOR_WINDOWS]:
+    "https://github.com/PowerShell/Win32-OpenSSH/wiki/Install-Win32-OpenSSH#install-using-winget",
+});
 
 const SSH_VENDOR_SETUP_AGENT_LINK = mapenum<SSH_VENDOR>()({
   [SSH_VENDOR.CORE_PORTABLE]: "https://wiki.archlinux.org/title/SSH_keys#ssh-agent",
-  [SSH_VENDOR.GIT_FOR_WINDOWS]: "https://gist.github.com/adojos/5aab5e1dcedc16957c465be0212ea099#a4-update-bashrc-file-inside-user-home-folder",
-  [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: "https://gist.github.com/gorbak25/fe90bc2f35afe394477db9d459e11a26"
-})
+  [SSH_VENDOR.GIT_FOR_WINDOWS]:
+    "https://gist.github.com/adojos/5aab5e1dcedc16957c465be0212ea099#a4-update-bashrc-file-inside-user-home-folder",
+  [SSH_VENDOR.OPENSSH_FOR_WINDOWS]:
+    "https://gist.github.com/gorbak25/fe90bc2f35afe394477db9d459e11a26",
+});
 
 async function tryOpenUrlInBrowser(url: string): Promise<void> {
   try {
     if (isWindows) {
-      await waitForProcessOutput("powershell", ["start", "", url])
+      await waitForProcessOutput("powershell", ["start", "", url]);
     } else {
-      try { await waitForProcessOutput("xdg-open", [url]); return; } catch (e) { }
-      try { await waitForProcessOutput("gio", ["open", url]); return; } catch (e) { }
-      try { await waitForProcessOutput("kde-open", [url]); return; } catch (e) { }
-      try { await waitForProcessOutput("gnome-open", [url]); return; } catch (e) { }
-      throw new Error("None of the methods worked .-.")
+      try {
+        await waitForProcessOutput("xdg-open", [url]);
+        return;
+      } catch (e) {}
+      try {
+        await waitForProcessOutput("gio", ["open", url]);
+        return;
+      } catch (e) {}
+      try {
+        await waitForProcessOutput("kde-open", [url]);
+        return;
+      } catch (e) {}
+      try {
+        await waitForProcessOutput("gnome-open", [url]);
+        return;
+      } catch (e) {}
+      throw new Error("None of the methods worked .-.");
     }
   } catch (err) {
     console.error(err);
@@ -65,42 +82,42 @@ function mkSSHVersion(major: number, minor: number): SSHVersion {
 function sshVersionCmp(a: SSHVersion, b: SSHVersion): number {
   const major = a.major - b.major;
   const minor = a.minor - b.minor;
-  return major === 0 ? minor : major
+  return major === 0 ? minor : major;
 }
 
 interface SSHClient {
-  vendor: SSH_VENDOR,
-  fullVersionString: string,
-  version: SSHVersion
+  vendor: SSH_VENDOR;
+  fullVersionString: string;
+  version: SSHVersion;
 }
 
 // Set of constraints on the SSH client version
 interface SSHVersionConstraints {
   // When a specific version is borked
-  blacklist: SSHVersion[],
+  blacklist: SSHVersion[];
   // The minimum SSH version
-  minimumVersion: SSHVersion,
+  minimumVersion: SSHVersion;
 }
 
 interface SSHVersionSpec {
   // Hard limits - If we don't bail out NOW then we will leave the host in a broken state requiring manual intervention!!!
   // For ex. After the extension activates ssh won't be able to parse the ssh config
-  hard?: SSHVersionConstraints,
+  hard?: SSHVersionConstraints;
   // Soft limits - Nothing is permamentelly borked but u may have an degraded experience
   // For ex. SSH agent forwarding is borked
-  soft?: SSHVersionConstraints,
+  soft?: SSHVersionConstraints;
 }
 
 // TODO: Setting up an weekly E2E test pipeline for testing the compatibility would be amazing >.<
 const REQUIRED_SSH_VERSION: Record<SSH_VENDOR, SSHVersionSpec> = {
   [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: {
-    // What I tested manually ¯\_(ツ)_/¯ 
+    // What I tested manually ¯\_(ツ)_/¯
     // 9.2.0.0, 9.1.0.0, 8.9.1.0 works out of the box
     // 8.6.0.0 connected but the agent forwading was borked
     // TODO: Test manually 8.9.0.0, 8.1.0.0, 8.0.0.0, 7.9.0.0, 7.7.2.0, 7.7.1.0, 7.7.0.0, 7.6.1.0, 7.6.0.1, 7.6.0.0
     hard: {
       blacklist: [],
-      minimumVersion: mkSSHVersion(7, 6)
+      minimumVersion: mkSSHVersion(7, 6),
     },
     // Some OpenSSH_for_Windows versions get borked when the agent receives a request for the SSH agent restriction extension .-.
     // You may connect to a workspace but agent forwarding won't work
@@ -108,21 +125,21 @@ const REQUIRED_SSH_VERSION: Record<SSH_VENDOR, SSHVersionSpec> = {
     soft: {
       blacklist: [],
       minimumVersion: mkSSHVersion(8, 9),
-    }
+    },
   },
   // Include and ProxyJump are only supported from OpenSSH 7.3 released August 01, 2016
   [SSH_VENDOR.GIT_FOR_WINDOWS]: {
     hard: {
       minimumVersion: mkSSHVersion(7, 3),
       blacklist: [],
-    }
+    },
   },
   [SSH_VENDOR.CORE_PORTABLE]: {
     hard: {
       minimumVersion: mkSSHVersion(7, 3),
       blacklist: [],
-    }
-  }
+    },
+  },
 };
 
 // Checks the output of ssh -V
@@ -133,34 +150,50 @@ async function discoverSshClientVersionString(): Promise<string> {
   } catch (err) {
     // Ok the binary was not found - Assume SSH Client is not available
     if ((err as any).code === "ENOENT") {
-      const opt1 = "How to install it?"
+      const opt1 = "How to install it?";
       const opt2 = "But I have it installed";
       // Delibrate floating promise
-      void vscode.window.showErrorMessage(`SSH client not found. Please install OpenSSH`, { modal: true }, opt1, opt2).then(async (v) => {
-        if (v === opt1) {
-          if (isWindows) {
-            await tryOpenUrlInBrowser(WINDOWS_SSH_INSTALL_URL)
-          } else {
-            await vscode.window.showInformationMessage("Ubuntu/Debian: sudo apt-get install openssh-client\nArch/Manjaro: sudo pacman -S openssh", { modal: true });
+      void vscode.window
+        .showErrorMessage(
+          `SSH client not found. Please install OpenSSH`,
+          { modal: true },
+          opt1,
+          opt2,
+        )
+        .then(async (v) => {
+          if (v === opt1) {
+            if (isWindows) {
+              await tryOpenUrlInBrowser(WINDOWS_SSH_INSTALL_URL);
+            } else {
+              await vscode.window.showInformationMessage(
+                "Ubuntu/Debian: sudo apt-get install openssh-client\nArch/Manjaro: sudo pacman -S openssh",
+                { modal: true },
+              );
+            }
+          } else if (v === opt2) {
+            await tryOpenUrlInBrowser(BUG_REPORT_URL);
           }
-        } else if (v === opt2) {
-          await tryOpenUrlInBrowser(BUG_REPORT_URL);
-        }
-      });
-      throw Error("SSH Client not found")
+        });
+      throw Error("SSH Client not found");
     }
     // The SSH client exists but we got a generic error while probing the SSH version
     // It's best to assume that we can't use this SSH client, for ex we don't have perms for executing the ssh binary
     else {
-      console.error(err)
+      console.error(err);
       const opt1 = "Bug report";
       // Delibrate floating promise
-      void vscode.window.showErrorMessage(`Unable to probe the SSH version`, { modal: true, detail: (err as Error).toString() }, opt1).then(async (v) => {
-        if (v === opt1) {
-          await tryOpenUrlInBrowser(BUG_REPORT_URL);
-        }
-      });
-      throw Error("Failed to retrieve the SSH version")
+      void vscode.window
+        .showErrorMessage(
+          `Unable to probe the SSH version`,
+          { modal: true, detail: (err as Error).toString() },
+          opt1,
+        )
+        .then(async (v) => {
+          if (v === opt1) {
+            await tryOpenUrlInBrowser(BUG_REPORT_URL);
+          }
+        });
+      throw Error("Failed to retrieve the SSH version");
     }
   }
 }
@@ -177,19 +210,32 @@ async function detectSshClient(): Promise<SSHClient> {
   // Windows:          OpenSSH_for_Windows_8.6p1, LibreSSL 3.4.3
   const sshVersionString = await discoverSshClientVersionString();
 
-  const matches = [...sshVersionString.matchAll(/(?<slug>OpenSSH_|OpenSSH_for_Windows_)(?<major>[0-9]+)\.(?<minor>[0-9]+)/ig)];
+  const matches = [
+    ...sshVersionString.matchAll(
+      /(?<slug>OpenSSH_|OpenSSH_for_Windows_)(?<major>[0-9]+)\.(?<minor>[0-9]+)/gi,
+    ),
+  ];
   if (matches.length !== 1) {
     const opt1 = "Bug report";
     // Delibrate floating promise
-    void vscode.window.showErrorMessage(`Unable to parse the SSH version slug`, { modal: true, detail: `Please send us this string:\n${sshVersionString}` }, opt1).then(async (v) => {
-      if (v === opt1) {
-        await tryOpenUrlInBrowser(BUG_REPORT_URL);
-      }
-    });
-    throw Error("Failed to parse the SSH version slug")
+    void vscode.window
+      .showErrorMessage(
+        `Unable to parse the SSH version slug`,
+        { modal: true, detail: `Please send us this string:\n${sshVersionString}` },
+        opt1,
+      )
+      .then(async (v) => {
+        if (v === opt1) {
+          await tryOpenUrlInBrowser(BUG_REPORT_URL);
+        }
+      });
+    throw Error("Failed to parse the SSH version slug");
   }
   const slug: string = (matches[0].groups as any).slug;
-  const sshVersion = mkSSHVersion(+(matches[0].groups as any).major, +(matches[0].groups as any).minor);
+  const sshVersion = mkSSHVersion(
+    +(matches[0].groups as any).major,
+    +(matches[0].groups as any).minor,
+  );
 
   // By default assume it's the official portable version
   let vendor: SSH_VENDOR = SSH_VENDOR.CORE_PORTABLE;
@@ -203,24 +249,30 @@ async function detectSshClient(): Promise<SSHClient> {
     // We need more probes cause OPENSSH_FOR_WINDOWS didn't always use "OpenSSH_for_Windows_" for the slug .-.
     try {
       // This resolves the absolute path to the ssh binary.
-      const path = (await waitForProcessOutput("powershell", ["get-command ssh | Select -ExpandProperty Source"])).stdout;
-      console.log(`SSH binary path: ${path}`)
+      const path = (
+        await waitForProcessOutput("powershell", [
+          "get-command ssh | Select -ExpandProperty Source",
+        ])
+      ).stdout;
+      console.log(`SSH binary path: ${path}`);
       if (path.includes("\\usr\\bin\\")) {
-        console.log("Looks like Git for Windows")
-        vendor = SSH_VENDOR.GIT_FOR_WINDOWS
+        console.log("Looks like Git for Windows");
+        vendor = SSH_VENDOR.GIT_FOR_WINDOWS;
       }
       if (path.includes("\\OpenSSH\\")) {
-        console.log("Looks like OpenSSH for Windows")
-        vendor = SSH_VENDOR.OPENSSH_FOR_WINDOWS
+        console.log("Looks like OpenSSH for Windows");
+        vendor = SSH_VENDOR.OPENSSH_FOR_WINDOWS;
       }
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   return {
     vendor,
     fullVersionString: sshVersionString,
-    version: sshVersion
-  }
+    version: sshVersion,
+  };
 }
 
 async function ensureSshNewEnough(sshClient: SSHClient): Promise<void> {
@@ -228,24 +280,47 @@ async function ensureSshNewEnough(sshClient: SSHClient): Promise<void> {
   // Check hard requirements
   if (versionRequirements.hard !== void 0) {
     const constraints = versionRequirements.hard;
-    if (sshVersionCmp(constraints.minimumVersion, sshClient.version) > 0 || constraints.blacklist.find((x) => sshVersionCmp(x, sshClient.version) === 0) !== void 0) {
+    if (
+      sshVersionCmp(constraints.minimumVersion, sshClient.version) > 0 ||
+      constraints.blacklist.find((x) => sshVersionCmp(x, sshClient.version) === 0) !== void 0
+    ) {
       const opt1 = "How to upgrade?";
       // Delibrate floating promise
-      void vscode.window.showErrorMessage(`Unsupported SSH version :(`, { modal: true, detail: `Continuing with\n${sshClient.fullVersionString}would break the system, Aborting\nPlease upgrade to at least OpenSSH ${constraints.minimumVersion.major}.${constraints.minimumVersion.minor} in order to use Hocus` }, opt1).then(async (v) => {
-        if (v === opt1) {
-          await tryOpenUrlInBrowser(SSH_VENDOR_UPGRADE_LINK[sshClient.vendor]);
-        }
-      });
+      void vscode.window
+        .showErrorMessage(
+          `Unsupported SSH version :(`,
+          {
+            modal: true,
+            detail: `Continuing with\n${sshClient.fullVersionString}would break the system, Aborting\nPlease upgrade to at least OpenSSH ${constraints.minimumVersion.major}.${constraints.minimumVersion.minor} in order to use Hocus`,
+          },
+          opt1,
+        )
+        .then(async (v) => {
+          if (v === opt1) {
+            await tryOpenUrlInBrowser(SSH_VENDOR_UPGRADE_LINK[sshClient.vendor]);
+          }
+        });
       throw new Error("Unsupported SSH version");
     }
   }
   // Check soft requirements
   if (versionRequirements.soft !== void 0) {
     const constraints = versionRequirements.soft;
-    if (sshVersionCmp(constraints.minimumVersion, sshClient.version) > 0 || constraints.blacklist.find((x) => sshVersionCmp(x, sshClient.version) === 0) !== void 0) {
+    if (
+      sshVersionCmp(constraints.minimumVersion, sshClient.version) > 0 ||
+      constraints.blacklist.find((x) => sshVersionCmp(x, sshClient.version) === 0) !== void 0
+    ) {
       const opt1 = "How to upgrade?";
-      const opt2 = "I want to continue"
-      const r = await vscode.window.showWarningMessage(`SSH client might be buggy`, { modal: true, detail: `Continuing with\n${sshClient.fullVersionString}might cause issues\nIf continuing expect that some Hocus features won't work\nIn order to get the full Hocus experience please upgrade to at least OpenSSH ${constraints.minimumVersion.major}.${constraints.minimumVersion.minor}\nDo you want to continue with a possibly buggy experience?` }, opt1, opt2)
+      const opt2 = "I want to continue";
+      const r = await vscode.window.showWarningMessage(
+        `SSH client might be buggy`,
+        {
+          modal: true,
+          detail: `Continuing with\n${sshClient.fullVersionString}might cause issues\nIf continuing expect that some Hocus features won't work\nIn order to get the full Hocus experience please upgrade to at least OpenSSH ${constraints.minimumVersion.major}.${constraints.minimumVersion.minor}\nDo you want to continue with a possibly buggy experience?`,
+        },
+        opt1,
+        opt2,
+      );
       if (r === opt1) {
         await tryOpenUrlInBrowser(SSH_VENDOR_UPGRADE_LINK[sshClient.vendor]);
       } else if (r === opt2) {
@@ -260,15 +335,21 @@ async function ensureSshNewEnough(sshClient: SSHClient): Promise<void> {
 // Checks if the SSH agent is available on the machine
 // If not then tells you how to set it up
 async function checkSSHAgentIsAvailable(sshClient: SSHClient): Promise<void> {
-  let agentAvailable = false
-  if (sshClient.vendor === SSH_VENDOR.CORE_PORTABLE || sshClient.vendor === SSH_VENDOR.GIT_FOR_WINDOWS) {
+  let agentAvailable = false;
+  if (
+    sshClient.vendor === SSH_VENDOR.CORE_PORTABLE ||
+    sshClient.vendor === SSH_VENDOR.GIT_FOR_WINDOWS
+  ) {
     if (process.env.SSH_AUTH_SOCK !== void 0) {
       agentAvailable = true;
     }
-  }
-  else if (sshClient.vendor === SSH_VENDOR.OPENSSH_FOR_WINDOWS) {
+  } else if (sshClient.vendor === SSH_VENDOR.OPENSSH_FOR_WINDOWS) {
     // The ssh agent is a global windows service
-    const serviceStatus = (await waitForProcessOutput("powershell", ["Get-Service ssh-agent | Select -ExpandProperty Status"])).stdout;
+    const serviceStatus = (
+      await waitForProcessOutput("powershell", [
+        "Get-Service ssh-agent | Select -ExpandProperty Status",
+      ])
+    ).stdout;
     if (serviceStatus.includes("Running")) {
       agentAvailable = true;
     }
@@ -277,15 +358,27 @@ async function checkSSHAgentIsAvailable(sshClient: SSHClient): Promise<void> {
   if (!agentAvailable) {
     const opt1 = "How to fix this?";
     const opt2 = "Proceed anyway!";
-    const r = await vscode.window.showWarningMessage("SSH Agent is not running", { modal: true, detail: "You may still connect to workspaces but you won't be able to push changes!\nDo you want to proceed anyway?" }, opt1, opt2);
+    const r = await vscode.window.showWarningMessage(
+      "SSH Agent is not running",
+      {
+        modal: true,
+        detail:
+          "You may still connect to workspaces but you won't be able to push changes!\nDo you want to proceed anyway?",
+      },
+      opt1,
+      opt2,
+    );
     if (r === opt1) {
       await tryOpenUrlInBrowser(SSH_VENDOR_SETUP_AGENT_LINK[sshClient.vendor]);
-      await vscode.window.showInformationMessage("Remember to FULLY restart Vscode after starting the ssh-agent! Also restart the terminal you used to launch Vscode with :)", { modal: true })
+      await vscode.window.showInformationMessage(
+        "Remember to FULLY restart Vscode after starting the ssh-agent! Also restart the terminal you used to launch Vscode with :)",
+        { modal: true },
+      );
     } else if (r === opt2) {
       vscode.window.showInformationMessage(`Continuing without SSH Agent`);
       return;
     }
-    throw new Error("SSH Agent not available")
+    throw new Error("SSH Agent not available");
   }
 }
 
@@ -301,7 +394,7 @@ async function ensureSshDirsExists() {
   const userSshDir = await getUserSshConfigDir();
   const hocusSshDir = path.join(userSshDir, "hocus");
   for (const dir of [userSshDir, hocusSshDir]) {
-    if (!await fs.exists(dir)) {
+    if (!(await fs.exists(dir))) {
       console.log(`Creating ${dir} dir`);
       await fs.mkdir(dir);
       await fs.chmod(dir, 0o700);
@@ -310,19 +403,26 @@ async function ensureSshDirsExists() {
 }
 
 // This also serves as a versioning string, If this changes the old config will be deleted
-const hocusSshConfigBaner = "# Don't edit this file - your changes WILL be overwritten!!!\n# Please perform customizations in the main config file under Host *.hocus.dev\n# This file is managed by Hocus\n# Hocus SSH Integration 0.0.4\n" as const;
+const hocusSshConfigBaner =
+  "# Don't edit this file - your changes WILL be overwritten!!!\n# Please perform customizations in the main config file under Host *.hocus.dev\n# This file is managed by Hocus\n# Hocus SSH Integration 0.0.4\n" as const;
 
 async function ensureSshConfigSetUp(recursed?: boolean) {
   await ensureSshDirsExists();
   const userSshDir = await getUserSshConfigDir();
   const sshUserConfigPath = path.join(userSshDir, "config");
   const sshHocusConfigPath = await getHocusSshConfigPath();
-  for (const [filePath, fileDefault] of [[sshUserConfigPath, "# This is the ssh client user configuration file. See\n# ssh_config(5) for more information.\n\n"], [sshHocusConfigPath, hocusSshConfigBaner]] as const) {
-    if (!await fs.exists(filePath)) {
+  for (const [filePath, fileDefault] of [
+    [
+      sshUserConfigPath,
+      "# This is the ssh client user configuration file. See\n# ssh_config(5) for more information.\n\n",
+    ],
+    [sshHocusConfigPath, hocusSshConfigBaner],
+  ] as const) {
+    if (!(await fs.exists(filePath))) {
       console.log(`Creating ssh config ${filePath}`);
       await fs.createFile(filePath);
       await fs.chmod(filePath, 0o600);
-      await fs.writeFile(filePath, fileDefault)
+      await fs.writeFile(filePath, fileDefault);
     }
   }
 
@@ -332,12 +432,21 @@ async function ensureSshConfigSetUp(recursed?: boolean) {
   // This needs to be prepended to the config
   if (!userConfig.includes("IgnoreUnknown UseKeychain")) {
     console.log(`Injecting compatibility snippet to ssh config`);
-    await fs.writeFile(sshUserConfigPath, Buffer.concat([Buffer.from("Host *\n    IgnoreUnknown UseKeychain\n\n", "utf-8"), userConfig]))
+    await fs.writeFile(
+      sshUserConfigPath,
+      Buffer.concat([
+        Buffer.from("Host *\n    IgnoreUnknown UseKeychain\n\n", "utf-8"),
+        userConfig,
+      ]),
+    );
   }
   // Ensure the Hocus config path is included
   if (!userConfig.includes("Include hocus/config")) {
     console.log(`Installing integration into ssh config`);
-    fs.appendFile(sshUserConfigPath, "\n\n# Beginning of Hocus Vscode integration\nHost *.hocus.dev\n    Include hocus/config\n# End of Hocus Vscode integration\n")
+    fs.appendFile(
+      sshUserConfigPath,
+      "\n\n# Beginning of Hocus Vscode integration\nHost *.hocus.dev\n    Include hocus/config\n# End of Hocus Vscode integration\n",
+    );
   }
 
   // Ensure the baner is up to date - if not then delete the config
@@ -347,21 +456,26 @@ async function ensureSshConfigSetUp(recursed?: boolean) {
 
     // Time to recurse
     if (recursed !== void 0) {
-      vscode.window.showInformationMessage(`Fatal error - failed to install SSH configs. Did more than 2 install calls`);
+      vscode.window.showInformationMessage(
+        `Fatal error - failed to install SSH configs. Did more than 2 install calls`,
+      );
       return;
     }
     ensureSshConfigSetUp(true);
   }
-
 }
 
 async function ensureRemoteExtensionSideloading() {
-  const remoteSSHconfig = vscode.workspace.getConfiguration('remote.SSH');
-  const defaultExtConfigInfo = remoteSSHconfig.inspect<string[]>('defaultExtensions');
+  const remoteSSHconfig = vscode.workspace.getConfiguration("remote.SSH");
+  const defaultExtConfigInfo = remoteSSHconfig.inspect<string[]>("defaultExtensions");
   const defaultExtensions = defaultExtConfigInfo?.globalValue ?? [];
-  if (!defaultExtensions.includes('hocus.hocus-remote')) {
-    defaultExtensions.unshift('hocus.hocus-remote');
-    await remoteSSHconfig.update('defaultExtensions', defaultExtensions, vscode.ConfigurationTarget.Global);
+  if (!defaultExtensions.includes("hocus.hocus-remote")) {
+    defaultExtensions.unshift("hocus.hocus-remote");
+    await remoteSSHconfig.update(
+      "defaultExtensions",
+      defaultExtensions,
+      vscode.ConfigurationTarget.Global,
+    );
   }
 }
 
@@ -369,12 +483,16 @@ async function ensureRemoteExtensionSideloading() {
 // TODO: Revisit this when https://github.com/microsoft/vscode-remote-release/issues/2997 gets closed
 // TODO: Should this be ran only on Windows?
 async function ensureRemotePlatformIsSet(workspaceHostname: string) {
-  const remoteSSHconfig = vscode.workspace.getConfiguration('remote.SSH');
-  const defaultExtConfigInfo = remoteSSHconfig.inspect<Record<string, string>>('remotePlatform');
+  const remoteSSHconfig = vscode.workspace.getConfiguration("remote.SSH");
+  const defaultExtConfigInfo = remoteSSHconfig.inspect<Record<string, string>>("remotePlatform");
   const remotePlatforms = defaultExtConfigInfo?.globalValue ?? {};
   if (!remotePlatforms[workspaceHostname]) {
-    remotePlatforms[workspaceHostname] = 'linux';
-    await remoteSSHconfig.update('remotePlatform', remotePlatforms, vscode.ConfigurationTarget.Global);
+    remotePlatforms[workspaceHostname] = "linux";
+    await remoteSSHconfig.update(
+      "remotePlatform",
+      remotePlatforms,
+      vscode.ConfigurationTarget.Global,
+    );
   }
 }
 
@@ -431,7 +549,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const config = await fs.readFile(hocusSshConfigPath).catch(async () => {
           // If the user manually deletes the hocus config while vscode is open
           // then we need to set up the config again
-          console.log("The hocus config probably was deleted, reinitializing")
+          console.log("The hocus config probably was deleted, reinitializing");
           await ensureSshConfigSetUp();
           return fs.readFile(hocusSshConfigPath);
         });
@@ -449,10 +567,18 @@ export async function activate(context: vscode.ExtensionContext) {
             return;
           }
 
-          await fs.writeFile(hocusSshConfigPath, Buffer.concat([config.slice(0, startMarkerPos), config.slice(endMarkerPos + endMarker.length)]))
+          await fs.writeFile(
+            hocusSshConfigPath,
+            Buffer.concat([
+              config.slice(0, startMarkerPos),
+              config.slice(endMarkerPos + endMarker.length),
+            ]),
+          );
         }
 
-        await fs.appendFile(hocusSshConfigPath, `
+        await fs.appendFile(
+          hocusSshConfigPath,
+          `
 #<${workspaceName}>
 Host ${workspaceName}.hocus.dev
     HostName ${workspaceHostname}
@@ -464,18 +590,22 @@ Host ${workspaceName}.hocus.dev
     AddKeysToAgent yes
     UseKeychain yes
 #</${workspaceName}>
-`
-        )
+`,
+        );
 
         await ensureRemotePlatformIsSet(`${workspaceName}.hocus.dev`);
         await ensureRemoteExtensionSideloading();
-        await
-          vscode.commands.executeCommand(
-            "vscode.openFolder",
-            vscode.Uri.parse(`vscode-remote://ssh-remote+${workspaceName}.hocus.dev${path.posix.join(HOCUS_PROJECT_LOCATION, workspaceRoot as string)}`),
-            { forceNewWindow: shouldOpenWorkspaceInNewWindow(), noRecentEntry: true }
-          );
-      })
+        await vscode.commands.executeCommand(
+          "vscode.openFolder",
+          vscode.Uri.parse(
+            `vscode-remote://ssh-remote+${workspaceName}.hocus.dev${path.posix.join(
+              HOCUS_PROJECT_LOCATION,
+              workspaceRoot as string,
+            )}`,
+          ),
+          { forceNewWindow: shouldOpenWorkspaceInNewWindow(), noRecentEntry: true },
+        );
+      });
     },
   });
 

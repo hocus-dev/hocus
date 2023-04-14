@@ -6,6 +6,7 @@ import { useLoaderData } from "@remix-run/react";
 import { Button } from "flowbite-react";
 import { StatusCodes } from "http-status-codes";
 import moment from "moment";
+
 import { AppPage } from "~/components/app-page";
 import { BackToProjectLink } from "~/components/projects/back-to-project-link";
 import { LogViewer } from "~/components/projects/prebuilds/log-viewer";
@@ -78,7 +79,7 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   }
   tasks.sort((a, b) => numericSort(a.idx, b.idx));
 
-  let activeTask: typeof tasks[number] | undefined = tasks[activeTaskIdx];
+  let activeTask: (typeof tasks)[number] | undefined = tasks[activeTaskIdx];
   if (activeTask == null && tasks.length > 0) {
     activeTask = tasks[tasks.length - 1];
   }
