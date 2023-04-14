@@ -6,11 +6,13 @@ import type {
   PrebuildEventFiles,
   PrebuildEventReservation,
   Prisma,
+  VmTask,
 } from "@prisma/client";
 import { PrebuildEventReservationType } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
+import { P, match } from "ts-pattern";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { BuildfsService } from "./buildfs.service";
@@ -20,6 +22,8 @@ import {
   PREBUILD_DEV_DIR,
   PREBUILD_SCRIPTS_DIR,
   PREBUILD_REPOSITORY_DIR,
+  SUCCESSFUL_PREBUILD_STATES,
+  UNSUCCESSFUL_PREBUILD_STATES,
 } from "./prebuild-constants";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
@@ -554,6 +558,81 @@ export class PrebuildService {
     await db.logGroup.deleteMany({
       where: { id: { in: logGroupIds } },
     });
+    await db.prebuildEventSystemError.delete({ where: { prebuildEventId } });
     await db.prebuildEvent.delete({ where: { id: prebuildEventId } });
+  }
+
+  private async cleanupDbAfterVmTaskError(
+    db: Prisma.TransactionClient,
+    vmTask: VmTask,
+  ): Promise<void> {
+    const quitNow = match(vmTask.status)
+      .with(
+        P.union(
+          VmTaskStatus.VM_TASK_STATUS_ERROR,
+          VmTaskStatus.VM_TASK_STATUS_SUCCESS,
+          VmTaskStatus.VM_TASK_STATUS_CANCELLED,
+        ),
+        () => true,
+      )
+      .with(
+        P.union(VmTaskStatus.VM_TASK_STATUS_PENDING, VmTaskStatus.VM_TASK_STATUS_RUNNING),
+        () => false,
+      )
+      .exhaustive();
+    if (quitNow) {
+      return;
+    }
+    await db.vmTask.update({
+      where: { id: vmTask.id },
+      data: {
+        status: VmTaskStatus.VM_TASK_STATUS_CANCELLED,
+      },
+    });
+  }
+
+  async cleanupDbAfterPrebuildError(
+    db: Prisma.TransactionClient,
+    prebuildEventId: bigint,
+    errorMessage: string,
+  ): Promise<void> {
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: prebuildEventId },
+      include: {
+        buildfsEvent: {
+          include: {
+            vmTask: true,
+          },
+        },
+        tasks: {
+          include: {
+            vmTask: true,
+          },
+        },
+      },
+    });
+    const quitNow = match(prebuildEvent.status)
+      .with(P.union(...SUCCESSFUL_PREBUILD_STATES), () => true)
+      .with(P.union(...UNSUCCESSFUL_PREBUILD_STATES), () => false)
+      .exhaustive();
+    if (quitNow) {
+      return;
+    }
+    let vmTasks: VmTask[] = prebuildEvent.tasks.map((t) => t.vmTask);
+    if (prebuildEvent.buildfsEvent != null) {
+      vmTasks.push(prebuildEvent.buildfsEvent.vmTask);
+    }
+    await waitForPromises(vmTasks.map((t) => this.cleanupDbAfterVmTaskError(db, t)));
+
+    await db.prebuildEvent.update({
+      where: { id: prebuildEventId },
+      data: { status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_ERROR },
+    });
+    await db.prebuildEventSystemError.create({
+      data: {
+        prebuildEventId,
+        message: errorMessage,
+      },
+    });
   }
 }

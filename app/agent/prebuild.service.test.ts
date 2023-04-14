@@ -1,7 +1,9 @@
 import type { PrebuildEvent } from "@prisma/client";
+import { LogGroupType, VmTaskStatus } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 
+import { SUCCESSFUL_PREBUILD_STATES } from "./prebuild-constants";
 import { provideInjectorAndDb } from "./test-utils";
 
 import { createExampleRepositoryAndProject } from "~/test-utils/project";
@@ -158,5 +160,114 @@ test.concurrent(
       now,
     );
     expect(sortedIds(removablePrebuildEvents2)).toEqual(sortedIds(archivedPrebuildEvents.slice(2)));
+  }),
+);
+
+test(
+  "cleanupDbAfterPrebuildError",
+  provideInjectorAndDb(async ({ injector, db }) => {
+    const prebuildService = injector.resolve(Token.PrebuildService);
+    const project = await db.$transaction((tdb) =>
+      createExampleRepositoryAndProject({ tdb, injector }),
+    );
+    const repo = project.gitRepository;
+    const gitObject = await db.gitObject.create({
+      data: {
+        hash: "a",
+      },
+    });
+    const gitBranch = await db.gitBranch.create({
+      data: {
+        name: "main",
+        gitObjectId: gitObject.id,
+        gitRepositoryId: repo.id,
+      },
+    });
+    const prebuildEvents: PrebuildEvent[] = [];
+    for (const status of Object.values(PrebuildEventStatus)) {
+      const prebuildEvent = await db.prebuildEvent.create({
+        data: {
+          status,
+          project: {
+            connect: {
+              id: project.id,
+            },
+          },
+          gitObject: {
+            connect: {
+              id: gitObject.id,
+            },
+          },
+          gitBranchLinks: {
+            create: {
+              gitBranch: {
+                connect: {
+                  id: gitBranch.id,
+                },
+              },
+            },
+          },
+        },
+      });
+      prebuildEvents.push(prebuildEvent);
+      for (const [idx, vmTaskStatus] of [
+        VmTaskStatus.VM_TASK_STATUS_SUCCESS,
+        VmTaskStatus.VM_TASK_STATUS_PENDING,
+      ].entries()) {
+        await db.prebuildEventTask.create({
+          data: {
+            prebuildEvent: {
+              connect: {
+                id: prebuildEvent.id,
+              },
+            },
+            idx,
+            originalCommand: "a",
+            vmTask: {
+              create: {
+                cwd: "/",
+                status: vmTaskStatus,
+                logGroup: {
+                  create: {
+                    type: LogGroupType.LOG_GROUP_TYPE_VM_TASK,
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+    }
+    for (const prebuildEvent of prebuildEvents) {
+      const errorMessage = `error-${prebuildEvent.status}`;
+      await db.$transaction(async (tdb) => {
+        await prebuildService.cleanupDbAfterPrebuildError(tdb, prebuildEvent.id, errorMessage);
+      });
+      const updatedPrebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+        where: {
+          id: prebuildEvent.id,
+        },
+        include: {
+          PrebuildEventSystemError: true,
+          tasks: {
+            include: {
+              vmTask: true,
+            },
+          },
+        },
+      });
+      if (SUCCESSFUL_PREBUILD_STATES.includes(prebuildEvent.status as any)) {
+        expect(updatedPrebuildEvent.status).toBe(prebuildEvent.status);
+        expect(updatedPrebuildEvent.PrebuildEventSystemError).toBeNull();
+        continue;
+      }
+      expect(updatedPrebuildEvent.status).toBe(PrebuildEventStatus.PREBUILD_EVENT_STATUS_ERROR);
+      expect(updatedPrebuildEvent.PrebuildEventSystemError?.message).toBe(errorMessage);
+      expect(
+        [VmTaskStatus.VM_TASK_STATUS_SUCCESS, VmTaskStatus.VM_TASK_STATUS_CANCELLED].map(
+          (s) => updatedPrebuildEvent.tasks.find((t) => t.vmTask.status === s) !== void 0,
+        ),
+      ).toEqual([true, true]);
+    }
   }),
 );
