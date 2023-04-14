@@ -21,25 +21,30 @@ async function isHocusWorkspace(): Promise<boolean> {
 
   // Assume that if this magic folder exists and we're on linux then we're in a Hocus workspace
   const platform = os.platform();
-  return platform === "linux" && await fs.exists(HOCUS_DIR);
+  return platform === "linux" && (await fs.exists(HOCUS_DIR));
 }
 
 interface WorkspaceTask {
   taskIdx: number;
-  taskName: string,
-  attachScriptPath: string,
-  running: boolean,
+  taskName: string;
+  attachScriptPath: string;
+  running: boolean;
 }
 
 async function scanWorkspaceTasks(): Promise<WorkspaceTask[]> {
   const tasks: WorkspaceTask[] = [];
-  for (const attachScriptPath of await glob.glob("attach-*.sh", { absolute: true, follow: false, cwd: HOCUS_WORKSPACE_TASKS_DIR, nodir: true })) {
+  for (const attachScriptPath of await glob.glob("attach-*.sh", {
+    absolute: true,
+    follow: false,
+    cwd: HOCUS_WORKSPACE_TASKS_DIR,
+    nodir: true,
+  })) {
     const taskIdx = +attachScriptPath.split("attach-")[1].slice(0, -3);
     tasks.push({
       taskIdx,
       taskName: `Task ${taskIdx + 1}`,
       attachScriptPath,
-      running: await fs.exists(attachScriptPath.replace("attach-", "task-").slice(0, -3) + ".sock")
+      running: await fs.exists(attachScriptPath.replace("attach-", "task-").slice(0, -3) + ".sock"),
     });
   }
   return tasks.reverse();
@@ -47,9 +52,7 @@ async function scanWorkspaceTasks(): Promise<WorkspaceTask[]> {
 
 function attachVscodeTerminalToTask(task: WorkspaceTask): vscode.Terminal {
   // TODO: Add an icon for the terminal
-  return vscode.window.createTerminal(
-    { name: task.taskName, shellPath: task.attachScriptPath }
-  );
+  return vscode.window.createTerminal({ name: task.taskName, shellPath: task.attachScriptPath });
 }
 
 // Turns out term.creationOptions is very unreliable. The info is lost after a window reload
@@ -57,7 +60,7 @@ function attachVscodeTerminalToTask(task: WorkspaceTask): vscode.Terminal {
 // BBQ Driven Developement here we come :)
 async function getTerminalCmdLine(term: vscode.Terminal): Promise<string | undefined> {
   const pid = await term.processId;
-  return (await fs.readFile(`/proc/${pid}/cmdline`, "utf-8")).split('\x00')[1];
+  return (await fs.readFile(`/proc/${pid}/cmdline`, "utf-8")).split("\x00")[1];
 }
 class GroupError extends Error {
   constructor(public readonly errors: unknown[]) {
@@ -92,14 +95,19 @@ const waitForPromises = async <T>(promises: Iterable<T>): Promise<Awaited<T>[]> 
 };
 
 async function getVSCodeProductJson() {
-  const productJsonStr = await fs.promises.readFile(path.join(vscode.env.appRoot, 'product.json'), 'utf8');
+  const productJsonStr = await fs.promises.readFile(
+    path.join(vscode.env.appRoot, "product.json"),
+    "utf8",
+  );
   return JSON.parse(productJsonStr);
 }
 
 async function setupExtensions(): Promise<void> {
   // Ensure extensions from the workspace config are installed
   try {
-    const workspaceConfig = ProjectConfigValidator.SafeParse(yaml.parse(await fs.readFile(HOCUS_CONFIG_PATH, "utf-8")));
+    const workspaceConfig = ProjectConfigValidator.SafeParse(
+      yaml.parse(await fs.readFile(HOCUS_CONFIG_PATH, "utf-8")),
+    );
     if (!workspaceConfig.success) {
       vscode.window.showInformationMessage("Syntax error in workspace configuration");
       console.log(workspaceConfig);
@@ -108,9 +116,12 @@ async function setupExtensions(): Promise<void> {
       if (workspaceConfig.value.vscode) {
         try {
           const productJson = await getVSCodeProductJson();
-          const binaryName = productJson.applicationName || 'code';
+          const binaryName = productJson.applicationName || "code";
           const cliPath = path.join(vscode.env.appRoot, "bin/remote-cli", binaryName);
-          const args = workspaceConfig.value.vscode.extensions.flatMap(e => ['--install-extension', e]);
+          const args = workspaceConfig.value.vscode.extensions.flatMap((e) => [
+            "--install-extension",
+            e,
+          ]);
 
           const cp = child_process.spawn(cliPath, args, { timeout: 30_000, stdio: "ignore" });
           await new Promise((resolve, reject) => {
@@ -119,7 +130,6 @@ async function setupExtensions(): Promise<void> {
             cp.on("close", resolve);
             cp.on("disconnect", resolve);
           });
-
         } catch (e) {
           console.error(e);
         }
@@ -133,10 +143,12 @@ async function setupExtensions(): Promise<void> {
 async function setupTerminals(): Promise<void> {
   const [alreadyOpened, tasks] = await Promise.all([
     waitForPromises(vscode.window.terminals.map((term) => getTerminalCmdLine(term))),
-    scanWorkspaceTasks()
+    scanWorkspaceTasks(),
   ] as const);
   for (const task of tasks) {
-    if (!task.running || alreadyOpened.includes(task.attachScriptPath)) { continue; }
+    if (!task.running || alreadyOpened.includes(task.attachScriptPath)) {
+      continue;
+    }
     const term = attachVscodeTerminalToTask(task);
     term.show(false);
   }
@@ -145,12 +157,16 @@ async function setupTerminals(): Promise<void> {
     const [cmdLine, tasks] = await Promise.all([getTerminalCmdLine(term), scanWorkspaceTasks()]);
     const taskState = tasks.find((task) => task.attachScriptPath === cmdLine);
 
-    if (taskState === void 0) { return; }
+    if (taskState === void 0) {
+      return;
+    }
 
     if (taskState.running) {
       // TODO: Ask the user whether to kill the terminal
       // TODO: If the user agrees then we would need to find the terminal process and shot it with SIGKILL
-      vscode.window.showInformationMessage("The terminal you closed is still running in the background. Reload the window to bring it back up.")
+      vscode.window.showInformationMessage(
+        "The terminal you closed is still running in the background. Reload the window to bring it back up.",
+      );
     }
   });
 }
@@ -159,25 +175,40 @@ async function checkSSHAgentForwarding(): Promise<void> {
   try {
     // First try listing keys in the agent
     const sshAgentProbe = await waitForProcessOutput("ssh-add", ["-l"]);
-    const nKeys = sshAgentProbe.stdout.split("\n").map((x) => x.trim()).filter(Boolean).length;
+    const nKeys = sshAgentProbe.stdout
+      .split("\n")
+      .map((x) => x.trim())
+      .filter(Boolean).length;
     console.log(`Detected ${nKeys} forwarded ssh keys`);
-    console.log(sshAgentProbe)
+    console.log(sshAgentProbe);
     if (nKeys === 0 || sshAgentProbe.exitCode !== 0) {
-      await vscode.window.showErrorMessage("SSH keys were not forwarded - git push/pull won't work!", { modal: true });
+      await vscode.window.showErrorMessage(
+        "SSH keys were not forwarded - git push/pull won't work!",
+        { modal: true },
+      );
       return;
     }
     // Now check if we actually have access to the repo
-    // There are windows ssh-agents which list the keys but get borked when we actually use them .-. 
+    // There are windows ssh-agents which list the keys but get borked when we actually use them .-.
     // TODO: We may fix those agents by proxying the ssh-agent and hotfix the bug .-.
     // The UI extension should auto add the decrypted key to the agent
-    const gitProbe = await waitForProcessOutput("git", ["ls-remote", "--heads"], { cwd: HOCUS_PROJECT_LOCATION, timeout: 60_000 });
+    const gitProbe = await waitForProcessOutput("git", ["ls-remote", "--heads"], {
+      cwd: HOCUS_PROJECT_LOCATION,
+      timeout: 60_000,
+    });
     if (gitProbe.exitCode !== 0) {
-      await vscode.window.showErrorMessage("SSH keys were forwarded but we were unable to access the git repo!", { modal: true });
+      await vscode.window.showErrorMessage(
+        "SSH keys were forwarded but we were unable to access the git repo!",
+        { modal: true },
+      );
       return;
     }
   } catch (err) {
     console.error(err);
-    await vscode.window.showWarningMessage("Unable to verify SSH agent forwarding", { modal: true, detail: (err as Error).toString() });
+    await vscode.window.showWarningMessage("Unable to verify SSH agent forwarding", {
+      modal: true,
+      detail: (err as Error).toString(),
+    });
   }
 }
 
@@ -185,17 +216,13 @@ export async function activate(context: vscode.ExtensionContext) {
   console.log("Hocus Workspace started activation");
 
   const isWorkspace = await isHocusWorkspace();
-  vscode.commands.executeCommand('setContext', 'hocus-remote.isHocusWorkspace', isWorkspace);
+  vscode.commands.executeCommand("setContext", "hocus-remote.isHocusWorkspace", isWorkspace);
   if (!isWorkspace) {
     console.log("Not inside a hocus workspace");
     return;
   }
 
-  await waitForPromises([
-    setupExtensions(),
-    setupTerminals(),
-    checkSSHAgentForwarding(),
-  ]);
+  await waitForPromises([setupExtensions(), setupTerminals(), checkSSHAgentForwarding()]);
 
   console.log("Hocus Workspace finished activation");
 }

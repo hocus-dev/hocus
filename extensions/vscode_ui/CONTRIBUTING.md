@@ -17,6 +17,7 @@ Inside a terminal on the **HOST/LOCAL** machine!!! please run `xdg-open "vscode:
 Publish on the official marketplace using `vsce`, publish on Open VSX using `ovsx`. The accounts are currently managed by @gorbak25
 
 # URI HANDLER
+
 ```sh
 xdg-open "vscode://hocus.hocus/?workspace-hostname=10.231.0.10&agent-hostname=setup1.hedgehog-hen.ts.net&workspace-name=test2"
 ```

@@ -17,7 +17,9 @@
     "lint": "eslint --max-warnings=0 .",
     "postinstall": "ops/bin/override-prisma-types.sh",
     "migrate": "wrap () { set -o nounset; prisma migrate dev --name \"$1\" && yarn run postinstall; }; wrap",
-    "regen": "yarn run prisma generate && ops/bin/override-prisma-types.sh"
+    "regen": "yarn run prisma generate && ops/bin/override-prisma-types.sh",
+    "format:fix": "yarn run prettier -w .",
+    "format:check": "yarn run prettier -c ."
   },
   "dependencies": {
     "@prisma/client": "4.7.1",
