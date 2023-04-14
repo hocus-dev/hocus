@@ -103,9 +103,6 @@ steps:
       - docker#v3.11.0:
           command: ["-c", "/workdir/"]
           image: "tmknom/prettier:latest"
-    # TODO: This will be fixed in a separate PR xd
-    soft_fail:
-      - exit_status: 1
 
   - label: ":typescript: Typecheck"
     command: |
