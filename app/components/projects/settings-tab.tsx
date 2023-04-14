@@ -17,7 +17,7 @@ export const VmSettingsFields = [
   "maxPrebuildRootDriveSizeMib",
 ] as const;
 
-export type VmSettingsField = typeof VmSettingsFields[number];
+export type VmSettingsField = (typeof VmSettingsFields)[number];
 // enforce that VmSettingsField is a subset of Project fields
 const _typecheck1: Any.Contains<VmSettingsField, keyof Project> = 1;
 // enforce that VmSettingsField is a subset of EditProjectVmSettings fields

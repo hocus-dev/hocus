@@ -112,7 +112,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
   }
   const projectAndGitObjectIdToPrebuildEvent = new ArbitraryKeyMap<
     { projectId: bigint; gitObjectId: bigint },
-    typeof prebuildEvents[0]
+    (typeof prebuildEvents)[0]
   >(({ projectId, gitObjectId }) => `${projectId}-${gitObjectId}`);
   for (const prebuildEvent of prebuildEvents) {
     const key = { projectId: prebuildEvent.projectId, gitObjectId: prebuildEvent.gitObjectId };
@@ -165,7 +165,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
     }),
   );
 
-  const prebuildEventsWithInspection: (typeof prebuildEvents[0] & {
+  const prebuildEventsWithInspection: ((typeof prebuildEvents)[0] & {
     inspection: CheckoutAndInspectResult;
   })[] = [];
   for (const [

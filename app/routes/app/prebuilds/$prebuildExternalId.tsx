@@ -78,7 +78,7 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   }
   tasks.sort((a, b) => numericSort(a.idx, b.idx));
 
-  let activeTask: typeof tasks[number] | undefined = tasks[activeTaskIdx];
+  let activeTask: (typeof tasks)[number] | undefined = tasks[activeTaskIdx];
   if (activeTask == null && tasks.length > 0) {
     activeTask = tasks[tasks.length - 1];
   }

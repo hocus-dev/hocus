@@ -49,7 +49,7 @@ const PROJECT_TAB_ORDER = [
   ProjectPathTabId.SETTINGS,
 ] as const;
 // enforces that PROJECT_TAB_ORDER contains all values of ProjectPathTabId
-const _typecheck: Any.Equals<typeof PROJECT_TAB_ORDER[number], ProjectPathTabId> = 1;
+const _typecheck: Any.Equals<(typeof PROJECT_TAB_ORDER)[number], ProjectPathTabId> = 1;
 
 function ProjectPageComponent(props: {
   project: { name: string; externalId: string; createdAt: number };

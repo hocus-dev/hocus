@@ -187,7 +187,7 @@ export class AgentUtilService {
 
     let cleanupStarted = false;
     const taskSshHandles: NodeSSH[] = [];
-    const taskFn = async (args: typeof taskDefinitions[0]) => {
+    const taskFn = async (args: (typeof taskDefinitions)[0]) => {
       await withSsh(sshConfig, async (taskSsh) => {
         if (cleanupStarted) {
           throw new Error("cleanup already started");
