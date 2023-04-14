@@ -111,9 +111,6 @@ steps:
     command: |
       docker build -t hocus-tests:$BUILDKITE_COMMIT -f ops/docker/backend-tests.Dockerfile $BUILDKITE_BUILD_CHECKOUT_PATH \
       && docker run -it --rm hocus-tests:$BUILDKITE_COMMIT yarn run typecheck
-    # TODO: This will be fixed in a separate PR xd
-    soft_fail:
-      - exit_status: 2
 
   - group: ":books: Grammar"
     steps:
