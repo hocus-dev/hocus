@@ -165,3 +165,4 @@ words:
   - upperdir
   - lowerdir
   - nproc
+  - automerge

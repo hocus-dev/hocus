@@ -8,5 +8,22 @@
   },
   "docker-compose": {
     "fileMatch": ["(^|/)(?:docker-)?compose[^/]*\\.ya?ml$", "docker/.+\\.ya?ml$"]
-  }
+  },
+  "platformAutomerge": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "matchDepTypes": ["devDependencies"],
+      "matchPackagePatterns": ["lint", "prettier"],
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true
+    }
+  ]
 }
