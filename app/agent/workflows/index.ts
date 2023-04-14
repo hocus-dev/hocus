@@ -13,13 +13,12 @@ import {
 // the native path module is a restricted import in workflows
 import path from "path-browserify";
 
-import type { CheckoutAndInspectResult } from "./activities-types";
-import type { Activities } from "./activities/list";
-import { HOST_PERSISTENT_DIR } from "./constants";
-import { PREBUILD_REPOSITORY_DIR } from "./prebuild-constants";
-import { ArbitraryKeyMap } from "./utils/arbitrary-key-map.server";
-import { parseGitSyncError } from "./workflows-utils";
-
+import type { CheckoutAndInspectResult } from "~/agent/activities-types";
+import type { Activities } from "~/agent/activities/list";
+import { HOST_PERSISTENT_DIR } from "~/agent/constants";
+import { PREBUILD_REPOSITORY_DIR } from "~/agent/prebuild-constants";
+import { ArbitraryKeyMap } from "~/agent/utils/arbitrary-key-map.server";
+import { parseGitSyncError } from "~/agent/workflows-utils";
 import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
 import {
   numericOrNullSort,
@@ -113,7 +112,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
   }
   const projectAndGitObjectIdToPrebuildEvent = new ArbitraryKeyMap<
     { projectId: bigint; gitObjectId: bigint },
-    (typeof prebuildEvents)[0]
+    typeof prebuildEvents[0]
   >(({ projectId, gitObjectId }) => `${projectId}-${gitObjectId}`);
   for (const prebuildEvent of prebuildEvents) {
     const key = { projectId: prebuildEvent.projectId, gitObjectId: prebuildEvent.gitObjectId };
@@ -166,7 +165,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
     }),
   );
 
-  const prebuildEventsWithInspection: ((typeof prebuildEvents)[0] & {
+  const prebuildEventsWithInspection: (typeof prebuildEvents[0] & {
     inspection: CheckoutAndInspectResult;
   })[] = [];
   for (const [
