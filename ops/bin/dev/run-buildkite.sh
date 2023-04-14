@@ -35,4 +35,3 @@ qemu-system-x86_64 \
         -netdev user,id=n1 \
         -device virtio-net-pci,netdev=n1 \
         -device virtio-balloon,deflate-on-oom=on,free-page-reporting=on
-

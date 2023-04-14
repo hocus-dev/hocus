@@ -27,12 +27,16 @@ steps:
       - label: ":file_folder: Run {{matrix}} lint"
         plugins:
           - docker#v3.11.0:
-              command: ["{{matrix}}", "--text", "--ignore", "$$FL_IGNORE_PATHS", "--path", "."]
+              command:
+                [
+                  "{{matrix}}",
+                  "--text",
+                  "--ignore",
+                  ".git/,deps/firecracker-client/,**/*.excalidraw,public/font-awesome/,public/fonts/,public/devicon.min.css,prisma/migrations/migration_lock.toml",
+                  "--path",
+                  ".",
+                ]
               image: "cytopia/file-lint:latest"
-              environment:
-                - FL_IGNORE_PATHS
-        env:
-          FL_IGNORE_PATHS: ".git"
         # TODO: This will be fixed in a separate PR xd
         soft_fail:
           - exit_status: 1

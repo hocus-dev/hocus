@@ -5434,4 +5434,3 @@ ALTER TABLE ONLY public.identity_provider_config
 --
 -- PostgreSQL database dump complete
 --
-
