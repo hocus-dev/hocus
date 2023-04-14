@@ -19,11 +19,6 @@ import { ArbitraryKeyMap } from "../utils/arbitrary-key-map.server";
 const {
   checkoutAndInspect,
   fetchRepository,
-  getOrCreateBuildfsEvents,
-  getPrebuildEvents,
-  cancelPrebuilds,
-  changePrebuildEventStatus,
-  initPrebuildEvents,
   waitForBuildfs,
   buildfs,
   prebuild,
@@ -35,6 +30,19 @@ const {
   // are running at the same time, it may take a long time for all of them
   // to finish.
   startToCloseTimeout: "24 hours",
+  retry: {
+    maximumAttempts: 1,
+  },
+});
+
+const {
+  getOrCreateBuildfsEvents,
+  getPrebuildEvents,
+  cancelPrebuilds,
+  changePrebuildEventStatus,
+  initPrebuildEvents,
+} = proxyActivities<Activities>({
+  startToCloseTimeout: "1 minute",
   retry: {
     maximumAttempts: 1,
   },
