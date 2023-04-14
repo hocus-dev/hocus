@@ -1,8 +1,8 @@
+import { execSshCmd, sha256 } from "./utils";
+
 import { provideInjector } from "~/agent/test-utils";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
-
-import { execSshCmd, sha256 } from "./utils";
 
 const DOCKERFILE_1 = `FROM ubuntu:latest
 COPY ./foo /foo`;

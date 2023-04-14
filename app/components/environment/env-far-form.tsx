@@ -1,12 +1,13 @@
 import { Badge, Button } from "flowbite-react";
 import React from "react";
 import { useState } from "react";
-import { PagePaths } from "~/page-paths.shared";
-import type { UpdateEnvVarsTarget } from "~/project/env-form.shared";
 
 import { CsrfInput } from "../csrf-input";
 
 import { EnvVarInput } from "./env-var-input";
+
+import { PagePaths } from "~/page-paths.shared";
+import type { UpdateEnvVarsTarget } from "~/project/env-form.shared";
 
 export interface EnvVarFormVariable {
   name: string;

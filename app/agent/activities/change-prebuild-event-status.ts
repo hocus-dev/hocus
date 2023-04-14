@@ -1,7 +1,8 @@
 import type { PrebuildEventStatus } from "@prisma/client";
-import { Token } from "~/token";
 
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
 
 export type ChangePrebuildEventStatusActivity = (
   prebuildEventId: bigint,

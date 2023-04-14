@@ -1,4 +1,5 @@
 import { Button, Card } from "flowbite-react";
+
 import { PagePaths } from "~/page-paths.shared";
 
 export default function NoProjectsView(): JSX.Element {

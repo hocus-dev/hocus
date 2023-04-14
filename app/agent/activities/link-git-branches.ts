@@ -1,7 +1,7 @@
+import type { CreateActivity } from "./types";
+
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
-
-import type { CreateActivity } from "./types";
 
 export type LinkGitBranchesActivity = (
   args: {

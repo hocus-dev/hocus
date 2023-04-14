@@ -1,5 +1,6 @@
 import { Avatar, Dropdown, Navbar as FlowbiteNavbar } from "flowbite-react";
 import React from "react";
+
 import { PagePaths } from "~/page-paths.shared";
 
 const NavbarComponent = (props: { userEmail?: string }): JSX.Element => {

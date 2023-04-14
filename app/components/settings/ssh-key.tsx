@@ -1,9 +1,10 @@
 import { Button, Modal } from "flowbite-react";
 import React from "react";
 import { useState } from "react";
-import { PagePaths } from "~/page-paths.shared";
 
 import { CsrfInput } from "../csrf-input";
+
+import { PagePaths } from "~/page-paths.shared";
 
 export const SshKey = (props: {
   name: string;

@@ -1,12 +1,13 @@
 import type { GitRepository } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
-import type { SshKeyService } from "~/ssh-key/ssh-key.service";
-import type { TimeService } from "~/time.service";
-import { Token } from "~/token";
 
 import { GitUrlError } from "./error";
 import type { GitRepoConnectionStatus } from "./types.shared";
+
+import type { SshKeyService } from "~/ssh-key/ssh-key.service";
+import type { TimeService } from "~/time.service";
+import { Token } from "~/token";
 
 export class GitService {
   static inject = [Token.SshKeyService, Token.TimeService] as const;

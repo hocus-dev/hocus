@@ -2,9 +2,6 @@ import fs from "fs/promises";
 import path from "path";
 
 import { SshKeyPairType } from "@prisma/client";
-import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
-import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
 
 import { PROJECT_DIR } from "../constants";
 import type { FirecrackerService } from "../firecracker.service";
@@ -13,6 +10,10 @@ import { provideInjector, provideInjectorAndDb, withTestMount } from "../test-ut
 import { execSshCmd } from "../utils";
 
 import type { GitRemoteInfo } from "./git.service";
+
+import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
+import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
 test.concurrent(
   "getRemotes",

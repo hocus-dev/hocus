@@ -1,11 +1,12 @@
 import type { GitRepository, Prisma, Project } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
+
+import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "./constants";
+
 import type { GitService } from "~/git/git.service";
 import type { ProjectService } from "~/project/project.service";
 import type { SshKeyService } from "~/ssh-key/ssh-key.service";
 import { Token } from "~/token";
-
-import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "./constants";
 
 export const createExampleRepositoryAndProject = async (args: {
   tdb: Prisma.TransactionClient;

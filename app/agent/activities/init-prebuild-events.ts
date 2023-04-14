@@ -1,8 +1,9 @@
 import type { PrebuildEvent } from "@prisma/client";
-import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
 
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
+import { waitForPromises } from "~/utils.shared";
 
 export type InitPrebuildEventsActivity = (
   args: {

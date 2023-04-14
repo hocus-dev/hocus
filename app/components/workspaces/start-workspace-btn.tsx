@@ -1,7 +1,8 @@
 import { Button } from "flowbite-react";
-import { getWorkspaceStartPath } from "~/page-paths.shared";
 
 import { CsrfInput } from "../csrf-input";
+
+import { getWorkspaceStartPath } from "~/page-paths.shared";
 
 export function StartWorkspaceButton(props: {
   workspaceExternalId: string;

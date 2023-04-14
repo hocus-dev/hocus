@@ -1,6 +1,6 @@
-import { numericSort } from "~/utils.shared";
-
 import { ArbitraryKeyMap } from "./arbitrary-key-map.server";
+
+import { numericSort } from "~/utils.shared";
 
 test("ArbitraryKeyMap", () => {
   const big = (n: number) => BigInt(n);

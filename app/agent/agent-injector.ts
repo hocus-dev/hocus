@@ -1,4 +1,15 @@
 import { DefaultLogger } from "@temporalio/worker";
+
+import { AgentUtilService } from "./agent-util.service";
+import { BuildfsService } from "./buildfs.service";
+import { factoryFirecrackerService } from "./firecracker.service";
+import { AgentGitService } from "./git/git.service";
+import { PrebuildService } from "./prebuild.service";
+import { ProjectConfigService } from "./project-config/project-config.service";
+import { SSHGatewayService } from "./ssh-gateway.service";
+import { LowLevelStorageService, StorageService } from "./storage/storage.service";
+import { WorkspaceAgentService } from "./workspace-agent.service";
+
 import { config } from "~/config";
 import type { GenericProviderMap, ProvidersFns, ProvidersOverrides } from "~/di/injector.server";
 import { Injector, Scope } from "~/di/injector.server";
@@ -11,16 +22,6 @@ import { clientFactory } from "~/temporal/client-factory";
 import { TimeService } from "~/time.service";
 import { Token } from "~/token";
 import { WorkspaceService } from "~/workspace/workspace.service";
-
-import { AgentUtilService } from "./agent-util.service";
-import { BuildfsService } from "./buildfs.service";
-import { factoryFirecrackerService } from "./firecracker.service";
-import { AgentGitService } from "./git/git.service";
-import { PrebuildService } from "./prebuild.service";
-import { ProjectConfigService } from "./project-config/project-config.service";
-import { SSHGatewayService } from "./ssh-gateway.service";
-import { LowLevelStorageService, StorageService } from "./storage/storage.service";
-import { WorkspaceAgentService } from "./workspace-agent.service";
 
 type Providers = typeof providers;
 type ProviderMap = GenericProviderMap<Providers>;

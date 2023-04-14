@@ -2,6 +2,12 @@ import { Button } from "flowbite-react";
 import moment from "moment";
 import React, { useState } from "react";
 import type { Any } from "ts-toolbelt";
+
+import { AppPage } from "../app-page";
+
+import { GitRepoConnectionStatusBadge } from "./repo-connection-status-badge";
+import { RepoSshKeyCard } from "./repo-ssh-key-card";
+
 import type { GitRepoConnectionStatus } from "~/git/types.shared";
 import {
   PagePaths,
@@ -9,11 +15,6 @@ import {
   getNewWorkspacePath,
   getProjectPath,
 } from "~/page-paths.shared";
-
-import { AppPage } from "../app-page";
-
-import { GitRepoConnectionStatusBadge } from "./repo-connection-status-badge";
-import { RepoSshKeyCard } from "./repo-ssh-key-card";
 
 const PROJECT_TAB_TITLES: Record<ProjectPathTabId, React.ReactNode> = {
   [ProjectPathTabId.WORKSPACES]: (

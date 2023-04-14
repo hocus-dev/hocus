@@ -1,9 +1,10 @@
 import { VmTaskStatus } from "@prisma/client";
-import { sleep } from "~/utils.shared";
 
 import { retry } from "../utils";
 
 import type { CreateActivity } from "./types";
+
+import { sleep } from "~/utils.shared";
 
 const FAILED_STATES = [
   VmTaskStatus.VM_TASK_STATUS_ERROR,

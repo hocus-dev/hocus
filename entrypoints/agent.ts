@@ -1,13 +1,14 @@
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import { NativeConnection, Worker } from "@temporalio/worker";
+
+import { setupHocusDevEnv } from "./utils/setup-hocus-dev-env";
+
 import { createActivities } from "~/agent/activities/list";
 import { createAgentInjector } from "~/agent/agent-injector";
 import { generateTemporalCodeBundle } from "~/temporal/bundle";
 import { MAIN_TEMPORAL_QUEUE } from "~/temporal/constants";
 import { Token } from "~/token";
-
-import { setupHocusDevEnv } from "./utils/setup-hocus-dev-env";
 
 async function run() {
   const injector = createAgentInjector();
@@ -16,6 +17,7 @@ async function run() {
   if (agentConfig.createHocusProjects || agentConfig.createDevelopementProjects) {
     // eslint-disable-next-line no-console
     console.log("Setting up projects automatically");
+    // eslint-disable-next-line no-console
     void setupHocusDevEnv().catch(console.error);
   } else {
     // eslint-disable-next-line no-console

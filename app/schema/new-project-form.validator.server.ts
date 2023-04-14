@@ -1,5 +1,6 @@
 import type { Static } from "@sinclair/typebox";
 import type { Any } from "ts-toolbelt";
+
 import { NewProjectFormSchema } from "~/schema/new-project-form.schema.server";
 import { compileSchema } from "~/schema/utils.server";
 

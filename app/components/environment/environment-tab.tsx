@@ -1,7 +1,7 @@
-import { UpdateEnvVarsTarget } from "~/project/env-form.shared";
-
 import type { EnvVarFormVariable } from "./env-far-form";
 import { EnvVarForm } from "./env-far-form";
+
+import { UpdateEnvVarsTarget } from "~/project/env-form.shared";
 
 export const EnvironmentTab = (props: {
   projectExternalId: string;

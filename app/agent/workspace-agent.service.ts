@@ -6,9 +6,6 @@ import { Prisma, WorkspaceStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, SSHExecOptions } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
-import type { Config } from "~/config";
-import { Token } from "~/token";
-import { unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "./agent-util.service";
 import {
@@ -25,6 +22,10 @@ import type { FirecrackerService } from "./firecracker.service";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { SSHGatewayService } from "./ssh-gateway.service";
 import { doesFileExist, execSshCmd } from "./utils";
+
+import type { Config } from "~/config";
+import { Token } from "~/token";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
 export class InvalidWorkspaceStatusError extends Error {}
 

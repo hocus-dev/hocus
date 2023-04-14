@@ -5,10 +5,6 @@ import type { GitBranch, GitObject, GitRepositoryFile, File } from "@prisma/clie
 import { Prisma } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
-import type { Config } from "~/config";
-import type { ValidationError } from "~/schema/utils.server";
-import { Token } from "~/token";
-import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
 import type { AgentUtilService } from "../agent-util.service";
 import { HOST_PERSISTENT_DIR, PROJECT_DIR } from "../constants";
@@ -16,6 +12,11 @@ import type { FirecrackerService } from "../firecracker.service";
 import { doesFileExist, execCmdWithOpts, execSshCmd, withFileLock } from "../utils";
 
 import { RemoteInfoTupleValidator } from "./validator";
+
+import type { Config } from "~/config";
+import type { ValidationError } from "~/schema/utils.server";
+import { Token } from "~/token";
+import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
 export interface GitRemoteInfo {
   /** The name of the remote, e.g. `refs/heads/master` */

@@ -2,10 +2,11 @@ import type { Project } from "@prisma/client";
 import { Alert, Badge, Button } from "flowbite-react";
 import React from "react";
 import type { Any } from "ts-toolbelt";
-import type { EditProjectVmSettings } from "~/schema/edit-project-vm-settings.validator.server";
 
 import { CsrfInput } from "../csrf-input";
 import { TextInputAddonRight } from "../text-input-addon-right";
+
+import type { EditProjectVmSettings } from "~/schema/edit-project-vm-settings.validator.server";
 
 export const VmSettingsFields = [
   "maxPrebuildRamMib",

@@ -1,8 +1,9 @@
 import type { Static } from "@sinclair/typebox";
 import type { Any } from "ts-toolbelt";
-import { compileSchema } from "~/schema/utils.server";
 
 import { TaskSchema, ProjectConfigSchema } from "./schema";
+
+import { compileSchema } from "~/schema/utils.server";
 
 export type Task = Any.Compute<Static<typeof TaskSchema>>;
 export const TaskValidator = compileSchema(TaskSchema);

@@ -1,7 +1,8 @@
 import { PrebuildEventReservationType } from "@prisma/client";
-import { sleep } from "~/utils.shared";
 
 import type { CreateActivity } from "../types";
+
+import { sleep } from "~/utils.shared";
 
 export type WaitForPrebuildEventReservationsActivity = (args: {
   prebuildEventId: bigint;

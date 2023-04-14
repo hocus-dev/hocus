@@ -1,6 +1,6 @@
-import { Token } from "~/token";
-
 import type { CreateActivity } from "./types";
+
+import { Token } from "~/token";
 
 export type CancelPrebuildsActivity = (prebuildEventIds: bigint[]) => Promise<void>;
 export const cancelPrebuilds: CreateActivity<CancelPrebuildsActivity> =

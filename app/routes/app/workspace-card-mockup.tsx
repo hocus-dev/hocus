@@ -1,4 +1,5 @@
 import { Button, Card } from "flowbite-react";
+
 import { AppPage } from "~/components/app-page";
 
 export default function WorkspaceCardMockup(): JSX.Element {

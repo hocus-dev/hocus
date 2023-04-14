@@ -1,8 +1,9 @@
 import { Button, Label, Spinner, TextInput } from "flowbite-react";
 import { useState } from "react";
-import { PagePaths } from "~/page-paths.shared";
 
 import { CsrfInput } from "../csrf-input";
+
+import { PagePaths } from "~/page-paths.shared";
 
 export function NewProjectForm(): JSX.Element {
   const [isSubmitted, setIsSubmitted] = useState(false);

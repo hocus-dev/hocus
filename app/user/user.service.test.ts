@@ -1,11 +1,12 @@
 import type { Prisma } from "@prisma/client";
+
+import type { UserService } from "./user.service.server";
+
 import { createAppInjector } from "~/app-injector.server";
 import { HttpError } from "~/http-error.server";
 import { DEFAULT_SEATS_LIMIT } from "~/license/constants";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
-
-import type { UserService } from "./user.service.server";
 
 type Args = {
   db: Prisma.NonTransactionClient;

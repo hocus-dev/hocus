@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+
 import { TELEMETRY_DISABLED_COOKIE } from "~/telemetry/constants";
 
 // readCookie from https://stackoverflow.com/a/11767598

@@ -1,14 +1,15 @@
 import path from "path";
 
 import { v4 as uuidv4 } from "uuid";
-import { execSshCmd } from "~/agent/utils";
-import { Token } from "~/token";
-import { unwrap } from "~/utils.shared";
 
 import type { VMTaskOutput } from "../agent-util.types";
 import { SOLO_AGENT_INSTANCE_ID, WORKSPACE_ENV_SCRIPT_PATH } from "../constants";
 
 import type { CreateActivity } from "./types";
+
+import { execSshCmd } from "~/agent/utils";
+import { Token } from "~/token";
+import { unwrap } from "~/utils.shared";
 
 export type PrebuildActivity = (args: { prebuildEventId: bigint }) => Promise<VMTaskOutput[]>;
 /**
