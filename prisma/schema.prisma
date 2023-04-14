@@ -101,9 +101,9 @@ model PrebuildEventFiles {
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
 
-  /// Enforce that agentInstanceId and fsFile.agentInstanceId are the same. 
+  /// Enforce that agentInstanceId and fsFile.agentInstanceId are the same.
   fsFileAgentMatch      File @relation("prebuild_event_fs_file_agent_match", fields: [fsFileId, agentInstanceId], references: [id, agentInstanceId])
-  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same. 
+  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same.
   projectFileAgentMatch File @relation("prebuild_event_project_file_agent_match", fields: [projectFileId, agentInstanceId], references: [id, agentInstanceId])
 
   @@unique([prebuildEventId, agentInstanceId])
@@ -192,9 +192,9 @@ model BuildfsEventFiles {
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
 
-  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same. 
+  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same.
   projectFileAgentMatch File @relation("buildfs_event_project_file_agent_match", fields: [projectFileId, agentInstanceId], references: [id, agentInstanceId])
-  /// Enforce that agentInstanceId and outputFile.agentInstanceId are the same. 
+  /// Enforce that agentInstanceId and outputFile.agentInstanceId are the same.
   outputFileAgentMatch  File @relation("buildfs_event_output_file_agent_match", fields: [outputFileId, agentInstanceId], references: [id, agentInstanceId])
 
   @@unique([buildfsEventId, agentInstanceId])
@@ -238,7 +238,7 @@ model GitRepositoryFile {
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
 
-  /// Enforce that agentInstanceId and file.agentInstanceId are the same. 
+  /// Enforce that agentInstanceId and file.agentInstanceId are the same.
   fileAgentMatch File @relation("git_repository_file_agent_match", fields: [fileId, agentInstanceId], references: [id, agentInstanceId])
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)

@@ -155,7 +155,7 @@ build_service () {
     T1=$(date +%s%N | cut -b1-13)
     DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
     echo -e "\r\033[KBuilding $2 done in $DT s ✅"
-  fi 
+  fi
 }
 
 # Buidling images
@@ -243,7 +243,7 @@ start_service "hocus-ui hocus-agent" "Hocus 🧙🪄 "
 
 echo -e "\nYou may access Hocus here: http://${HOCUS_HOSTNAME}:3000/ Creds: dev/dev"
 echo -e "Keycloak: http://${HOCUS_HOSTNAME}:4200/ Creds: admin/admin"
-echo -e "Temporal: http://${HOCUS_HOSTNAME}:8080/" 
+echo -e "Temporal: http://${HOCUS_HOSTNAME}:8080/"
 
 echo -e "\nTo delete all data ./ops/bin/local-cleanup.sh"
 echo -e "To get debug logs: ./ops/bin/local-cmd.sh logs"

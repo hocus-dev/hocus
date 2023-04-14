@@ -1,6 +1,6 @@
 #!/bin/bash
 # Lint step for the CI
-# Checks if all ports in all docker-compose files in the repo 
+# Checks if all ports in all docker-compose files in the repo
 # have the ability to hide their ports by setting NO_EXPOSE_PORTS in the environment
 
 # Assume that any file which has a line starting with services is probably a docker-compose file :P

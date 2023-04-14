@@ -13,7 +13,7 @@ RUN curl -fsSL https://tailscale.com/install.sh | sh
 RUN sudo wget https://github.com/buildkite/cli/releases/download/v2.0.0/cli-linux-amd64 -O /usr/bin/bk && sudo chmod +x /usr/bin/bk
 RUN curl -sL https://raw.githubusercontent.com/buildkite/agent/main/install.sh | bash && fish -c "set -U fish_user_paths \$fish_user_paths ~/.buildkite-agent/bin" && echo 'export PATH="~/.buildkite-agent/bin:$PATH"' >> ~/.bashrc
 # Hadolint :)
-RUN sudo wget https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64 -O /usr/bin/hadolint && sudo chmod +x /usr/bin/hadolint 
+RUN sudo wget https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64 -O /usr/bin/hadolint && sudo chmod +x /usr/bin/hadolint
 # Absurdly fast rust typo finder :3
 RUN cd ~/ && mkdir ./typos-dl && wget https://github.com/crate-ci/typos/releases/download/v1.14.5/typos-v1.14.5-x86_64-unknown-linux-musl.tar.gz -O ./typos-dl/typos.tar.gz && tar -xvf ./typos-dl/typos.tar.gz -C ./typos-dl && sudo cp ./typos-dl/typos /usr/bin/typos && rm -r ./typos-dl
 # Vale prose checker

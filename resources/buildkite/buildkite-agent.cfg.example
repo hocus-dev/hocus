@@ -72,7 +72,7 @@ git-mirrors-path=/var/lib/buildkite-agent/mirrors
 # metrics-datadog=true
 
 # Host to collect Buildkite metrics
-# datadog-agent will need to run DogStatsD, presumed on port 8125. 
+# datadog-agent will need to run DogStatsD, presumed on port 8125.
 # Specify port below like my-host:8126 if not using 8125
 # metrics-datadog-host=127.0.0.1
 

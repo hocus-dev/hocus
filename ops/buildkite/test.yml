@@ -32,14 +32,11 @@ steps:
                   "{{matrix}}",
                   "--text",
                   "--ignore",
-                  ".git/,deps/firecracker-client/,**/*.excalidraw,public/font-awesome/,public/fonts/,public/devicon.min.css,prisma/migrations/migration_lock.toml",
+                  ".git/,deps/firecracker-client/,**/*.excalidraw,public/font-awesome/,public/fonts/,public/devicon.min.css,prisma/migrations/migration_lock.toml,ops/docker/resources/keycloak-db-dump.sql",
                   "--path",
                   ".",
                 ]
               image: "cytopia/file-lint:latest"
-        # TODO: This will be fixed in a separate PR xd
-        soft_fail:
-          - exit_status: 1
         matrix:
           - file-cr
           - file-crlf
