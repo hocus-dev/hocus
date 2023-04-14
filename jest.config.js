@@ -5,6 +5,9 @@ var config = {
   transform: {
     "^.+\\.(t|j)sx?$": ["@swc/jest"],
   },
+  moduleNameMapper: {
+    "^~/(.*)$": "<rootDir>/app/$1",
+  },
   testEnvironment: "node",
 };
 

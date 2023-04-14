@@ -26,11 +26,19 @@ test.concurrent(
     expect(linuxMaster).toBeDefined();
 
     const remotes = await gitService.getRemotes(TESTS_REPO_URL, TESTS_PRIVATE_SSH_KEY);
+    const expectedRemoteHash = "0d09d2f74fc2aa39c693b80e840027f7a8f8b16c";
+    const expectedRemoteName = "refs/heads/git-service-test";
     const testRemote = remotes.find(
-      (r) =>
-        r.name === "refs/heads/git-service-test" &&
-        r.hash === "6aa1af1afb061b67d22e6bcd8a1d8d5bbec64987",
+      (r) => r.name === expectedRemoteName && r.hash === expectedRemoteHash,
     );
+    if (testRemote === void 0) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `Head ${expectedRemoteHash} on remote ${expectedRemoteName} not found. Received ${JSON.stringify(
+          remotes,
+        )}`,
+      );
+    }
     expect(testRemote).toBeDefined();
   }),
 );

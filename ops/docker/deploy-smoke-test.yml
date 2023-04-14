@@ -1,0 +1,24 @@
+version: "3"
+networks:
+  hocus_net:
+services:
+  tester:
+    image: ubuntu:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      setup-vm-images:
+        condition: service_completed_successfully
+      hocus-ui:
+        condition: service_healthy
+      hocus-agent:
+        condition: service_started
+  # Place the DB on a ramdisk
+  db:
+    command: postgres -c 'max_connections=10000' -c 'shared_buffers=2GB' -c 'effective_cache_size=6GB' -c 'maintenance_work_mem=512MB' -c 'random_page_cost=1.1' -c 'effective_io_concurrency=200' -c 'work_mem=4MB' -c 'min_wal_size=2GB' -c 'max_wal_size=8GB' -c 'max_worker_processes=8' -c 'max_parallel_workers_per_gather=4' -c 'max_parallel_workers=8' -c 'max_parallel_maintenance_workers=4' -c 'fsync=off' -c 'full_page_writes=off' -c 'synchronous_commit=off' -c 'wal_level=minimal' -c 'max_wal_senders=0' -c 'log_error_verbosity=terse'
+    environment:
+      PGDATA: /pgtmpfs
+    tmpfs:
+      - /pgtmpfs

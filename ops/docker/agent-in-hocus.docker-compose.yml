@@ -11,7 +11,7 @@ services:
     restart: "no"
     privileged: true
     ports:
-      - 8822:22
+      - "${NO_EXPOSE_PORTS-8822:}22"
     volumes:
       - "${AGENT_REPO_DIR}:/app"
       - "${HOCUS_RESOURCES_DIR}:/srv/jailer"

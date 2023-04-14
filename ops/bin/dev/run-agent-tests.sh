@@ -10,7 +10,7 @@ export REPO_DIR="$(realpath "${SCRIPT_DIR}/../../..")"
 export RESOURCES_DIR=$REPO_DIR/../hocus-resources/resources
 
 if ! [[ -f $RESOURCES_DIR/test-buildfs.ext4 ]]; then
-  $REPO_DIR/ops/bin/dev/build-test-buildfs.sh
+  $REPO_DIR/ops/bin/dev/build-test-buildfs.sh "$RESOURCES_DIR"
 fi
 
 # Detect agent
@@ -23,4 +23,4 @@ fi
 set -o errexit
 set -o pipefail
 set -o nounset
-docker exec -it $AGENT_CONTAINER bash -c "yarn jest 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000"
+docker exec -it $AGENT_CONTAINER bash -c "yarn test:agent"

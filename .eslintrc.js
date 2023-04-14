@@ -1,6 +1,13 @@
 module.exports = {
   plugins: ["filename-rules"],
-  ignorePatterns: ["node_modules/**/*", "public/**/*", "build/**/*", "ops/**/*", "deps/**/*"],
+  ignorePatterns: [
+    "node_modules/**/*",
+    "public/**/*",
+    "build/**/*",
+    "ops/**/*",
+    "deps/**/*",
+    "agent-build/**/*",
+  ],
   overrides: [
     {
       files: ["*.ts", "*.tsx"],

@@ -4,8 +4,11 @@ COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
 COPY deps deps
 COPY package.json yarn.lock ./
 RUN yarn
-COPY . .
-RUN yarn run regen && yarn run build
+COPY prisma prisma
+RUN yarn run regen
+COPY app app
+COPY entrypoints entrypoints
+COPY tsconfig.json ./
 RUN npx esbuild entrypoints/codec-server.ts --outfile=codec-server.js --platform=node --format=cjs --bundle --external:bson --alias:~=./app
 
 FROM gcr.io/distroless/nodejs16-debian11 AS runner

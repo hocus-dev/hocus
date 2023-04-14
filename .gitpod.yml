@@ -26,7 +26,6 @@ tasks:
   - name: Agent+CP dev-env setup
     init: yarn install && npm run dev-prebuild && git lfs pull && ops/bin/prepare.sh
     command: |
-      ops/bin/link.sh
       ops/bin/up.sh
       ops/bin/temporal-up.sh
       npm run dev
@@ -34,8 +33,7 @@ tasks:
     init: |
       yarn install
     command: |
-      ops/bin/link.sh
-      PORT=1337 npx ts-node entrypoints/codec-server.ts
+      PORT=1337 npx ts-node -r tsconfig-paths/register entrypoints/codec-server.ts
   - name: Terminal
     init: sleep 0.01
 # Ports to expose on workspace startup

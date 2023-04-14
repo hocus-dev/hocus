@@ -4,8 +4,14 @@ COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
 COPY deps deps
 COPY package.json yarn.lock ./
 RUN yarn
-COPY . .
-RUN yarn run regen && yarn run build
+COPY prisma prisma
+RUN yarn run regen
+COPY app app
+COPY entrypoints entrypoints
+COPY public public
+COPY styles styles
+COPY remix.config.js tailwind.config.js tsconfig.json ./
+RUN yarn run build
 # TODO: Remix is unable to detect aliases when using require.resolve
 # For now just replace that alias manually
 # Actually what does it even mean to do require.resolve(one_module_from_a_bundle) in a bundle?!?!?!?
@@ -20,7 +26,7 @@ COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
 COPY deps deps
 COPY package.json yarn.lock ./
 RUN yarn install --production
-COPY . .
+COPY prisma prisma
 RUN yarn run regen
 
 FROM node:16-bullseye AS runner

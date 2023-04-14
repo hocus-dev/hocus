@@ -1,0 +1,185 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+env:
+  # So the build logs are actually useful
+  BUILDKIT_PROGRESS: plain
+steps:
+  # In theory the pipeline can be executed locally using the buildkite CLI but there are bugs...
+  # 1. Group steps are not supported in the cli .-. https://github.com/buildkite/cli/issues/123
+  # 2. When running on a real agent the repo is cleared before executing the CI, when running locally node_modules and other stuff if present .-.
+  # 3. If steps are unsupported .-.
+  # 4. Soft fail is unsupported .-.
+  - group: ":broom: Lints"
+    steps:
+      - label: ":clown_face: Detect clown emojis"
+        plugins:
+          - detect-clowns#v2.0.0: ~
+
+      - label: ":docker: Lint dockerfiles"
+        plugins:
+          - docker#v3.11.0:
+              command:
+                ["bash", "-c", "hadolint $(grep --exclude-dir=node_modules -rl '^FROM ' /workdir)"]
+              image: "hadolint/hadolint:latest-debian"
+        # TODO: This will be fixed in a separate PR xd
+        soft_fail:
+          - exit_status: 1
+
+      - label: ":file_folder: Run {{matrix}} lint"
+        plugins:
+          - docker#v3.11.0:
+              command: ["{{matrix}}", "--text", "--ignore", "$$FL_IGNORE_PATHS", "--path", "."]
+              image: "cytopia/file-lint:latest"
+              environment:
+                - FL_IGNORE_PATHS
+        env:
+          FL_IGNORE_PATHS: ".git"
+        # TODO: This will be fixed in a separate PR xd
+        soft_fail:
+          - exit_status: 1
+        matrix:
+          - file-cr
+          - file-crlf
+          - file-trailing-single-newline
+          - file-trailing-space
+          - file-utf8
+          - file-utf8-bom
+          - git-conflicts
+
+      - label: ":bash: Lint Shell scripts"
+        plugins:
+          - shellcheck#v1.3.0:
+              version: v0.9.0
+              recursive_glob: true
+              files:
+                - ops/bin/*.sh
+                - ops/bin/**/*.sh
+                - resources/bin/*.sh
+                - resources/bin/**/*.sh
+        # TODO: This will be fixed in a separate PR xd
+        soft_fail:
+          - exit_status: 1
+
+      - label: ":yaml: YAML Lint"
+        plugins:
+          - docker#v3.11.0:
+              command: ["/workdir"]
+              image: "cytopia/yamllint:alpine-1"
+        # TODO: This will be fixed in a separate PR xd
+        soft_fail:
+          - exit_status: 1
+
+      - label: ":bug: Ensure docker workaround"
+        command: ./ops/bin/dev/check-ports-in-docker-compose.sh
+
+      - label: ":eslint: ESLint"
+        command: |
+          docker build -t hocus-tests:$BUILDKITE_COMMIT -f ops/docker/backend-tests.Dockerfile $BUILDKITE_BUILD_CHECKOUT_PATH \
+          && docker run -it --rm hocus-tests:$BUILDKITE_COMMIT yarn run lint
+        # TODO: This will be fixed in a separate PR xd
+        soft_fail:
+          - exit_status: 1
+
+      - label: ":spider_web: Link check"
+        skip: true
+        plugins:
+          - docker#v3.11.0:
+              command:
+                [
+                  "-l",
+                  "-c",
+                  "200",
+                  "-i",
+                  "^http(s)?:\\/\\/(127\\.0\\.0\\.1)|(localhost)|(registry.yarnpkg.com).*$",
+                  "/workdir",
+                ]
+              image: "cytopia/linkcheck:latest"
+        # TODO: This will be fixed in a separate PR xd
+        soft_fail:
+          - exit_status: 1
+
+  # TODO: Move to dprint ;)
+  - label: ":prettier: Formatting"
+    plugins:
+      - docker#v3.11.0:
+          command: ["-c", "/workdir/"]
+          image: "tmknom/prettier:latest"
+    # TODO: This will be fixed in a separate PR xd
+    soft_fail:
+      - exit_status: 1
+
+  - label: ":typescript: Typecheck"
+    command: |
+      docker build -t hocus-tests:$BUILDKITE_COMMIT -f ops/docker/backend-tests.Dockerfile $BUILDKITE_BUILD_CHECKOUT_PATH \
+      && docker run -it --rm hocus-tests:$BUILDKITE_COMMIT yarn run typecheck
+    # TODO: This will be fixed in a separate PR xd
+    soft_fail:
+      - exit_status: 2
+
+  - group: ":books: Grammar"
+    steps:
+      - label: ":notebook: cspell"
+        plugins:
+          - docker#v3.11.0:
+              command: ["cspell", "/workdir/**"]
+              image: "ghcr.io/streetsidesoftware/cspell:latest"
+        # TODO: This will be fixed in a separate PR xd
+        soft_fail:
+          - exit_status: 1
+
+      - label: ":rust: Typos"
+        plugins:
+          - docker#v3.11.0:
+              command: ["."]
+              image: "imunew/typos-cli:latest"
+        # TODO: This will be fixed in a separate PR xd
+        soft_fail:
+          - exit_status: 2
+
+      - label: ":man_in_lotus_position::skin-tone-6: vale"
+        plugins:
+          - docker#v3.11.0:
+              command: ["/workdir/"]
+              image: "jdkato/vale:latest"
+        # TODO: This will be fixed in a separate PR xd
+        soft_fail:
+          - exit_status: 1
+
+  - label: ":smoking: Deploy smoke test"
+    command: "ls"
+    env:
+      REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
+      HOCUS_HOSTNAME: localhost
+      NO_EXPOSE_PORTS: ""
+    plugins:
+      - docker-compose#v4.12.0:
+          run: tester
+          build-parallel: true
+          config:
+            - ops/docker/hocus-local.yml
+            - ops/docker/deploy-smoke-test.yml
+
+  - label: ":jest: Backend tests"
+    command: |
+      yarn test:backend
+    env:
+      REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
+      NO_EXPOSE_PORTS: ""
+    plugins:
+      - docker-compose#v4.12.0:
+          run: repo
+          config: ops/docker/backend-tests.docker-compose.yml
+
+  - label: ":fire: E2E agent tests"
+    command: |
+      export DB_HOST="db";
+      export AGENT_DATABASE_URL="postgres://postgres:pass@db:5432/rooms";
+      ops/docker/resources/setup-network.sh;
+      yarn test:agent;
+    env:
+      REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
+      NO_EXPOSE_PORTS: ""
+    plugins:
+      - docker-compose#v4.12.0:
+          run: agent
+          build-parallel: true
+          config: ops/docker/agent-tests.docker-compose.yml

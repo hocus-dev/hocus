@@ -14,7 +14,7 @@ services:
     networks:
       - hocus_dev_net
     ports:
-      - 6432:5432
+      - "${NO_EXPOSE_PORTS-6432:}5432"
   temporal:
     container_name: temporal
     depends_on:
@@ -30,7 +30,7 @@ services:
       - hocus_dev_net
     image: temporalio/auto-setup:1.20.0
     ports:
-      - 7233:7233
+      - "${NO_EXPOSE_PORTS-7233:}7233"
   temporal-admin-tools:
     container_name: temporal-admin-tools
     depends_on:
@@ -55,4 +55,4 @@ services:
     networks:
       - hocus_dev_net
     ports:
-      - 8080:8080
+      - "${NO_EXPOSE_PORTS-8080:}8080"

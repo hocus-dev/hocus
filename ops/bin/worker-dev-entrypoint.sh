@@ -5,7 +5,6 @@ set -o nounset
 
 ops/docker/resources/setup-network.sh
 yarn
-ops/bin/link.sh
 source ops/resources/gitpod-ip.sh
 export DB_HOST="db"
 export AGENT_TEMPORAL_ADDRESS="$GITPOD_IP:7233"

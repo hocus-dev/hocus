@@ -19,6 +19,7 @@
     // ./ops/docker/hocus-ui.Dockerfile - until https://github.com/evanw/esbuild/issues/3003 gets fixed
     // ./ops/docker/hocus-agent.Dockerfile - until https://github.com/evanw/esbuild/issues/3003 gets fixed
     // ./remix.config.js - remix does a good job of resolving aliases but if that resolution fails then you may override it here
+    // ./jest.config.js - .-.
     "paths": {
       "~/*": ["./app/*"]
     },

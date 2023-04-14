@@ -129,9 +129,10 @@ test.concurrent(
   provideActivities(async ({ activities, injector, db }) => {
     let isGetWorkspaceInstanceStatusMocked = true;
     const { client, nativeConnection } = testEnv;
+    const taskQueue = `test-${uuidv4()}`;
     const worker = await Worker.create({
       connection: nativeConnection,
-      taskQueue: "test",
+      taskQueue,
       workflowsPath: require.resolve("./workflows"),
       activities: {
         ...activities,
@@ -261,7 +262,7 @@ test.concurrent(
 
       await client.workflow.execute(runBuildfsAndPrebuilds, {
         workflowId: uuidv4(),
-        taskQueue: "test",
+        taskQueue,
         retry: { maximumAttempts: 1 },
         args: [prebuildEvents.map((e) => e.id)],
       });
@@ -349,7 +350,10 @@ test.concurrent(
             for (const vmTask of vmTasks) {
               console.error(`### ${vmTask.command} ###`);
               console.error(`Status: ${vmTask.status}`);
-              if (vmTask.status === VmTaskStatus.VM_TASK_STATUS_ERROR) {
+              if (
+                vmTask.status === VmTaskStatus.VM_TASK_STATUS_ERROR ||
+                vmTask.status === VmTaskStatus.VM_TASK_STATUS_CANCELLED
+              ) {
                 console.error(`Logs:`);
                 console.error(vmTask.logGroup.logs.map((l) => l.content).join());
               }
@@ -389,7 +393,7 @@ test.concurrent(
       console.log("running create workspace");
       const workspace = await client.workflow.execute(runCreateWorkspace, {
         workflowId: uuidv4(),
-        taskQueue: "test",
+        taskQueue,
         retry: { maximumAttempts: 1 },
         args: [
           {
@@ -405,14 +409,14 @@ test.concurrent(
       const startWorkspace = () =>
         client.workflow.execute(runStartWorkspace, {
           workflowId: uuidv4(),
-          taskQueue: "test",
+          taskQueue,
           retry: { maximumAttempts: 1 },
           args: [workspace.id],
         });
       const stopWorkspace = () =>
         client.workflow.execute(runStopWorkspace, {
           workflowId: uuidv4(),
-          taskQueue: "test",
+          taskQueue,
           retry: { maximumAttempts: 1 },
           args: [workspace.id],
         });
@@ -516,7 +520,7 @@ test.concurrent(
       });
       await client.workflow.execute(runDeleteWorkspace, {
         workflowId: uuidv4(),
-        taskQueue: "test",
+        taskQueue,
         retry: { maximumAttempts: 1 },
         args: [{ workspaceId: workspace.id }],
       });
@@ -553,7 +557,7 @@ test.concurrent(
           expect(await doPrebuildFilesExist()).toEqual([true, true]);
           await client.workflow.execute(runArchivePrebuild, {
             workflowId: uuidv4(),
-            taskQueue: "test",
+            taskQueue,
             retry: { maximumAttempts: 1 },
             args: [{ prebuildEventId: e.id }],
           });
@@ -580,7 +584,7 @@ test.concurrent(
         projects.map((p) =>
           client.workflow.execute(runDeleteRemovablePrebuilds, {
             workflowId: uuidv4(),
-            taskQueue: "test",
+            taskQueue,
             retry: { maximumAttempts: 1 },
             args: [p.id],
           }),
@@ -602,9 +606,10 @@ test.concurrent(
   "runAddProjectAndRepository",
   provideActivities(async ({ activities }) => {
     const { client, nativeConnection } = testEnv;
+    const taskQueue = `test-${uuidv4()}`;
     const worker = await Worker.create({
       connection: nativeConnection,
-      taskQueue: "test",
+      taskQueue,
       workflowsPath: require.resolve("./workflows"),
       activities,
       dataConverter: {
@@ -617,7 +622,7 @@ test.concurrent(
       const runWorkflow = () =>
         client.workflow.execute(runAddProjectAndRepository, {
           workflowId: uuidv4(),
-          taskQueue: "test",
+          taskQueue,
           retry: { maximumAttempts: 1 },
           args: [
             {

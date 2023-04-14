@@ -8,3 +8,7 @@ const _clientNotAssignableToNonTxClient: Any.Extends<
   Prisma.Client,
   Prisma.NonTransactionClient
 > = 0;
+
+test.concurrent("Prisma", () => {
+  return;
+});

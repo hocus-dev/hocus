@@ -1,0 +1,24 @@
+[default]
+check-filename = true
+extend-ignore-re = [
+    # Test private keys
+    "(?s)-----BEGIN OPENSSH PRIVATE KEY-----.*-----END OPENSSH PRIVATE KEY-----",
+    # JWT
+    "\"([a-zA-Z0-9_=]+)\\.([a-zA-Z0-9_=]+)\\.([a-zA-Z0-9_\\-\\+/=]*)\"",
+]
+
+[files]
+extend-exclude = [
+    ".clinic",
+    "public/font-awesome/*",
+    "public/fonts/*",
+    "ops/docker/resources/keycloak-db-dump.sql"
+]
+
+[type.excalidraw]
+extend-glob = ["*.excalidraw"]
+extend-ignore-re = [
+    "\"id\": \".*\"",
+    "\"containerId\": \".*\"",
+    "\"elementId\": \".*\"",
+]

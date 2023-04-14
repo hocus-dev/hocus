@@ -4,8 +4,11 @@ COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
 COPY deps deps
 COPY package.json yarn.lock ./
 RUN yarn
-COPY . .
+COPY prisma prisma
 RUN yarn run regen
+COPY app app
+COPY entrypoints entrypoints
+COPY tsconfig.json ./
 RUN mkdir agent-build
 RUN npx esbuild entrypoints/agent.ts --outfile=agent-build/agent.js --platform=node --format=cjs --bundle --packages=external --alias:~=./app
 # Generate worker bundles 
@@ -20,7 +23,7 @@ COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
 COPY deps deps
 COPY package.json yarn.lock ./
 RUN yarn install --production
-COPY . .
+COPY prisma prisma
 RUN yarn run regen
 
 

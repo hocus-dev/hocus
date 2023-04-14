@@ -26,7 +26,6 @@ services:
       "
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /etc/localtime:/etc/localtime:ro
       - agent_data:/agent_data:rw
 
   setup-keycloak:
@@ -67,7 +66,7 @@ services:
       POSTGRES_DB: rooms
       PGDATA: /data
     ports:
-      - "5432:5432"
+      - "${NO_EXPOSE_PORTS-5432:}5432"
     networks:
       - hocus_net
     volumes:
@@ -94,7 +93,7 @@ services:
       - KC_DB_USERNAME=${POSTGRES_USER}
       - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
     ports:
-      - "4200:8080"
+      - "${NO_EXPOSE_PORTS-4200:}8080"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl --fail http://localhost:8080/health"]
@@ -149,7 +148,7 @@ services:
     networks:
       - hocus_net
     ports:
-      - 8080:8080
+      - "${NO_EXPOSE_PORTS-8080:}8080"
 
   temporal-hocus-codec:
     build:
@@ -160,7 +159,7 @@ services:
     networks:
       - hocus_net
     ports:
-      - 8081:8081
+      - "${NO_EXPOSE_PORTS-8081:}8081"
 
   hocus-ui:
     depends_on:
@@ -186,7 +185,7 @@ services:
       - PRISMA_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms?schema=public
       - TELEMETRY_DISABLED=${TELEMETRY_DISABLED:-}
     ports:
-      - 3000:3000
+      - "${NO_EXPOSE_PORTS-3000:}3000"
     networks:
       - hocus_net
     healthcheck:
@@ -226,7 +225,7 @@ services:
     restart: "no"
     privileged: true
     ports:
-      - 8822:22
+      - "${NO_EXPOSE_PORTS-8822:}22"
     volumes:
       - agent_data:/srv/jailer:rw
       - /dev/kvm:/dev/kvm

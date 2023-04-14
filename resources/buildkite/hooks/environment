@@ -1,0 +1,57 @@
+#!/bin/bash
+set -eu -o pipefail
+
+# Based on https://github.com/buildkite/elastic-ci-stack-for-aws/blob/16a3f45aa0b5e7ac9c3eca123b01a344eab8d009/packer/linux/conf/buildkite-agent/hooks/environment
+echo "Checking disk space"
+if ! /usr/bin/bk-check-disk-space ; then
+
+  echo "Cleaning up docker resources older than ${DOCKER_PRUNE_UNTIL:-4h}"
+  docker image prune --all --force --filter "until=${DOCKER_PRUNE_UNTIL:-4h}"
+
+  echo "Checking disk space again"
+  if ! /usr/bin/bk-check-disk-space ; then
+    echo "Disk health checks failed" >&2
+    exit 1
+ fi
+fi
+
+# We need to scope the next bit to only the currently running agent dir and
+# pipeline, but we also need to control security and make sure arbitrary folders
+# can't be chmoded.
+#
+# The agent builds path isn't exposed nicely by itself. The agent name also
+# doesn't quite map to its builds path. We do have a complete checkout path,
+# but we need to chop it up, safely. The path looks like:
+#
+#   BUILDKITE_BUILD_CHECKOUT_PATH="/var/lib/buildkite-agent/builds/my-agent-1/my-org/my-pipeline"
+#
+# We know the beginning of this path, it's in BUILDKITE_BUILD_PATH:
+#
+#   BUILDKITE_BUILD_PATH="/var/lib/buildkite-agent/builds"
+
+# So we can calculate the suffix as a substring:
+AGENT_ORG_PIPELINE_DIR="${BUILDKITE_BUILD_CHECKOUT_PATH#"${BUILDKITE_BUILD_PATH}/"}"
+# => "my-agent-1/my-org/my-pipeline"
+
+# Then we can grab just the first path component, the agent name, by removing
+# the longest suffix starting with a slash:
+AGENT_DIR="${AGENT_ORG_PIPELINE_DIR%%/*}"
+# => "my-agent-1"
+
+# Then we can figure out the org/pipeline path component
+ORG_PIPELINE_DIR="${AGENT_ORG_PIPELINE_DIR#"${AGENT_DIR}/"}"
+# => "my-org/my-pipeline"
+
+# Then we grab just the first path component, the org, by removing the longest
+# suffix starting with a slash:
+ORG_DIR="${ORG_PIPELINE_DIR%%/*}"
+# => "my-org"
+
+# Then we can figure out the pipeline path component using the org dir
+PIPELINE_DIR="${ORG_PIPELINE_DIR#"${ORG_DIR}/"}"
+# => "my-pipeline"
+
+# Now we can pass this to the sudo script which will validate it before safely chmodding:
+echo "~~~ Fixing permissions for '${AGENT_DIR}/${ORG_DIR}/${PIPELINE_DIR}'..."
+sudo /usr/bin/fix-buildkite-agent-builds-permissions "${AGENT_DIR}" "${ORG_DIR}" "${PIPELINE_DIR}"
+echo
