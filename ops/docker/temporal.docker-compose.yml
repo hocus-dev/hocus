@@ -51,7 +51,7 @@ services:
       - TEMPORAL_UI_ENABLED=true
       - TEMPORAL_OPENAPI_ENABLED=true
       - TEMPORAL_CODEC_ENDPOINT=http://localhost:1337
-    image: temporalio/ui:2.11.2
+    image: temporalio/ui:2.14.0
     networks:
       - hocus_dev_net
     ports:
