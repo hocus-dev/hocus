@@ -16,7 +16,7 @@ steps:
 
       - label: ":docker: Lint dockerfiles"
         plugins:
-          - docker#v3.11.0:
+          - docker#v5.6.0:
               command:
                 ["bash", "-c", "hadolint $(grep --exclude-dir=node_modules -rl '^FROM ' /workdir)"]
               image: "hadolint/hadolint:latest-debian"
@@ -26,7 +26,7 @@ steps:
 
       - label: ":file_folder: Run {{matrix}} lint"
         plugins:
-          - docker#v3.11.0:
+          - docker#v5.6.0:
               command:
                 [
                   "{{matrix}}",
@@ -62,7 +62,7 @@ steps:
 
       - label: ":yaml: YAML Lint"
         plugins:
-          - docker#v3.11.0:
+          - docker#v5.6.0:
               command: ["/workdir"]
               image: "cytopia/yamllint:alpine-1"
         # TODO: This will be fixed in a separate PR xd
@@ -80,7 +80,7 @@ steps:
       - label: ":spider_web: Link check"
         skip: true
         plugins:
-          - docker#v3.11.0:
+          - docker#v5.6.0:
               command:
                 [
                   "-l",
@@ -98,7 +98,7 @@ steps:
   # TODO: Move to dprint ;)
   - label: ":prettier: Formatting"
     plugins:
-      - docker#v3.11.0:
+      - docker#v5.6.0:
           command: ["-c", "/workdir/"]
           image: "tmknom/prettier:latest"
 
@@ -111,7 +111,7 @@ steps:
     steps:
       - label: ":notebook: cspell"
         plugins:
-          - docker#v3.11.0:
+          - docker#v5.6.0:
               command: ["cspell", "/workdir/**"]
               image: "ghcr.io/streetsidesoftware/cspell:latest"
         # TODO: This will be fixed in a separate PR xd
@@ -120,7 +120,7 @@ steps:
 
       - label: ":rust: Typos"
         plugins:
-          - docker#v3.11.0:
+          - docker#v5.6.0:
               command: ["."]
               image: "imunew/typos-cli:latest"
         # TODO: This will be fixed in a separate PR xd
@@ -129,7 +129,7 @@ steps:
 
       - label: ":man_in_lotus_position::skin-tone-6: vale"
         plugins:
-          - docker#v3.11.0:
+          - docker#v5.6.0:
               command: ["/workdir/"]
               image: "jdkato/vale:latest"
         # TODO: This will be fixed in a separate PR xd
