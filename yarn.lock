@@ -4350,9 +4350,9 @@ cbor-extract@^2.1.1:
     "@cbor-extract/cbor-extract-win32-x64" "2.1.1"
 
 cbor-x@^1.5.0:
-  version "1.5.0"
-  resolved "https://registry.yarnpkg.com/cbor-x/-/cbor-x-1.5.0.tgz#71d13d268284ac307faed29c218d633160633826"
-  integrity sha512-BKMxdeq8jFRH/6cBWfN6w5JcnMEJexBUOANaXKqJ4CQNDmpVFGAbJ+eU2SdltB4nZOe8nzlefb7xxtRIyOw9Vg==
+  version "1.5.2"
+  resolved "https://registry.yarnpkg.com/cbor-x/-/cbor-x-1.5.2.tgz#ceabc48bda06185de1f3a078bb4a793e6e222de5"
+  integrity sha512-JArE6xcgj3eo13fpnShO42QFBUuXP2uG12RLeF2Nb+dJcETFYxkUa27gXQrRYp67Ahtaxyfbg+ihc62XTyQqsQ==
   optionalDependencies:
     cbor-extract "^2.1.1"
 
