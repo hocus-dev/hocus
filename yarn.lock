@@ -2071,9 +2071,9 @@
     tslib "^2.4.0"
 
 "@popperjs/core@^2.9.3":
-  version "2.11.6"
-  resolved "https://registry.yarnpkg.com/@popperjs/core/-/core-2.11.6.tgz#cee20bd55e68a1720bdab363ecf0c821ded4cd45"
-  integrity sha512-50/17A98tWUfQ176raKiOGXuYpLyyVMkxxG6oylzL3BPOlA6ADGdK7EYunSa4I064xerltq9TGXs8HmOk5E+vw==
+  version "2.11.7"
+  resolved "https://registry.yarnpkg.com/@popperjs/core/-/core-2.11.7.tgz#ccab5c8f7dc557a52ca3288c10075c9ccd37fff7"
+  integrity sha512-Cr4OjIkipTtcXKjAsm8agyleBuDHvxzeBoa1v543lbv1YaIwQjESsVcmjiWiPEbC1FIeHOG/Op9kdCmAmiS3Kw==
 
 "@prisma/client@4.7.1":
   version "4.7.1"
@@ -6081,9 +6081,9 @@ flowbite-react@^0.4.2:
     react-indiana-drag-scroll "^2.2.0"
 
 flowbite@^1.6.2:
-  version "1.6.2"
-  resolved "https://registry.yarnpkg.com/flowbite/-/flowbite-1.6.2.tgz#3deb3add4db3525ce35e5c35f5ca4c6eeed7f6c4"
-  integrity sha512-a/hB/fyG6m+EsMWpCaKOtFZGeQef+JLPS854DdFYitct8MNPnW5YKIOBQnIroyMtn60jOeMINg/XU1yh6m4pxw==
+  version "1.6.5"
+  resolved "https://registry.yarnpkg.com/flowbite/-/flowbite-1.6.5.tgz#a0eb2f3f0cf5098f802004df635e2717efc52bbc"
+  integrity sha512-eI4h3pIRI9d7grlYq14r0A01KUtw7189sPLLx/O2i7JyPEWpbleScfYuEc48XTeNjk1xxm/JHgZkD9kjyOWAlA==
   dependencies:
     "@popperjs/core" "^2.9.3"
     mini-svg-data-uri "^1.4.3"
