@@ -42,7 +42,7 @@
     "express-openid-connect": "^2.8.0",
     "firecracker-client": "./deps/firecracker-client",
     "flowbite": "^1.6.2",
-    "flowbite-react": "0.4.2",
+    "flowbite-react": "0.4.3",
     "http-status-codes": "^2.2.0",
     "jsonwebtoken": "^9.0.0",
     "moment": "^2.29.4",
