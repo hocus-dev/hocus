@@ -1,0 +1,9 @@
+{
+  "builder": {
+    "gc": {
+      "enabled": true,
+      "defaultKeepStorage": "100GB",
+      "policy": [{ "keepStorage": "100GB", "all": true }]
+    }
+  }
+}

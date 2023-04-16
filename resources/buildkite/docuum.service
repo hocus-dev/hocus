@@ -1,0 +1,12 @@
+[Unit]
+Description=Docuum
+After=docker.service
+Wants=docker.service
+
+[Service]
+Environment='THRESHOLD=100 GB'
+ExecStart=/usr/bin/docuum --threshold ${THRESHOLD}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
