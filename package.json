@@ -85,7 +85,7 @@
     "@types/ssh2-streams": "^0.1.9",
     "@types/sshpk": "^1.17.1",
     "@types/tail": "^2.2.1",
-    "@types/uuid": "^8.3.4",
+    "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^5.33.1",
     "@typescript-eslint/parser": "^5.33.1",
     "autoprefixer": "^10.4.8",
@@ -103,7 +103,7 @@
     "ts-sinon": "^2.0.2",
     "ts-toolbelt": "^9.6.0",
     "typescript": "^5.0.0",
-    "uuid": "^8.3.2",
+    "uuid": "^9.0.0",
     "prettier": "^2.8.7"
   },
   "engines": {
