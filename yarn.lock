@@ -6072,7 +6072,7 @@ flow-parser@0.*:
   resolved "https://registry.yarnpkg.com/flow-parser/-/flow-parser-0.185.1.tgz#32777ecbb7c6fa272713077599e6fb44fb2331c3"
   integrity sha512-nbtJZFMGgJVCRBlE/66p7L6IWF+wy6Nbd65sVwyrH7WsnZgeef8m263uxN4xah+8BZwuGndU8HKlt8cHIpTwew==
 
-flowbite-react@^0.4.2:
+flowbite-react@0.4.2:
   version "0.4.2"
   resolved "https://registry.yarnpkg.com/flowbite-react/-/flowbite-react-0.4.2.tgz#660f0fdc9630d82cd1e2ae11a4d2080225410f1d"
   integrity sha512-o4VsyYpJKfmiuHdfFA36o4slimdOyTKHmBIcqZNtd9eYCMrRDqEttUISIBPLDB9MArPZ13U1snAIKXHLp2Nr/A==
