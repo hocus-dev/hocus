@@ -1,22 +1,22 @@
 import path from "path";
 
+import { VmTaskStatus } from "@prisma/client";
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { Button } from "flowbite-react";
 import { StatusCodes } from "http-status-codes";
 import moment from "moment";
 
 import { AppPage } from "~/components/app-page";
 import { BackToProjectLink } from "~/components/projects/back-to-project-link";
-import { LogViewer } from "~/components/projects/prebuilds/log-viewer";
 import { PrebuildStatus } from "~/components/projects/prebuilds/prebuild-status";
+import { TaskViewer } from "~/components/projects/prebuilds/task-viewer";
 import { VmTaskStatusComponent } from "~/components/projects/prebuilds/vm-task-status";
 import { HttpError } from "~/http-error.server";
-import { getPrebuildLogsPath, getPrebuildPath, ProjectPathTabId } from "~/page-paths.shared";
+import { getPrebuildPath, ProjectPathTabId } from "~/page-paths.shared";
 import { PrebuildQueryValidator } from "~/schema/prebuild-query.validator.server";
 import { UuidValidator } from "~/schema/uuid.validator.server";
-import { formatBranchName, numericSort } from "~/utils.shared";
+import { formatBranchName, numericSort, unwrap } from "~/utils.shared";
 
 export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   const { success, value: prebuildExternalId } = UuidValidator.SafeParse(
@@ -55,25 +55,40 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
           vmTask: true,
         },
       },
+      PrebuildEventSystemError: true,
     },
   });
   if (prebuildEvent == null) {
     throw new HttpError(StatusCodes.NOT_FOUND, "Prebuild not found");
   }
-  const tasks = prebuildEvent.tasks.map((task) => ({
+  const tasks: {
+    vmTaskExternalId?: string;
+    status: VmTaskStatus;
+    command: string;
+    idx: number;
+    logGroupId?: bigint;
+  }[] = prebuildEvent.tasks.map((task) => ({
     vmTaskExternalId: task.vmTask.externalId,
     status: task.vmTask.status,
     command: task.originalCommand,
-    idx: task.idx + 1,
+    idx: task.idx + 2,
     logGroupId: task.vmTask.logGroupId,
   }));
+  const systemErrorCommand = "System Error";
+  if (prebuildEvent.PrebuildEventSystemError != null) {
+    tasks.push({
+      idx: 0,
+      status: VmTaskStatus.VM_TASK_STATUS_ERROR,
+      command: systemErrorCommand,
+    });
+  }
   if (prebuildEvent.buildfsEvent != null) {
     const buildfsEvent = prebuildEvent.buildfsEvent;
     tasks.push({
       vmTaskExternalId: buildfsEvent.vmTask.externalId,
       status: buildfsEvent.vmTask.status,
       command: "Build Image",
-      idx: 0,
+      idx: 1,
       logGroupId: buildfsEvent.vmTask.logGroupId,
     });
   }
@@ -85,13 +100,23 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   }
   let activeTaskLogs: string | undefined = void 0;
   if (activeTask != null) {
-    const logs = await db.log.findMany({
-      where: { logGroupId: activeTask.logGroupId },
-      orderBy: { idx: "desc" },
-      take: 150,
-    });
-    activeTaskLogs = Buffer.concat(logs.map((log) => log.content).reverse()).toString("utf8");
+    if (activeTask.command === systemErrorCommand) {
+      activeTaskLogs = unwrap(prebuildEvent.PrebuildEventSystemError).message;
+    } else {
+      const logs = await db.log.findMany({
+        where: { logGroupId: unwrap(activeTask.logGroupId) },
+        orderBy: { idx: "desc" },
+        take: 150,
+      });
+      activeTaskLogs = Buffer.concat(logs.map((log) => log.content).reverse()).toString("utf8");
+    }
   }
+
+  const displayTasks = tasks.map((task) => ({
+    idx: task.idx,
+    status: task.status,
+    command: task.command,
+  }));
 
   return json({
     project: {
@@ -106,20 +131,20 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
       gitHash: prebuildEvent.gitObject.hash,
       createdAt: prebuildEvent.createdAt.getTime(),
       status: prebuildEvent.status,
-      tasks: tasks.map((task) => ({ ...task, logGroupId: void 0 })),
     },
+    displayTasks,
     activeTask:
       activeTask != null
         ? {
-            task: { ...activeTask, logGroupId: void 0 },
-            logs: activeTaskLogs as string,
+            idx: activeTask.idx,
+            logs: activeTaskLogs ?? "",
           }
         : void 0,
   });
 };
 
 export default function PrebuildRoute(): JSX.Element {
-  const { project, prebuild, activeTask } = useLoaderData<typeof loader>();
+  const { project, prebuild, activeTask, displayTasks } = useLoaderData<typeof loader>();
   const branchTitle = prebuild.branches.length > 1 ? "Branches" : "Branch";
   const branchValues = prebuild.branches.join(", ");
   const createdAt = moment(prebuild.createdAt).fromNow();
@@ -163,11 +188,11 @@ export default function PrebuildRoute(): JSX.Element {
             <h1 className="h-16 font-bold text-lg p-4 border-b border-gray-700 flex flex-col justify-center">
               <span>Tasks</span>
             </h1>
-            {prebuild.tasks.map((task) => (
+            {displayTasks.map((task) => (
               <a key={task.idx} href={getPrebuildPath(prebuild.externalId, task.idx)}>
                 <button
                   className={`${
-                    activeTask?.task.idx === task.idx ? "bg-slate-700 text-white " : ""
+                    activeTask?.idx === task.idx ? "bg-slate-700 text-white " : ""
                   }transition-all text-left w-full font-mono text-sm text-gray-400 p-4 border-b border-gray-700 hover:bg-slate-600 hover:text-white whitespace-nowrap truncate`}
                 >
                   <VmTaskStatusComponent status={task.status} />
@@ -176,45 +201,11 @@ export default function PrebuildRoute(): JSX.Element {
               </a>
             ))}
           </div>
-          <div className="flex flex-col grow" style={{ width: "calc(100% - 14rem)" }}>
-            {activeTask ? (
-              <>
-                <div className="border-b border-gray-700 flex">
-                  <div
-                    className="shrink-0 h-16 font-mono text-sm flex flex-col justify-center"
-                    style={{ width: "calc(100% - 11rem)" }}
-                  >
-                    <p className="whitespace-nowrap overflow-y-hidden overflow-x-auto p-6">
-                      {activeTask.task.command}
-                    </p>
-                  </div>
-                  <div className="grow flex flex-col justify-center items-center">
-                    <Button
-                      href={getPrebuildLogsPath(
-                        prebuild.externalId,
-                        activeTask.task.vmTaskExternalId,
-                      )}
-                      color="dark"
-                      className="transition-all"
-                    >
-                      <i className="fa-solid fa-download mr-2"></i>
-                      <span>Download Log</span>
-                    </Button>
-                  </div>
-                </div>
-                <div className="grow bg-gray-900 rounded-br-lg font-mono text-sm overflow-auto">
-                  <LogViewer text={activeTask.logs} />
-                </div>
-              </>
-            ) : (
-              <div className="flex-grow flex items-center justify-center">
-                <div className="text-gray-400 text-center">
-                  <h1 className="text-2xl font-bold">No tasks</h1>
-                  <p className="mt-4">This prebuild has no tasks associated with it.</p>
-                </div>
-              </div>
-            )}
-          </div>
+          <TaskViewer
+            activeTask={activeTask}
+            prebuild={{ externalId: prebuild.externalId }}
+            tasks={displayTasks}
+          />
         </div>
       </div>
     </AppPage>
