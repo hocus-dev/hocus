@@ -4,11 +4,13 @@ import { Button } from "flowbite-react";
 import { LogViewer } from "./log-viewer";
 
 import { getPrebuildLogsPath } from "~/page-paths.shared";
+import { unwrap } from "~/utils.shared";
 
 export interface Task {
   status: VmTaskStatus;
   command: string;
   externalId?: string;
+  idx: number;
 }
 
 export interface ActiveTask {
@@ -21,8 +23,15 @@ export function TaskViewer(props: {
   tasks: Task[];
   activeTask?: ActiveTask;
 }): JSX.Element {
-  const { prebuild, tasks, activeTask } = props;
-  const activeTaskExternalId = activeTask != null ? tasks[activeTask.idx].externalId : void 0;
+  const { prebuild, tasks } = props;
+  const activeTask =
+    props.activeTask != null
+      ? {
+          ...unwrap(tasks.find((t) => t.idx === props.activeTask?.idx)),
+          logs: props.activeTask.logs,
+        }
+      : void 0;
+  const activeTaskExternalId = activeTask != null ? activeTask.externalId : void 0;
   const downloadLogBtn =
     activeTaskExternalId != null ? (
       <Button
@@ -44,7 +53,7 @@ export function TaskViewer(props: {
               style={{ width: "calc(100% - 11rem)" }}
             >
               <p className="whitespace-nowrap overflow-y-hidden overflow-x-auto p-6">
-                {tasks[activeTask.idx].command}
+                {activeTask.command}
               </p>
             </div>
             <div className="grow flex flex-col justify-center items-center">{downloadLogBtn}</div>

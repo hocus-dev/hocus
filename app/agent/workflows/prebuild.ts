@@ -9,14 +9,7 @@ import { parseWorkflowError } from "../workflows-utils";
 
 import type { Activities } from "~/agent/activities/list";
 import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
-import {
-  groupBy,
-  numericSort,
-  unwrap,
-  filterNull,
-  numericOrNullSort,
-  displayError,
-} from "~/utils.shared";
+import { groupBy, numericSort, unwrap, filterNull, numericOrNullSort } from "~/utils.shared";
 
 const {
   checkoutAndInspect,
@@ -52,13 +45,15 @@ const {
   },
 });
 
-export async function runBuildfs(buildfsEventId: bigint): Promise<{ buildSuccessful: boolean }> {
+export async function runBuildfs(
+  buildfsEventId: bigint,
+): Promise<{ buildSuccessful: boolean; error?: string }> {
   try {
     return await buildfs({ buildfsEventId });
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error(displayError(err));
-    return { buildSuccessful: false };
+    console.error(err);
+    return { buildSuccessful: false, error: parseWorkflowError(err) };
   }
 }
 
@@ -256,15 +251,21 @@ async function runBuildfsAndPrebuildsInner(prebuildEventIds: bigint[]): Promise<
         if (buildfsEvent.status === "created") {
           const buildfsResult = await executeChild(runBuildfs, { args: [buildfsEventId] });
           if (!buildfsResult.buildSuccessful) {
-            await cancelPrebuilds(innerPrebuildEvents.map((e) => e.id));
+            await cancelPrebuilds(
+              innerPrebuildEvents.map((e) => e.id),
+              buildfsResult.error,
+            );
             return;
           }
         } else if (buildfsEvent.status === "found") {
           const twoHours = 2 * 1000 * 60 * 60;
           try {
             await waitForBuildfs(buildfsEventId, twoHours);
-          } catch {
-            await cancelPrebuilds(innerPrebuildEvents.map((e) => e.id));
+          } catch (err) {
+            await cancelPrebuilds(
+              innerPrebuildEvents.map((e) => e.id),
+              parseWorkflowError(err),
+            );
             return;
           }
         }

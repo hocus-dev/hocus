@@ -94,7 +94,7 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   }
   tasks.sort((a, b) => numericSort(a.idx, b.idx));
 
-  let activeTask: (typeof tasks)[number] | undefined = tasks[activeTaskIdx];
+  let activeTask: (typeof tasks)[number] | undefined = tasks.find((t) => t.idx === activeTaskIdx);
   if (activeTask == null && tasks.length > 0) {
     activeTask = tasks[tasks.length - 1];
   }
@@ -116,6 +116,7 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
     idx: task.idx,
     status: task.status,
     command: task.command,
+    externalId: task.vmTaskExternalId,
   }));
 
   return json({

@@ -578,7 +578,7 @@ export class PrebuildService {
   async cleanupDbAfterPrebuildError(
     db: Prisma.TransactionClient,
     prebuildEventId: bigint,
-    errorMessage: string,
+    errorMessage?: string,
   ): Promise<void> {
     const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
       where: { id: prebuildEventId },
@@ -612,12 +612,14 @@ export class PrebuildService {
       where: { id: prebuildEventId },
       data: { status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_ERROR },
     });
-    await db.prebuildEventSystemError.create({
-      data: {
-        prebuildEventId,
-        message: errorMessage,
-      },
-    });
+    if (errorMessage != null) {
+      await db.prebuildEventSystemError.create({
+        data: {
+          prebuildEventId,
+          message: errorMessage,
+        },
+      });
+    }
   }
 
   /**
