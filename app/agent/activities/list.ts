@@ -26,6 +26,8 @@ import type { ChangePrebuildEventStatusActivity } from "./change-prebuild-event-
 import { changePrebuildEventStatus } from "./change-prebuild-event-status";
 import type { CheckoutAndInspectActivity } from "./checkout-and-inspect";
 import { checkoutAndInspect } from "./checkout-and-inspect";
+import type { CleanUpAfterPrebuildErrorActivity } from "./clean-up-after-prebuild-error";
+import { cleanUpAfterPrebuildError } from "./clean-up-after-prebuild-error";
 import type { CreatePrebuildFilesActivity } from "./create-prebuild-files";
 import { createPrebuildFiles } from "./create-prebuild-files";
 import type { CreateWorkspaceActivity } from "./create-workspace";
@@ -95,6 +97,7 @@ export interface Activities {
   deleteRemovablePrebuildEvents: DeleteRemovablePrebuildEventsActivity;
   getArchivablePrebuildEvents: GetArchivablePrebuildEventsActivity;
   saveGitRepoConnectionStatus: SaveGitRepoConnectionStatusActivity;
+  cleanUpAfterPrebuildError: CleanUpAfterPrebuildErrorActivity;
 }
 
 export interface ActivityArgs {
@@ -141,6 +144,7 @@ export const createActivities = async (
     deleteRemovablePrebuildEvents,
     getArchivablePrebuildEvents,
     saveGitRepoConnectionStatus,
+    cleanUpAfterPrebuildError,
   };
 
   return Object.fromEntries(

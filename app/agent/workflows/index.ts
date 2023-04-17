@@ -12,7 +12,7 @@ import {
 import { runBuildfsAndPrebuilds, runPrebuild, runBuildfs } from "./prebuild";
 
 import type { Activities } from "~/agent/activities/list";
-import { parseGitSyncError } from "~/agent/workflows-utils";
+import { parseWorkflowError } from "~/agent/workflows-utils";
 import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
 import { numericSort, unwrap, groupBy } from "~/utils.shared";
 
@@ -208,7 +208,7 @@ export async function runSyncGitRepository(
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);
-      await saveGitRepoConnectionStatus({ gitRepositoryId, error: parseGitSyncError(err) }).catch(
+      await saveGitRepoConnectionStatus({ gitRepositoryId, error: parseWorkflowError(err) }).catch(
         (err) =>
           // eslint-disable-next-line no-console
           console.error(err),

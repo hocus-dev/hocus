@@ -5,9 +5,10 @@ import type { CheckoutAndInspectResult } from "../activities-types";
 import { HOST_PERSISTENT_DIR } from "../constants";
 import { PREBUILD_REPOSITORY_DIR } from "../prebuild-constants";
 import { ArbitraryKeyMap } from "../utils/arbitrary-key-map.server";
+import { parseWorkflowError } from "../workflows-utils";
 
 import type { Activities } from "~/agent/activities/list";
-import { waitForPromisesWorkflow } from "~/temporal/utils";
+import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
 import {
   groupBy,
   numericSort,
@@ -36,6 +37,7 @@ const {
   cancelPrebuilds,
   changePrebuildEventStatus,
   initPrebuildEvents,
+  cleanUpAfterPrebuildError,
 } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
   retry: {
@@ -279,5 +281,12 @@ async function runBuildfsAndPrebuildsInner(prebuildEventIds: bigint[]): Promise<
 }
 
 export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promise<void> {
-  return await runBuildfsAndPrebuildsInner(prebuildEventIds);
+  return await runBuildfsAndPrebuildsInner(prebuildEventIds).catch(async (err) => {
+    const errorMessage = parseWorkflowError(err);
+    await retryWorkflow(() => cleanUpAfterPrebuildError({ prebuildEventIds, errorMessage }), {
+      retryIntervalMs: 1000,
+      isExponential: true,
+      maxRetries: 6,
+    });
+  });
 }

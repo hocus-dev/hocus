@@ -24,10 +24,13 @@ export const retryWorkflow = async <T>(
     maxRetries: number;
     retryIntervalMs: number;
     isRetriable?: (err: unknown) => boolean;
+    // if true, retryIntervalMs will be doubled after each retry
+    isExponential?: boolean;
   },
 ): Promise<T> => {
   const isRetriable = options.isRetriable ?? (() => true);
   let lastError: unknown = void 0;
+  let retryIntervalMs = options.retryIntervalMs;
   for (let i = 0; i < options.maxRetries; i++) {
     try {
       return await fn();
@@ -37,7 +40,10 @@ export const retryWorkflow = async <T>(
       }
       lastError = err;
       if (i < options.maxRetries - 1) {
-        await sleep(options.retryIntervalMs);
+        await sleep(retryIntervalMs);
+        if (options.isExponential ?? false) {
+          retryIntervalMs *= 2;
+        }
       }
     }
   }
