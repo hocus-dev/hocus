@@ -90,7 +90,7 @@
     "@typescript-eslint/parser": "^5.33.1",
     "autoprefixer": "^10.4.8",
     "cross-env": "^7.0.3",
-    "esbuild": "v0.17.12",
+    "esbuild": "0.17.17",
     "eslint": "^8.25.0",
     "eslint-plugin-filename-rules": "^1.2.0",
     "jest": "^28.1.3",
