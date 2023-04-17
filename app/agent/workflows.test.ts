@@ -226,7 +226,7 @@ test.concurrent(
           {
             project: projects[0],
             buildfsStatus: VmTaskStatus.VM_TASK_STATUS_ERROR,
-            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_CANCELLED,
+            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_ERROR,
           },
           {
             project: projects[1],
