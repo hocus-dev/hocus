@@ -14,11 +14,12 @@ export const withActivityHeartbeat = <T>(
 
     fn()
       .then((result) => {
+        clearInterval(interval);
         resolve(result);
       })
       .catch((err) => {
+        clearInterval(interval);
         reject(err);
-      })
-      .finally(() => clearInterval(interval));
+      });
   });
 };
