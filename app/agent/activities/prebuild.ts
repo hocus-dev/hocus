@@ -24,7 +24,7 @@ export const prebuild: CreateActivity<PrebuildActivity> =
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const prebuildService = injector.resolve(Token.PrebuildService);
 
-    return await withActivityHeartbeat({ intervalMs: 10000 }, () =>
+    return await withActivityHeartbeat({ intervalMs: 5000 }, () =>
       prebuildService.prebuild(db, firecrackerService, args.prebuildEventId),
     );
   };

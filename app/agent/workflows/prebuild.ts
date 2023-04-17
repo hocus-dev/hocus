@@ -26,6 +26,7 @@ const { checkoutAndInspect, fetchRepository, buildfs, prebuild, createPrebuildFi
     // are running at the same time, it may take a long time for all of them
     // to finish.
     startToCloseTimeout: "24 hours",
+    heartbeatTimeout: "20 seconds",
     retry: {
       maximumAttempts: 1,
     },
