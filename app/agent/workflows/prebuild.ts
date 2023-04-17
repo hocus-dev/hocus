@@ -1,5 +1,11 @@
 import { proxyActivities, uuid4, executeChild, ApplicationFailure } from "@temporalio/workflow";
 import path from "path-browserify";
+
+import type { CheckoutAndInspectResult } from "../activities-types";
+import { HOST_PERSISTENT_DIR } from "../constants";
+import { PREBUILD_REPOSITORY_DIR } from "../prebuild-constants";
+import { ArbitraryKeyMap } from "../utils/arbitrary-key-map.server";
+
 import type { Activities } from "~/agent/activities/list";
 import { waitForPromisesWorkflow } from "~/temporal/utils";
 import {
@@ -10,11 +16,6 @@ import {
   numericOrNullSort,
   displayError,
 } from "~/utils.shared";
-
-import type { CheckoutAndInspectResult } from "../activities-types";
-import { HOST_PERSISTENT_DIR } from "../constants";
-import { PREBUILD_REPOSITORY_DIR } from "../prebuild-constants";
-import { ArbitraryKeyMap } from "../utils/arbitrary-key-map.server";
 
 const { checkoutAndInspect, fetchRepository, buildfs, prebuild, createPrebuildFiles } =
   proxyActivities<Activities>({
