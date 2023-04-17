@@ -189,6 +189,11 @@ export class BuildfsService {
         buildfsEvent: {
           cacheHash,
           projectId,
+          vmTask: {
+            status: {
+              notIn: [VmTaskStatus.VM_TASK_STATUS_CANCELLED, VmTaskStatus.VM_TASK_STATUS_ERROR],
+            },
+          },
         },
       },
       include: {
