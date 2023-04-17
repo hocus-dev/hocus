@@ -18,6 +18,12 @@ PERF_MONITORING_ENABLED=1
 
 This will build test VM's, attach to the running Hocus agent and start an E2E test suite using https://github.com/hocus-dev/tests
 
+You may also attach to the agent container manually and run:
+
+```bash
+yarn jest 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
+```
+
 ## To add another buildkite runner
 
 ```bash

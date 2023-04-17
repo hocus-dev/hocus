@@ -15,8 +15,13 @@ import type { Logger } from "@temporalio/worker";
 import { P, match } from "ts-pattern";
 
 import type { AgentUtilService } from "./agent-util.service";
+import type { VMTaskOutput } from "./agent-util.types";
 import type { BuildfsService } from "./buildfs.service";
-import { HOST_PERSISTENT_DIR } from "./constants";
+import {
+  HOST_PERSISTENT_DIR,
+  SOLO_AGENT_INSTANCE_ID,
+  WORKSPACE_ENV_SCRIPT_PATH,
+} from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
 import {
   PREBUILD_DEV_DIR,
@@ -30,6 +35,7 @@ import type { ProjectConfig } from "./project-config/validator";
 import { doesFileExist, execSshCmd, sha256, withFileLock } from "./utils";
 
 import type { Config } from "~/config";
+import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
 import { displayError, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
@@ -39,6 +45,7 @@ export class PrebuildService {
     Token.AgentUtilService,
     Token.ProjectConfigService,
     Token.BuildfsService,
+    Token.PerfService,
     Token.Config,
   ] as const;
   private readonly agentConfig: ReturnType<Config["agent"]>;
@@ -48,6 +55,7 @@ export class PrebuildService {
     private readonly agentUtilService: AgentUtilService,
     private readonly projectConfigService: ProjectConfigService,
     private readonly buildfsService: BuildfsService,
+    private readonly perfService: PerfService,
     config: Config,
   ) {
     this.agentConfig = config.agent();
@@ -558,7 +566,7 @@ export class PrebuildService {
     await db.logGroup.deleteMany({
       where: { id: { in: logGroupIds } },
     });
-    await db.prebuildEventSystemError.delete({ where: { prebuildEventId } });
+    await db.prebuildEventSystemError.deleteMany({ where: { prebuildEventId } });
     await db.prebuildEvent.delete({ where: { id: prebuildEventId } });
   }
 
@@ -634,5 +642,90 @@ export class PrebuildService {
         message: errorMessage,
       },
     });
+  }
+
+  /**
+   * Returns the result for every task.
+   *
+   * Assumes that there is a `hocus` user with passwordless sudo on the
+   * filesystem drive, sshd is configured to start running automatically after VM boot,
+   * and the corresponding public key to the private key used to connect to the VM
+   * (`agentConfig.prebuildSshPrivateKey`) is already present in the `hocus` user's authorized_keys.
+   */
+  async prebuild(
+    db: Prisma.NonTransactionClient,
+    firecrackerService: FirecrackerService,
+    prebuildEventId: bigint,
+  ): Promise<VMTaskOutput[]> {
+    this.perfService.log("prebuild", "start", prebuildEventId);
+    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
+      where: { id: prebuildEventId },
+      include: {
+        tasks: { include: { vmTask: true } },
+        prebuildEventFiles: { include: { agentInstance: true, fsFile: true, projectFile: true } },
+        project: {
+          include: {
+            environmentVariableSet: {
+              include: {
+                environmentVariables: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    const prebuildEventFiles = unwrap(
+      prebuildEvent.prebuildEventFiles.find(
+        (f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
+      ),
+    );
+    const envVariables = prebuildEvent.project.environmentVariableSet.environmentVariables.map(
+      (v) => ({
+        name: v.name,
+        value: v.value,
+      }),
+    );
+    const tasks = prebuildEvent.tasks;
+    const result = await firecrackerService.withVM(
+      {
+        ssh: {
+          username: "hocus",
+          privateKey: this.agentConfig.prebuildSshPrivateKey,
+        },
+        kernelPath: this.agentConfig.defaultKernel,
+        rootFsPath: prebuildEventFiles.fsFile.path,
+        extraDrives: [
+          {
+            pathOnHost: prebuildEventFiles.projectFile.path,
+            guestMountPath: this.devDir,
+          },
+        ],
+        memSizeMib: prebuildEvent.project.maxPrebuildRamMib,
+        vcpuCount: prebuildEvent.project.maxPrebuildVCPUCount,
+      },
+      async ({ ssh, sshConfig }) => {
+        const envScript = this.agentUtilService.generateEnvVarsScript(envVariables);
+        await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
+        await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
+        await Promise.all(
+          tasks.map(async (task) => {
+            const script = this.agentUtilService.generatePrebuildTaskScript(task.originalCommand);
+            const paths = this.getPrebuildTaskPaths(task.idx);
+            await execSshCmd({ ssh }, ["mkdir", "-p", this.prebuildScriptsDir]);
+            await this.agentUtilService.writeFile(ssh, paths.scriptPath, script);
+          }),
+        );
+
+        return await this.agentUtilService.execVmTasks(
+          sshConfig,
+          db,
+          tasks.map((t) => ({
+            vmTaskId: t.vmTask.id,
+          })),
+        );
+      },
+    );
+    this.perfService.log("prebuild", "end", prebuildEventId);
+    return result;
   }
 }
