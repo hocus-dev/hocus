@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { createAgentInjector } from "./agent-injector";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
-import { execCmd, sleep } from "./utils";
+import { execCmd, execSshCmd, sleep } from "./utils";
 
 import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
@@ -74,6 +74,42 @@ test.concurrent(
       tapDeviceIp: "10.231.255.253",
       vmIp: "10.231.255.254",
     });
+  }),
+);
+
+// tests that when a firecracker process exits, withVM throws in a reasonable amount of time
+test.concurrent(
+  "withVM - unresponsive ssh",
+  provideInjector(async ({ injector }) => {
+    const instanceId = uuidv4();
+    const fcService = injector.resolve(Token.FirecrackerService)(instanceId);
+    const agentConfig = injector.resolve(Token.Config).agent();
+
+    let sshCommandExitedWithin: number | null = null;
+    await expect(
+      fcService.withVM(
+        {
+          ssh: {
+            username: "hocus",
+            password: "hocus",
+          },
+          kernelPath: agentConfig.defaultKernel,
+          rootFsPath: agentConfig.fetchRepositoryRootFs,
+          copyRootFs: true,
+          memSizeMib: 128,
+          vcpuCount: 1,
+        },
+        async ({ ssh, firecrackerPid }) => {
+          await execCmd("kill", "-9", firecrackerPid.toString());
+          const now = Date.now();
+          await execSshCmd({ ssh }, ["bash", "-c", "echo hey"]).catch(() => {
+            sshCommandExitedWithin = Date.now() - now;
+          });
+        },
+      ),
+    ).rejects.toThrow();
+    expect(sshCommandExitedWithin).not.toBe(null);
+    expect(sshCommandExitedWithin).toBeLessThan(5000);
   }),
 );
 

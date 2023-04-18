@@ -163,7 +163,7 @@ export class FirecrackerService {
       this.logger.error(`firecracker process errored: ${displayError(err)}`);
     });
     child.on("close", (code) => {
-      this.logger.warn(`firecracker process closed: ${code}`);
+      this.logger.warn(`firecracker process with pid ${child.pid} closed: ${code}`);
     });
 
     if (child.pid == null) {
@@ -419,6 +419,39 @@ export class FirecrackerService {
     };
   }
 
+  private async monitorProcessDuringSsh<T>(
+    ssh: NodeSSH,
+    firecrackerPid: number,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const interval = setInterval(() => {
+        try {
+          // test for the existence of the process
+          // if it doesn't exist, kill will throw an error
+          process.kill(firecrackerPid, 0);
+        } catch {
+          clearInterval(interval);
+          this.logger.warn(
+            `Firecracker process with pid ${firecrackerPid} died while ssh was active. Killing ssh connection.`,
+          );
+          // we need to kill the ssh connection because it will hang otherwise
+          ssh.connection?.destroy();
+        }
+      }, 500);
+
+      return fn()
+        .then((result) => {
+          clearInterval(interval);
+          resolve(result);
+        })
+        .catch((err) => {
+          clearInterval(interval);
+          reject(err);
+        });
+    });
+  }
+
   async withVM<T>(
     config: {
       ssh: Omit<SSHConfig, "host">;
@@ -500,30 +533,32 @@ export class FirecrackerService {
       );
       await this.writeVmInfoFile({ pid: fcPid, ipBlockId });
       const sshConfig = { ...config.ssh, host: vmIp };
-      return await withSsh(sshConfig, async (ssh) => {
-        const useSudo = config.ssh.username !== "root";
-        for (const drive of extraDrives) {
-          await this.agentUtilService.mountDriveAtPath(
+      return await withSsh(sshConfig, async (ssh) =>
+        this.monitorProcessDuringSsh(ssh, fcPid, async () => {
+          const useSudo = config.ssh.username !== "root";
+          for (const drive of extraDrives) {
+            await this.agentUtilService.mountDriveAtPath(
+              ssh,
+              drive.pathOnHost,
+              drive.guestMountPath,
+              useSudo,
+            );
+          }
+          const r = await fn({
             ssh,
-            drive.pathOnHost,
-            drive.guestMountPath,
-            useSudo,
-          );
-        }
-        const r = await fn({
-          ssh,
-          sshConfig,
-          firecrackerPid: fcPid,
-          vmIp,
-          ipBlockId: unwrap(ipBlockId),
-        });
+            sshConfig,
+            firecrackerPid: fcPid,
+            vmIp,
+            ipBlockId: unwrap(ipBlockId),
+          });
 
-        this.perfService.log(fcPid, "withVM exit start");
-        // Ensure the page cache is flushed before proceeding
-        await execSshCmd({ ssh }, ["sync"]);
+          this.perfService.log(fcPid, "withVM exit start");
+          // Ensure the page cache is flushed before proceeding
+          await execSshCmd({ ssh }, ["sync"]);
 
-        return r;
-      });
+          return r;
+        }),
+      );
     } finally {
       if (shouldPoweroff && vmStarted) {
         await this.shutdownVM();
