@@ -163,7 +163,7 @@ export class FirecrackerService {
       this.logger.error(`firecracker process errored: ${displayError(err)}`);
     });
     child.on("close", (code) => {
-      this.logger.warn(`firecracker process closed: ${code}`);
+      this.logger.warn(`firecracker process with pid ${child.pid} closed: ${code}`);
     });
 
     if (child.pid == null) {
@@ -499,7 +499,7 @@ export class FirecrackerService {
         ).toFixed(2)} ms`,
       );
       await this.writeVmInfoFile({ pid: fcPid, ipBlockId });
-      const sshConfig = { ...config.ssh, host: vmIp };
+      const sshConfig = { ...config.ssh, host: vmIp, monitoredProcessPid: fcPid };
       return await withSsh(sshConfig, async (ssh) => {
         const useSudo = config.ssh.username !== "root";
         for (const drive of extraDrives) {

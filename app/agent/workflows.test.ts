@@ -608,11 +608,20 @@ test.concurrent(
   provideActivities(async ({ activities }) => {
     const { client, nativeConnection } = testEnv;
     const taskQueue = `test-${uuidv4()}`;
+    const updateGitBranchesAndObjects: typeof activities.updateGitBranchesAndObjects = async () => {
+      return {
+        newGitBranches: [],
+        updatedGitBranches: [],
+      };
+    };
     const worker = await Worker.create({
       connection: nativeConnection,
       taskQueue,
       workflowsPath: require.resolve("./workflows"),
-      activities,
+      activities: {
+        ...activities,
+        updateGitBranchesAndObjects,
+      },
       dataConverter: {
         payloadConverterPath: require.resolve("~/temporal/data-converter"),
       },
