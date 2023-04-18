@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 import type { CreateActivity } from "./types";
+import { withActivityHeartbeat } from "./utils";
 
 import { Token } from "~/token";
 
@@ -17,28 +18,30 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
       .resolve(Token.Config)
       .shared().maxRepositoryDriveSizeMib;
     perfService.log("fetchRepository", "start", gitRepositoryId);
-    const repo = await db.gitRepository.findUniqueOrThrow({
-      where: { id: gitRepositoryId },
-      include: {
-        sshKeyPair: true,
-      },
-    });
-    const repoFile = await db.$transaction(async (tdb) => {
-      const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(tdb);
-      return await gitService.getOrCreateGitRepositoryFile(tdb, agentInstance.id, repo.id);
-    });
-    await gitService.fetchRepository(
-      firecrackerService,
-      {
-        pathOnHost: repoFile.file.path,
-        maxSizeMiB: maxRepositoryDriveSizeMib,
-      },
-      {
-        url: repo.url,
-        credentials: {
-          privateSshKey: repo.sshKeyPair.privateKey,
+    await withActivityHeartbeat({ intervalMs: 5000 }, async () => {
+      const repo = await db.gitRepository.findUniqueOrThrow({
+        where: { id: gitRepositoryId },
+        include: {
+          sshKeyPair: true,
         },
-      },
-    );
+      });
+      const repoFile = await db.$transaction(async (tdb) => {
+        const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(tdb);
+        return await gitService.getOrCreateGitRepositoryFile(tdb, agentInstance.id, repo.id);
+      });
+      await gitService.fetchRepository(
+        firecrackerService,
+        {
+          pathOnHost: repoFile.file.path,
+          maxSizeMiB: maxRepositoryDriveSizeMib,
+        },
+        {
+          url: repo.url,
+          credentials: {
+            privateSshKey: repo.sshKeyPair.privateKey,
+          },
+        },
+      );
+    });
     perfService.log("fetchRepository", "end", gitRepositoryId);
   };

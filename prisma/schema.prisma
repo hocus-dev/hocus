@@ -84,10 +84,21 @@ model PrebuildEvent {
   workspaceTasksCommand String[]
   workspaceTasksShell   String[]
 
-  createdAt          DateTime                   @default(now()) @db.Timestamptz(3)
-  prebuildEventFiles PrebuildEventFiles[]
-  workspaces         Workspace[]
-  reservations       PrebuildEventReservation[]
+  createdAt                DateTime                   @default(now()) @db.Timestamptz(3)
+  prebuildEventFiles       PrebuildEventFiles[]
+  workspaces               Workspace[]
+  reservations             PrebuildEventReservation[]
+  /// Set if the prebuild failed because an error occurred within the application itself.
+  PrebuildEventSystemError PrebuildEventSystemError?
+}
+
+model PrebuildEventSystemError {
+  id              BigInt        @id @default(autoincrement())
+  prebuildEvent   PrebuildEvent @relation(fields: [prebuildEventId], references: [id])
+  prebuildEventId BigInt        @unique
+  message         String
+
+  occurredAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model PrebuildEventFiles {

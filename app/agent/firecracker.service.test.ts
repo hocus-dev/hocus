@@ -94,7 +94,7 @@ test.concurrent(
         rootFsPath: agentConfig.fetchRepositoryRootFs,
         copyRootFs: true,
         removeVmDirAfterPoweroff: false,
-        memSizeMib: 1024,
+        memSizeMib: 128,
         vcpuCount: 1,
       },
       async () => {

@@ -3,6 +3,7 @@ import { SOLO_AGENT_INSTANCE_ID } from "../constants";
 import { randomString } from "../utils";
 
 import type { CreateActivity } from "./types";
+import { withActivityHeartbeat } from "./utils";
 
 import { Token } from "~/token";
 import { unwrap } from "~/utils.shared";
@@ -38,24 +39,28 @@ export const checkoutAndInspect: CreateActivity<CheckoutAndInspectActivity> =
     const prebuildService = injector.resolve(Token.PrebuildService);
     const perfService = injector.resolve(Token.PerfService);
     perfService.log("checkoutAndInspect", "start", args.gitRepositoryId, args.targetBranch);
-    const gitRepository = await db.gitRepository.findUniqueOrThrow({
-      where: { id: args.gitRepositoryId },
-      include: {
-        gitRepositoryFiles: { include: { agentInstance: true, file: true } },
-      },
+
+    const result = await withActivityHeartbeat({ intervalMs: 5000 }, async () => {
+      const gitRepository = await db.gitRepository.findUniqueOrThrow({
+        where: { id: args.gitRepositoryId },
+        include: {
+          gitRepositoryFiles: { include: { agentInstance: true, file: true } },
+        },
+      });
+      const repoFile = unwrap(
+        gitRepository.gitRepositoryFiles.find(
+          (f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
+        ),
+      );
+      return await prebuildService.checkoutAndInspect({
+        fcService,
+        repositoryDrivePath: repoFile.file.path,
+        targetBranch: args.targetBranch,
+        outputDrivePath: args.outputDrivePath,
+        projectConfigPaths: args.projectConfigPaths,
+      });
     });
-    const repoFile = unwrap(
-      gitRepository.gitRepositoryFiles.find(
-        (f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
-      ),
-    );
-    const result = await prebuildService.checkoutAndInspect({
-      fcService,
-      repositoryDrivePath: repoFile.file.path,
-      targetBranch: args.targetBranch,
-      outputDrivePath: args.outputDrivePath,
-      projectConfigPaths: args.projectConfigPaths,
-    });
+
     perfService.log("checkoutAndInspect", "end", args.gitRepositoryId, args.targetBranch);
     return result;
   };

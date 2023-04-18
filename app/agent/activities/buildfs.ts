@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 import type { CreateActivity } from "./types";
+import { withActivityHeartbeat } from "./utils";
 
 import { Token } from "~/token";
 
@@ -16,7 +17,9 @@ export const buildfs: CreateActivity<BuildfsActivity> =
     const perfService = injector.resolve(Token.PerfService);
 
     perfService.log("buildfs", "start", args.buildfsEventId);
-    const result = await buildfsService.buildfs({ ...args, db, firecrackerService });
+    const result = await withActivityHeartbeat({ intervalMs: 5000 }, () =>
+      buildfsService.buildfs({ ...args, db, firecrackerService }),
+    );
     perfService.log("buildfs", "end", args.buildfsEventId);
 
     return result;
