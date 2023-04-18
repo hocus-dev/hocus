@@ -97,52 +97,22 @@ export const execSshCmd = async (
   }
 };
 
-const monitorProcessDuringSsh = <T>(
-  ssh: NodeSSH,
-  processPid: number,
-  fn: () => Promise<T>,
-): Promise<T> => {
-  return new Promise((resolve, reject) => {
-    const interval = setInterval(() => {
-      try {
-        // test for the existence of the process
-        // if it doesn't exist, kill will throw an error
-        process.kill(processPid, 0);
-      } catch {
-        clearInterval(interval);
-        // we need to kill the ssh connection because it will hang otherwise
-        ssh.connection?.destroy();
-      }
-    }, 500);
-
-    return fn()
-      .then((result) => {
-        clearInterval(interval);
-        resolve(result);
-      })
-      .catch((err) => {
-        clearInterval(interval);
-        reject(err);
-      });
-  });
-};
-
 export const withSsh = async <T>(
-  connectionOptions: SSHConfig & {
-    /** if set, the ssh connection will be killed when the process exits  */
-    monitoredProcessPid?: number;
-  },
+  connectionOptions: SSHConfig,
   fn: (ssh: NodeSSH) => Promise<T>,
 ): Promise<T> => {
-  const ssh = await retry(async () => await new NodeSSH().connect(connectionOptions), 15, 500);
+  const ssh = await retry(
+    async () =>
+      await new NodeSSH().connect({
+        keepaliveInterval: 250,
+        keepaliveCountMax: 4,
+        ...connectionOptions,
+      }),
+    15,
+    500,
+  );
   try {
-    if (connectionOptions.monitoredProcessPid != null) {
-      return await monitorProcessDuringSsh(ssh, connectionOptions.monitoredProcessPid, () =>
-        fn(ssh),
-      );
-    } else {
-      return await fn(ssh);
-    }
+    return await fn(ssh);
   } finally {
     ssh.dispose();
   }
