@@ -32,7 +32,6 @@ const {
   },
 });
 
-
 export async function runCreateWorkspace(args: {
   name: string;
   prebuildEventId: bigint;
@@ -71,7 +70,8 @@ export async function runCreateWorkspace(args: {
 }
 
 export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceInstance> {
-  const workspaceInstance = await startWorkspace(workspaceId);
+  const vmInstanceId = uuid4();
+  const workspaceInstance = await startWorkspace({ workspaceId, vmInstanceId });
   await startChild(monitorWorkspaceInstance, {
     args: [workspaceId, workspaceInstance.id],
     workflowId: workspaceInstance.monitoringWorkflowId,

@@ -29,14 +29,7 @@ export const stopWorkspace: CreateActivity<StopWorkspaceActivity> =
       instance.firecrackerInstanceId,
     );
 
-    const vmInfo = await firecrackerService.getVMInfo();
-    if (vmInfo?.status === "on") {
-      await firecrackerService.shutdownVM();
-    }
-    if (vmInfo != null) {
-      await firecrackerService.releaseVmResources(vmInfo.info.ipBlockId);
-    }
-    await firecrackerService.tryDeleteVmDir();
+    await firecrackerService.cleanup();
 
     await db.$transaction((tdb) =>
       workspaceAgentService.removeWorkspaceInstanceFromDb(tdb, workspaceId),

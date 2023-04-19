@@ -1,18 +1,20 @@
 import type { WorkspaceInstance } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
-import { v4 as uuidv4 } from "uuid";
 
 import type { CreateActivity } from "./types";
 
 import { Token } from "~/token";
 import { formatBranchName } from "~/utils.shared";
 
-export type StartWorkspaceActivity = (workspaceId: bigint) => Promise<WorkspaceInstance>;
+export type StartWorkspaceActivity = (args: {
+  workspaceId: bigint;
+  vmInstanceId: string;
+}) => Promise<WorkspaceInstance>;
 export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
   ({ injector, db }) =>
-  async (workspaceId) => {
-    const monitoringWorkflowId = uuidv4();
-    const fcInstanceId = monitoringWorkflowId;
+  async (args) => {
+    const monitoringWorkflowId = args.vmInstanceId;
+    const fcInstanceId = args.vmInstanceId;
 
     const t1 = performance.now();
     const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
@@ -23,12 +25,12 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
     await db.$transaction((tdb) =>
       workspaceAgentService.markWorkspaceAs(
         tdb,
-        workspaceId,
+        args.workspaceId,
         WorkspaceStatus.WORKSPACE_STATUS_PENDING_START,
       ),
     );
     const workspace = await db.workspace.findUniqueOrThrow({
-      where: { id: workspaceId },
+      where: { id: args.workspaceId },
       include: {
         rootFsFile: true,
         projectFile: true,
@@ -105,9 +107,9 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
     const t4 = performance.now();
     logger.info(`Starting workspace took: ${(t4 - t3).toFixed(2)} ms`);
 
-    const r = await db.$transaction((tdb) =>
+    const workspaceInstance = await db.$transaction((tdb) =>
       workspaceAgentService.createWorkspaceInstanceInDb(tdb, {
-        workspaceId,
+        workspaceId: args.workspaceId,
         firecrackerInstanceId: fcInstanceId,
         monitoringWorkflowId,
         vmIp: instanceInfo.vmIp,
@@ -116,5 +118,5 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
     const t5 = performance.now();
     logger.info(`startWorkspaceActivity took: ${(t5 - t1).toFixed(2)} ms`);
 
-    return r;
+    return workspaceInstance;
   };
