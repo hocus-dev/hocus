@@ -471,7 +471,7 @@ test.concurrent(
         workspaceInstance3.firecrackerInstanceId,
       );
       await firecrackerService3.shutdownVM();
-      await firecrackerService3.tryDeleteVmDir();
+      await firecrackerService3.deleteVMDir();
       await stopWorkspace();
 
       const workspaceInstance4 = await startWorkspace();

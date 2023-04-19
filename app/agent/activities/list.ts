@@ -65,6 +65,8 @@ import type { UpdateGitBranchesAndObjectsActivity } from "./update-git-branches-
 import { updateGitBranchesAndObjects } from "./update-git-branches-and-objects";
 import type { WaitForBuildfsActivity } from "./wait-for-buildfs";
 import { waitForBuildfs } from "./wait-for-buildfs";
+import type { CleanUpWorkspaceInstanceLocalActivity } from "./workspace/clean-up-workspace-instance";
+import { cleanUpWorkspaceInstanceLocal } from "./workspace/clean-up-workspace-instance";
 
 export interface Activities {
   fetchRepository: FetchRepositoryActivity;
@@ -98,6 +100,7 @@ export interface Activities {
   getArchivablePrebuildEvents: GetArchivablePrebuildEventsActivity;
   saveGitRepoConnectionStatus: SaveGitRepoConnectionStatusActivity;
   cleanUpAfterPrebuildError: CleanUpAfterPrebuildErrorActivity;
+  cleanUpWorkspaceInstanceLocal: CleanUpWorkspaceInstanceLocalActivity;
 }
 
 export interface ActivityArgs {
@@ -145,6 +148,7 @@ export const createActivities = async (
     getArchivablePrebuildEvents,
     saveGitRepoConnectionStatus,
     cleanUpAfterPrebuildError,
+    cleanUpWorkspaceInstanceLocal,
   };
 
   return Object.fromEntries(

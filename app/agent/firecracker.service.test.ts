@@ -145,10 +145,12 @@ test.concurrent(
     expect(vmInfo2).not.toBeNull();
     expect(vmInfo2?.info).toEqual(vmInfo?.info);
 
-    await fcService.tryDeleteVmDir();
+    await fcService.deleteVMDir();
 
     const vmInfo3 = await fcService.getVMInfo();
     expect(vmInfo3).toBeNull();
+
+    await fcService.cleanup();
   }),
 );
 

@@ -532,7 +532,7 @@ export class FirecrackerService {
         await this.releaseVmResources(ipBlockId);
       }
       if (shouldPoweroff && config.removeVmDirAfterPoweroff !== false) {
-        await this.tryDeleteVmDir();
+        await this.deleteVMDir();
       }
       this.perfService.log(fcPid, "withVM exit end");
     }
@@ -565,12 +565,8 @@ export class FirecrackerService {
     await this.releaseIpBlockId(ipBlockId);
   }
 
-  async tryDeleteVmDir(): Promise<void> {
-    try {
-      await fsAsync.rm(this.instanceDir, { recursive: true, force: true });
-    } catch (err) {
-      this.logger.error(`failed to delete vm dir ${this.instanceDir}: ${displayError(err)}`);
-    }
+  async deleteVMDir(): Promise<void> {
+    await fsAsync.rm(this.instanceDir, { recursive: true, force: true });
   }
 
   changeVMNetworkVisibility(ipBlockId: number, changeTo: "public" | "private"): void {
@@ -581,5 +577,17 @@ export class FirecrackerService {
     ]) {
       execCmd(...NS_PREFIX, ...cmd.split(" "));
     }
+  }
+
+  /** Stops the VM and cleans up its resources. Idempotent. */
+  async cleanup(): Promise<void> {
+    const vmInfo = await this.getVMInfo();
+    if (vmInfo?.status === "on") {
+      await this.shutdownVM();
+    }
+    if (vmInfo != null) {
+      await this.releaseVmResources(vmInfo.info.ipBlockId);
+    }
+    await this.deleteVMDir();
   }
 }
