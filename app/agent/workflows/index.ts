@@ -1,8 +1,6 @@
-import type { Workspace, WorkspaceInstance, Project, GitRepository } from "@prisma/client";
+import type { Project, GitRepository } from "@prisma/client";
 import {
   proxyActivities,
-  uuid4,
-  executeChild,
   startChild,
   sleep,
   continueAsNew,
@@ -10,24 +8,33 @@ import {
 } from "@temporalio/workflow";
 
 import { runBuildfsAndPrebuilds, runPrebuild, runBuildfs } from "./prebuild";
+import {
+  runCreateWorkspace,
+  runStartWorkspace,
+  runStopWorkspace,
+  monitorWorkspaceInstance,
+} from "./workspace";
 
 import type { Activities } from "~/agent/activities/list";
 import { parseWorkflowError } from "~/agent/workflows-utils";
 import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
 import { numericSort, unwrap, groupBy } from "~/utils.shared";
 
-export { runBuildfsAndPrebuilds, runPrebuild, runBuildfs };
+export {
+  runBuildfsAndPrebuilds,
+  runPrebuild,
+  runBuildfs,
+  runCreateWorkspace,
+  runStartWorkspace,
+  runStopWorkspace,
+  monitorWorkspaceInstance,
+};
 
 const {
-  createWorkspace,
-  startWorkspace,
-  stopWorkspace,
-  getWorkspaceInstanceStatus,
   addProjectAndRepository,
   deleteWorkspace,
   linkGitBranches,
   reservePrebuildEvent,
-  removePrebuildEventReservation,
   waitForPrebuildEventReservations,
   markPrebuildEventAsArchived,
   deleteLocalPrebuildEventFiles,
@@ -57,78 +64,6 @@ const {
     maximumAttempts: 1,
   },
 });
-
-export async function runCreateWorkspace(args: {
-  name: string;
-  prebuildEventId: bigint;
-  gitBranchId: bigint;
-  userId: bigint;
-  externalId: string;
-  startWorkspace: boolean;
-}): Promise<Workspace> {
-  const workspace = await (async () => {
-    const reservationExternalId = uuid4();
-    const now = Date.now();
-    try {
-      const fifteenMinutes = 1000 * 60 * 15;
-      await reservePrebuildEvent({
-        prebuildEventId: args.prebuildEventId,
-        reservationType: "PREBUILD_EVENT_RESERVATION_TYPE_CREATE_WORKSPACE",
-        reservationExternalId,
-        validUntil: new Date(now + fifteenMinutes),
-      });
-      return await createWorkspace(args);
-    } finally {
-      await retryWorkflow(() => removePrebuildEventReservation(reservationExternalId), {
-        maxRetries: 5,
-        retryIntervalMs: 1000,
-      });
-    }
-  })();
-  if (args.startWorkspace) {
-    await startChild(runStartWorkspace, {
-      args: [workspace.id],
-      workflowId: uuid4(),
-      parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
-    });
-  }
-  return workspace;
-}
-
-export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceInstance> {
-  const workspaceInstance = await startWorkspace(workspaceId);
-  await startChild(monitorWorkspaceInstance, {
-    args: [workspaceId, workspaceInstance.id],
-    workflowId: workspaceInstance.monitoringWorkflowId,
-    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
-  });
-  return workspaceInstance;
-}
-
-export async function runStopWorkspace(workspaceId: bigint): Promise<void> {
-  return await stopWorkspace(workspaceId);
-}
-
-export async function monitorWorkspaceInstance(
-  workspaceId: bigint,
-  workspaceInstanceId: bigint,
-): Promise<void> {
-  for (let i = 0; i < 1000; i++) {
-    await sleep(5000);
-    const status = await retryWorkflow(() => getWorkspaceInstanceStatus(workspaceInstanceId), {
-      maxRetries: 10,
-      retryIntervalMs: 1000,
-    });
-    if (status === "removed") {
-      return;
-    }
-    if (status !== "on") {
-      await executeChild(runStopWorkspace, { args: [workspaceId] });
-      return;
-    }
-  }
-  await continueAsNew<typeof monitorWorkspaceInstance>(workspaceId, workspaceInstanceId);
-}
 
 export async function runSyncGitRepository(
   gitRepositoryId: bigint,
