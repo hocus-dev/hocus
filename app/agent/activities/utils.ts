@@ -5,7 +5,7 @@ export const runActivityHeartbeat = <T>(
     /** Default: 5000 */
     intervalMs?: number;
   },
-  fn: (...args: any[]) => Promise<T>,
+  fn: () => Promise<T>,
 ): Promise<T> => {
   return new Promise((resolve, reject) => {
     const interval = setInterval(() => {
@@ -24,8 +24,14 @@ export const runActivityHeartbeat = <T>(
   });
 };
 
-export const withActivityHeartbeat = <T>(
-  ...args: Parameters<typeof runActivityHeartbeat<T>>
-): (() => Promise<T>) => {
-  return () => runActivityHeartbeat(...args);
+export const withActivityHeartbeat = <T, Args>(
+  options: {
+    /** Default: 5000 */
+    intervalMs?: number;
+  },
+  fn: (args: Args) => Promise<T>,
+): ((args: Args) => Promise<T>) => {
+  return (args: Args) => {
+    return runActivityHeartbeat(options, () => fn(args));
+  };
 };
