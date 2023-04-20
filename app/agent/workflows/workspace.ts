@@ -32,6 +32,19 @@ const {
   },
 });
 
+const { cleanUpWorkspaceInstanceLocal } = proxyActivities<Activities>({
+  // Setting this too low may cause activities such as buildfs to fail.
+  // Buildfs in particular waits on a file lock to obtain a lock on its
+  // project filesystem, so if several buildfs activities for the same project
+  // are running at the same time, it may take a long time for all of them
+  // to finish.
+  startToCloseTimeout: "24 hours",
+  heartbeatTimeout: "20 seconds",
+  retry: {
+    maximumAttempts: 1,
+  },
+});
+
 export async function runCreateWorkspace(args: {
   name: string;
   prebuildEventId: bigint;
@@ -69,9 +82,24 @@ export async function runCreateWorkspace(args: {
   return workspace;
 }
 
+async function cleanUpAfterWorkspaceError(
+  workspaceId: bigint,
+  vmInstanceId?: string,
+): Promise<void> {
+  await retryWorkflow(() => cleanUpWorkspaceInstanceLocal({ workspaceId, vmInstanceId }), {
+    maxRetries: 8,
+    retryIntervalMs: 1000,
+  });
+}
+
 export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceInstance> {
   const vmInstanceId = uuid4();
-  const workspaceInstance = await startWorkspace({ workspaceId, vmInstanceId });
+  const workspaceInstance = await startWorkspace({ workspaceId, vmInstanceId }).catch(
+    async (err) => {
+      await cleanUpAfterWorkspaceError(workspaceId, vmInstanceId);
+      throw err;
+    },
+  );
   await startChild(monitorWorkspaceInstance, {
     args: [workspaceId, workspaceInstance.id],
     workflowId: workspaceInstance.monitoringWorkflowId,
@@ -81,7 +109,10 @@ export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceI
 }
 
 export async function runStopWorkspace(workspaceId: bigint): Promise<void> {
-  return await stopWorkspace(workspaceId);
+  return await stopWorkspace(workspaceId).catch(async (err) => {
+    await cleanUpAfterWorkspaceError(workspaceId);
+    throw err;
+  });
 }
 
 export async function monitorWorkspaceInstance(
