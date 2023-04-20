@@ -89,6 +89,7 @@ async function cleanUpAfterWorkspaceError(
   await retryWorkflow(() => cleanUpWorkspaceInstanceLocal({ workspaceId, vmInstanceId }), {
     maxRetries: 8,
     retryIntervalMs: 1000,
+    isExponential: true,
   });
 }
 
