@@ -102,6 +102,18 @@ BLOCK_DEV_NAME=$(ls /sys/class/scsi_device/${BLOCK_DEV_SCSI_ADDR}/device/block)
 e2fsck -fy /dev/${BLOCK_DEV_NAME} || true
 resize2fs /dev/${BLOCK_DEV_NAME}
 
+	# Qemu options for virtio-blk
+	#-m ${allocated_memory}K \
+	#-blockdev node-name=q1,driver=raw,file.driver=host_device,file.filename=/dev/${BLOCK_DEV_NAME},discard=on,detect-zeroes=on \
+	#-device virtio-blk,drive=q1 \
+        #-append "root=/dev/vda rw rootflags=discard console=ttyS0 ip=dhcp kernel.panic=-1" \
+
+	# Qemu options for virtio-pmem
+	#-m ${allocated_memory}K,slots=2,maxmem=1000G \
+	#-object memory-backend-file,id=mem1,share=on,mem-path=/dev/${BLOCK_DEV_NAME},size=512G,align=2M \
+	#-device virtio-pmem-pci,memdev=mem1,id=nv1 \
+        #-append "root=/dev/pmem0 rw rootflags=dax,discard console=ttyS0 ip=dhcp kernel.panic=-1" \
+
 # Now finally we may boot the vm :)
 total_cores=$(nproc)
 allocated_cores=$((total_cores / 2))
@@ -109,16 +121,16 @@ total_memory=$(free -b | awk '/^Mem:/{print $2}')
 allocated_memory=$((total_memory * 8 / 10 / 1024))
 qemu-system-x86_64 \
 	-machine q35 \
-	-m ${allocated_memory}K,slots=2,maxmem=1000G \
+	-m ${allocated_memory}K \
+	-blockdev node-name=q1,driver=raw,file.driver=host_device,file.filename=/dev/${BLOCK_DEV_NAME},discard=unmap,detect-zeroes=unmap \
+	-device virtio-blk,drive=q1,discard=on \
+        -append "root=/dev/vda rw rootflags=discard console=ttyS0 ip=dhcp kernel.panic=-1" \
         -cpu host \
 	-smp ${allocated_cores} \
         -nographic \
         -enable-kvm \
 	-no-reboot \
         -kernel ./vmlinux-6.2-x86_64.bin \
-	-object memory-backend-file,id=mem1,share=on,mem-path=/dev/${BLOCK_DEV_NAME},size=512G,align=2M \
-	-device virtio-pmem-pci,memdev=mem1,id=nv1 \
-        -append "root=/dev/pmem0 rw rootflags=dax console=ttyS0 ip=dhcp kernel.panic=-1" \
         -netdev user,id=n1 \
         -device virtio-net-pci,netdev=n1 \
         -device virtio-balloon,deflate-on-oom=on,free-page-reporting=on
