@@ -3,7 +3,7 @@ import { VmTaskStatus } from "@prisma/client";
 import { retry } from "../utils";
 
 import type { CreateActivity } from "./types";
-import { withActivityHeartbeat } from "./utils";
+import { runActivityHeartbeat } from "./utils";
 
 import { sleep } from "~/utils.shared";
 
@@ -16,7 +16,7 @@ export type WaitForBuildfsActivity = (buildfsEventId: bigint, timeoutMs: number)
 export const waitForBuildfs: CreateActivity<WaitForBuildfsActivity> =
   ({ db }) =>
   async (buildfsEventId, timeoutMs) => {
-    await withActivityHeartbeat({ intervalMs: 5000 }, async () => {
+    await runActivityHeartbeat({ intervalMs: 5000 }, async () => {
       const startAt = Date.now();
       while (true) {
         const buildfsEvent = await retry(
