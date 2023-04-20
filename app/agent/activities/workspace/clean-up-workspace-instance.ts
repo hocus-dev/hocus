@@ -1,3 +1,5 @@
+import { withActivityHeartbeat } from "../utils";
+
 import type { CreateActivity } from "~/agent/activities/types";
 import { Token } from "~/token";
 
@@ -6,9 +8,10 @@ export type CleanUpWorkspaceInstanceLocalActivity = (args: {
   /** Used if there is no workspace instance associated with the workspace */
   vmInstanceId?: string;
 }) => Promise<void>;
-export const cleanUpWorkspaceInstanceLocal: CreateActivity<CleanUpWorkspaceInstanceLocalActivity> =
-  ({ injector, db }) =>
-  async (args) => {
+export const cleanUpWorkspaceInstanceLocal: CreateActivity<
+  CleanUpWorkspaceInstanceLocalActivity
+> = ({ injector, db }) =>
+  withActivityHeartbeat({ intervalMs: 5000 }, async (args) => {
     const logger = injector.resolve(Token.Logger);
     const workspace = await db.workspace.findUniqueOrThrow({
       where: { id: args.workspaceId },
@@ -25,4 +28,4 @@ export const cleanUpWorkspaceInstanceLocal: CreateActivity<CleanUpWorkspaceInsta
     }
     const firecrackerService = injector.resolve(Token.FirecrackerService)(vmInstanceId);
     await firecrackerService.cleanup();
-  };
+  });

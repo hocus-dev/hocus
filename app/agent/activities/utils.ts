@@ -23,3 +23,9 @@ export const runActivityHeartbeat = <T>(
       });
   });
 };
+
+export const withActivityHeartbeat = <T>(
+  ...args: Parameters<typeof runActivityHeartbeat<T>>
+): (() => Promise<T>) => {
+  return () => runActivityHeartbeat(...args);
+};
