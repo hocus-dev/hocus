@@ -1,6 +1,6 @@
 import { Context } from "@temporalio/activity";
 
-export const withActivityHeartbeat = <T>(
+export const runActivityHeartbeat = <T>(
   options: {
     /** Default: 5000 */
     intervalMs?: number;

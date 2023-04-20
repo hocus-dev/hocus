@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 import type { CreateActivity } from "./types";
-import { withActivityHeartbeat } from "./utils";
+import { runActivityHeartbeat } from "./utils";
 
 import { Token } from "~/token";
 
@@ -18,7 +18,7 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
       .resolve(Token.Config)
       .shared().maxRepositoryDriveSizeMib;
     perfService.log("fetchRepository", "start", gitRepositoryId);
-    await withActivityHeartbeat({ intervalMs: 5000 }, async () => {
+    await runActivityHeartbeat({ intervalMs: 5000 }, async () => {
       const repo = await db.gitRepository.findUniqueOrThrow({
         where: { id: gitRepositoryId },
         include: {

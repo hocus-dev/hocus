@@ -1,7 +1,7 @@
 import type { PrebuildEventFiles } from "@prisma/client";
 
 import type { CreateActivity } from "./types";
-import { withActivityHeartbeat } from "./utils";
+import { runActivityHeartbeat } from "./utils";
 
 import { Token } from "~/token";
 
@@ -17,7 +17,7 @@ export const createPrebuildFiles: CreateActivity<CreatePrebuildFilesActivity> =
     const perfService = injector.resolve(Token.PerfService);
 
     perfService.log("createPrebuildFiles", "start", args);
-    const result = await withActivityHeartbeat({}, async () => {
+    const result = await runActivityHeartbeat({}, async () => {
       const agentInstance = await db.$transaction(async (tdb) =>
         agentUtilService.getOrCreateSoloAgentInstance(tdb),
       );

@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { VMTaskOutput } from "../agent-util.types";
 
 import type { CreateActivity } from "./types";
-import { withActivityHeartbeat } from "./utils";
+import { runActivityHeartbeat } from "./utils";
 
 import { Token } from "~/token";
 
@@ -24,7 +24,7 @@ export const prebuild: CreateActivity<PrebuildActivity> =
     const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
     const prebuildService = injector.resolve(Token.PrebuildService);
 
-    return await withActivityHeartbeat({ intervalMs: 5000 }, () =>
+    return await runActivityHeartbeat({ intervalMs: 5000 }, () =>
       prebuildService.prebuild(db, firecrackerService, args.prebuildEventId),
     );
   };
