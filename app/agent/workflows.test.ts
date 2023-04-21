@@ -407,6 +407,13 @@ test.concurrent(
           },
         ],
       });
+      const updateWorkspace = (update: { status: WorkspaceStatus }) =>
+        db.workspace.update({
+          where: {
+            id: workspace.id,
+          },
+          data: update,
+        });
       const startWorkspace = () =>
         client.workflow.execute(runStartWorkspace, {
           workflowId: uuidv4(),
@@ -422,7 +429,7 @@ test.concurrent(
           args: [workspace.id],
         });
 
-      const workspaceInstance1 = await startWorkspace();
+      const { workspaceInstance: workspaceInstance1 } = await startWorkspace();
       const execInInstance1 = async (cmd: string) => {
         const cmdBash = `bash -c '${cmd}'`;
         return await execSshCmdThroughProxy({
@@ -451,22 +458,16 @@ test.concurrent(
 
       await stopWorkspace();
 
-      const workspaceInstance2 = await startWorkspace();
+      const { workspaceInstance: workspaceInstance2 } = await startWorkspace();
       const firecrackerService2 = injector.resolve(Token.FirecrackerService)(
         workspaceInstance2.firecrackerInstanceId,
       );
       await firecrackerService2.shutdownVM();
       await stopWorkspace();
 
-      const workspaceInstance3 = await startWorkspace();
-      try {
-        await startWorkspace();
-        throw new Error("Expected startWorkspace to fail");
-      } catch (err) {
-        expect((err as any)?.cause?.cause?.message).toMatch(
-          /Workspace is not in WORKSPACE_STATUS_STOPPED state/,
-        );
-      }
+      const { workspaceInstance: workspaceInstance3 } = await startWorkspace();
+      const { status: startWorkspaceStatus } = await startWorkspace();
+      expect(startWorkspaceStatus).toBe("found");
       const firecrackerService3 = injector.resolve(Token.FirecrackerService)(
         workspaceInstance3.firecrackerInstanceId,
       );
@@ -474,7 +475,7 @@ test.concurrent(
       await firecrackerService3.deleteVMDir();
       await stopWorkspace();
 
-      const workspaceInstance4 = await startWorkspace();
+      const { workspaceInstance: workspaceInstance4 } = await startWorkspace();
       isGetWorkspaceInstanceStatusMocked = false;
       const firecrackerService4 = injector.resolve(Token.FirecrackerService)(
         workspaceInstance4.firecrackerInstanceId,
@@ -510,6 +511,22 @@ test.concurrent(
         5,
         3000,
       );
+
+      await updateWorkspace({
+        status: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
+      });
+      await startWorkspace()
+        .then(() => {
+          throw new Error("should have thrown");
+        })
+        .catch((err: any) => {
+          expect(err?.cause?.cause?.message).toMatch(
+            /Workspace is not in WORKSPACE_STATUS_STOPPED state/,
+          );
+        });
+      await updateWorkspace({
+        status: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+      });
       const workspaceWithFiles = await db.workspace.findUniqueOrThrow({
         where: {
           id: workspace.id,

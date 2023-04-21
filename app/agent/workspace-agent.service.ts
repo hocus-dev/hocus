@@ -1,8 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { Workspace, WorkspaceInstance } from "@prisma/client";
-import { Prisma, WorkspaceStatus } from "@prisma/client";
+import type { Workspace, WorkspaceInstance, Prisma } from "@prisma/client";
+import { WorkspaceStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, SSHExecOptions } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
@@ -368,6 +368,10 @@ export class WorkspaceAgentService {
     );
   }
 
+  async lockWorkspace(db: Prisma.TransactionClient, workspaceId: bigint): Promise<void> {
+    await db.$executeRaw`SELECT id FROM "Workspace" WHERE id = ${workspaceId} FOR UPDATE`;
+  }
+
   async markWorkspaceAs(
     db: Prisma.TransactionClient,
     workspaceId: bigint,
@@ -376,9 +380,7 @@ export class WorkspaceAgentService {
       | typeof WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP
       | typeof WorkspaceStatus.WORKSPACE_STATUS_PENDING_DELETE,
   ): Promise<void> {
-    await db.$executeRawUnsafe(
-      `LOCK TABLE "${Prisma.ModelName.Workspace}" IN SHARE UPDATE EXCLUSIVE MODE`,
-    );
+    await this.lockWorkspace(db, workspaceId);
     const workspace = await db.workspace.findUniqueOrThrow({
       where: {
         id: workspaceId,
