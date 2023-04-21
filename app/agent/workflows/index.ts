@@ -13,6 +13,7 @@ import {
   runStartWorkspace,
   runStopWorkspace,
   monitorWorkspaceInstance,
+  runDeleteWorkspace,
 } from "./workspace";
 
 import type { Activities } from "~/agent/activities/list";
@@ -28,11 +29,11 @@ export {
   runStartWorkspace,
   runStopWorkspace,
   monitorWorkspaceInstance,
+  runDeleteWorkspace,
 };
 
 const {
   addProjectAndRepository,
-  deleteWorkspace,
   linkGitBranches,
   reservePrebuildEvent,
   waitForPrebuildEventReservations,
@@ -174,10 +175,6 @@ export async function runAddProjectAndRepository(args: {
     parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
   });
   return result;
-}
-
-export async function runDeleteWorkspace(args: { workspaceId: bigint }): Promise<void> {
-  await deleteWorkspace(args.workspaceId);
 }
 
 /**
