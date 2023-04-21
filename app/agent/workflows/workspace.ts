@@ -20,6 +20,7 @@ const {
   getWorkspaceInstanceStatus,
   reservePrebuildEvent,
   removePrebuildEventReservation,
+  deleteWorkspace,
 } = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
@@ -137,4 +138,8 @@ export async function monitorWorkspaceInstance(
     }
   }
   await continueAsNew<typeof monitorWorkspaceInstance>(workspaceId, workspaceInstanceId);
+}
+
+export async function runDeleteWorkspace(args: { workspaceId: bigint }): Promise<void> {
+  await deleteWorkspace(args.workspaceId);
 }
