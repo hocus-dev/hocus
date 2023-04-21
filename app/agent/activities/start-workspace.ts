@@ -9,7 +9,7 @@ import { formatBranchName } from "~/utils.shared";
 export type StartWorkspaceActivity = (args: {
   workspaceId: bigint;
   vmInstanceId: string;
-}) => Promise<WorkspaceInstance>;
+}) => Promise<{ workspaceInstance: WorkspaceInstance; status: "found" | "started" }>;
 export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
   ({ injector, db }) =>
   async (args) => {
@@ -22,13 +22,28 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
     const t2 = performance.now();
     logger.info(`Resolving dependencies took: ${(t2 - t1).toFixed(2)} ms`);
 
-    await db.$transaction((tdb) =>
-      workspaceAgentService.markWorkspaceAs(
+    const existingInstance = await db.$transaction(async (tdb) => {
+      await workspaceAgentService.lockWorkspace(tdb, args.workspaceId);
+      const existingWorkspace = await tdb.workspace.findUniqueOrThrow({
+        where: {
+          id: args.workspaceId,
+        },
+        include: {
+          activeInstance: true,
+        },
+      });
+      if (existingWorkspace.activeInstance != null) {
+        return existingWorkspace.activeInstance;
+      }
+      await workspaceAgentService.markWorkspaceAs(
         tdb,
         args.workspaceId,
         WorkspaceStatus.WORKSPACE_STATUS_PENDING_START,
-      ),
-    );
+      );
+    });
+    if (existingInstance != null) {
+      return { workspaceInstance: existingInstance, status: "found" };
+    }
     const workspace = await db.workspace.findUniqueOrThrow({
       where: { id: args.workspaceId },
       include: {
@@ -118,5 +133,5 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
     const t5 = performance.now();
     logger.info(`startWorkspaceActivity took: ${(t5 - t1).toFixed(2)} ms`);
 
-    return workspaceInstance;
+    return { workspaceInstance, status: "started" };
   };

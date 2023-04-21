@@ -93,20 +93,22 @@ async function cleanUpAfterWorkspaceError(
   });
 }
 
-export async function runStartWorkspace(workspaceId: bigint): Promise<WorkspaceInstance> {
+export async function runStartWorkspace(
+  workspaceId: bigint,
+): Promise<{ workspaceInstance: WorkspaceInstance; status: "started" | "found" }> {
   const vmInstanceId = uuid4();
-  const workspaceInstance = await startWorkspace({ workspaceId, vmInstanceId }).catch(
-    async (err) => {
-      await cleanUpAfterWorkspaceError(workspaceId, vmInstanceId);
-      throw err;
-    },
-  );
-  await startChild(monitorWorkspaceInstance, {
-    args: [workspaceId, workspaceInstance.id],
-    workflowId: workspaceInstance.monitoringWorkflowId,
-    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+  const result = await startWorkspace({ workspaceId, vmInstanceId }).catch(async (err) => {
+    await cleanUpAfterWorkspaceError(workspaceId, vmInstanceId);
+    throw err;
   });
-  return workspaceInstance;
+  if (result.status === "started") {
+    await startChild(monitorWorkspaceInstance, {
+      args: [workspaceId, result.workspaceInstance.id],
+      workflowId: result.workspaceInstance.monitoringWorkflowId,
+      parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+    });
+  }
+  return result;
 }
 
 export async function runStopWorkspace(workspaceId: bigint): Promise<void> {
