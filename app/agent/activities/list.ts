@@ -52,6 +52,8 @@ import type { InitPrebuildEventsActivity } from "./init-prebuild-events";
 import { initPrebuildEvents } from "./init-prebuild-events";
 import type { LinkGitBranchesActivity } from "./link-git-branches";
 import { linkGitBranches } from "./link-git-branches";
+import type { SignalWithStartLockWorkflowActivity } from "./mutex/signal-with-start-lock-workflow";
+import { signalWithStartLockWorkflow } from "./mutex/signal-with-start-lock-workflow";
 import type { PrebuildActivity } from "./prebuild";
 import { prebuild } from "./prebuild";
 import type { SaveGitRepoConnectionStatusActivity } from "./save-git-repo-connection-status";
@@ -101,6 +103,7 @@ export interface Activities {
   saveGitRepoConnectionStatus: SaveGitRepoConnectionStatusActivity;
   cleanUpAfterPrebuildError: CleanUpAfterPrebuildErrorActivity;
   cleanUpWorkspaceInstanceLocal: CleanUpWorkspaceInstanceLocalActivity;
+  signalWithStartLockWorkflow: SignalWithStartLockWorkflowActivity;
 }
 
 export interface ActivityArgs {
@@ -149,6 +152,7 @@ export const createActivities = async (
     saveGitRepoConnectionStatus,
     cleanUpAfterPrebuildError,
     cleanUpWorkspaceInstanceLocal,
+    signalWithStartLockWorkflow,
   };
 
   return Object.fromEntries(
