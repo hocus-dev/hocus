@@ -23,9 +23,16 @@ interface LockResponse {
   releaseSignalName: string;
 }
 
-export async function lockWorkflow(requests = Array<LockRequest>()): Promise<void> {
+export async function lockWorkflow(
+  requests = Array<LockRequest>(),
+  seenAcquireIds = new Set<string>(),
+): Promise<void> {
   let currentWorkflowId: string | null = null;
   setHandler(lockRequestSignal, (req: LockRequest) => {
+    if (seenAcquireIds.has(req.lockAcquiredSignalName)) {
+      return;
+    }
+    seenAcquireIds.add(req.lockAcquiredSignalName);
     requests.push(req);
   });
   setHandler(currentWorkflowIdQuery, () => currentWorkflowId);
@@ -59,7 +66,7 @@ export async function lockWorkflow(requests = Array<LockRequest>()): Promise<voi
   }
   // carry over any pending requests to the next execution
   if (requests.length > 0) {
-    await continueAsNew<typeof lockWorkflow>(requests);
+    await continueAsNew<typeof lockWorkflow>(requests, seenAcquireIds);
   }
 }
 
