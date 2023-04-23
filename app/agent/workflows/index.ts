@@ -7,6 +7,8 @@ import {
   ParentClosePolicy,
 } from "@temporalio/workflow";
 
+import { lockWorkflow } from "./mutex";
+import { testLock } from "./mutex/test";
 import { runBuildfsAndPrebuilds, runPrebuild, runBuildfs } from "./prebuild";
 import {
   runCreateWorkspace,
@@ -30,6 +32,8 @@ export {
   runStopWorkspace,
   monitorWorkspaceInstance,
   runDeleteWorkspace,
+  lockWorkflow,
+  testLock,
 };
 
 const {
