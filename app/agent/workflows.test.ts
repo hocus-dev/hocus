@@ -24,6 +24,7 @@ import {
   runDeleteWorkspace,
   runArchivePrebuild,
   runDeleteRemovablePrebuilds,
+  testLock,
 } from "./workflows";
 
 import { config } from "~/config";
@@ -73,6 +74,14 @@ const provideActivities = (
             ...config.shared(),
             maxRepositoryDriveSizeMib: 100,
           }),
+        },
+      },
+    },
+    [Token.TemporalClient]: {
+      provide: {
+        factory: () => (fn) => {
+          const { client } = testEnv;
+          return fn(client);
         },
       },
     },
@@ -667,6 +676,40 @@ test.concurrent(
       const { project: project2, gitRepository: gitRepository2 } = await runWorkflow();
       expect(project2.id).not.toBe(project.id);
       expect(gitRepository2.id).toBe(gitRepository.id);
+    });
+  }),
+);
+
+test.concurrent(
+  "withLock",
+  provideActivities(async ({ activities }) => {
+    const { client, nativeConnection } = testEnv;
+    const taskQueue = `test-${uuidv4()}`;
+    const worker = await Worker.create({
+      connection: nativeConnection,
+      taskQueue,
+      workflowsPath: require.resolve("./workflows"),
+      activities,
+      dataConverter: {
+        payloadConverterPath: require.resolve("~/temporal/data-converter"),
+      },
+      workflowBundle,
+    });
+    await worker.runUntil(async () => {
+      const result = await client.workflow.execute(testLock, {
+        workflowId: uuidv4(),
+        taskQueue,
+        retry: { maximumAttempts: 1 },
+        args: [],
+      });
+      expect(result).toHaveLength(16);
+      for (let i = 0; i < result.length; i += 2) {
+        const [acquire, idx] = result[i].split("-");
+        const [release, idx2] = result[i + 1].split("-");
+        expect(acquire).toBe("acquire");
+        expect(release).toBe("release");
+        expect(idx).toBe(idx2);
+      }
     });
   }),
 );
