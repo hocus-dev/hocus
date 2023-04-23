@@ -1,21 +1,28 @@
-import { uuid4, sleep } from "@temporalio/workflow";
+import { proxyActivities } from "@temporalio/workflow";
 
 import { withLock } from ".";
 
+import type { Activities } from "~/agent/activities/list";
 import { waitForPromisesWorkflow } from "~/temporal/utils";
 
+const { mutexTest } = proxyActivities<Activities>({
+  startToCloseTimeout: "1 minute",
+});
+
 export async function testLock(): Promise<string[]> {
-  const resourceId = uuid4();
   const results: string[] = [];
-  const cases = Array.from({ length: 8 }).map((_, idx) => idx);
-  await waitForPromisesWorkflow(
-    cases.map((idx) =>
-      withLock({ resourceId, lockTimeoutMs: 5000 }, async () => {
-        results.push(`acquire-${idx}`);
-        await sleep(10);
-        results.push(`release-${idx}`);
-      }),
-    ),
-  );
+  const cases = Array.from({ length: 5 }).map((_, idx) => idx);
+  await withLock({ resourceId: "mutex-test-outer", lockTimeoutMs: 1000 * 60 * 60 }, async () => {
+    await waitForPromisesWorkflow(
+      cases.map((idx) =>
+        withLock({ resourceId: "mutex-test-inner", lockTimeoutMs: 5000 }, async () => {
+          results.push(`acquire-${idx}`);
+          const result = await mutexTest();
+          results.push(`result-${idx}-${result}`);
+          results.push(`release-${idx}`);
+        }),
+      ),
+    );
+  });
   return results;
 }
