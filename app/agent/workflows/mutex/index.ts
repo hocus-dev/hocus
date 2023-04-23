@@ -37,7 +37,11 @@ export async function lockWorkflow(
   });
   setHandler(currentWorkflowIdQuery, () => currentWorkflowId);
   while (workflowInfo().historyLength < MAX_WORKFLOW_HISTORY_LENGTH) {
-    await condition(() => requests.length > 0);
+    await condition(() => requests.length > 0, "10 minutes");
+    if (requests.length === 0) {
+      // timeout occurred
+      return;
+    }
     const req = requests.shift();
     // Check for `undefined` because otherwise TypeScript complains that `req`
     // may be undefined.
