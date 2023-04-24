@@ -65,6 +65,7 @@ export default function ProjectRoute(): JSX.Element {
         WORKSPACE_STATUS_PENDING_STOP: 1000,
         WORKSPACE_STATUS_STARTED: 10000,
         WORKSPACE_STATUS_STOPPED: 1000,
+        WORKSPACE_STATUS_STOPPED_WITH_ERROR: 1000,
         WORKSPACE_STATUS_PENDING_DELETE: 1000,
       };
       let lastFetchAt = 0;

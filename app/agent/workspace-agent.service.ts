@@ -386,14 +386,17 @@ export class WorkspaceAgentService {
         id: workspaceId,
       },
     });
-    const statusPredecessor: { [key in typeof status]: WorkspaceStatus } = {
-      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_START]: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
-      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP]: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
-      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_DELETE]: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+    const statusPredecessors: { [key in typeof status]: WorkspaceStatus[] } = {
+      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_START]: [
+        WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+        WorkspaceStatus.WORKSPACE_STATUS_STOPPED_WITH_ERROR,
+      ],
+      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP]: [WorkspaceStatus.WORKSPACE_STATUS_STARTED],
+      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_DELETE]: [WorkspaceStatus.WORKSPACE_STATUS_STOPPED],
     };
-    if (workspace.status !== statusPredecessor[status]) {
+    if (!statusPredecessors[status].includes(workspace.status)) {
       throw new InvalidWorkspaceStatusError(
-        `Workspace is not in ${statusPredecessor[status]} state`,
+        `Workspace state ${workspace.status} is not one of ${statusPredecessors[status]}`,
       );
     }
     await db.workspace.update({
