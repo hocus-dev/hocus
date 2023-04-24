@@ -8,10 +8,12 @@ import {
   workflowInfo,
   uuid4,
 } from "@temporalio/workflow";
+import ms from "ms";
 
 import type { Activities } from "~/agent/activities/list";
 import type { LockRequest } from "~/agent/activities/mutex/shared";
 import { currentWorkflowIdQuery, lockRequestSignal } from "~/agent/activities/mutex/shared";
+import type { MsStringValue } from "~/types/ms";
 
 const { signalWithStartLockWorkflow } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
@@ -77,7 +79,7 @@ export async function lockWorkflow(
 export async function withLock<T>(
   options: {
     resourceId: string;
-    lockTimeoutMs: number;
+    lockTimeout: MsStringValue;
   },
   fn: () => Promise<T>,
 ): Promise<void> {
@@ -92,7 +94,7 @@ export async function withLock<T>(
   await signalWithStartLockWorkflow(
     options.resourceId,
     lockAcquiredSignalName,
-    options.lockTimeoutMs,
+    ms(options.lockTimeout),
   );
   await condition(hasLock);
 
