@@ -392,11 +392,16 @@ export class WorkspaceAgentService {
         WorkspaceStatus.WORKSPACE_STATUS_STOPPED_WITH_ERROR,
       ],
       [WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP]: [WorkspaceStatus.WORKSPACE_STATUS_STARTED],
-      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_DELETE]: [WorkspaceStatus.WORKSPACE_STATUS_STOPPED],
+      [WorkspaceStatus.WORKSPACE_STATUS_PENDING_DELETE]: [
+        WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+        WorkspaceStatus.WORKSPACE_STATUS_STOPPED_WITH_ERROR,
+      ],
     };
     if (!statusPredecessors[status].includes(workspace.status)) {
       throw new InvalidWorkspaceStatusError(
-        `Workspace state ${workspace.status} is not one of ${statusPredecessors[status]}`,
+        `Workspace state ${workspace.status} is not one of ${statusPredecessors[status].join(
+          ", ",
+        )}`,
       );
     }
     await db.workspace.update({

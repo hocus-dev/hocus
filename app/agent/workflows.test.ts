@@ -97,13 +97,16 @@ const provideActivities = (
 let testEnv: TestWorkflowEnvironment;
 let workflowBundle: any;
 
+const expectedErrorMessage =
+  "Workspace state WORKSPACE_STATUS_STARTED is not one of WORKSPACE_STATUS_STOPPED, WORKSPACE_STATUS_STOPPED_WITH_ERROR";
+
 beforeAll(async () => {
   // Use console.log instead of console.error to avoid red output
   // Filter INFO log messages for clearer test output
   Runtime.install({
     logger: new DefaultLogger("WARN", (entry: LogEntry) => {
       const error = entry.meta?.error;
-      const msg = "Workspace is not in WORKSPACE_STATUS_STOPPED state";
+      const msg = expectedErrorMessage;
       if (error?.stack?.includes(msg) || error?.cause?.stack?.includes(msg)) {
         // there is a test case where we expect this error,
         // so in order not to pollute the test output with it,
@@ -529,13 +532,8 @@ test.concurrent(
           throw new Error("should have thrown");
         })
         .catch((err: any) => {
-          expect(err?.cause?.cause?.message).toMatch(
-            /Workspace is not in WORKSPACE_STATUS_STOPPED state/,
-          );
+          expect(err?.cause?.cause?.message).toMatch(expectedErrorMessage);
         });
-      await updateWorkspace({
-        status: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
-      });
       const workspaceWithFiles = await db.workspace.findUniqueOrThrow({
         where: {
           id: workspace.id,
@@ -545,6 +543,8 @@ test.concurrent(
           rootFsFile: true,
         },
       });
+      expect(workspaceWithFiles.status).toBe(WorkspaceStatus.WORKSPACE_STATUS_STOPPED_WITH_ERROR);
+      expect(workspaceWithFiles.latestError).not.toBeNull();
       await client.workflow.execute(runDeleteWorkspace, {
         workflowId: uuidv4(),
         taskQueue,
