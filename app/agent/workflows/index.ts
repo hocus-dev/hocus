@@ -8,7 +8,7 @@ import {
 } from "@temporalio/workflow";
 
 import { lockWorkflow } from "./mutex";
-import { testLock } from "./mutex/test";
+import { testLock } from "./mutex/test-workflow";
 import { runBuildfsAndPrebuilds, runPrebuild, runBuildfs } from "./prebuild";
 import {
   runCreateWorkspace,
