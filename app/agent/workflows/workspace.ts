@@ -11,6 +11,8 @@ import {
 
 import type { Activities } from "../activities/list";
 
+import { withLock } from "./mutex";
+
 import { retryWorkflow } from "~/temporal/utils";
 
 const {
@@ -87,11 +89,19 @@ async function cleanUpAfterWorkspaceError(
   workspaceId: bigint,
   vmInstanceId?: string,
 ): Promise<void> {
-  await retryWorkflow(() => cleanUpWorkspaceInstanceLocal({ workspaceId, vmInstanceId }), {
-    maxRetries: 8,
-    retryIntervalMs: 1000,
-    isExponential: true,
-  });
+  await retryWorkflow(
+    async () => {
+      await withLock(
+        { resourceId: `workspace-clean-up-${workspaceId}`, lockTimeout: "24 hours" },
+        () => cleanUpWorkspaceInstanceLocal({ workspaceId, vmInstanceId }),
+      );
+    },
+    {
+      maxRetries: 8,
+      retryIntervalMs: 1000,
+      isExponential: true,
+    },
+  );
 }
 
 export async function runStartWorkspace(
