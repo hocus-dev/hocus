@@ -444,6 +444,35 @@ export class WorkspaceAgentService {
     return workspaceInstance;
   }
 
+  async cleanUpWorkspaceAfterErrorDb(
+    db: Prisma.TransactionClient,
+    workspaceId: bigint,
+    latestError: string,
+  ): Promise<void> {
+    await this.lockWorkspace(db, workspaceId);
+    const workspace = await db.workspace.findUniqueOrThrow({
+      where: {
+        id: workspaceId,
+      },
+    });
+    if (workspace.activeInstanceId != null) {
+      await db.workspaceInstance.delete({
+        where: {
+          id: workspace.activeInstanceId,
+        },
+      });
+    }
+    await db.workspace.update({
+      where: {
+        id: workspaceId,
+      },
+      data: {
+        status: WorkspaceStatus.WORKSPACE_STATUS_STOPPED_WITH_ERROR,
+        latestError,
+      },
+    });
+  }
+
   async removeWorkspaceInstanceFromDb(
     db: Prisma.TransactionClient,
     workspaceId: bigint,

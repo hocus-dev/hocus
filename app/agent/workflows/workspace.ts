@@ -10,6 +10,7 @@ import {
 } from "@temporalio/workflow";
 
 import type { Activities } from "../activities/list";
+import { parseWorkflowError } from "../workflows-utils";
 
 import { withLock } from "./mutex";
 
@@ -35,7 +36,7 @@ const {
   },
 });
 
-const { cleanUpWorkspaceInstanceLocal } = proxyActivities<Activities>({
+const { cleanUpWorkspaceInstanceLocal, cleanUpWorkspaceInstanceDb } = proxyActivities<Activities>({
   // Setting this too low may cause activities such as buildfs to fail.
   // Buildfs in particular waits on a file lock to obtain a lock on its
   // project filesystem, so if several buildfs activities for the same project
@@ -85,31 +86,37 @@ export async function runCreateWorkspace(args: {
   return workspace;
 }
 
-async function cleanUpAfterWorkspaceError(
-  workspaceId: bigint,
-  vmInstanceId?: string,
-): Promise<void> {
-  await retryWorkflow(
-    async () => {
-      await withLock({ resourceId: `workspace-clean-up-${workspaceId}` }, () =>
-        cleanUpWorkspaceInstanceLocal({ workspaceId, vmInstanceId }),
-      );
-    },
-    {
-      maxRetries: 8,
-      retryIntervalMs: 1000,
-      isExponential: true,
-    },
-  );
+async function cleanUpAfterWorkspaceError(args: {
+  workspaceId: bigint;
+  error: unknown;
+  vmInstanceId?: string;
+}): Promise<void> {
+  const retry = <T>(fn: () => Promise<T>) =>
+    retryWorkflow(fn, { maxRetries: 8, retryIntervalMs: 1000, isExponential: true });
+  const latestError = parseWorkflowError(args.error);
+  await withLock({ resourceId: `workspace-clean-up-${args.workspaceId}` }, async () => {
+    await retry(() =>
+      cleanUpWorkspaceInstanceLocal({
+        workspaceId: args.workspaceId,
+        vmInstanceId: args.vmInstanceId,
+      }),
+    );
+    await retry(() =>
+      cleanUpWorkspaceInstanceDb({
+        workspaceId: args.workspaceId,
+        latestError,
+      }),
+    );
+  });
 }
 
 export async function runStartWorkspace(
   workspaceId: bigint,
 ): Promise<{ workspaceInstance: WorkspaceInstance; status: "started" | "found" }> {
   const vmInstanceId = uuid4();
-  const result = await startWorkspace({ workspaceId, vmInstanceId }).catch(async (err) => {
-    await cleanUpAfterWorkspaceError(workspaceId, vmInstanceId);
-    throw err;
+  const result = await startWorkspace({ workspaceId, vmInstanceId }).catch(async (error) => {
+    await cleanUpAfterWorkspaceError({ workspaceId, error, vmInstanceId });
+    throw error;
   });
   if (result.status === "started") {
     await startChild(monitorWorkspaceInstance, {
@@ -122,9 +129,9 @@ export async function runStartWorkspace(
 }
 
 export async function runStopWorkspace(workspaceId: bigint): Promise<void> {
-  return await stopWorkspace(workspaceId).catch(async (err) => {
-    await cleanUpAfterWorkspaceError(workspaceId);
-    throw err;
+  return await stopWorkspace(workspaceId).catch(async (error) => {
+    await cleanUpAfterWorkspaceError({ workspaceId, error });
+    throw error;
   });
 }
 
