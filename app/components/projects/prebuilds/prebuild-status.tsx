@@ -26,7 +26,7 @@ export function PrebuildStatus(props: { status: PrebuildEventStatus }): JSX.Elem
     .with("PREBUILD_EVENT_STATUS_ERROR", () => [
       "fa-solid fa-circle-xmark",
       "Error",
-      "text-red-700",
+      "text-red-500",
     ])
     .with("PREBUILD_EVENT_STATUS_CANCELLED", () => [
       "fa-solid fa-ban",
