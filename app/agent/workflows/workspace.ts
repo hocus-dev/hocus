@@ -25,11 +25,6 @@ const {
   removePrebuildEventReservation,
   deleteWorkspace,
 } = proxyActivities<Activities>({
-  // Setting this too low may cause activities such as buildfs to fail.
-  // Buildfs in particular waits on a file lock to obtain a lock on its
-  // project filesystem, so if several buildfs activities for the same project
-  // are running at the same time, it may take a long time for all of them
-  // to finish.
   startToCloseTimeout: "24 hours",
   retry: {
     maximumAttempts: 1,
@@ -37,11 +32,6 @@ const {
 });
 
 const { cleanUpWorkspaceInstanceLocal, cleanUpWorkspaceInstanceDb } = proxyActivities<Activities>({
-  // Setting this too low may cause activities such as buildfs to fail.
-  // Buildfs in particular waits on a file lock to obtain a lock on its
-  // project filesystem, so if several buildfs activities for the same project
-  // are running at the same time, it may take a long time for all of them
-  // to finish.
   startToCloseTimeout: "24 hours",
   heartbeatTimeout: "20 seconds",
   retry: {
