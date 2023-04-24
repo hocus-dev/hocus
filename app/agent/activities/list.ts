@@ -71,7 +71,11 @@ import type { UpdateGitBranchesAndObjectsActivity } from "./update-git-branches-
 import { updateGitBranchesAndObjects } from "./update-git-branches-and-objects";
 import type { WaitForBuildfsActivity } from "./wait-for-buildfs";
 import { waitForBuildfs } from "./wait-for-buildfs";
-import type { CleanUpWorkspaceInstanceLocalActivity } from "./workspace/clean-up-workspace-instance";
+import type {
+  CleanUpWorkspaceInstanceDbActivity,
+  CleanUpWorkspaceInstanceLocalActivity,
+} from "./workspace/clean-up-workspace-instance";
+import { cleanUpWorkspaceInstanceDb } from "./workspace/clean-up-workspace-instance";
 import { cleanUpWorkspaceInstanceLocal } from "./workspace/clean-up-workspace-instance";
 
 export interface Activities {
@@ -110,6 +114,7 @@ export interface Activities {
   signalWithStartLockWorkflow: SignalWithStartLockWorkflowActivity;
   mutexTest: MutexTestActivity;
   getWorkflowStatus: GetWorkflowStatusActivity;
+  cleanUpWorkspaceInstanceDb: CleanUpWorkspaceInstanceDbActivity;
 }
 
 export interface ActivityArgs {
@@ -161,6 +166,7 @@ export const createActivities = async (
     signalWithStartLockWorkflow,
     mutexTest,
     getWorkflowStatus,
+    cleanUpWorkspaceInstanceDb,
   };
 
   return Object.fromEntries(

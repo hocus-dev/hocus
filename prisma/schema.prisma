@@ -393,6 +393,7 @@ model EnvironmentVariableSet {
 enum WorkspaceStatus {
   WORKSPACE_STATUS_PENDING_CREATE
   WORKSPACE_STATUS_STOPPED
+  WORKSPACE_STATUS_STOPPED_WITH_ERROR
   WORKSPACE_STATUS_PENDING_START
   WORKSPACE_STATUS_STARTED
   WORKSPACE_STATUS_PENDING_STOP
@@ -418,6 +419,7 @@ model Workspace {
   status           WorkspaceStatus
   activeInstanceId BigInt?
   activeInstance   WorkspaceInstance? @relation(fields: [activeInstanceId], references: [id])
+  latestError      String?
 
   /// Enforce that agentInstanceId and rootFsFile.agentInstanceId are the same.
   rootFsFileAgentMatch  File @relation("workspace_root_fs_file_agent_match", fields: [rootFsFileId, agentInstanceId], references: [id, agentInstanceId])

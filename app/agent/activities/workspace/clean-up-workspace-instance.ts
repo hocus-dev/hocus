@@ -29,3 +29,18 @@ export const cleanUpWorkspaceInstanceLocal: CreateActivity<
     const firecrackerService = injector.resolve(Token.FirecrackerService)(vmInstanceId);
     await firecrackerService.cleanup();
   });
+
+export type CleanUpWorkspaceInstanceDbActivity = (args: {
+  workspaceId: bigint;
+  latestError: string;
+}) => Promise<void>;
+export const cleanUpWorkspaceInstanceDb: CreateActivity<CleanUpWorkspaceInstanceDbActivity> = ({
+  injector,
+  db,
+}) =>
+  withActivityHeartbeat({ intervalMs: 5000 }, async (args) => {
+    const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
+    await db.$transaction((tdb) =>
+      workspaceAgentService.cleanUpWorkspaceAfterErrorDb(tdb, args.workspaceId, args.latestError),
+    );
+  });
