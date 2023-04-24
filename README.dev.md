@@ -1,6 +1,6 @@
-# Developer Readme
+# Developer README
 
-This is a developer readme. It is not intended for end users.
+Developer README. Not intended for end users.
 
 ## Running workflow tests
 
@@ -16,15 +16,15 @@ You can set the following environment variable before running jest to see perfor
 PERF_MONITORING_ENABLED=1
 ```
 
-This will build test VM's, attach to the running Hocus agent and start an E2E test suite using https://github.com/hocus-dev/tests
+This builds test virtual machines, attaches to the running Hocus agent, and starts an E2E test suite using https://github.com/hocus-dev/tests
 
-You may also attach to the agent container manually. The following will run a single E2E test of the prebuild workflow:
+You may also attach to the agent container manually. The following runs a single E2E test of the prebuild workflow:
 
 ```bash
 yarn jest 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
 ```
 
-## To add another buildkite runner
+## Add another BuildKite runner
 
 ```bash
 cp resources/buildkite/buildkite-agent.cfg.example resources/buildkite/buildkite-agent.cfg
