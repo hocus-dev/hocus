@@ -13,7 +13,11 @@ export function PrebuildStatus(props: { status: PrebuildEventStatus }): JSX.Elem
       "Pending",
       "text-yellow-400",
     ])
-    .with("PREBUILD_EVENT_STATUS_RUNNING", () => ["fa-solid fa-circle", "Running", "text-blue-500"])
+    .with("PREBUILD_EVENT_STATUS_RUNNING", () => [
+      "fa-solid fa-circle-play",
+      "Running",
+      "text-blue-500",
+    ])
     .with("PREBUILD_EVENT_STATUS_SUCCESS", () => [
       "fa-solid fa-circle-check",
       "Success",
