@@ -17,6 +17,9 @@ import { currentWorkflowIdQuery, lockRequestSignal } from "~/agent/activities/mu
 
 const { signalWithStartLockWorkflow, getWorkflowStatus } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
+  retry: {
+    maximumAttempts: 10,
+  },
 });
 
 const MAX_WORKFLOW_HISTORY_LENGTH = 2000;
