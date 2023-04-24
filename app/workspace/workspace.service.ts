@@ -23,6 +23,7 @@ export interface WorkspaceInfo {
   workspaceHostname?: string;
   lastOpenedAt: number;
   createdAt: number;
+  latestError?: string;
 }
 export class WorkspaceService {
   private readonly agentHostname: string;
@@ -84,6 +85,7 @@ export class WorkspaceService {
       workspaceHostname: workspace.activeInstance?.vmIp,
       lastOpenedAt: workspace.lastOpenedAt.getTime(),
       createdAt: workspace.createdAt.getTime(),
+      latestError: "Error:\n\n" + workspace.latestError ?? void 0,
     };
   }
 }
