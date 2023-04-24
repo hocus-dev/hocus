@@ -91,9 +91,8 @@ async function cleanUpAfterWorkspaceError(
 ): Promise<void> {
   await retryWorkflow(
     async () => {
-      await withLock(
-        { resourceId: `workspace-clean-up-${workspaceId}`, lockTimeout: "24 hours" },
-        () => cleanUpWorkspaceInstanceLocal({ workspaceId, vmInstanceId }),
+      await withLock({ resourceId: `workspace-clean-up-${workspaceId}` }, () =>
+        cleanUpWorkspaceInstanceLocal({ workspaceId, vmInstanceId }),
       );
     },
     {

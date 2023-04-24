@@ -11,10 +11,10 @@ const { mutexTest } = proxyActivities<Activities>({
 
 export async function testLock(): Promise<string[]> {
   const results: string[] = [];
-  await withLock({ resourceId: "mutex-test-outer", lockTimeout: "1 hour" }, async () => {
+  await withLock({ resourceId: "mutex-test-outer" }, async () => {
     await waitForPromisesWorkflow(
       Array.from({ length: 5 }).map((_, idx) =>
-        withLock({ resourceId: "mutex-test-inner", lockTimeout: "5 minutes" }, async () => {
+        withLock({ resourceId: "mutex-test-inner" }, async () => {
           results.push(`acquire-${idx}`);
           const result = await mutexTest();
           results.push(`result-${idx}-${result}`);
