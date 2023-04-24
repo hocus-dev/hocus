@@ -71,11 +71,21 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
     WORKSPACE_STATUS_PENDING_STOP: "warning",
     WORKSPACE_STATUS_STARTED: "success",
     WORKSPACE_STATUS_STOPPED: "gray",
+    WORKSPACE_STATUS_STOPPED_WITH_ERROR: "gray",
     WORKSPACE_STATUS_PENDING_DELETE: "gray",
   };
   const spinner = (
     <div className="w-full flex justify-center mt-10">
       <Spinner size="lg" color={spinnerColor[status]} />
+    </div>
+  );
+  const stoppedLowerPart = (
+    <div className="grid grid-cols-2 gap-4 mt-10">
+      <DeleteWorkspaceButton
+        workspaceExternalId={workspace.externalId}
+        workspaceName={workspace.name}
+      />
+      <StartWorkspaceButton workspaceExternalId={workspace.externalId} className={"w-full"} />
     </div>
   );
   const lowerPartByStatus: Record<WorkspaceStatus, JSX.Element> = {
@@ -96,15 +106,8 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
         </div>
       </>
     ),
-    WORKSPACE_STATUS_STOPPED: (
-      <div className="grid grid-cols-2 gap-4 mt-10">
-        <DeleteWorkspaceButton
-          workspaceExternalId={workspace.externalId}
-          workspaceName={workspace.name}
-        />
-        <StartWorkspaceButton workspaceExternalId={workspace.externalId} className={"w-full"} />
-      </div>
-    ),
+    WORKSPACE_STATUS_STOPPED: stoppedLowerPart,
+    WORKSPACE_STATUS_STOPPED_WITH_ERROR: stoppedLowerPart,
     WORKSPACE_STATUS_PENDING_CREATE: spinner,
     WORKSPACE_STATUS_PENDING_START: spinner,
     WORKSPACE_STATUS_PENDING_STOP: spinner,
