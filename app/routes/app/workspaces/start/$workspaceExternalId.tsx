@@ -33,7 +33,12 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
   if (workspace.userId !== unwrap(user).id) {
     throw new HttpError(StatusCodes.FORBIDDEN, "Workspace does not belong to user");
   }
-  if (workspace.status !== WorkspaceStatus.WORKSPACE_STATUS_STOPPED) {
+  if (
+    ![
+      WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+      WorkspaceStatus.WORKSPACE_STATUS_STOPPED_WITH_ERROR,
+    ].includes(workspace.status as any)
+  ) {
     throw new HttpError(StatusCodes.BAD_REQUEST, "Workspace must be stopped before starting");
   }
   const missingSshKeys = await userService.isUserMissingSshKeys(db, unwrap(user).id);
@@ -52,3 +57,7 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
 
   return redirect(getWorkspacePath(workspaceExternalId, { justStarted: true, shouldOpen: true }));
 };
+
+export default function StartWorkspaceRoute() {
+  return null;
+}

@@ -107,14 +107,25 @@ export function WorkspaceStatusCard(props: { workspace: WorkspaceInfo }): JSX.El
       </>
     ),
     WORKSPACE_STATUS_STOPPED: stoppedLowerPart,
-    WORKSPACE_STATUS_STOPPED_WITH_ERROR: stoppedLowerPart,
+    WORKSPACE_STATUS_STOPPED_WITH_ERROR: (
+      <>
+        <textarea
+          readOnly={true}
+          className="w-full mt-4 bg-gray-900 border-none text-xs focus:ring-0 rounded mb-[-24px] font-mono min-h-[10rem]"
+          value={workspace.latestError}
+        ></textarea>
+        {stoppedLowerPart}
+      </>
+    ),
     WORKSPACE_STATUS_PENDING_CREATE: spinner,
     WORKSPACE_STATUS_PENDING_START: spinner,
     WORKSPACE_STATUS_PENDING_STOP: spinner,
     WORKSPACE_STATUS_PENDING_DELETE: spinner,
   };
+  const width =
+    workspace.status === "WORKSPACE_STATUS_STOPPED_WITH_ERROR" ? "w-[40rem]" : "w-[28rem]";
   return (
-    <Card className="w-[28rem] max-w-xl">
+    <Card className={`${width} max-w-xl`}>
       <div>
         <h2 className="text-center text-md text-gray-400 mb-4">
           <WorkspaceStatusComponent status={status} />
