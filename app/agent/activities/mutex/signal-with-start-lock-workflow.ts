@@ -10,15 +10,13 @@ import { Token } from "~/token";
 export type SignalWithStartLockWorkflowActivity = (
   resourceId: string,
   lockAcquiredSignalName: string,
-  timeoutMs: number,
 ) => Promise<void>;
 export const signalWithStartLockWorkflow: CreateActivity<SignalWithStartLockWorkflowActivity> =
   ({ injector }) =>
-  async (resourceId: string, lockAcquiredSignalName: string, timeoutMs: number) => {
+  async (resourceId: string, lockAcquiredSignalName: string) => {
     const req: LockRequest = {
       initiatorWorkflowId: Context.current().info.workflowExecution.workflowId,
       lockAcquiredSignalName,
-      timeoutMs,
     };
     const withClient = injector.resolve(Token.TemporalClient);
     await withClient(async (client) => {

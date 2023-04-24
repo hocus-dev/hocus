@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import {
   condition,
   continueAsNew,
@@ -8,14 +9,13 @@ import {
   workflowInfo,
   uuid4,
 } from "@temporalio/workflow";
-import ms from "ms";
 
 import type { Activities } from "~/agent/activities/list";
 import type { LockRequest } from "~/agent/activities/mutex/shared";
+import { FINAL_WORKFLOW_EXECUTION_STATUS_NAMES } from "~/agent/activities/mutex/shared";
 import { currentWorkflowIdQuery, lockRequestSignal } from "~/agent/activities/mutex/shared";
-import type { MsStringValue } from "~/types/ms";
 
-const { signalWithStartLockWorkflow } = proxyActivities<Activities>({
+const { signalWithStartLockWorkflow, getWorkflowStatus } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
 });
 
@@ -65,9 +65,22 @@ export async function lockWorkflow(
       releaseSignalName,
     });
 
-    // The lock is automatically released after `req.timeoutMs`, unless the
-    // acquiring Workflow released it. This is to prevent deadlock.
-    await condition(() => released, req.timeoutMs);
+    const isReleased = () => released;
+    while (!released) {
+      await condition(isReleased, "15 minutes");
+      if (released) {
+        break;
+      }
+      const workflowRequestingLockStatus = await getWorkflowStatus(req.initiatorWorkflowId).catch(
+        (err) => console.warn(err),
+      );
+      if (FINAL_WORKFLOW_EXECUTION_STATUS_NAMES.includes(workflowRequestingLockStatus as any)) {
+        // The workflow that acquired the lock has finished execution but did
+        // not release the lock. This can happen if the Workflow was cancelled
+        // or timed out. In this case, we release the lock and continue to prevent deadlock.
+        break;
+      }
+    }
     currentWorkflowId = null;
   }
   // carry over any pending requests to the next execution
@@ -79,7 +92,6 @@ export async function lockWorkflow(
 export async function withLock<T>(
   options: {
     resourceId: string;
-    lockTimeout: MsStringValue;
   },
   fn: () => Promise<T>,
 ): Promise<void> {
@@ -91,11 +103,7 @@ export async function withLock<T>(
   const hasLock = () => releaseSignalName !== "";
 
   // Send a signal to the given lock Workflow to acquire the lock
-  await signalWithStartLockWorkflow(
-    options.resourceId,
-    lockAcquiredSignalName,
-    ms(options.lockTimeout),
-  );
+  await signalWithStartLockWorkflow(options.resourceId, lockAcquiredSignalName);
   await condition(hasLock);
 
   await fn().finally(async () => {

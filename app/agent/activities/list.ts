@@ -52,6 +52,8 @@ import type { InitPrebuildEventsActivity } from "./init-prebuild-events";
 import { initPrebuildEvents } from "./init-prebuild-events";
 import type { LinkGitBranchesActivity } from "./link-git-branches";
 import { linkGitBranches } from "./link-git-branches";
+import type { GetWorkflowStatusActivity } from "./mutex/get-workflow-status";
+import { getWorkflowStatus } from "./mutex/get-workflow-status";
 import type { SignalWithStartLockWorkflowActivity } from "./mutex/signal-with-start-lock-workflow";
 import { signalWithStartLockWorkflow } from "./mutex/signal-with-start-lock-workflow";
 import type { MutexTestActivity } from "./mutex/test-activity";
@@ -107,6 +109,7 @@ export interface Activities {
   cleanUpWorkspaceInstanceLocal: CleanUpWorkspaceInstanceLocalActivity;
   signalWithStartLockWorkflow: SignalWithStartLockWorkflowActivity;
   mutexTest: MutexTestActivity;
+  getWorkflowStatus: GetWorkflowStatusActivity;
 }
 
 export interface ActivityArgs {
@@ -157,6 +160,7 @@ export const createActivities = async (
     cleanUpWorkspaceInstanceLocal,
     signalWithStartLockWorkflow,
     mutexTest,
+    getWorkflowStatus,
   };
 
   return Object.fromEntries(
