@@ -27,7 +27,7 @@ export function WorkspaceStatusComponent(props: { status: WorkspaceStatus }): JS
     .with("WORKSPACE_STATUS_STOPPED_WITH_ERROR", () => [
       "fa-solid fa-circle-stop",
       "Stopped With Error",
-      "text-gray-400",
+      "text-red-500",
     ])
     .with("WORKSPACE_STATUS_PENDING_DELETE", () => [
       "fa-solid fa-trash",
