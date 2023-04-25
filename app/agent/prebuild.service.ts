@@ -432,7 +432,7 @@ export class PrebuildService {
     projectId: bigint,
   ): Promise<PrebuildEvent[]> {
     const prebuildEventIds = await db.$queryRaw<{ r: bigint; prebuildEventId: bigint }[]>`
-      SELECT x."r", x."prebuildEventId", x."gitBranchId"
+      SELECT x."r", x."prebuildEventId"
       FROM (
         SELECT
           ROW_NUMBER() OVER (PARTITION BY t."gitBranchId" ORDER BY t."createdAt" DESC) AS r,
