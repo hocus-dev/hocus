@@ -176,12 +176,8 @@ export class AgentGitService {
       const remoteUpdates = await this.findRemoteUpdates(currentRemotes, newRemotes);
       const newBranches = remoteUpdates.filter((u) => u.state === "new");
       const updatedBranches = remoteUpdates.filter((u) => u.state === "updated");
-      const hashes = Array.from(
-        new Set([
-          ...newBranches.map((b) => b.remoteInfo.hash),
-          ...updatedBranches.map((b) => b.remoteInfo.hash),
-        ]),
-      );
+      const allBranches = [...newBranches, ...updatedBranches];
+      const hashes = Array.from(new Set(allBranches.map((b) => b.remoteInfo.hash)));
       const gitObjects = await waitForPromises(
         hashes.map((hash) =>
           tdb.gitObject.upsert({
@@ -223,6 +219,39 @@ export class AgentGitService {
             },
           }),
         ),
+      );
+      await waitForPromises(
+        allBranches.map(async (b) => {
+          const existing = await tdb.gitObjectToBranch.findFirst({
+            where: {
+              gitBranch: {
+                gitRepositoryId,
+                name: b.remoteInfo.name,
+              },
+              gitObject: {
+                hash: b.remoteInfo.hash,
+              },
+            },
+          });
+          if (existing != null) {
+            return;
+          }
+          await tdb.gitObjectToBranch.create({
+            data: {
+              gitBranch: {
+                connect: {
+                  // eslint-disable-next-line camelcase
+                  gitRepositoryId_name: { gitRepositoryId, name: b.remoteInfo.name },
+                },
+              },
+              gitObject: {
+                connect: {
+                  hash: b.remoteInfo.hash,
+                },
+              },
+            },
+          });
+        }),
       );
       if (newGitBranches.length + updatedGitBranches.length > 0) {
         await tdb.gitRepository.update({
