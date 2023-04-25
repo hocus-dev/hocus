@@ -50,8 +50,6 @@ import type { GetWorkspaceInstanceStatusActivity } from "./get-workspace-instanc
 import { getWorkspaceInstanceStatus } from "./get-workspace-instance-status";
 import type { InitPrebuildEventsActivity } from "./init-prebuild-events";
 import { initPrebuildEvents } from "./init-prebuild-events";
-import type { LinkGitBranchesActivity } from "./link-git-branches";
-import { linkGitBranches } from "./link-git-branches";
 import type { GetWorkflowStatusActivity } from "./mutex/get-workflow-status";
 import { getWorkflowStatus } from "./mutex/get-workflow-status";
 import type { SignalWithStartLockWorkflowActivity } from "./mutex/signal-with-start-lock-workflow";
@@ -99,7 +97,6 @@ export interface Activities {
   getOrCreatePrebuildEvents: GetOrCreatePrebuildEventsActivity;
   initPrebuildEvents: InitPrebuildEventsActivity;
   getPrebuildEvents: GetPrebuildEventsActivity;
-  linkGitBranches: LinkGitBranchesActivity;
   waitForBuildfs: WaitForBuildfsActivity;
   reservePrebuildEvent: ReservePrebuildEventActivity;
   removePrebuildEventReservation: RemovePrebuildEventReservationActivity;
@@ -151,7 +148,6 @@ export const createActivities = async (
     getOrCreatePrebuildEvents,
     initPrebuildEvents,
     getPrebuildEvents,
-    linkGitBranches,
     waitForBuildfs,
     reservePrebuildEvent,
     removePrebuildEventReservation,

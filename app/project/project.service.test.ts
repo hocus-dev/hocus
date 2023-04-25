@@ -175,6 +175,12 @@ test.concurrent(
           gitRepositoryId: repo.id,
         },
       });
+      await db.gitObjectToBranch.create({
+        data: {
+          gitObjectId: gitObject.id,
+          gitBranchId: gitBranch.id,
+        },
+      });
       for (const status of Array.from(Object.values(PrebuildEventStatus)).sort()) {
         for (const createdAt of [1, 2, 3]) {
           if (
@@ -214,15 +220,6 @@ test.concurrent(
               gitObject: {
                 connect: {
                   id: gitObject.id,
-                },
-              },
-              gitBranchLinks: {
-                create: {
-                  gitBranch: {
-                    connect: {
-                      id: gitBranch.id,
-                    },
-                  },
                 },
               },
             },

@@ -21,23 +21,26 @@ test.concurrent(
       createExampleRepositoryAndProject({ tdb, injector }),
     );
     const repo = project.gitRepository;
-    const gitBranchArgs = ["a", "b", "c", "d"].map((name, idx) => ({
-      name,
-      gitObjectHash: `hash${idx}`,
-    }));
+    const gitBranchNames = ["a", "b", "c", "d"];
     const statuses = Array.from(Object.values(PrebuildEventStatus)).sort();
     const archivablePrebuildEvents: PrebuildEvent[] = [];
-    for (const args of gitBranchArgs) {
+    for (const gitBranchName of gitBranchNames) {
       const gitObject = await db.gitObject.create({
         data: {
-          hash: args.gitObjectHash,
+          hash: `${gitBranchName}-hash`,
         },
       });
       const gitBranch = await db.gitBranch.create({
         data: {
-          name: args.name,
+          name: gitBranchName,
           gitObjectId: gitObject.id,
           gitRepositoryId: repo.id,
+        },
+      });
+      await db.gitObjectToBranch.create({
+        data: {
+          gitObjectId: gitObject.id,
+          gitBranchId: gitBranch.id,
         },
       });
       for (const status of statuses) {
@@ -52,15 +55,11 @@ test.concurrent(
                 },
               },
               gitObject: {
-                connect: {
-                  id: gitObject.id,
-                },
-              },
-              gitBranchLinks: {
                 create: {
-                  gitBranch: {
-                    connect: {
-                      id: gitBranch.id,
+                  hash: `${gitBranchName}-${status}-${createdAt}`,
+                  gitObjectToBranch: {
+                    create: {
+                      gitBranchId: gitBranch.id,
                     },
                   },
                 },
@@ -85,10 +84,10 @@ test.concurrent(
         gitRepositoryId: repo.id,
       },
     });
-    await db.prebuildEventToGitBranch.create({
+    await db.gitObjectToBranch.create({
       data: {
         gitBranchId: newGitBranch.id,
-        prebuildEventId: archivablePrebuildEvents[0].id,
+        gitObjectId: archivablePrebuildEvents[0].gitObjectId,
       },
     });
     const prebuildEvents2 = await prebuildService.getArchivablePrebuildEvents(db, project.id);
@@ -183,6 +182,12 @@ test(
         gitRepositoryId: repo.id,
       },
     });
+    await db.gitObjectToBranch.create({
+      data: {
+        gitObjectId: gitObject.id,
+        gitBranchId: gitBranch.id,
+      },
+    });
     const prebuildEvents: PrebuildEvent[] = [];
     for (const status of Object.values(PrebuildEventStatus)) {
       const prebuildEvent = await db.prebuildEvent.create({
@@ -196,15 +201,6 @@ test(
           gitObject: {
             connect: {
               id: gitObject.id,
-            },
-          },
-          gitBranchLinks: {
-            create: {
-              gitBranch: {
-                connect: {
-                  id: gitBranch.id,
-                },
-              },
             },
           },
         },

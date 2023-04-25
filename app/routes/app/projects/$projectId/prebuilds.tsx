@@ -16,16 +16,21 @@ export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
     orderBy: { createdAt: "desc" },
     take: 100,
     include: {
-      gitObject: true,
-      gitBranchLinks: {
-        include: { gitBranch: true },
+      gitObject: {
+        include: {
+          gitObjectToBranch: {
+            include: {
+              gitBranch: true,
+            },
+          },
+        },
       },
     },
   });
   return json({
     projectPageProps,
     prebuildEvents: prebuildEvents.map((e) => ({
-      branches: e.gitBranchLinks
+      branches: e.gitObject.gitObjectToBranch
         .map((b) => ({
           name: formatBranchName(b.gitBranch.name),
           externalId: b.gitBranch.externalId,

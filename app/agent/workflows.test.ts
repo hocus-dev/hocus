@@ -35,7 +35,7 @@ import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
-import { groupBy, unwrap, waitForPromises, formatBranchName, numericSort } from "~/utils.shared";
+import { unwrap, waitForPromises, formatBranchName, numericSort } from "~/utils.shared";
 
 const provideActivities = (
   testFn: (args: {
@@ -254,20 +254,12 @@ test.concurrent(
       "refs/heads/run-buildfs-and-prebuilds-test-3-error",
     ].map((name) => unwrap(updates.newGitBranches.find((b) => b.name === name)));
     await worker.runUntil(async () => {
-      const branchesByGitObjectId = groupBy(
-        testBranches,
-        (b) => b.gitObjectId,
-        (b) => b,
-      );
-      const git = Array.from(branchesByGitObjectId.entries()).map(([gitObjectId, branches]) => ({
-        objectId: gitObjectId,
-        branchIds: branches.map((b) => b.id),
-      }));
+      const gitObjectIds = Array.from(new Set(testBranches.map((b) => b.gitObjectId)));
       const prebuildEvents: PrebuildEvent[] = [];
       for (const p of projects) {
         const { created } = await activities.getOrCreatePrebuildEvents({
           projectId: p.id,
-          git,
+          gitObjectIds,
         });
         prebuildEvents.push(...created);
       }
@@ -388,9 +380,13 @@ test.concurrent(
         include: {
           prebuildEvents: {
             include: {
-              gitBranchLinks: {
+              gitObject: {
                 include: {
-                  gitBranch: true,
+                  gitObjectToBranch: {
+                    include: {
+                      gitBranch: true,
+                    },
+                  },
                 },
               },
             },
@@ -399,7 +395,8 @@ test.concurrent(
       });
       const prebuildEvent = unwrap(
         project.prebuildEvents.find(
-          (e) => e.gitBranchLinks.find((l) => l.gitBranchId === testBranches[0].id) != null,
+          (e) =>
+            e.gitObject.gitObjectToBranch.find((l) => l.gitBranchId === testBranches[0].id) != null,
         ),
       );
       const testUser = await createTestUser(db);

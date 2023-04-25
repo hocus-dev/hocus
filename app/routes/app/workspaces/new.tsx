@@ -21,12 +21,15 @@ const findPrebuild = async (db: Prisma.Client, prebuildId: string) => {
       externalId: prebuildId,
     },
     include: {
-      gitBranchLinks: {
+      gitObject: {
         include: {
-          gitBranch: true,
+          gitObjectToBranch: {
+            include: {
+              gitBranch: true,
+            },
+          },
         },
       },
-      gitObject: true,
       project: true,
     },
   });
@@ -35,7 +38,7 @@ const findPrebuild = async (db: Prisma.Client, prebuildId: string) => {
   }
   return [
     prebuildEvent.project,
-    prebuildEvent.gitBranchLinks.map((link) => ({
+    prebuildEvent.gitObject.gitObjectToBranch.map((link) => ({
       branch: link.gitBranch,
       ongoingPrebuild: null,
       finishedPrebuild: prebuildEvent,

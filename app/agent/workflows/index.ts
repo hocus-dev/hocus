@@ -21,7 +21,6 @@ import {
 import type { Activities } from "~/agent/activities/list";
 import { parseWorkflowError } from "~/agent/workflows-utils";
 import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
-import { numericSort, unwrap, groupBy } from "~/utils.shared";
 
 export {
   runBuildfsAndPrebuilds,
@@ -38,7 +37,6 @@ export {
 
 const {
   addProjectAndRepository,
-  linkGitBranches,
   reservePrebuildEvent,
   waitForPrebuildEventReservations,
   markPrebuildEventAsArchived,
@@ -86,12 +84,7 @@ export async function runSyncGitRepository(
           for (const p of newProjects) {
             const prebuildEvents = await getOrCreatePrebuildEvents({
               projectId: p.id,
-              git: [
-                {
-                  objectId: defaultBranch.gitObjectId,
-                  branchIds: [defaultBranch.id],
-                },
-              ],
+              gitObjectIds: [defaultBranch.gitObjectId],
             });
             const prebuildEvent = prebuildEvents.created[0];
             await startChild(runBuildfsAndPrebuilds, {
@@ -109,33 +102,16 @@ export async function runSyncGitRepository(
         updates.newGitBranches.length + updates.updatedGitBranches.length > 0
       ) {
         const branches = [...updates.newGitBranches, ...updates.updatedGitBranches];
-        const branchesByGitObjectId = groupBy(
-          branches,
-          (b) => b.gitObjectId,
-          (b) => b,
-        );
-        const branchesByGitObjectIdArray = Array.from(branchesByGitObjectId.entries()).sort(
-          ([a], [b]) => numericSort(a, b),
-        );
+        const gitObjectIds = Array.from(new Set(branches.map((b) => b.gitObjectId)));
         // TODO: HOC-123 - fix race condition in prebuild archival
         const allPrebuildEvents = await waitForPromisesWorkflow(
           seenProjects.map((p) =>
             getOrCreatePrebuildEvents({
               projectId: p.id,
-              git: branchesByGitObjectIdArray.map(([gitObjectId, branches]) => ({
-                objectId: gitObjectId,
-                branchIds: branches.map((b) => b.id),
-              })),
+              gitObjectIds,
             }),
           ),
         );
-        const linkArgs = allPrebuildEvents.flatMap((prebuildEvents) =>
-          prebuildEvents.found.map((e) => ({
-            prebuildEventId: e.id,
-            gitBranchIds: unwrap(branchesByGitObjectId.get(e.gitObjectId)).map((b) => b.id),
-          })),
-        );
-        await linkGitBranches(linkArgs);
         const prebuildArgs = allPrebuildEvents.flatMap((prebuildEvents) =>
           prebuildEvents.created.map((e) => e.id),
         );

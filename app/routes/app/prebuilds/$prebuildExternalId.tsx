@@ -10,6 +10,7 @@ import moment from "moment";
 import { AppPage } from "~/components/app-page";
 import { BackToProjectLink } from "~/components/projects/back-to-project-link";
 import { PrebuildStatus } from "~/components/projects/prebuilds/prebuild-status";
+import { PrebuildRetryButton } from "~/components/projects/prebuilds/retry-button";
 import { TaskViewer } from "~/components/projects/prebuilds/task-viewer";
 import { VmTaskStatusComponent } from "~/components/projects/prebuilds/vm-task-status";
 import { HttpError } from "~/http-error.server";
@@ -44,12 +45,15 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
         },
       },
       project: true,
-      gitBranchLinks: {
+      gitObject: {
         include: {
-          gitBranch: true,
+          gitObjectToBranch: {
+            include: {
+              gitBranch: true,
+            },
+          },
         },
       },
-      gitObject: true,
       tasks: {
         include: {
           vmTask: true,
@@ -126,7 +130,7 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
     },
     prebuild: {
       externalId: prebuildEvent.externalId,
-      branches: prebuildEvent.gitBranchLinks
+      branches: prebuildEvent.gitObject.gitObjectToBranch
         .map((link) => formatBranchName(link.gitBranch.name))
         .sort(),
       gitHash: prebuildEvent.gitObject.hash,
@@ -154,7 +158,12 @@ export default function PrebuildRoute(): JSX.Element {
     <AppPage>
       <BackToProjectLink project={project} tabId={ProjectPathTabId.PREBUILDS} />
 
-      <h1 className="font-bold text-3xl mt-4">Prebuild</h1>
+      <div className="flex gap-4 w-full mt-4 items-end justify-between">
+        <h1 className="font-bold text-3xl">Prebuild</h1>
+        <div className="flex gap-4">
+          <PrebuildRetryButton prebuildExternalId={prebuild.externalId} />
+        </div>
+      </div>
       <h3 className="text-gray-400 mt-2 mb-2">
         This page is <span className="font-bold">not</span> updated automatically. Refresh it to see
         new changes.
