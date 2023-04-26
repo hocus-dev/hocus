@@ -46,3 +46,7 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
 
   return redirect(getWorkspacePath(workspaceExternalId, { justStopped: true }));
 };
+
+export default function DefaultView() {
+  return null;
+}

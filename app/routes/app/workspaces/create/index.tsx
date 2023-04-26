@@ -85,3 +85,7 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
     }),
   );
 };
+
+export default function DefaultView() {
+  return null;
+}
