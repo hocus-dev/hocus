@@ -44,10 +44,9 @@ test.concurrent(
         },
       });
       for (const status of statuses) {
-        for (const createdAt of [1, 2, 3]) {
+        for (const createdAt of [3, 2, 1]) {
           const prebuildEvent = await db.prebuildEvent.create({
             data: {
-              createdAt: new Date(createdAt),
               status,
               project: {
                 connect: {
@@ -57,6 +56,7 @@ test.concurrent(
               gitObject: {
                 create: {
                   hash: `${gitBranchName}-${status}-${createdAt}`,
+                  createdAt: new Date(createdAt),
                   gitObjectToBranch: {
                     create: {
                       gitBranchId: gitBranch.id,
