@@ -28,6 +28,8 @@ import type { CheckoutAndInspectActivity } from "./checkout-and-inspect";
 import { checkoutAndInspect } from "./checkout-and-inspect";
 import type { CleanUpAfterPrebuildErrorActivity } from "./clean-up-after-prebuild-error";
 import { cleanUpAfterPrebuildError } from "./clean-up-after-prebuild-error";
+import type { CreatePrebuildEventActivity } from "./create-prebuild-event";
+import { createPrebuildEvent } from "./create-prebuild-event";
 import type { CreatePrebuildFilesActivity } from "./create-prebuild-files";
 import { createPrebuildFiles } from "./create-prebuild-files";
 import type { CreateWorkspaceActivity } from "./create-workspace";
@@ -112,6 +114,7 @@ export interface Activities {
   mutexTest: MutexTestActivity;
   getWorkflowStatus: GetWorkflowStatusActivity;
   cleanUpWorkspaceInstanceDb: CleanUpWorkspaceInstanceDbActivity;
+  createPrebuildEvent: CreatePrebuildEventActivity;
 }
 
 export interface ActivityArgs {
@@ -163,6 +166,7 @@ export const createActivities = async (
     mutexTest,
     getWorkflowStatus,
     cleanUpWorkspaceInstanceDb,
+    createPrebuildEvent,
   };
 
   return Object.fromEntries(

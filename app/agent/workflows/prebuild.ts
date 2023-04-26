@@ -1,4 +1,12 @@
-import { proxyActivities, uuid4, executeChild, ApplicationFailure } from "@temporalio/workflow";
+import type { PrebuildEvent } from "@prisma/client";
+import {
+  proxyActivities,
+  uuid4,
+  executeChild,
+  ApplicationFailure,
+  startChild,
+  ParentClosePolicy,
+} from "@temporalio/workflow";
 import path from "path-browserify";
 
 import type { CheckoutAndInspectResult } from "../activities-types";
@@ -28,6 +36,14 @@ const {
   heartbeatTimeout: "20 seconds",
   retry: {
     maximumAttempts: 1,
+  },
+});
+
+const { createPrebuildEvent } = proxyActivities<Activities>({
+  startToCloseTimeout: "1 minute",
+  heartbeatTimeout: "5 seconds",
+  retry: {
+    maximumAttempts: 10,
   },
 });
 
@@ -290,4 +306,22 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
       maxRetries: 6,
     });
   });
+}
+
+export async function scheduleNewPrebuild(args: {
+  projectId: bigint;
+  gitObjectId: bigint;
+}): Promise<{ prebuildEvent: PrebuildEvent; prebuildWorkflowId: string }> {
+  const externalId = uuid4();
+  const prebuildEvent = await createPrebuildEvent({
+    ...args,
+    externalId,
+  });
+  const prebuildWorkflowId = uuid4();
+  await startChild(runBuildfsAndPrebuilds, {
+    args: [[prebuildEvent.id]],
+    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+    workflowId: prebuildWorkflowId,
+  });
+  return { prebuildEvent, prebuildWorkflowId };
 }

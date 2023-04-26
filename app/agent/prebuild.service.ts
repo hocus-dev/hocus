@@ -76,17 +76,27 @@ export class PrebuildService {
 
   async createPrebuildEvent(
     db: Prisma.TransactionClient,
-    args: { projectId: bigint; gitObjectId: bigint },
+    args: { projectId: bigint; gitObjectId: bigint; externalId?: string },
   ): Promise<PrebuildEvent> {
     const { projectId, gitObjectId } = args;
-    const prebuildEvent = await db.prebuildEvent.create({
-      data: {
-        projectId,
-        gitObjectId,
-        status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT,
-      },
-    });
-    return prebuildEvent;
+    const data = {
+      projectId,
+      gitObjectId,
+      status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT,
+    } as const;
+    if (args.externalId != null) {
+      return await db.prebuildEvent.upsert({
+        create: {
+          ...data,
+          externalId: args.externalId,
+        },
+        update: {},
+        where: {
+          externalId: args.externalId,
+        },
+      });
+    }
+    return await db.prebuildEvent.create({ data });
   }
 
   async initPrebuildEvent(
