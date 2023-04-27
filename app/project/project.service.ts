@@ -168,12 +168,21 @@ export class ProjectService {
       SELECT x."prebuildEventId", x."gitBranchId"
       FROM (
         SELECT
-          ROW_NUMBER() OVER (PARTITION BY t."gitBranchId", t."status" ORDER BY t."createdAt" DESC) AS r,
+          ROW_NUMBER() OVER (
+            PARTITION BY t."gitBranchId", t."status" ORDER BY
+              t."createdAt" DESC,
+              t."prebuildEventId" DESC
+          ) AS r,
           t.*
         FROM (
-          SELECT *
-          FROM "PrebuildEventToGitBranch" AS p2b
-          INNER JOIN "PrebuildEvent" AS p ON p2b."prebuildEventId" = p.id
+          SELECT
+            p."id" AS "prebuildEventId",
+            g2b."gitBranchId",
+            p."status",
+            g."createdAt"
+          FROM "PrebuildEvent" AS p
+          INNER JOIN "GitObjectToBranch" AS g2b ON p."gitObjectId" = g2b."gitObjectId"
+          INNER JOIN "GitObject" AS g ON p."gitObjectId" = g."id"
           WHERE p."projectId" = ${project.id}
           ORDER BY p."createdAt" DESC
         ) AS t

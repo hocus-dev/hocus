@@ -182,7 +182,7 @@ test.concurrent(
         },
       });
       for (const status of Array.from(Object.values(PrebuildEventStatus)).sort()) {
-        for (const createdAt of [1, 2, 3]) {
+        for (const createdAt of [3, 2, 1]) {
           if (
             status === PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT &&
             !args.pendingInitPrebuild
@@ -210,7 +210,6 @@ test.concurrent(
 
           await db.prebuildEvent.create({
             data: {
-              createdAt: new Date(createdAt),
               status,
               project: {
                 connect: {
@@ -218,8 +217,18 @@ test.concurrent(
                 },
               },
               gitObject: {
-                connect: {
-                  id: gitObject.id,
+                create: {
+                  hash: `hash-${status}-${args.name}-${createdAt}`,
+                  createdAt: new Date(createdAt),
+                  gitObjectToBranch: {
+                    create: {
+                      gitBranch: {
+                        connect: {
+                          id: gitBranch.id,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -236,6 +245,14 @@ test.concurrent(
       (prebuild) => prebuild.branch.name,
       (prebuild) => prebuild,
     );
+    const getGitObjectTime = (args: { gitObjectId: bigint }) =>
+      db.gitObject
+        .findUniqueOrThrow({
+          where: {
+            id: args.gitObjectId,
+          },
+        })
+        .then((gitObject) => gitObject.createdAt.getTime());
     for (const args of gitBranchArgs) {
       if (
         !(
@@ -253,20 +270,20 @@ test.concurrent(
       if (args.finishedPrebuild) {
         const prebuild = unwrap(result.finishedPrebuild);
         expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS);
-        expect(prebuild.createdAt.getTime()).toEqual(3);
+        expect(await getGitObjectTime(prebuild)).toEqual(3);
       }
       if (args.runningPrebuild) {
         const prebuild = unwrap(result.ongoingPrebuild);
         expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_RUNNING);
-        expect(prebuild.createdAt.getTime()).toEqual(3);
+        expect(await getGitObjectTime(prebuild)).toEqual(3);
       } else if (args.pendingInitPrebuild) {
         const prebuild = unwrap(result.ongoingPrebuild);
         expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT);
-        expect(prebuild.createdAt.getTime()).toEqual(3);
+        expect(await getGitObjectTime(prebuild)).toEqual(3);
       } else if (args.pendingReadyPrebuild) {
         const prebuild = unwrap(result.ongoingPrebuild);
         expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_READY);
-        expect(prebuild.createdAt.getTime()).toEqual(3);
+        expect(await getGitObjectTime(prebuild)).toEqual(3);
       }
     }
   }),
