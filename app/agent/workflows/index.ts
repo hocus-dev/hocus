@@ -21,6 +21,7 @@ import {
 import type { Activities } from "~/agent/activities/list";
 import { parseWorkflowError } from "~/agent/workflows-utils";
 import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
+import { numericSort } from "~/utils.shared";
 
 export {
   runBuildfsAndPrebuilds,
@@ -103,7 +104,9 @@ export async function runSyncGitRepository(
         updates.newGitBranches.length + updates.updatedGitBranches.length > 0
       ) {
         const branches = [...updates.newGitBranches, ...updates.updatedGitBranches];
-        const gitObjectIds = Array.from(new Set(branches.map((b) => b.gitObjectId)));
+        const gitObjectIds = Array.from(new Set(branches.map((b) => b.gitObjectId))).sort(
+          numericSort,
+        );
         // TODO: HOC-123 - fix race condition in prebuild archival
         const allPrebuildEvents = await waitForPromisesWorkflow(
           seenProjects.map((p) =>
