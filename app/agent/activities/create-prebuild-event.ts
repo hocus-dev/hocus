@@ -9,6 +9,7 @@ export type CreatePrebuildEventActivity = (args: {
   projectId: bigint;
   gitObjectId: bigint;
   externalId: string;
+  archiveAfter?: Date;
 }) => Promise<PrebuildEvent>;
 export const createPrebuildEvent: CreateActivity<CreatePrebuildEventActivity> = ({
   injector,

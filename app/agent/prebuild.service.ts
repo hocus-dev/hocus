@@ -76,13 +76,14 @@ export class PrebuildService {
 
   async createPrebuildEvent(
     db: Prisma.TransactionClient,
-    args: { projectId: bigint; gitObjectId: bigint; externalId?: string },
+    args: { projectId: bigint; gitObjectId: bigint; externalId?: string; archiveAfter?: Date },
   ): Promise<PrebuildEvent> {
-    const { projectId, gitObjectId } = args;
+    const { projectId, gitObjectId, archiveAfter } = args;
     const data = {
       projectId,
       gitObjectId,
       status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT,
+      archiveAfter,
     } as const;
     if (args.externalId != null) {
       return await db.prebuildEvent.upsert({
@@ -441,14 +442,28 @@ export class PrebuildService {
     db: Prisma.Client,
     projectId: bigint,
   ): Promise<PrebuildEvent[]> {
-    const prebuildEventIds = await db.$queryRaw<{ r: bigint; prebuildEventId: bigint }[]>`
-      SELECT x."r", x."prebuildEventId"
+    type QueryResult = { r: bigint; prebuildEventId: bigint; isArchivable: boolean }[];
+    const prebuildEventIds = await db.$queryRaw<QueryResult>`
+      SELECT
+        x."r",
+        x."prebuildEventId",
+        x."archiveAfter" < NOW() AS "isArchivable"
       FROM (
         SELECT
-          ROW_NUMBER() OVER (PARTITION BY t."gitBranchId" ORDER BY t."createdAt" DESC, t."prebuildEventId" DESC) AS r,
+          ROW_NUMBER() OVER (
+            PARTITION BY t."gitBranchId" ORDER BY
+              t."gitObjectCreatedAt" DESC,
+              t."prebuildCreatedAt" DESC,
+              t."prebuildEventId" DESC
+          ) AS r,
           t.*
         FROM (
-          SELECT p."id" AS "prebuildEventId", g2b."gitBranchId", g."createdAt"
+          SELECT
+            p."id" AS "prebuildEventId",
+            g2b."gitBranchId",
+            p."createdAt" AS "prebuildCreatedAt",
+            g."createdAt" AS "gitObjectCreatedAt",
+            p."archiveAfter"
           FROM "PrebuildEvent" AS p
           INNER JOIN "GitObjectToBranch" AS g2b ON p."gitObjectId" = g2b."gitObjectId"
           INNER JOIN "GitObject" AS g ON p."gitObjectId" = g."id"
@@ -463,7 +478,7 @@ export class PrebuildService {
       prebuildEventIds.filter((e) => e.r === BigInt(1)).map((e) => e.prebuildEventId),
     );
     const prebuildEventIdsToArchive = prebuildEventIds
-      .filter((e) => !latestPrebuildEventIds.has(e.prebuildEventId))
+      .filter((e) => !latestPrebuildEventIds.has(e.prebuildEventId) && e.isArchivable)
       .map((e) => e.prebuildEventId);
     const prebuildEvents = await db.prebuildEvent.findMany({
       where: { id: { in: prebuildEventIdsToArchive } },

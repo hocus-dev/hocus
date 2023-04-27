@@ -92,6 +92,16 @@ test.concurrent(
     });
     const prebuildEvents2 = await prebuildService.getArchivablePrebuildEvents(db, project.id);
     expect(sortedIds(prebuildEvents2)).toEqual(sortedIds(archivablePrebuildEvents.slice(1)));
+    await db.prebuildEvent.update({
+      where: {
+        id: archivablePrebuildEvents[1].id,
+      },
+      data: {
+        archiveAfter: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+    const prebuildEvents3 = await prebuildService.getArchivablePrebuildEvents(db, project.id);
+    expect(sortedIds(prebuildEvents3)).toEqual(sortedIds(archivablePrebuildEvents.slice(2)));
 
     const now = new Date();
     const aWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

@@ -313,9 +313,11 @@ export async function scheduleNewPrebuild(args: {
   gitObjectId: bigint;
 }): Promise<{ prebuildEvent: PrebuildEvent; prebuildWorkflowId: string }> {
   const externalId = uuid4();
+  const twentyFourHoursInTheFuture = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const prebuildEvent = await createPrebuildEvent({
     ...args,
     externalId,
+    archiveAfter: twentyFourHoursInTheFuture,
   });
   const prebuildWorkflowId = uuid4();
   await startChild(runBuildfsAndPrebuilds, {
