@@ -68,22 +68,22 @@ enum PrebuildEventStatus {
 }
 
 model PrebuildEvent {
-  id                    BigInt                     @id @default(autoincrement())
-  externalId            String                     @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                    BigInt              @id @default(autoincrement())
+  externalId            String              @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   tasks                 PrebuildEventTask[]
-  project               Project                    @relation(fields: [projectId], references: [id])
+  project               Project             @relation(fields: [projectId], references: [id])
   projectId             BigInt
-  gitObject             GitObject                  @relation(fields: [gitObjectId], references: [id])
+  gitObject             GitObject           @relation(fields: [gitObjectId], references: [id])
   gitObjectId           BigInt
   status                PrebuildEventStatus
-  gitBranchLinks        PrebuildEventToGitBranch[]
   buildfsEventId        BigInt?
   /// Null if project configuration was not found or did not include image config.
-  buildfsEvent          BuildfsEvent?              @relation(fields: [buildfsEventId], references: [id])
+  buildfsEvent          BuildfsEvent?       @relation(fields: [buildfsEventId], references: [id])
   // Nah, until https://github.com/prisma/prisma/issues/4263 gets fixed then just leave it...
   workspaceTasksCommand String[]
   workspaceTasksShell   String[]
 
+  archiveAfter             DateTime                   @default(now()) @db.Timestamptz(3)
   createdAt                DateTime                   @default(now()) @db.Timestamptz(3)
   prebuildEventFiles       PrebuildEventFiles[]
   workspaces               Workspace[]
@@ -118,16 +118,6 @@ model PrebuildEventFiles {
   projectFileAgentMatch File @relation("prebuild_event_project_file_agent_match", fields: [projectFileId, agentInstanceId], references: [id, agentInstanceId])
 
   @@unique([prebuildEventId, agentInstanceId])
-}
-
-model PrebuildEventToGitBranch {
-  id              BigInt        @id @default(autoincrement())
-  prebuildEvent   PrebuildEvent @relation(fields: [prebuildEventId], references: [id])
-  prebuildEventId BigInt
-  gitBranch       GitBranch     @relation(fields: [gitBranchId], references: [id])
-  gitBranchId     BigInt
-
-  @@unique([prebuildEventId, gitBranchId])
 }
 
 model PrebuildEventTask {
@@ -288,10 +278,10 @@ model GitBranch {
   gitObjectId     BigInt
   gitObject       GitObject     @relation(fields: [gitObjectId], references: [id])
 
-  updatedAt                DateTime                   @updatedAt @db.Timestamptz(3)
-  createdAt                DateTime                   @default(now()) @db.Timestamptz(3)
-  PrebuildEventToGitBranch PrebuildEventToGitBranch[]
-  Workspace                Workspace[]
+  updatedAt         DateTime            @updatedAt @db.Timestamptz(3)
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  Workspace         Workspace[]
+  GitObjectToBranch GitObjectToBranch[]
 
   @@unique([gitRepositoryId, name])
 }
@@ -300,9 +290,20 @@ model GitObject {
   id   BigInt @id @default(autoincrement())
   hash String @unique
 
-  createdAt     DateTime        @default(now()) @db.Timestamptz(3)
-  gitBranches   GitBranch[]
-  PrebuildEvent PrebuildEvent[]
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  gitBranches       GitBranch[]
+  PrebuildEvent     PrebuildEvent[]
+  gitObjectToBranch GitObjectToBranch[]
+}
+
+model GitObjectToBranch {
+  id          BigInt    @id @default(autoincrement())
+  gitObject   GitObject @relation(fields: [gitObjectId], references: [id])
+  gitObjectId BigInt
+  gitBranch   GitBranch @relation(fields: [gitBranchId], references: [id])
+  gitBranchId BigInt
+
+  @@unique([gitObjectId, gitBranchId])
 }
 
 model Project {

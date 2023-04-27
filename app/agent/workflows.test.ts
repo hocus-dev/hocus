@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import type { PrebuildEvent, Prisma } from "@prisma/client";
+import type { GitRepository, PrebuildEvent, Prisma } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
@@ -25,6 +25,7 @@ import {
   runArchivePrebuild,
   runDeleteRemovablePrebuilds,
   testLock,
+  scheduleNewPrebuild,
 } from "./workflows";
 
 import { config } from "~/config";
@@ -35,7 +36,7 @@ import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
-import { groupBy, unwrap, waitForPromises, formatBranchName, numericSort } from "~/utils.shared";
+import { unwrap, waitForPromises, formatBranchName, numericSort } from "~/utils.shared";
 
 const provideActivities = (
   testFn: (args: {
@@ -137,6 +138,24 @@ test.concurrent("HOST_PERSISTENT_DIR has no trailing slash", async () => {
   expect(HOST_PERSISTENT_DIR).not.toMatch(/\/$/);
 });
 
+const createTestRepo = async (
+  db: Prisma.NonTransactionClient,
+  injector: AgentInjector,
+): Promise<GitRepository> => {
+  const gitService = injector.resolve(Token.GitService);
+  const sshKeyService = injector.resolve(Token.SshKeyService);
+
+  const pair = await sshKeyService.createSshKeyPair(
+    db,
+    TESTS_PRIVATE_SSH_KEY,
+    SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
+  );
+  const repo = await db.$transaction((tdb) =>
+    gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
+  );
+  return repo;
+};
+
 test.concurrent(
   "runBuildfsAndPrebuilds",
   provideActivities(async ({ activities, injector, db }) => {
@@ -164,18 +183,9 @@ test.concurrent(
       workflowBundle,
     });
 
-    const gitService = injector.resolve(Token.GitService);
     const agentGitService = injector.resolve(Token.AgentGitService);
     const projectService = injector.resolve(Token.ProjectService);
-    const sshKeyService = injector.resolve(Token.SshKeyService);
-    const pair = await sshKeyService.createSshKeyPair(
-      db,
-      TESTS_PRIVATE_SSH_KEY,
-      SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
-    );
-    const repo = await db.$transaction((tdb) =>
-      gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
-    );
+    const repo = await createTestRepo(db, injector);
     const updates = await agentGitService.updateBranches(db, repo.id);
     console.log("branches updated");
     const projects = await db.$transaction((tdb) =>
@@ -254,20 +264,12 @@ test.concurrent(
       "refs/heads/run-buildfs-and-prebuilds-test-3-error",
     ].map((name) => unwrap(updates.newGitBranches.find((b) => b.name === name)));
     await worker.runUntil(async () => {
-      const branchesByGitObjectId = groupBy(
-        testBranches,
-        (b) => b.gitObjectId,
-        (b) => b,
-      );
-      const git = Array.from(branchesByGitObjectId.entries()).map(([gitObjectId, branches]) => ({
-        objectId: gitObjectId,
-        branchIds: branches.map((b) => b.id),
-      }));
+      const gitObjectIds = Array.from(new Set(testBranches.map((b) => b.gitObjectId)));
       const prebuildEvents: PrebuildEvent[] = [];
       for (const p of projects) {
         const { created } = await activities.getOrCreatePrebuildEvents({
           projectId: p.id,
-          git,
+          gitObjectIds,
         });
         prebuildEvents.push(...created);
       }
@@ -388,9 +390,13 @@ test.concurrent(
         include: {
           prebuildEvents: {
             include: {
-              gitBranchLinks: {
+              gitObject: {
                 include: {
-                  gitBranch: true,
+                  gitObjectToBranch: {
+                    include: {
+                      gitBranch: true,
+                    },
+                  },
                 },
               },
             },
@@ -399,7 +405,8 @@ test.concurrent(
       });
       const prebuildEvent = unwrap(
         project.prebuildEvents.find(
-          (e) => e.gitBranchLinks.find((l) => l.gitBranchId === testBranches[0].id) != null,
+          (e) =>
+            e.gitObject.gitObjectToBranch.find((l) => l.gitBranchId === testBranches[0].id) != null,
         ),
       );
       const testUser = await createTestUser(db);
@@ -743,6 +750,54 @@ test.concurrent(
           expect(curActivityResult + 1).toBe(nextActivityResult);
         }
       }
+    });
+  }),
+);
+
+test.concurrent(
+  "scheduleNewPrebuild",
+  provideActivities(async ({ activities, db, injector }) => {
+    const { client, nativeConnection } = testEnv;
+    const taskQueue = `test-${uuidv4()}`;
+    const worker = await Worker.create({
+      connection: nativeConnection,
+      taskQueue,
+      workflowsPath: require.resolve("./workflows"),
+      activities,
+      dataConverter: {
+        payloadConverterPath: require.resolve("~/temporal/data-converter"),
+      },
+      workflowBundle,
+    });
+    const projectService = injector.resolve(Token.ProjectService);
+    const repo = await createTestRepo(db, injector);
+    const project = await db.$transaction((tdb) =>
+      projectService.createProject(tdb, {
+        gitRepositoryId: repo.id,
+        rootDirectoryPath: "/",
+        name: "test",
+      }),
+    );
+    const gitObject = await db.gitObject.create({
+      data: {
+        hash: "test",
+      },
+    });
+
+    await worker.runUntil(async () => {
+      const { prebuildEvent, prebuildWorkflowId } = await client.workflow.execute(
+        scheduleNewPrebuild,
+        {
+          workflowId: uuidv4(),
+          taskQueue,
+          retry: { maximumAttempts: 1 },
+          args: [{ projectId: project.id, gitObjectId: gitObject.id }],
+        },
+      );
+      expect(prebuildEvent.id).toBeTruthy();
+      const handle = client.workflow.getHandle(prebuildWorkflowId);
+      await handle.cancel();
+      await expect(handle.result()).rejects.toThrow();
     });
   }),
 );

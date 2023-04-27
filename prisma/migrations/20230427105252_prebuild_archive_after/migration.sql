@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "PrebuildEvent" ADD COLUMN     "archiveAfter" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

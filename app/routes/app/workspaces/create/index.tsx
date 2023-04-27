@@ -23,12 +23,22 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
   }
   const prebuildEvent = await db.prebuildEvent.findUnique({
     where: { externalId: workspaceInfo.prebuildEventId },
-    include: { gitBranchLinks: { include: { gitBranch: true } } },
+    include: {
+      gitObject: {
+        include: {
+          gitObjectToBranch: {
+            include: {
+              gitBranch: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (prebuildEvent == null) {
     throw new HttpError(StatusCodes.NOT_FOUND, "Prebuild not found");
   }
-  const gitBranch = prebuildEvent.gitBranchLinks.find(
+  const gitBranch = prebuildEvent.gitObject.gitObjectToBranch.find(
     (link) => link.gitBranch.externalId === workspaceInfo.gitBranchId,
   )?.gitBranch;
   if (gitBranch == null) {
@@ -75,3 +85,7 @@ export const action = async ({ context: { app, db, req, user } }: ActionArgs) =>
     }),
   );
 };
+
+export default function DefaultView() {
+  return null;
+}

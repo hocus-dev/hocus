@@ -76,18 +76,28 @@ export class PrebuildService {
 
   async createPrebuildEvent(
     db: Prisma.TransactionClient,
-    args: { projectId: bigint; gitObjectId: bigint; gitBranchIds: bigint[] },
+    args: { projectId: bigint; gitObjectId: bigint; externalId?: string; archiveAfter?: Date },
   ): Promise<PrebuildEvent> {
-    const { projectId, gitObjectId, gitBranchIds } = args;
-    const prebuildEvent = await db.prebuildEvent.create({
-      data: {
-        projectId,
-        gitObjectId,
-        status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT,
-      },
-    });
-    await this.linkGitBranchesToPrebuildEvent(db, prebuildEvent.id, gitBranchIds);
-    return prebuildEvent;
+    const { projectId, gitObjectId, archiveAfter } = args;
+    const data = {
+      projectId,
+      gitObjectId,
+      status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_INIT,
+      archiveAfter,
+    } as const;
+    if (args.externalId != null) {
+      return await db.prebuildEvent.upsert({
+        create: {
+          ...data,
+          externalId: args.externalId,
+        },
+        update: {},
+        where: {
+          externalId: args.externalId,
+        },
+      });
+    }
+    return await db.prebuildEvent.create({ data });
   }
 
   async initPrebuildEvent(
@@ -138,36 +148,6 @@ export class PrebuildService {
         workspaceTasksShell: args.workspaceTasks.map((x) => x.commandShell),
       },
     });
-  }
-
-  async linkGitBranchesToPrebuildEvent(
-    db: Prisma.TransactionClient,
-    prebuildEventId: bigint,
-    gitBranchIds: bigint[],
-  ) {
-    await db.prebuildEventToGitBranch.createMany({
-      data: gitBranchIds.map((gitBranchId) => ({
-        prebuildEventId,
-        gitBranchId,
-      })),
-    });
-  }
-
-  async upsertGitBranchesToPrebuildEvent(
-    db: Prisma.TransactionClient,
-    prebuildEventId: bigint,
-    gitBranchIds: bigint[],
-  ): Promise<void> {
-    await waitForPromises(
-      gitBranchIds.map((gitBranchId) =>
-        db.prebuildEventToGitBranch.upsert({
-          // eslint-disable-next-line camelcase
-          where: { prebuildEventId_gitBranchId: { prebuildEventId, gitBranchId } },
-          create: { prebuildEventId, gitBranchId },
-          update: {},
-        }),
-      ),
-    );
   }
 
   async getSourceFsDrivePath(
@@ -462,17 +442,34 @@ export class PrebuildService {
     db: Prisma.Client,
     projectId: bigint,
   ): Promise<PrebuildEvent[]> {
-    const prebuildEventIds = await db.$queryRaw<{ r: bigint; prebuildEventId: bigint }[]>`
-      SELECT x."r", x."prebuildEventId"
+    type QueryResult = { r: bigint; prebuildEventId: bigint; isArchivable: boolean }[];
+    const prebuildEventIds = await db.$queryRaw<QueryResult>`
+      SELECT
+        x."r",
+        x."prebuildEventId",
+        x."archiveAfter" < NOW() AS "isArchivable"
       FROM (
         SELECT
-          ROW_NUMBER() OVER (PARTITION BY t."gitBranchId" ORDER BY t."createdAt" DESC) AS r,
+          ROW_NUMBER() OVER (
+            PARTITION BY t."gitBranchId" ORDER BY
+              t."gitObjectCreatedAt" DESC,
+              t."prebuildCreatedAt" DESC,
+              t."prebuildEventId" DESC
+          ) AS r,
           t.*
         FROM (
-          SELECT *
-          FROM "PrebuildEventToGitBranch" AS p2b
-          INNER JOIN "PrebuildEvent" AS p ON p2b."prebuildEventId" = p.id
-          WHERE p."projectId" = ${projectId} AND p."status" = 'PREBUILD_EVENT_STATUS_SUCCESS'::"PrebuildEventStatus"
+          SELECT
+            p."id" AS "prebuildEventId",
+            g2b."gitBranchId",
+            p."createdAt" AS "prebuildCreatedAt",
+            g."createdAt" AS "gitObjectCreatedAt",
+            p."archiveAfter"
+          FROM "PrebuildEvent" AS p
+          INNER JOIN "GitObjectToBranch" AS g2b ON p."gitObjectId" = g2b."gitObjectId"
+          INNER JOIN "GitObject" AS g ON p."gitObjectId" = g."id"
+          WHERE
+            p."projectId" = ${projectId} AND
+            p."status" = 'PREBUILD_EVENT_STATUS_SUCCESS'::"PrebuildEventStatus"
           ORDER BY p."createdAt" DESC
         ) AS t
       ) AS x;
@@ -481,7 +478,7 @@ export class PrebuildService {
       prebuildEventIds.filter((e) => e.r === BigInt(1)).map((e) => e.prebuildEventId),
     );
     const prebuildEventIdsToArchive = prebuildEventIds
-      .filter((e) => !latestPrebuildEventIds.has(e.prebuildEventId))
+      .filter((e) => !latestPrebuildEventIds.has(e.prebuildEventId) && e.isArchivable)
       .map((e) => e.prebuildEventId);
     const prebuildEvents = await db.prebuildEvent.findMany({
       where: { id: { in: prebuildEventIdsToArchive } },
@@ -529,9 +526,6 @@ export class PrebuildService {
     const logGroupIds = prebuildEvent.tasks.map((t) => t.vmTask.logGroupId);
     await db.log.deleteMany({
       where: { logGroupId: { in: logGroupIds } },
-    });
-    await db.prebuildEventToGitBranch.deleteMany({
-      where: { prebuildEventId },
     });
     await db.prebuildEventTask.deleteMany({
       where: { prebuildEventId },

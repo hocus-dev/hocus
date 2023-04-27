@@ -7,11 +7,7 @@ import { waitForPromises } from "~/utils.shared";
 
 export type GetOrCreatePrebuildEventsActivity = (args: {
   projectId: bigint;
-  git: {
-    /** must be unique within the `git` array */
-    objectId: bigint;
-    branchIds: bigint[];
-  }[];
+  gitObjectIds: bigint[];
 }) => Promise<{
   found: PrebuildEvent[];
   created: PrebuildEvent[];
@@ -21,7 +17,7 @@ export const getOrCreatePrebuildEvents: CreateActivity<GetOrCreatePrebuildEvents
   ({ injector, db }) =>
   async (args) => {
     const prebuildService = injector.resolve(Token.PrebuildService);
-    const gitObjectIds = args.git.map((arg) => arg.objectId);
+    const gitObjectIds = args.gitObjectIds;
     if (new Set(gitObjectIds).size !== gitObjectIds.length) {
       throw new Error("git object ids must be unique");
     }
@@ -32,14 +28,15 @@ export const getOrCreatePrebuildEvents: CreateActivity<GetOrCreatePrebuildEvents
       },
     });
     const foundEventsByGitObjectId = new Map(found.map((event) => [event.gitObjectId, event]));
-    const argsToCreate = args.git.filter((arg) => !foundEventsByGitObjectId.has(arg.objectId));
+    const argsToCreate = gitObjectIds.filter(
+      (gitObjectId) => !foundEventsByGitObjectId.has(gitObjectId),
+    );
     const created = await db.$transaction((tdb) =>
       waitForPromises(
-        argsToCreate.map((arg) =>
+        argsToCreate.map((gitObjectId) =>
           prebuildService.createPrebuildEvent(tdb, {
             projectId: args.projectId,
-            gitObjectId: arg.objectId,
-            gitBranchIds: arg.branchIds,
+            gitObjectId,
           }),
         ),
       ),

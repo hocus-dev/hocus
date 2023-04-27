@@ -136,6 +136,12 @@ test.concurrent(
       },
     });
     expect(updatedGitBranch.gitObject.hash).toEqual(mockHash);
+    const allGitObjects = await db.gitObject.findMany({
+      include: {
+        gitObjectToBranch: true,
+      },
+    });
+    expect(allGitObjects.map((o) => o.gitObjectToBranch.length > 0).every((b) => b)).toBe(true);
   }),
 );
 
