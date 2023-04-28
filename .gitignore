@@ -11,6 +11,7 @@ ops/resources/gitpod-ip.sh
 buildkite.ext4
 buildkite.qcow2
 vmlinux-*.bin
+!resources/kernels/vmlinux-*.bin
 hocus.yml.schema.json
 .clinic
 agent-build
@@ -20,3 +21,5 @@ buildkite-obd-write-layer/
 hocus-poc-registry/
 overlaybd-buildkite.config.v1.json
 poc-dir-export/
+cloud-hypervisor-static
+ch-remote-static

@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y \
     util-linux \
     vim \
     jq \
-    htop
+    htop \
+    stress
 # WARNING THOSE PACKAGES ARE NEEDED ON UBUNTU TO GET A SERIAL OUTPUT
 RUN apt-get install -y util-linux p11-kit udev dbus coreutils bash e2fsprogs
 RUN systemctl enable ssh
