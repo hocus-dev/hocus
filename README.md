@@ -81,6 +81,8 @@ You can run `ops/bin/local-cleanup.sh` to remove Hocus from your system complete
 - [ ] Add multi-node support
 - [ ] Add support for more IDEs, particularly JetBrains
 
+For more details please consult the [release schedule](./RELEASE_SCHEDULE.md).
+
 ## Versioning
 
 While in **alpha**, every version change should be assumed to be **breaking**. There are no upgrade paths.
