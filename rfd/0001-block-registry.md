@@ -21,7 +21,7 @@ To experiment with various storage solutions the workspace storage layer needs t
 1. Layered storage - Supports layers which can be overlayed on top of each other (rules out raw files)
 1. Dozens of layers can be combined together without performance degradation (rules out qcow2 due to performance issues with too many backing files)
 1. Allows to keep its data in sparse files, no need to reformat or dedicate a disk for it (rules out SPDK blobfs/mayastor/ceph/etc...)
-1. The resulting storage needs to natively support Docker on top of it after passing it to an VM (rules out overlayfs over virtio-fs)
+1. The resulting storage needs to natively support Docker on top of it after passing it to a VM (rules out overlayfs over virtio-fs)
 1. It should both support providing storage for a VM and a Container
 
 ### OverlayBD storage
@@ -30,7 +30,7 @@ OverlayBD is an OCI compatible container format from Alibaba which is compatible
 
 ### TCMU
 
-Overlaybd uses TCMU under the hood. We think this it's a good choice for Hocus. In the future we may easily build a custom storage format using TCMU and the rest of our code will be compatible. All block devices created by the block registry using TCMU MUST have an SCSI Serial starting with `hocusbd-`. For example `hocusbd-u2fpCGJ7`. The WWN of the TCM loop device for the block registry MUST be `naa.726163636f6f6e73`. All TCMU storage objects will be exposed under a single SAS HBA and will be forwarded to a single TCM loop target under different LUN's. OverlayBD will be forked so it will be possible to change the name of the TCMU service and UIO path in runtime so multiple block registries can run on the same host at the same time (important for CI).
+Overlaybd uses TCMU under the hood. We think this it's a good choice for Hocus. In the future we may easily build a custom storage format using TCMU and the rest of our code will be compatible. All block devices created by the block registry using TCMU MUST have a SCSI Serial starting with `hocusbd-`. For example `hocusbd-u2fpCGJ7`. The WWN of the TCM loop device for the block registry MUST be `naa.726163636f6f6e73`. All TCMU storage objects will be exposed under a single SAS HBA (`user_726163636`) and will be forwarded to a single TCM loop target under different LUNs. OverlayBD will be forked so it will be possible to change the name of the TCMU service and UIO path in runtime so multiple block registries can run on the same host at the same time (important for CI), the path of the UIO devices will be nonstandard.
 
 ### Exposing TCMU to the agent container
 
@@ -40,11 +40,16 @@ The Hocus install script NEEDS to install the following udev rule on the host OS
 # Hardlink hocus block devices using their serial number
 SUBSYSTEM=="block", ACTION=="add|change", ENV{ID_SCSI_SERIAL}=="hocusbd-[0-9A-Za-z]*", RUN+="/bin/sh -c 'mkdir -p /dev/hocus && ln $env{DEVNAME} /dev/hocus/$env{ID_SCSI_SERIAL}'"
 SUBSYSTEM=="block", ACTION=="remove", ENV{ID_SCSI_SERIAL}=="hocusbd-[0-9A-Za-z]*", RUN+="/bin/sh -c 'unlink /dev/hocus/$env{ID_SCSI_SERIAL}'"
+# Now hardlink UIO devices
+SUBSYSTEM=="uio", ACTION=="add|change", ATTR{name}=="tcm-user/726163636/*", RUN+="/bin/sh -c 'mkdir -p /dev/hocus && ln $env{DEVNAME} /dev/hocus/%k'"
+SUBSYSTEM=="uio", ACTION=="remove", ATTR{name}=="tcm-user/726163636/*", RUN+="/bin/sh -c 'unlink /dev/hocus/%k'"
 ```
 
-This exposes block devices from the block registry in `/dev/hocus` on the host, the `/dev/hocus` folder is bind mounted into the Agent container. The block registry MUST consider that multiple agents might be running on the same computer and it does not have exclusivity over `/dev/hocus`. `/sys/kernel/config` and `/dev/uio0` will also be bind mounted in the container.
+This exposes block devices from the block registry in `/dev/hocus` on the host along with any TCMU uio devices, the `/dev/hocus` folder is bind mounted into the Agent container. The block registry MUST consider that multiple agents might be running on the same computer and it DOES NOT have exclusivity over `/dev/hocus`. `/sys/kernel/config/target` will also be bind mounted in the container. Users of `/dev/hocus` MUST consider that there might be some latency between the creation of a block device and it appearing in `/dev/hocus` as udev running in userspace on the host must process new events coming from the kernel.
 
 ### Block registry interface
+
+The block registry stores Images and Containers, like other projects in this space the former represents an RO filesystem and the latter an RW one. Building blocks of Hocus MUST be idempotent in order for unsuccessful operations to be safely retried. Names of images and containers come from the user of the interface. The storage directory of the registry MUST be considered private. The registry might be accessed concurrently but no code besides the registry is allowed to touch it as it might cause the registry to end up in an inconsistent state, especially deleting an RW layer directly from the disk won't result in an proper cleanup as the block registry must reconfigure TCMU and other parts of the storage system.
 
 ```js
 interface Image {
@@ -62,8 +67,9 @@ interface BlockRegistry {
   deleteImage(image: Image): void
 
   // Loads an image from buildfs transferred via virtio-fs or downloaded from the internet using skopeo
+  // This will destroy data, as layers will be moved not copied
   loadImageFromDisk(path: path_to_oci_dump, outputId?: string): Image
-  // Creates a RW layer on top of an image, creates a random hash
+  // Creates a RW layer on top of an image, creates a random id if `outputId` is not supplied
   createContainer(image: Image, outputId?: string): Container
   // Converts the RW layer back into a RO layer, this deletes the container as overlaybd does not support cow snapshots
   commitContainer(container: Container, outputId?: string): Image
@@ -80,7 +86,7 @@ interface BlockRegistry {
 
 Use virtio-fs:
 
-1. Attach an empty agent directory to the buildfs vm using virtio-fs
+1. Attach an empty agent directory to the buildfs vm using virtio-fs (preferably on the same filesystem as the block registry)
 2. buildfs exports the image to the shared directory
 3. Agent loads the image into the block registry using loadImageFromDisk
 
@@ -90,6 +96,6 @@ Use virtio-fs:
 <BLOCK_REGISTRY_DIR>/tcmu_name # Name of the TCMU service owning this registry
 <BLOCK_REGISTRY_DIR>/block_config/<image or container hash>.config.v1.json # OverlayBD configs for block devices
 <BLOCK_REGISTRY_DIR>/layers/<content hash> # RO image layers
-<BLOCK_REGISTRY_DIR>/containers/<container hash>/* # OverlayBD write layers
-<BLOCK_REGISTRY_DIR>/images/<image hash>.json # Arrays of layer content hashes
+<BLOCK_REGISTRY_DIR>/containers/<container_id>/* # OverlayBD write layers
+<BLOCK_REGISTRY_DIR>/images/<image_id>.json # Arrays of paths to layers, IF relative path then path is relative with regards to the manifest file
 ```
