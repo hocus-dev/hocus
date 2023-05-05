@@ -15,21 +15,21 @@ To increase the density of workspaces on a single machine and to minimize the fo
 
 ## Details
 
-### Containers vs MicroVM's vs Hocus Workspaces
+### Containers vs MicroVMs vs Hocus Workspaces
 
-Containers are much more lightweight than VM's due to their shared host kernel and page cache. When running a container, the workload has full access to the host resources, and efficient resource sharing is easy. VMs, on the other hand, run a fully separate kernel and are always designed to use every MB of RAM that was given to them. Workloads running in VMs, contrary to containers, might be using up 1GB of RAM but 15GB in various caches, which are never freed and usually duplicated on the host kernel, resulting in very high memory usage on the host and decreasing the density of workspaces. MicroVM's are short-lived, so they avoid the problem of page caches piling up altogether. Hocus workspaces are meant to be operating for a very long time and have periods of inactivity, like a developer having 3 workspaces open but only using 1 of them or leaving workspaces on during their lunch break or overnight. Hocus workspaces are designed to autoscale their RAM during periods of intense usage (like compiling a project) and to release back their RAM as soon as the usage comes down.
+Containers are much more lightweight than VMs due to their shared host kernel and page cache. When running a container, the workload has full access to the host resources, and efficient resource sharing is easy. VMs, on the other hand, run a fully separate kernel and are always designed to use every MB of RAM that was given to them. Workloads running in VMs, contrary to containers, might only need 1GB of RAM but use up 15GB in various caches, which are never freed and usually duplicated on the host kernel, resulting in very high memory usage on the host and decreasing the maximum density of workspaces. MicroVMs are short-lived, so they avoid the problem of page caches piling up altogether. Hocus workspaces are meant to operate for a very long time and have periods of inactivity, like a developer having 3 workspaces open but only using 1 or leaving workspaces on during their lunch break or overnight. Hocus workspaces are designed to autoscale their RAM during periods of intense usage (like compiling a project) and to release back their RAM as soon as the usage comes down.
 
 ### Manual ballooning
 
-Previously, the only option for dynamic VM RAM management was memory ballooning where the hypervisor might manually readjust the size of the VM's RAM. Unfortunately, this introduces a ton of complexity in the hypervisor and is a half measure, not a solution, as creating a RAM usage policy which actually works well is very hard. Even if a good policy was designed and implemented, the inflation/deflation of the balloon is slow, unreliable, and unsuited for our use case. We want VMs to access most of the Host resources like containers and quickly give them back when unneeded.
+In the past, the only option for dynamic VM RAM management was memory ballooning where the hypervisor could manually readjust the size of a VM's RAM. Unfortunately, this introduces a ton of complexity in the hypervisor and is a half measure, not a solution, as creating a RAM usage policy which actually works well is very hard. Even if a good policy was designed and implemented, the inflation/deflation of the balloon would be slow, unreliable, and unsuitable for our use case. We want VMs to access most of the host's resources like containers and quickly give them back when not needed.
 
 ### Free page reporting
 
-The solution to this problem is Free Page Reporting[^1], a feature in `virtio-balloon` available since the 5.7 kernel, which gives a primitive in which the VM might give back their unused RAM to the hypervisor without manual intervention. By default, free page reporting operates in 4MB segments on x86_64, limiting its effectiveness without other measures. Since the 5.14 kernel, it's possible to override the segment size and for free page reporting to operate on a per-page granularity[^2]. In my testing, free page reporting with `page_reporting.page_reporting_order=0` works well and has acceptable overhead.
+The solution to this problem is Free Page Reporting[^1], a feature in `virtio-balloon` available since the 5.7 kernel, which provides a primitive in which the VM can give back its unused RAM to the hypervisor without manual intervention. By default, free page reporting operates in 4MB segments on x86_64, limiting its effectiveness without other measures. Since the 5.14 kernel, it's possible to override the segment size and for free page reporting to operate on a per-page granularity[^2]. In my testing, free page reporting with `page_reporting.page_reporting_order=0` works well and has acceptable overhead.
 
 ### Limiting page cache usage via `virtio-pmem` and DAX
 
-I tested this possibility, and this doesn't work well:
+I tested this possibility, and it doesn't work well:
 
 - For a 0.5TB sparse disk, the RAM overhead for the VM is 8GB, which is prohibitively large.
 - No support for discard, which results in the sparse disk files always growing in size.
@@ -45,11 +45,11 @@ Workspaces running on a single machine will usually run the same kernel, IDE ver
 
 ### DAMON (Data Access MONitor)
 
-For free page reporting to be effective, the workspace needs the ability to drop page caches it doesn't need. By default, Linux is designed to consume as much RAM as possible and never release it back until there is some memory pressure. Hocus workspaces use DAMON RECLAIM, available since the 5.16 kernel[^4], to proactively reclaim unused page caches. In our testing, this releases most of the caches the VM uses, but as DAMON is a very new subsystem in the kernel, there is still a lot of room for improvements[^5].
+For free page reporting to be effective, the workspace needs the ability to drop page caches it doesn't need. By default, Linux is designed to consume as much RAM as possible and never release it back until there is some memory pressure. Hocus workspaces use DAMON RECLAIM, available since the 5.16 kernel[^4], to proactively reclaim unused page caches. In our testing, this releases most of the caches the VM uses, but as DAMON is a very new subsystem in the kernel, there is still a lot of room for improvement[^5].
 
 ### PSI-based autosizing
 
-DAMON is able to reclaim unused caches but won't prevent the page cache from growing uncontrollably as the VM is rarely under high memory pressure. To ensure RAM is only allocated to the VM when it's actually needed, Hocus Workspaces ship [Sempai](https://github.com/facebookincubator/senpai), which is responsible for autosizing the system cgroup to ensure the VM is always under some kind of memory pressure. Sempai uses the PSI kernel mechanism to determine whether the workspace is under memory pressure and needs to increase/decrease its memory limits.
+DAMON is able to reclaim unused caches but won't prevent the page cache from growing uncontrollably as the VM is rarely under high memory pressure. To ensure RAM is only allocated to the VM when it's actually needed, Hocus Workspaces ship [Senpai](https://github.com/facebookincubator/senpai), which is responsible for autosizing the system cgroup to ensure the VM is always under some kind of memory pressure. Senpai uses the PSI kernel mechanism to determine whether the workspace is under memory pressure and needs to increase/decrease its memory limits.
 
 ### Memlocking critical binaries
 
@@ -57,11 +57,11 @@ Hocus tries to reclaim as much of the page cache as possible and as quickly as p
 
 ### Using swap on the host
 
-Hocus is designed to run a ton of workspaces on a single machine as the usage pattern of dev machines is high usage spikes followed by periods of inactivity. In the unlikely event multiple developers run multiple heavy jobs at the same time, exceeding the available memory on the host machine, the OOM killer will kill some workspaces. If that's unwanted, then we recommend having swap enabled on the host machine to swap out some of the workspaces and give KSM time to deduplicate the pages of the new jobs.
+Hocus is designed to pack as many workspaces as possible on a single machine as the usage pattern of dev machines is high usage spikes followed by long periods of inactivity. In the unlikely event that multiple developers run multiple heavy jobs at the same time, exceeding the available memory on the host machine, the OOM killer will kill some workspaces. If that's unwanted, then we recommend having swap enabled on the host machine to swap out some of the workspaces and give KSM time to deduplicate the pages of the new jobs.
 
 ### Guest kernel version
 
-For now, Hocus Workspaces will ship with the 6.2 kernel. This might be extended in the future down to the 5.16 kernel.
+For now, Hocus Workspaces will ship with the 6.2 kernel.
 
 [^1]: https://github.com/torvalds/linux/commit/b0c504f154718904ae49349147e3b7e6ae91ffdc
 [^2]: https://github.com/torvalds/linux/commit/f58780a8e3851edae5bafb7d3af19425308a37f5
