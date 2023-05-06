@@ -32,7 +32,7 @@ spawn qemu-system-x86_64 \
     -m 1024 \
     -nographic \
     -enable-kvm \
-    -kernel $RESOURCES_DIR/vmlinux-5.10-x86_64.bin \
+    -kernel $RESOURCES_DIR/vmlinux-6.2-x86_64.bin \
     -drive file=$RESOURCES_DIR/tmp-buildfs.ext4,format=raw,if=virtio,media=disk \
     -append \"root=/dev/vda console=ttyS0 ip=dhcp\" \
     -netdev user,id=n1 \
