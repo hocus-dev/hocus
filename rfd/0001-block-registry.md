@@ -5,15 +5,15 @@ state: draft
 
 # RFD 1 - Block Registry
 
-## Overview
+## What
 
 This document defines the block registry, which is responsible for managing node storage in workspaces while being extensible for future P2P operations. The goal is to decouple the workspace storage layer from the workspace runtime and use a well-defined interface between them.
 
-## Rationale
+## Why
 
 Workspaces are currently defined as Docker images, so the storage layer should provide container-like primitives while being compatible with VMs. Experimenting with various storage solutions requires a fully decoupled storage layer.
 
-## Specifications
+## Details
 
 ### Requirements
 
