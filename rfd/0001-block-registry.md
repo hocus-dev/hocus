@@ -7,7 +7,7 @@ state: draft
 
 ## What
 
-This document defines the block registry, which is responsible for managing node storage in workspaces while being extensible for future P2P operations. The goal is to decouple the workspace storage layer from the workspace runtime and use a well-defined interface between them.
+This document defines the block registry, which is responsible for managing storage for workspaces while being extensible for future P2P operations. The goal is to decouple the workspace storage layer from the workspace runtime and use a well-defined interface between them.
 
 ## Why
 
