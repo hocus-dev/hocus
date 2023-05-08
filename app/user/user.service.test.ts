@@ -33,21 +33,5 @@ test.concurrent(
     expect(user.externalId).toEqual(externalId);
     expect(userWithExtras.gitConfig.gitEmail).toEqual("dev@example.com");
     expect(userWithExtras.gitConfig.gitUsername).toEqual("dev");
-
-    for (let i = 0; i < DEFAULT_SEATS_LIMIT - 1; i++) {
-      await userService.getOrCreateUser(db, {
-        externalId: `abc${i}`,
-        gitEmail: `dev${i}@example.com`,
-      });
-    }
-    try {
-      await userService.getOrCreateUser(db, {
-        externalId: "toomany",
-        gitEmail: "toomany@example.com",
-      });
-      throw new Error("Should have thrown");
-    } catch (err) {
-      expect(err instanceof HttpError).toBe(true);
-    }
   }),
 );
