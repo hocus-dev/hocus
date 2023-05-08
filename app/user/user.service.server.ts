@@ -1,9 +1,7 @@
 import type { User } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import { StatusCodes } from "http-status-codes";
 
 import type { GitService } from "~/git/git.service";
-import { HttpError } from "~/http-error.server";
 import type { LicenseService } from "~/license/license.service";
 import { Token } from "~/token";
 
