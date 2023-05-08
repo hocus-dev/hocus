@@ -36,17 +36,6 @@ export class UserService {
       if (user != null) {
         return user;
       }
-      const activeUsersCount = await db.user.count({
-        where: {
-          active: true,
-        },
-      });
-      if (activeUsersCount >= this.licenseService.numSeats) {
-        throw new HttpError(
-          StatusCodes.FORBIDDEN,
-          `Too many active users. Please obtain a license with more seats. Currently used seats: ${activeUsersCount}/${this.licenseService.numSeats}.`,
-        );
-      }
       user = await tdb.user.create({
         data: {
           externalId,
