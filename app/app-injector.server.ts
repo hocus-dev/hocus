@@ -2,6 +2,7 @@ import type { GenericProviderMap, ProvidersFns, ProvidersOverrides } from "./di/
 import { Injector, Scope } from "./di/injector.server";
 import { overrideProviders } from "./di/utils.server";
 import { GitService } from "./git/git.service";
+import { InitService } from "./init/init.service.server";
 import { LicenseService } from "./license/license.service";
 import { PerfService } from "./perf.service.server";
 import { ProjectService } from "./project/project.service";
@@ -33,6 +34,7 @@ const providers = [
   { token: Token.ProjectService, provide: { class: ProjectService } },
   { token: Token.TemporalClient, provide: { factory: clientFactory } },
   { token: Token.WorkspaceService, provide: { class: WorkspaceService } },
+  { token: Token.InitService, provide: { class: InitService } },
 ] as const;
 
 export const createAppInjector = (overrides?: ProviderOverrides): AppInjector => {
