@@ -37,7 +37,7 @@ else
     skopeo copy --dest-decompress --dest-oci-accept-uncompressed-layers docker-daemon:"${IMAGE_NAME}" oci:"$OCI_DUMP_DIR"  
 fi
 
-/opt/overlaybd/convertor -r local-directory -i "$OCI_DUMP_DIR" -o "$OCI_DUMP_DIR2"
+/opt/overlaybd/bin/convertor -r local-directory -i "$OCI_DUMP_DIR" -o "$OCI_DUMP_DIR2"
 
 exit 1
 

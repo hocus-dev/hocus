@@ -33,7 +33,7 @@ RUN cd ~/ \
 COPY --from=obd-builder /opt/overlaybd /opt/overlaybd
 COPY --from=obd-builder /etc/overlaybd /etc/overlaybd
 # Install the overlaybd conversion tool
-COPY --from=obd-convertor-builder /convertor /opt/overlaybd/convertor
+COPY --from=obd-convertor-builder /convertor /opt/overlaybd/bin/convertor
 # Buildkite CLI + agent for running the CI jobs locally ;)
 RUN sudo wget https://github.com/buildkite/cli/releases/download/v2.0.0/cli-linux-amd64 -O /usr/bin/bk && sudo chmod +x /usr/bin/bk
 RUN curl -sL https://raw.githubusercontent.com/buildkite/agent/main/install.sh | bash && fish -c "set -U fish_user_paths \$fish_user_paths ~/.buildkite-agent/bin" && echo 'export PATH="~/.buildkite-agent/bin:$PATH"' >> ~/.bashrc
