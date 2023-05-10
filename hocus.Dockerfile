@@ -1,7 +1,16 @@
-FROM hocusdev/workspace
+FROM gcc:12.2.0 as obd-builder
+RUN apt-get update && apt-get install -y sudo cmake zlib1g-dev libcurl4-openssl-dev libssl-dev libaio-dev libnl-3-dev libnl-genl-3-dev libgflags-dev libzstd-dev libext2fs-dev
+RUN git clone https://github.com/containerd/overlaybd.git
+RUN cd overlaybd && git submodule update --init
+RUN cd overlaybd && mkdir build && cd build && cmake .. && make && sudo make install
 
+FROM golang:1.20.4-bullseye as obd-convertor-builder
+RUN git clone https://github.com/hocus-dev/accelerated-container-image.git && cd accelerated-container-image && git checkout 62f480a697ca68098ff2c91569aeaaf5e5b3463f
+RUN cd accelerated-container-image && make bin/convertor && cp ./bin/convertor /convertor
+
+FROM hocusdev/workspace
 RUN { curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 -fsSL https://deb.nodesource.com/setup_18.x | sudo bash -; } \
-    && DEBIAN_FRONTEND=noninteractive sudo apt-get install -y nodejs qemu-system psmisc expect unzip \
+    && DEBIAN_FRONTEND=noninteractive sudo apt-get install -y nodejs qemu-system psmisc expect unzip skopeo jq \
     && sudo npm install --global yarn \
     && fish -c "set -U fish_user_paths \$fish_user_paths ~/.yarn/bin" \
     && echo 'export PATH="~/.yarn/bin:$PATH"' >> ~/.bashrc \
@@ -9,6 +18,18 @@ RUN { curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --re
 RUN cspell link add @cspell/dict-html-symbol-entities && cspell link add @cspell/dict-lorem-ipsum && cspell link add @cspell/dict-npm
 RUN echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
 RUN curl -fsSL https://tailscale.com/install.sh | sh
+# Golang for messing with overlaybd
+RUN cd ~/ \
+    && mkdir ./go-dl \
+    && wget https://go.dev/dl/go1.20.4.linux-amd64.tar.gz -O ./go-dl/go1.20.4.linux-amd64.tar.gz \
+    && sudo tar -xvf ./go-dl/go1.20.4.linux-amd64.tar.gz -C /usr/local \
+    && rm -r ./go-dl \
+    && fish -c "set -U fish_user_paths \$fish_user_paths /usr/local/go/bin/" && echo 'export PATH="/usr/local/go/bin/:$PATH"' >> ~/.bashrc
+# Install overlaybd
+COPY --from=obd-builder /opt/overlaybd /opt/overlaybd
+COPY --from=obd-builder /etc/overlaybd /etc/overlaybd
+# Install the overlaybd conversion tool
+COPY --from=obd-convertor-builder /convertor /opt/overlaybd/convertor
 # Buildkite CLI + agent for running the CI jobs locally ;)
 RUN sudo wget https://github.com/buildkite/cli/releases/download/v2.0.0/cli-linux-amd64 -O /usr/bin/bk && sudo chmod +x /usr/bin/bk
 RUN curl -sL https://raw.githubusercontent.com/buildkite/agent/main/install.sh | bash && fish -c "set -U fish_user_paths \$fish_user_paths ~/.buildkite-agent/bin" && echo 'export PATH="~/.buildkite-agent/bin:$PATH"' >> ~/.bashrc
