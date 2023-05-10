@@ -1,9 +1,20 @@
-import { SshKeyPairType } from "@prisma/client";
+import fs from "fs/promises";
 
-import { provideAppInjectorAndDb } from "~/test-utils";
+import { SshKeyPairType } from "@prisma/client";
+import { TestWorkflowEnvironment } from "@temporalio/testing";
+import { DefaultLogger, Runtime, Worker } from "@temporalio/worker";
+import { v4 as uuidv4 } from "uuid";
+
+import { createActivities } from "~/agent/activities/list";
+import { createAgentInjector } from "~/agent/agent-injector";
+import { generateTemporalCodeBundle } from "~/temporal/bundle";
+import { provideAppInjector, provideAppInjectorAndDb } from "~/test-utils";
 import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
+
+// Temporal worker setup is long
+jest.setTimeout(30 * 1000);
 
 const USER1_ID = "b7b83d63-a9b0-4871-92d0-07779f28cfa8";
 const USER2_ID = "166908ef-15d0-498f-88e3-bfd97cf5d21b";
@@ -65,8 +76,29 @@ users:
         publicKey: pk_b7b83d63-a9b0-4871-92d0-07779f28cfa8
 `;
 
+let testEnv: TestWorkflowEnvironment;
+let workflowBundle: any;
+
+beforeAll(async () => {
+  Runtime.install({
+    logger: new DefaultLogger("WARN"),
+  });
+  testEnv = await TestWorkflowEnvironment.createTimeSkipping({
+    client: {
+      dataConverter: {
+        payloadConverterPath: require.resolve("~/temporal/data-converter"),
+      },
+    },
+  });
+  workflowBundle = await generateTemporalCodeBundle();
+});
+
+afterAll(async () => {
+  await testEnv?.teardown();
+});
+
 test.concurrent(
-  "initConfig",
+  "getInitConfig",
   provideAppInjectorAndDb(async ({ injector, db }) => {
     const initService = injector.resolve(Token.InitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
@@ -103,11 +135,6 @@ test.concurrent(
     const repo = await db.$transaction((tdb) =>
       gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
     );
-    // we set it manually because createSshKeyPair slightly modifies the private key
-    await db.sshKeyPair.update({
-      where: { id: pair.id },
-      data: { privateKey: TESTS_PRIVATE_SSH_KEY },
-    });
     await db.project.create({
       data: {
         name: "test",
@@ -154,8 +181,67 @@ test.concurrent(
         },
       },
     });
-    const initConfig = await initService.getInitConfig(db);
-    const initConfigStr = initService.stringifyInitConfig(initConfig);
+    const initConfig = await initService["getInitConfig"](db);
+    const initConfigStr = initService["stringifyInitConfig"](initConfig);
     expect(initConfigStr).toEqual(EXPECTED_CONFIG);
+  }),
+);
+
+test.concurrent(
+  "dump and load",
+  provideAppInjector(async ({ injector }) => {
+    const initService = injector.resolve(Token.InitService);
+    const initConfig = initService["parseInitConfig"](EXPECTED_CONFIG);
+    const filePath = `/tmp/init-config-test-${uuidv4()}`;
+    await initService["dumpInitConfigToFile"](filePath, initConfig);
+    const loadedConfig = await initService["loadInitConfigFromFile"](filePath);
+    const stringifiedConfig = initService["stringifyInitConfig"](loadedConfig);
+    expect(stringifiedConfig).toEqual(EXPECTED_CONFIG);
+    await fs.rm(filePath);
+  }),
+);
+
+test.concurrent(
+  "loadConfig",
+  provideAppInjectorAndDb(async ({ injector, db }) => {
+    const taskQueue = `test-${uuidv4()}`;
+    const initService = injector.resolve(Token.InitService);
+    initService["temporalQueue"] = taskQueue;
+    const initConfig = initService["parseInitConfig"](EXPECTED_CONFIG);
+
+    const agentInjector = createAgentInjector();
+    const activities = await createActivities(agentInjector, db);
+
+    const worker = await Worker.create({
+      connection: testEnv.nativeConnection,
+      taskQueue,
+      workflowsPath: require.resolve("~/agent/workflows"),
+      activities: {
+        ...activities,
+        updateGitBranchesAndObjects: async () => ({
+          newGitBranches: [],
+          updatedGitBranches: [],
+        }),
+      },
+      dataConverter: {
+        payloadConverterPath: require.resolve("~/temporal/data-converter"),
+      },
+      workflowBundle,
+    });
+
+    const initialInitConfig = await initService["getInitConfig"](db);
+    expect(initialInitConfig).toEqual({
+      projects: [],
+      repos: [],
+      users: [],
+    });
+
+    await worker.runUntil(async () => {
+      for (const _ of [1, 2, 3]) {
+        await initService["loadConfig"](db, testEnv.client, initConfig);
+        const updatedInitConfig = await initService["getInitConfig"](db);
+        expect(updatedInitConfig).toEqual(initConfig);
+      }
+    });
   }),
 );

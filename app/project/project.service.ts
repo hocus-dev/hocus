@@ -36,11 +36,13 @@ export class ProjectService {
       gitRepositoryId: bigint;
       rootDirectoryPath: string;
       name: string;
+      externalId?: string;
     },
   ): Promise<Project> {
     const environmentVariableSet = await db.environmentVariableSet.create({ data: {} });
     return await db.project.create({
       data: {
+        externalId: args.externalId,
         gitRepositoryId: args.gitRepositoryId,
         rootDirectoryPath: args.rootDirectoryPath,
         environmentVariableSetId: environmentVariableSet.id,

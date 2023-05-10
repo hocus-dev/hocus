@@ -10,13 +10,17 @@ export class SshKeyService {
     return await this.createSshKeyPair(db, sshPrivateKey, type);
   }
 
+  normalizePrivateKey(privateKey: string): string {
+    return privateKey.trim() + "\n";
+  }
+
   async createSshKeyPair(
     db: Prisma.Client,
     privateKey: string,
     type: SshKeyPairType,
   ): Promise<SshKeyPair> {
-    const parsedPrivateKey = sshpk.parsePrivateKey(privateKey);
-    const sshPrivateKey = parsedPrivateKey.toString("ssh");
+    const parsedPrivateKey = sshpk.parsePrivateKey(privateKey, "ssh-private");
+    const sshPrivateKey = this.normalizePrivateKey(privateKey);
     const sshPublicKey = parsedPrivateKey.toPublic().toString("ssh", { comment: "hocus" });
 
     return await db.sshKeyPair.create({

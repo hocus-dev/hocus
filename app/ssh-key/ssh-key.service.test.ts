@@ -15,6 +15,7 @@ test.concurrent(
       TESTS_PRIVATE_SSH_KEY,
       SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
     );
+    expect(pair.privateKey).toEqual(TESTS_PRIVATE_SSH_KEY);
     expect(pair.publicKey).toEqual(TESTS_PUBLIC_SSH_KEY);
     expect(pair.type).toEqual(SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED);
 
