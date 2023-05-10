@@ -1,4 +1,7 @@
+import fs from "fs/promises";
+
 import { SshKeyPairType } from "@prisma/client";
+import { v4 as uuidv4 } from "uuid";
 
 import { provideAppInjector, provideAppInjectorAndDb } from "~/test-utils";
 import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
@@ -156,11 +159,15 @@ test.concurrent(
 );
 
 test.concurrent(
-  "parse and stringify",
+  "dump and load",
   provideAppInjector(async ({ injector }) => {
     const initService = injector.resolve(Token.InitService);
-    const parsedConfig = initService.parseInitConfig(EXPECTED_CONFIG);
-    const stringifiedConfig = initService.stringifyInitConfig(parsedConfig);
+    const initConfig = initService.parseInitConfig(EXPECTED_CONFIG);
+    const filePath = `/tmp/init-config-test-${uuidv4()}`;
+    await initService.dumpInitConfigToFile(filePath, initConfig);
+    const loadedConfig = await initService.loadInitConfigFromFile(filePath);
+    const stringifiedConfig = initService.stringifyInitConfig(loadedConfig);
     expect(stringifiedConfig).toEqual(EXPECTED_CONFIG);
+    await fs.rm(filePath);
   }),
 );
