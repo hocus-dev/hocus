@@ -175,8 +175,8 @@ test.concurrent(
         },
       },
     });
-    const initConfig = await initService.getInitConfig(db);
-    const initConfigStr = initService.stringifyInitConfig(initConfig);
+    const initConfig = await initService["getInitConfig"](db);
+    const initConfigStr = initService["stringifyInitConfig"](initConfig);
     expect(initConfigStr).toEqual(EXPECTED_CONFIG);
   }),
 );
@@ -185,11 +185,11 @@ test.concurrent(
   "dump and load",
   provideAppInjector(async ({ injector }) => {
     const initService = injector.resolve(Token.InitService);
-    const initConfig = initService.parseInitConfig(EXPECTED_CONFIG);
+    const initConfig = initService["parseInitConfig"](EXPECTED_CONFIG);
     const filePath = `/tmp/init-config-test-${uuidv4()}`;
-    await initService.dumpInitConfigToFile(filePath, initConfig);
-    const loadedConfig = await initService.loadInitConfigFromFile(filePath);
-    const stringifiedConfig = initService.stringifyInitConfig(loadedConfig);
+    await initService["dumpInitConfigToFile"](filePath, initConfig);
+    const loadedConfig = await initService["loadInitConfigFromFile"](filePath);
+    const stringifiedConfig = initService["stringifyInitConfig"](loadedConfig);
     expect(stringifiedConfig).toEqual(EXPECTED_CONFIG);
     await fs.rm(filePath);
   }),
@@ -201,7 +201,7 @@ test.concurrent(
     const taskQueue = `test-${uuidv4()}`;
     const initService = injector.resolve(Token.InitService);
     initService["temporalQueue"] = taskQueue;
-    const initConfig = initService.parseInitConfig(EXPECTED_CONFIG);
+    const initConfig = initService["parseInitConfig"](EXPECTED_CONFIG);
 
     const agentInjector = createAgentInjector();
     const activities = await createActivities(agentInjector, db);
@@ -223,7 +223,7 @@ test.concurrent(
       workflowBundle,
     });
 
-    const initialInitConfig = await initService.getInitConfig(db);
+    const initialInitConfig = await initService["getInitConfig"](db);
     expect(initialInitConfig).toEqual({
       projects: [],
       repos: [],
@@ -232,8 +232,8 @@ test.concurrent(
 
     await worker.runUntil(async () => {
       for (const _ of [1, 2, 3]) {
-        await initService.loadConfig(db, testEnv.client, initConfig);
-        const updatedInitConfig = await initService.getInitConfig(db);
+        await initService["loadConfig"](db, testEnv.client, initConfig);
+        const updatedInitConfig = await initService["getInitConfig"](db);
         expect(updatedInitConfig).toEqual(initConfig);
       }
     });

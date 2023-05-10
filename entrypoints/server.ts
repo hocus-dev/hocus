@@ -23,12 +23,17 @@ const config = appInjector.resolve(Token.Config);
 const userService = appInjector.resolve(Token.UserService);
 const initService = appInjector.resolve(Token.InitService);
 const telemetryConfig = config.telemetry();
+const withClient = appInjector.resolve(Token.TemporalClient);
 
-initService.runDumpLoop(db).catch((err) => {
-  /* eslint-disable no-console */
-  console.error("Fatal error running config dump loop. Config will not be saved to disk.");
-  console.error(err);
-  /* eslint-enable */
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
+withClient(async (client) => {
+  await initService.loadInitConfigFromFileIntoDb(db, client);
+  await initService.runDumpLoop(db).catch((err) => {
+    /* eslint-disable no-console */
+    console.error("Fatal error running config dump loop. Config will not be saved to disk.");
+    console.error(err);
+    /* eslint-enable */
+  });
 });
 
 const BUILD_DIR = path.join(process.cwd(), "build");

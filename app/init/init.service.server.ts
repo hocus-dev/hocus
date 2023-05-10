@@ -29,7 +29,7 @@ export class InitService {
     this.initConfig = config.init();
   }
 
-  async getInitConfig(db: Prisma.Client): Promise<InitConfig> {
+  private async getInitConfig(db: Prisma.Client): Promise<InitConfig> {
     const usersRaw = await db.user.findMany({
       include: {
         gitConfig: true,
@@ -125,42 +125,25 @@ export class InitService {
     };
   }
 
-  stringifyInitConfig(initConfig: InitConfig): string {
+  private stringifyInitConfig(initConfig: InitConfig): string {
     return yaml.stringify(initConfig, { sortMapEntries: true, indent: 2 });
   }
 
-  parseInitConfig(contents: string): InitConfig {
+  private parseInitConfig(contents: string): InitConfig {
     return yaml.parse(contents);
   }
 
-  async loadInitConfigFromFile(filePath: string): Promise<InitConfig> {
+  private async loadInitConfigFromFile(filePath: string): Promise<InitConfig> {
     const contents = await fs.readFile(filePath, "utf-8");
     return this.parseInitConfig(contents);
   }
 
-  async dumpInitConfigToFile(filePath: string, initConfig: InitConfig): Promise<void> {
+  private async dumpInitConfigToFile(filePath: string, initConfig: InitConfig): Promise<void> {
     const contents = this.stringifyInitConfig(initConfig);
     await fs.writeFile(filePath, contents);
   }
 
-  async runDumpLoop(db: Prisma.Client): Promise<void> {
-    if (!this.initConfig.configDumpEnabled) {
-      return;
-    }
-    const interval = this.initConfig.configDumpIntervalSeconds * 1000;
-
-    while (true) {
-      try {
-        const initConfig = await this.getInitConfig(db);
-        await this.dumpInitConfigToFile(this.initConfig.configDumpPath, initConfig);
-      } catch (err) {
-        this.logger.error(displayError(err));
-      }
-      await sleep(interval);
-    }
-  }
-
-  async createUsers(db: Prisma.Client, initConfig: InitConfig): Promise<void> {
+  private async createUsers(db: Prisma.Client, initConfig: InitConfig): Promise<void> {
     for (const userConfig of initConfig.users) {
       let user = await db.user.findUnique({
         where: {
@@ -216,7 +199,7 @@ export class InitService {
     }
   }
 
-  async createProjectsAndRepos(
+  private async createProjectsAndRepos(
     db: Prisma.Client,
     temporalClient: Client,
     initConfig: InitConfig,
@@ -339,8 +322,37 @@ export class InitService {
     }
   }
 
-  async loadConfig(db: Prisma.Client, client: Client, initConfig: InitConfig): Promise<void> {
+  private async loadConfig(
+    db: Prisma.Client,
+    client: Client,
+    initConfig: InitConfig,
+  ): Promise<void> {
     await this.createUsers(db, initConfig);
     await this.createProjectsAndRepos(db, client, initConfig);
+  }
+
+  async runDumpLoop(db: Prisma.Client): Promise<void> {
+    if (!this.initConfig.configDumpEnabled) {
+      return;
+    }
+    const interval = this.initConfig.configDumpIntervalSeconds * 1000;
+
+    while (true) {
+      try {
+        const initConfig = await this.getInitConfig(db);
+        await this.dumpInitConfigToFile(this.initConfig.configDumpPath, initConfig);
+      } catch (err) {
+        this.logger.error(displayError(err));
+      }
+      await sleep(interval);
+    }
+  }
+
+  async loadInitConfigFromFileIntoDb(db: Prisma.Client, client: Client): Promise<void> {
+    if (!this.initConfig.configLoadEnabled) {
+      return;
+    }
+    const initConfig = await this.loadInitConfigFromFile(this.initConfig.configLoadPath);
+    await this.loadConfig(db, client, initConfig);
   }
 }
