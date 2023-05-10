@@ -35,3 +35,21 @@ vim resources/buildkite/buildkite-agent.cfg
 # Half of the host cores are passed to the VM
 sudo ./ops/bin/dev/run-buildkite.sh
 ```
+
+## Running Hocus locally with an init configuration
+
+Init configuration is a YAML file that defines users, projects, and repositories that Hocus creates when it starts.
+It gets continuously updated by the control plane as users create new entities. Here's how to enable it.
+
+First, create a directory for the init configuration:
+
+```bash
+INIT_CONFIG_DIR_PATH="$(pwd)/hocus-init"
+mkdir -p "$INIT_CONFIG_DIR_PATH"
+```
+
+Then start Hocus with the environment variable `INIT_CONFIG_DIR_PATH`. Make sure it's an absolute path.
+
+```bash
+INIT_CONFIG_DIR_PATH="$INIT_CONFIG_DIR_PATH" HOCUS_HOSTNAME="localhost" ops/bin/local-up.sh
+```
