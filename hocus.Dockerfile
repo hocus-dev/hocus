@@ -1,5 +1,9 @@
-FROM gcc:12.2.0 as obd-builder
-RUN apt-get update && apt-get install -y sudo cmake zlib1g-dev libcurl4-openssl-dev libssl-dev libaio-dev libnl-3-dev libnl-genl-3-dev libgflags-dev libzstd-dev libext2fs-dev
+FROM gcc:12.2.0-bullseye as obd-builder
+RUN apt-get update \
+    && apt-get -y --no-install-recommends install software-properties-common \
+    && add-apt-repository "deb http://httpredir.debian.org/debian sid main" \
+    && apt-get update \
+    && apt-get -t sid install -y sudo cmake zlib1g-dev libcurl4-openssl-dev libssl3 libssl-dev libaio-dev libnl-3-dev libnl-genl-3-dev libgflags-dev libzstd-dev libext2fs-dev
 RUN git clone https://github.com/containerd/overlaybd.git
 RUN cd overlaybd && git submodule update --init
 RUN cd overlaybd && mkdir build && cd build && cmake .. && make && sudo make install
@@ -28,8 +32,9 @@ RUN cd ~/ \
 # Install overlaybd
 COPY --from=obd-builder /opt/overlaybd /opt/overlaybd
 COPY --from=obd-builder /etc/overlaybd /etc/overlaybd
+RUN sudo chmod u+s /opt/overlaybd/bin/overlaybd-apply
 # Install the overlaybd conversion tool
-COPY --from=obd-convertor-builder /convertor /opt/overlaybd/convertor
+COPY --from=obd-convertor-builder /convertor /opt/overlaybd/bin/convertor
 # Buildkite CLI + agent for running the CI jobs locally ;)
 RUN sudo wget https://github.com/buildkite/cli/releases/download/v2.0.0/cli-linux-amd64 -O /usr/bin/bk && sudo chmod +x /usr/bin/bk
 RUN curl -sL https://raw.githubusercontent.com/buildkite/agent/main/install.sh | bash && fish -c "set -U fish_user_paths \$fish_user_paths ~/.buildkite-agent/bin" && echo 'export PATH="~/.buildkite-agent/bin:$PATH"' >> ~/.bashrc
