@@ -32,6 +32,7 @@ RUN cd ~/ \
 # Install overlaybd
 COPY --from=obd-builder /opt/overlaybd /opt/overlaybd
 COPY --from=obd-builder /etc/overlaybd /etc/overlaybd
+RUN sudo chmod u+s /opt/overlaybd/bin/overlaybd-apply
 # Install the overlaybd conversion tool
 COPY --from=obd-convertor-builder /convertor /opt/overlaybd/bin/convertor
 # Buildkite CLI + agent for running the CI jobs locally ;)
