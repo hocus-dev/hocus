@@ -1,9 +1,23 @@
+import fs from "fs/promises";
+
 import type { Prisma } from "@prisma/client";
+import type { Logger } from "winston";
 import yaml from "yaml";
 
 import type { InitConfig } from "./init-config.validator.server";
 
+import type { Config } from "~/config";
+import { Token } from "~/token";
+import { displayError, sleep } from "~/utils.shared";
+
 export class InitService {
+  static inject = [Token.Logger, Token.Config] as const;
+  private readonly initConfig: ReturnType<Config["init"]>;
+
+  constructor(private readonly logger: Logger, config: Config) {
+    this.initConfig = config.init();
+  }
+
   async getInitConfig(db: Prisma.Client): Promise<InitConfig> {
     const usersRaw = await db.user.findMany({
       include: {
@@ -102,5 +116,36 @@ export class InitService {
 
   stringifyInitConfig(initConfig: InitConfig): string {
     return yaml.stringify(initConfig, { sortMapEntries: true, indent: 2 });
+  }
+
+  parseInitConfig(contents: string): InitConfig {
+    return yaml.parse(contents);
+  }
+
+  async loadInitConfigFromFile(filePath: string): Promise<InitConfig> {
+    const contents = await fs.readFile(filePath, "utf-8");
+    return this.parseInitConfig(contents);
+  }
+
+  async dumpInitConfigToFile(filePath: string, initConfig: InitConfig): Promise<void> {
+    const contents = this.stringifyInitConfig(initConfig);
+    await fs.writeFile(filePath, contents);
+  }
+
+  async runDumpLoop(db: Prisma.Client): Promise<void> {
+    if (!this.initConfig.configDumpEnabled) {
+      return;
+    }
+    const interval = this.initConfig.configDumpIntervalSeconds * 1000;
+
+    while (true) {
+      try {
+        const initConfig = await this.getInitConfig(db);
+        await this.dumpInitConfigToFile(this.initConfig.configDumpPath, initConfig);
+      } catch (err) {
+        this.logger.error(displayError(err));
+      }
+      await sleep(interval);
+    }
   }
 }

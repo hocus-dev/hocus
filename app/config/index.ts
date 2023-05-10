@@ -92,4 +92,14 @@ export const config = makeConfig()({
   perfMonitoring: () => ({
     enabled: (process.env.PERF_MONITORING_ENABLED ?? "") !== "",
   }),
+  init: () => ({
+    configLoadEnabled: (process.env.INIT_CONFIG_LOAD_ENABLED ?? "") !== "",
+    configLoadPath: process.env.INIT_CONFIG_LOAD_PATH ?? "/tmp/hocus-config.yaml",
+    configDumpEnabled: (process.env.INIT_CONFIG_DUMP_ENABLED ?? "") !== "",
+    configDumpPath: process.env.INIT_CONFIG_DUMP_PATH ?? "/tmp/hocus-config.yaml",
+    configDumpIntervalSeconds: parseIntWithMin(
+      process.env.INIT_CONFIG_DUMP_INTERVAL_SECONDS ?? "15",
+      1,
+    ),
+  }),
 });
