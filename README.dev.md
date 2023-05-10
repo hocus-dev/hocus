@@ -48,6 +48,8 @@ INIT_CONFIG_DIR_PATH="$(pwd)/hocus-init"
 mkdir -p "$INIT_CONFIG_DIR_PATH"
 ```
 
+Hocus will create a file called `config.yaml` in this directory.
+
 Then start Hocus with the environment variable `INIT_CONFIG_DIR_PATH`. Make sure it's an absolute path.
 
 ```bash
