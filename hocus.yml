@@ -58,4 +58,4 @@ vscode:
     # Shell script linter
     - timonwong.shellcheck
     # Prose linter
-    - errata-ai.vale-server
+    - ChrisChinchilla.vale-vscode
