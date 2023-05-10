@@ -2,7 +2,7 @@ import fs from "fs/promises";
 
 import { SshKeyPairType } from "@prisma/client";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
-import { Worker } from "@temporalio/worker";
+import { DefaultLogger, Runtime, Worker } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import { createActivities } from "~/agent/activities/list";
@@ -77,6 +77,9 @@ let testEnv: TestWorkflowEnvironment;
 let workflowBundle: any;
 
 beforeAll(async () => {
+  Runtime.install({
+    logger: new DefaultLogger("WARN"),
+  });
   testEnv = await TestWorkflowEnvironment.createTimeSkipping({
     client: {
       dataConverter: {
