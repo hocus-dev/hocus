@@ -19,27 +19,14 @@ FS_MAX_SIZE_MIB="${4}"
 
 IMAGE_TAG=$(basename "$DOCKERFILE_PATH" | sed 's/\.Dockerfile//')
 IMAGE_NAME="buildfs:${IMAGE_TAG}"
-OCI_DUMP_DIR=./test
-OCI_DUMP_DIR2=./test2
+CONTAINER_TAG="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 8 || true)"
+CONTAINER_NAME="container-buildfs-${CONTAINER_TAG}"
+MOUNT_PATH="/tmp/buildfs-${IMAGE_TAG}"
+ORIGINAL_PATH="$(pwd)"
 
 # Build the image - is instant if the image already exists :)
 docker build --progress=plain --tag "${IMAGE_NAME}" --file "${DOCKERFILE_PATH}" "${CONTEXT_DIR}"
-IMAGE_HASH=$(docker images --no-trunc --digests --quiet "${IMAGE_NAME}" | tr -d '\n')
-if [ -f "$OCI_DUMP_DIR"/manifest.json ]; then
-    EXISTING_IMAGE_HASH=$(jq .config.digest < "$OCI_DUMP_DIR"/manifest.json | tr -d '"' | tr -d '\n')
-    echo "Found existing image dump with hash $EXISTING_IMAGE_HASH, target hash $IMAGE_HASH"
-    if [ "$IMAGE_HASH" = "$EXISTING_IMAGE_HASH" ]; then
-        echo "Skipping image dump - hashes the same";
-    else
-        skopeo copy --dest-decompress --dest-oci-accept-uncompressed-layers docker-daemon:"${IMAGE_NAME}" oci:"$OCI_DUMP_DIR"
-    fi
-else
-    skopeo copy --dest-decompress --dest-oci-accept-uncompressed-layers docker-daemon:"${IMAGE_NAME}" oci:"$OCI_DUMP_DIR"  
-fi
-
-/opt/overlaybd/bin/convertor -r local-directory -i "$OCI_DUMP_DIR" -o "$OCI_DUMP_DIR2"
-
-exit 1
+FS_HASH=$(docker images --no-trunc --digests --quiet "${IMAGE_NAME}" | tr -d '\n' | tail -c16)
 
 # If the target image already exists
 if [ -f "${OUTPUT_PATH}" ]; then
