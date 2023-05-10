@@ -13,6 +13,9 @@ import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
+// Temporal worker setup is long
+jest.setTimeout(30 * 1000);
+
 const USER1_ID = "b7b83d63-a9b0-4871-92d0-07779f28cfa8";
 const USER2_ID = "166908ef-15d0-498f-88e3-bfd97cf5d21b";
 
