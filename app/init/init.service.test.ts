@@ -1,6 +1,6 @@
 import { SshKeyPairType } from "@prisma/client";
 
-import { provideAppInjectorAndDb } from "~/test-utils";
+import { provideAppInjector, provideAppInjectorAndDb } from "~/test-utils";
 import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
@@ -152,5 +152,15 @@ test.concurrent(
     const initConfig = await initService.getInitConfig(db);
     const initConfigStr = initService.stringifyInitConfig(initConfig);
     expect(initConfigStr).toEqual(EXPECTED_CONFIG);
+  }),
+);
+
+test.concurrent(
+  "parse and stringify",
+  provideAppInjector(async ({ injector }) => {
+    const initService = injector.resolve(Token.InitService);
+    const parsedConfig = initService.parseInitConfig(EXPECTED_CONFIG);
+    const stringifiedConfig = initService.stringifyInitConfig(parsedConfig);
+    expect(stringifiedConfig).toEqual(EXPECTED_CONFIG);
   }),
 );
