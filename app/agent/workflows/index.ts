@@ -144,6 +144,7 @@ export async function runAddProjectAndRepository(args: {
   gitRepositoryUrl: string;
   projectName: string;
   projectWorkspaceRoot: string;
+  projectExternalId?: string;
   sshKeyPairId?: bigint;
 }): Promise<{ project: Project; gitRepository: GitRepository }> {
   const result = await addProjectAndRepository(args);

@@ -8,6 +8,7 @@ export type AddProjectAndRepositoryActivity = (args: {
   gitRepositoryUrl: string;
   projectName: string;
   projectWorkspaceRoot: string;
+  projectExternalId?: string;
   sshKeyPairId?: bigint;
 }) => Promise<{
   project: Project;
@@ -29,6 +30,7 @@ export const addProjectAndRepository: CreateActivity<AddProjectAndRepositoryActi
         gitRepositoryId: gitRepository.id,
         name: args.projectName,
         rootDirectoryPath: args.projectWorkspaceRoot,
+        externalId: args.projectExternalId,
       });
       return { project, gitRepository, gitRepositoryCreated: wasCreated };
     });
