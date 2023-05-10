@@ -94,9 +94,9 @@ export const config = makeConfig()({
   }),
   init: () => ({
     configLoadEnabled: (process.env.INIT_CONFIG_LOAD_ENABLED ?? "") !== "",
-    configLoadPath: process.env.INIT_CONFIG_LOAD_PATH ?? "/tmp/hocus-config.yaml",
+    configLoadPath: process.env.INIT_CONFIG_LOAD_PATH ?? "/init-config.yaml",
     configDumpEnabled: (process.env.INIT_CONFIG_DUMP_ENABLED ?? "") !== "",
-    configDumpPath: process.env.INIT_CONFIG_DUMP_PATH ?? "/tmp/hocus-config.yaml",
+    configDumpPath: process.env.INIT_CONFIG_DUMP_PATH ?? "/init-config.yaml",
     configDumpIntervalSeconds: parseIntWithMin(
       process.env.INIT_CONFIG_DUMP_INTERVAL_SECONDS ?? "15",
       1,

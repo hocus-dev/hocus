@@ -184,6 +184,12 @@ services:
       - TEMPORAL_SERVER_URL=temporal:7233
       - PRISMA_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/rooms?schema=public
       - TELEMETRY_DISABLED=${TELEMETRY_DISABLED:-}
+      - INIT_CONFIG_LOAD_ENABLED=${INIT_CONFIG_PATH:-}
+      - INIT_CONFIG_DUMP_ENABLED=${INIT_CONFIG_PATH:-}
+    volumes:
+      # this volume only needs to be set up if you are using an init config, which is
+      # a feature targeted towards developers working on Hocus itself
+      - ${INIT_CONFIG_PATH:-/tmp/hocus-init-config-placeholder}:/init-config.yaml
     ports:
       - "${NO_EXPOSE_PORTS-3000:}3000"
     networks:
