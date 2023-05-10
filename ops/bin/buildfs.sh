@@ -20,6 +20,7 @@ FS_MAX_SIZE_MIB="${4}"
 IMAGE_TAG=$(basename "$DOCKERFILE_PATH" | sed 's/\.Dockerfile//')
 IMAGE_NAME="buildfs:${IMAGE_TAG}"
 OCI_DUMP_DIR=./test
+OCI_DUMP_DIR2=./test2
 
 # Build the image - is instant if the image already exists :)
 docker build --progress=plain --tag "${IMAGE_NAME}" --file "${DOCKERFILE_PATH}" "${CONTEXT_DIR}"
@@ -35,6 +36,8 @@ if [ -f "$OCI_DUMP_DIR"/manifest.json ]; then
 else
     skopeo copy --dest-decompress --dest-oci-accept-uncompressed-layers docker-daemon:"${IMAGE_NAME}" oci:"$OCI_DUMP_DIR"  
 fi
+
+/opt/overlaybd/convertor -r local-directory -i "$OCI_DUMP_DIR" -o "$OCI_DUMP_DIR2"
 
 exit 1
 
