@@ -28,12 +28,12 @@ const withClient = appInjector.resolve(Token.TemporalClient);
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 withClient(async (client) => {
   await initService.loadInitConfigFromFileIntoDb(db, client);
-  await initService.runDumpLoop(db).catch((err) => {
-    /* eslint-disable no-console */
-    console.error("Fatal error running config dump loop. Config will not be saved to disk.");
-    console.error(err);
-    /* eslint-enable */
-  });
+  await initService.runDumpLoop(db);
+}).catch((err) => {
+  /* eslint-disable no-console */
+  console.error("Fatal error running init config operations. Config will not be saved to disk.");
+  console.error(err);
+  /* eslint-enable */
 });
 
 const BUILD_DIR = path.join(process.cwd(), "build");

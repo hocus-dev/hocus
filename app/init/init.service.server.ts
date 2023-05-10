@@ -352,7 +352,17 @@ export class InitService {
     if (!this.initConfig.configLoadEnabled) {
       return;
     }
-    const initConfig = await this.loadInitConfigFromFile(this.initConfig.configLoadPath);
+    const initConfig = await this.loadInitConfigFromFile(this.initConfig.configLoadPath).catch(
+      (err) => {
+        if (err?.code === "ENOENT") {
+          return null;
+        }
+        throw err;
+      },
+    );
+    if (initConfig == null) {
+      return;
+    }
     await this.loadConfig(db, client, initConfig);
   }
 }
