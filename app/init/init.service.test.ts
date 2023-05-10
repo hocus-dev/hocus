@@ -103,11 +103,6 @@ test.concurrent(
     const repo = await db.$transaction((tdb) =>
       gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
     );
-    // we set it manually because createSshKeyPair slightly modifies the private key
-    await db.sshKeyPair.update({
-      where: { id: pair.id },
-      data: { privateKey: TESTS_PRIVATE_SSH_KEY },
-    });
     await db.project.create({
       data: {
         name: "test",
