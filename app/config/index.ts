@@ -69,6 +69,7 @@ export const config = makeConfig()({
     // They will be public soon anyway :)
     createDevelopementProjects:
       (process.env.AGENT_DEV_CREATE_DEVELOPEMENT_PROJECTS ?? "false") === "true",
+    
   }),
   hocusRepoAccess: () => ({
     // Temporarily the Hocus repo is private :P Will be removed soon.

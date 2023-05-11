@@ -4,7 +4,7 @@ RUN apt-get update \
     && add-apt-repository "deb http://httpredir.debian.org/debian sid main" \
     && apt-get update \
     && apt-get -t sid install -y sudo cmake zlib1g-dev libcurl4-openssl-dev libssl3 libssl-dev libaio-dev libnl-3-dev libnl-genl-3-dev libgflags-dev libzstd-dev libext2fs-dev
-RUN git clone https://github.com/containerd/overlaybd.git
+RUN git clone https://github.com/hocus-dev/overlaybd.git && cd overlaybd && git checkout 5735850ff0950f20172e829cc9ce3c47ceb3cd73
 RUN cd overlaybd && git submodule update --init
 RUN cd overlaybd && mkdir build && cd build && cmake .. && make && sudo make install
 
@@ -14,7 +14,7 @@ RUN cd accelerated-container-image && make bin/convertor && cp ./bin/convertor /
 
 FROM hocusdev/workspace
 RUN { curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 -fsSL https://deb.nodesource.com/setup_18.x | sudo bash -; } \
-    && DEBIAN_FRONTEND=noninteractive sudo apt-get install -y nodejs qemu-system psmisc expect unzip skopeo jq \
+    && DEBIAN_FRONTEND=noninteractive sudo apt-get install -y cmake nodejs qemu-system psmisc expect unzip skopeo jq \
     && sudo npm install --global yarn \
     && fish -c "set -U fish_user_paths \$fish_user_paths ~/.yarn/bin" \
     && echo 'export PATH="~/.yarn/bin:$PATH"' >> ~/.bashrc \

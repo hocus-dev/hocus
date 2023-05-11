@@ -1,0 +1,5 @@
+{
+  "test1": "quay.io/gorbak25/hocus-block-registry-tests@sha256:12c858877888da5efeed26d36ef0e12423a9699044121cbd6543a9b9666b9e4b",
+  "test2": "quay.io/gorbak25/hocus-block-registry-tests@sha256:12a807466bb532af44b28f810ae7632a699f2b37b559140163ab6915475905bc",
+  "test3": "quay.io/gorbak25/hocus-block-registry-tests@sha256:f5afad0827942df6687b3d8f5551e818e42323a57056b2fcd3d6f5fc027a3c53"
+}
