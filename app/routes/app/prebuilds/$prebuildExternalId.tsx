@@ -9,6 +9,7 @@ import moment from "moment";
 
 import { AppPage } from "~/components/app-page";
 import { BackToProjectLink } from "~/components/projects/back-to-project-link";
+import { PrebuildArchiveButton } from "~/components/projects/prebuilds/archive-button";
 import { PrebuildStatus } from "~/components/projects/prebuilds/prebuild-status";
 import { PrebuildRetryButton } from "~/components/projects/prebuilds/retry-button";
 import { TaskViewer } from "~/components/projects/prebuilds/task-viewer";
@@ -161,6 +162,9 @@ export default function PrebuildRoute(): JSX.Element {
       <div className="flex gap-4 w-full mt-4 items-end justify-between">
         <h1 className="font-bold text-3xl">Prebuild</h1>
         <div className="flex gap-4">
+          {prebuild.status === "PREBUILD_EVENT_STATUS_SUCCESS" && (
+            <PrebuildArchiveButton prebuildExternalId={prebuild.externalId} />
+          )}
           <PrebuildRetryButton
             projectExternalId={project.externalId}
             gitObjectHash={prebuild.gitHash}

@@ -12,6 +12,7 @@ export const PagePaths = {
   UserSettingsSshKeyDelete: "/app/user/settings/ssh-key/delete",
   UserSettingsSshKeyCreate: "/app/user/settings/ssh-key/create",
   SchedulePrebuild: "/app/prebuilds/schedule",
+  ArchivePrebuild: "/app/prebuilds/archive",
 } as const;
 
 export type ProjectPathTabId = valueof<typeof ProjectPathTabId>;
