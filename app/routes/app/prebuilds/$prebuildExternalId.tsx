@@ -162,7 +162,9 @@ export default function PrebuildRoute(): JSX.Element {
       <div className="flex gap-4 w-full mt-4 items-end justify-between">
         <h1 className="font-bold text-3xl">Prebuild</h1>
         <div className="flex gap-4">
-          <PrebuildArchiveButton prebuildExternalId={prebuild.externalId} />
+          {prebuild.status === "PREBUILD_EVENT_STATUS_SUCCESS" && (
+            <PrebuildArchiveButton prebuildExternalId={prebuild.externalId} />
+          )}
           <PrebuildRetryButton
             projectExternalId={project.externalId}
             gitObjectHash={prebuild.gitHash}

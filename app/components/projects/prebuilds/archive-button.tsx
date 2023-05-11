@@ -7,7 +7,7 @@ export function PrebuildArchiveButton(props: { prebuildExternalId: string }): JS
       action={PagePaths.ArchivePrebuild}
       method="POST"
       inputs={{
-        projectExternalId: props.prebuildExternalId,
+        prebuildExternalId: props.prebuildExternalId,
       }}
       buttonProps={{ color: "light", className: "transition-all" }}
       loadingSpinnerProps={{ color: "gray" }}
