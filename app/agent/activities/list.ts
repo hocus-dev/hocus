@@ -37,6 +37,7 @@ import { stopWorkspace } from "./stop-workspace";
 import type { CreateActivity } from "./types";
 import { updateGitBranchesAndObjects } from "./update-git-branches-and-objects";
 import { waitForBuildfs } from "./wait-for-buildfs";
+import { signalWithStartWaitWorkflow } from "./wait-for-workflow/signal-with-start-wait-workflow";
 import { cleanUpWorkspaceInstanceDb } from "./workspace/clean-up-workspace-instance";
 import { cleanUpWorkspaceInstanceLocal } from "./workspace/clean-up-workspace-instance";
 
@@ -77,6 +78,7 @@ const activities = {
   getWorkflowStatus,
   cleanUpWorkspaceInstanceDb,
   createPrebuildEvent,
+  signalWithStartWaitWorkflow,
 } as const;
 
 const _typecheck: typeof activities extends Record<string, CreateActivity<any>> ? 1 : 0 = 1;

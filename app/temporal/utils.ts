@@ -2,20 +2,18 @@ import { ApplicationFailure, sleep } from "@temporalio/workflow";
 
 import { waitForPromises } from "~/utils.shared";
 
-export const wrapWorkflowError = async <T>(fn: () => Promise<T>): Promise<T> => {
-  try {
-    return await fn();
-  } catch (e) {
-    if (e instanceof Error) {
-      throw new ApplicationFailure(e.message, null, null, null, e);
-    }
-    const asString = String(e);
-    throw new ApplicationFailure(asString, null, null, null, new Error(asString));
+export const wrapWorkflowError = (e: unknown): ApplicationFailure => {
+  if (e instanceof Error) {
+    return new ApplicationFailure(e.message, null, null, null, e);
   }
+  const asString = String(e);
+  return new ApplicationFailure(asString, null, null, null, new Error(asString));
 };
 
 export const waitForPromisesWorkflow: typeof waitForPromises = async (args) => {
-  return await wrapWorkflowError(() => waitForPromises(args));
+  return await waitForPromises(args).catch((err) => {
+    throw wrapWorkflowError(err);
+  });
 };
 
 export const retryWorkflow = async <T>(
