@@ -10,6 +10,7 @@ import {
 import { lockWorkflow } from "./mutex";
 import { testLock } from "./mutex/test-workflow";
 import { runBuildfsAndPrebuilds, runPrebuild, runBuildfs, scheduleNewPrebuild } from "./prebuild";
+import { runWaitForWorkflow } from "./wait-for-workflow";
 import {
   runCreateWorkspace,
   runStartWorkspace,
@@ -35,6 +36,7 @@ export {
   lockWorkflow,
   testLock,
   scheduleNewPrebuild,
+  runWaitForWorkflow,
 };
 
 const {
