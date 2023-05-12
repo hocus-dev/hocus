@@ -1,6 +1,6 @@
-// Source: https://github.com/sinclairzx81/typebox/blob/c4061c162eb99be3d07b08c9cb393804c3977060/example/formats/additional.ts
-// Based on this comment from typebox's author: https://github.com/sinclairzx81/typebox/issues/293#issuecomment-1357169652
-import { Format } from "@sinclair/typebox/format";
+// Source: https://github.com/sinclairzx81/typebox/tree/8ca61abeb5f66a19493b06847c7c9c48bf5a2397/example/formats
+import { Type, FormatRegistry } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 
 /** Configures TypeBox for additional string formats */
 export namespace AdditionalFormats {
@@ -87,14 +87,14 @@ export namespace AdditionalFormats {
 
   /** Configures additional string formats */
   export function Configure(): void {
-    Format.Set("date-time", (value) => IsDateTime(value, true));
-    Format.Set("date", (value) => IsDate(value));
-    Format.Set("time", (value) => IsTime(value));
-    Format.Set("email", (value) => IsEmail(value));
-    Format.Set("uuid", (value) => IsUuid(value));
-    Format.Set("url", (value) => IsUrl(value));
-    Format.Set("ipv6", (value) => IsIPv6(value));
-    Format.Set("ipv4", (value) => IsIPv4(value));
+    FormatRegistry.Set("date-time", (value) => IsDateTime(value, true));
+    FormatRegistry.Set("date", (value) => IsDate(value));
+    FormatRegistry.Set("time", (value) => IsTime(value));
+    FormatRegistry.Set("email", (value) => IsEmail(value));
+    FormatRegistry.Set("uuid", (value) => IsUuid(value));
+    FormatRegistry.Set("url", (value) => IsUrl(value));
+    FormatRegistry.Set("ipv6", (value) => IsIPv6(value));
+    FormatRegistry.Set("ipv4", (value) => IsIPv4(value));
     //
     // optional: add additional formats
     //

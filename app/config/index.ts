@@ -69,7 +69,7 @@ export const config = makeConfig()({
     // They will be public soon anyway :)
     createDevelopementProjects:
       (process.env.AGENT_DEV_CREATE_DEVELOPEMENT_PROJECTS ?? "false") === "true",
-    
+    blockRegistryRoot: "/srv/jailer/block-registry/",
   }),
   hocusRepoAccess: () => ({
     // Temporarily the Hocus repo is private :P Will be removed soon.

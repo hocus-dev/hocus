@@ -20,4 +20,5 @@ services:
       - "HOCUS_DEV_GIT_NAME=${HOCUS_DEV_GIT_NAME}"
       - "HOCUS_DEV_GIT_EMAIL=${HOCUS_DEV_GIT_EMAIL}"
       - "DB_HOST=db"
+      #- NODE_DEBUG=module
     entrypoint: /app/ops/bin/worker-in-hocus-entrypoint.sh

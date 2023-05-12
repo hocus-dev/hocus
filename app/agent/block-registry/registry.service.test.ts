@@ -1,9 +1,13 @@
 import { DefaultLogger } from "@temporalio/worker";
+import { v4 as uuidv4 } from "uuid";
+
+import { createAgentInjector } from "../agent-injector";
+
+import testImages from "./test-data/test_images.json";
+
 import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
-import { createAgentInjector } from "../agent-injector";
-import { v4 as uuidv4 } from "uuid";
 
 const provideInjector = (
   testFn: (args: {
@@ -38,6 +42,10 @@ const provideInjector = (
 test.concurrent(
   "startFirecrackerInstance",
   provideInjector(async ({ injector, runId }) => {
+    const brService = injector.resolve(Token.BlockRegistryService);
+    await brService.initializeRegistry();
+
+    await brService.loadImageFromRemoteRepo(testImages.test1);
     throw new Error("AAAA");
     console.log("Hello world");
     /*const fcService = injector.resolve(Token.FirecrackerService)(runId);

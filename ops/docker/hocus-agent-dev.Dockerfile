@@ -19,7 +19,11 @@ RUN wget --continue --retry-connrefused --waitretry=1 --timeout=20 --tries=3 -q 
     mv release-v1.1.2-x86_64/firecracker-v1.1.2-x86_64 /usr/local/bin/firecracker && \
     mv release-v1.1.2-x86_64/jailer-v1.1.2-x86_64 /usr/local/bin/jailer
 RUN yarn config set cache-folder /app/.yarn-cache
-RUN apt-get update && apt-get install -y skopeo net-tools iproute2 iptables psmisc socat openssh-server iputils-ping tmux
+RUN apt-get update \
+    && apt-get -y --no-install-recommends install software-properties-common \
+    && add-apt-repository "deb http://httpredir.debian.org/debian sid main" \
+    && apt-get update \
+    && apt-get -t sid install -y skopeo net-tools iproute2 iptables psmisc socat openssh-server iputils-ping tmux
 RUN test -f /usr/sbin/nologin && useradd -ms /usr/sbin/nologin sshgateway
 COPY --chown=root:root --chmod=0644 resources/sshd_config /etc/ssh/sshd_config
 # Install overlaybd
