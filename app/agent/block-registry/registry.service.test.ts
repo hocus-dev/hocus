@@ -45,7 +45,12 @@ test.concurrent(
     const brService = injector.resolve(Token.BlockRegistryService);
     await brService.initializeRegistry();
 
-    await brService.loadImageFromRemoteRepo(testImages.test1);
+    const im = await brService.loadImageFromRemoteRepo(testImages.test2, "AAAA");
+
+    const c = await brService.createContainer(im, "AAAAAasdaasd");
+
+    await brService.commitContainer(c, "VVVVVVV");
+
     throw new Error("AAAA");
     console.log("Hello world");
     /*const fcService = injector.resolve(Token.FirecrackerService)(runId);

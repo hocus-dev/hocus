@@ -41,7 +41,8 @@ export type HttpsOpencontainersOrgSchemaImageManifestAnnotations = Static<
 export const HttpsOpencontainersOrgSchemaImageManifestAnnotations = Type.Object(
   {},
   {
-    additionalProperties: Type.String(),
+    // additionalProperties: Type.String(),
+    additionalProperties: true,
   },
 );
 
@@ -51,7 +52,8 @@ export type HttpsOpencontainersOrgSchemaDescriptorAnnotations = Static<
 export const HttpsOpencontainersOrgSchemaDescriptorAnnotations = Type.Object(
   {},
   {
-    additionalProperties: Type.String(),
+    // additionalProperties: Type.String(),
+    additionalProperties: true,
   },
 );
 

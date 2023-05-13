@@ -8,6 +8,7 @@ To regenerate the code after updating the json schema:
    1. Reorder the exports(the converter sometimes uses an token which is defined later)
    1. Change in one place `Type.Tuple([<SYMBOL>, Type.Rest()])` to `Type.Array(<SYMBOL>)`
    1. Format using prettier
+1. Due to [this bug](https://github.com/sinclairzx81/typebox/pull/434) in Typebox temporarily change `additionalProperties: Type.String()` to `additionalProperties: true`
 
 Codegen in typebox is in very early stages but it is actively worked on: https://github.com/sinclairzx81/typebox/discussions/317#discussioncomment-5883641
 The codegen is not shipped in the official typebox packages, I copied and tweaked it :)
