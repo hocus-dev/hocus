@@ -10,11 +10,13 @@ import {
   Trigger,
   proxyActivities,
   uuid4,
+  isCancellation,
   defineSignal,
 } from "@temporalio/workflow";
 
 import type { Activities } from "~/agent/activities/list";
 import type { AwaitableWorkflows, WaitRequest } from "~/agent/activities/wait-for-workflow/shared";
+import { WorkflowCancelledError } from "~/agent/activities/wait-for-workflow/shared";
 import { WaitRequestType } from "~/agent/activities/wait-for-workflow/shared";
 import { waitRequestSignal } from "~/agent/activities/wait-for-workflow/shared";
 import { wrapWorkflowError } from "~/temporal/utils";
@@ -90,7 +92,7 @@ export async function runWaitForWorkflow<K extends keyof Workflows>(
     });
   }
   const finalResult: GetWorkflowResult =
-    result === "cancelled" ? { ok: false, error: new Error("cancelled") } : result;
+    result === "cancelled" ? { ok: false, error: new WorkflowCancelledError() } : result;
 
   while (requests.length > 0) {
     const req = requests.shift()!;
@@ -108,27 +110,36 @@ type WorkflowResults = {
 
 export async function withSharedWorkflow<K extends keyof Workflows>(
   args: WithSharedWorkflowParams<K>,
-  fn: (workflowResult: WorkflowResults[K]) => Promise<void>,
-): Promise<void> {
+): Promise<WorkflowResults[K]> {
   const releaseSignalId = uuid4();
   const releaseSignal = defineSignal<[GetWorkflowResult]>(releaseSignalId);
   let workflowResult: undefined | GetWorkflowResult;
   setHandler(releaseSignal, (result) => {
     workflowResult = result;
   });
-  // TODO: handle cancellation
-  await signalWithStartWaitWorkflow({ ...args, releaseSignalId });
-
-  await condition(() => workflowResult !== void 0);
-  assert(workflowResult !== void 0);
 
   try {
-    if (workflowResult.ok) {
-      return await fn(workflowResult?.result as WorkflowResults[K]);
-    } else {
-      throw wrapWorkflowError(workflowResult.error);
+    await signalWithStartWaitWorkflow({
+      ...args,
+      releaseSignalId,
+      waitRequestType: WaitRequestType.WAIT,
+    });
+    await condition(() => workflowResult !== void 0);
+  } catch (err) {
+    if (isCancellation(err)) {
+      await signalWithStartWaitWorkflow({
+        ...args,
+        releaseSignalId,
+        waitRequestType: WaitRequestType.CANCEL,
+      });
+      throw err;
     }
-  } finally {
-    // TODO: signal that we're done
+  }
+
+  assert(workflowResult !== void 0);
+  if (workflowResult.ok) {
+    return workflowResult?.result as WorkflowResults[K];
+  } else {
+    throw wrapWorkflowError(workflowResult.error);
   }
 }

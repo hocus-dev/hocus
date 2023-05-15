@@ -81,7 +81,7 @@ const activities = {
   signalWithStartWaitWorkflow,
 } as const;
 
-const _typecheck: typeof activities extends Record<string, CreateActivity<any>> ? 1 : 0 = 1;
+const _typeCheck: typeof activities extends Record<string, CreateActivity<any>> ? 1 : 0 = 1;
 
 type ExtractActivityType<T> = T extends CreateActivity<infer A> ? A : never;
 

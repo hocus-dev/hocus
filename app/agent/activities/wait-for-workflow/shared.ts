@@ -29,3 +29,8 @@ export type AwaitableWorkflow = valueof<{
     params: Parameters<AwaitableWorkflows[Name]>;
   };
 }>;
+
+export class WorkflowCancelledError extends Error {
+  public readonly name = "WorkflowCancelledError";
+  public readonly message = "Workflow was cancelled";
+}

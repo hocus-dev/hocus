@@ -2,9 +2,9 @@ import { Context } from "@temporalio/activity";
 
 import type { CreateActivity } from "../types";
 
-import type { AwaitableWorkflows, WaitRequest } from "./shared";
 import { waitRequestSignal } from "./shared";
-import { WaitRequestType } from "./shared";
+import type { AwaitableWorkflows, WaitRequest } from "./shared";
+import type { WaitRequestType } from "./shared";
 
 import { runWaitForWorkflow } from "~/agent/workflows";
 import type { WithSharedWorkflowParams } from "~/agent/workflows/wait-for-workflow";
@@ -13,6 +13,7 @@ import { Token } from "~/token";
 export type SignalWithStartWaitWorkflowActivity = <K extends keyof AwaitableWorkflows>(
   args: {
     releaseSignalId: string;
+    waitRequestType: WaitRequestType;
   } & WithSharedWorkflowParams<K>,
 ) => Promise<void>;
 export const signalWithStartWaitWorkflow: CreateActivity<SignalWithStartWaitWorkflowActivity> =
@@ -20,7 +21,7 @@ export const signalWithStartWaitWorkflow: CreateActivity<SignalWithStartWaitWork
   async (args) => {
     const req: WaitRequest = {
       initiatorWorkflowId: Context.current().info.workflowExecution.workflowId,
-      type: WaitRequestType.WAIT,
+      type: args.waitRequestType,
       releaseSignalId: args.releaseSignalId,
     };
     const withClient = injector.resolve(Token.TemporalClient);
