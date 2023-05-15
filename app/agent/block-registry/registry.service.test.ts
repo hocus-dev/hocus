@@ -8,6 +8,10 @@ import testImages from "./test-data/test_images.json";
 import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
+import { EXPOSE_METHOD } from "./registry.service";
+import { ChildProcess, spawn } from "child_process";
+import path from "path";
+import { sleep } from "~/utils.shared";
 
 const provideInjector = (
   testFn: (args: {
@@ -43,13 +47,30 @@ test.concurrent(
   "startFirecrackerInstance",
   provideInjector(async ({ injector, runId }) => {
     const brService = injector.resolve(Token.BlockRegistryService);
+    const config = injector.resolve(Token.Config);
     await brService.initializeRegistry();
 
     const im = await brService.loadImageFromRemoteRepo(testImages.test2, "AAAA");
+    const a = spawn("/opt/overlaybd/bin/overlaybd-tcmu", [
+      path.join(config.agent().blockRegistryRoot, "overlaybd.json"),
+    ]);
+    a.stdout.on("data", (data) => {
+      console.log(`stdout: ${data}`);
+    });
+    a.stderr.on("data", (data) => {
+      console.error(`stderr: ${data}`);
+    });
+    a.on("close", (code) => {
+      console.log(`child process exited with code ${code}`);
+    });
+
+    await sleep(3000);
 
     const c = await brService.createContainer(im, "AAAAAasdaasd");
 
-    await brService.commitContainer(c, "VVVVVVV");
+    const im2 = await brService.commitContainer(c, "VVVVVVV");
+
+    console.log(await brService.expose(im, EXPOSE_METHOD.BLOCK_DEV));
 
     throw new Error("AAAA");
     console.log("Hello world");

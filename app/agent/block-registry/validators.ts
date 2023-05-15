@@ -1,4 +1,5 @@
-import { Static, Type } from "@sinclair/typebox";
+import type { Static } from "@sinclair/typebox";
+import { Type } from "@sinclair/typebox";
 import type { Any } from "ts-toolbelt";
 
 import type { HttpsOpencontainersOrgSchemaDescriptor } from "./oci-schema/content-descriptor";
@@ -19,7 +20,7 @@ export type OCIDescriptor = Any.Compute<Static<typeof HttpsOpencontainersOrgSche
 
 const OBDConfigSchema = Type.Object({
   lowers: Type.Array(Type.Object({ file: Type.String() })),
-  upper: Type.Object({ data: Type.String(), index: Type.String() }),
+  upper: Type.Optional(Type.Object({ data: Type.String(), index: Type.String() })),
   resultFile: Type.String(),
   // OBD doesn't complain about this extra field :)
   hocusImageId: Type.Optional(Type.String()),

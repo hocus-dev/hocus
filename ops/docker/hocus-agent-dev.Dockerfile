@@ -23,7 +23,7 @@ RUN apt-get update \
     && apt-get -y --no-install-recommends install software-properties-common \
     && add-apt-repository "deb http://httpredir.debian.org/debian sid main" \
     && apt-get update \
-    && apt-get -t sid install -y skopeo net-tools iproute2 iptables psmisc socat openssh-server iputils-ping tmux libaio1
+    && apt-get -t sid install -y skopeo net-tools iproute2 iptables psmisc socat openssh-server iputils-ping tmux libaio1 libnl-3-200 libnl-genl-3-200
 RUN test -f /usr/sbin/nologin && useradd -ms /usr/sbin/nologin sshgateway
 COPY --chown=root:root --chmod=0644 resources/sshd_config /etc/ssh/sshd_config
 # Install overlaybd
