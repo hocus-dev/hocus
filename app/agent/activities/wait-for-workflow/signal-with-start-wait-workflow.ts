@@ -10,13 +10,10 @@ import { runWaitForWorkflow } from "~/agent/workflows";
 import type { WithSharedWorkflowParams } from "~/agent/workflows/wait-for-workflow";
 import { Token } from "~/token";
 
-export type SignalWithStartWaitWorkflowActivity = <
-  K extends keyof AwaitableWorkflows,
-  L extends keyof AwaitableWorkflows,
->(
+export type SignalWithStartWaitWorkflowActivity = <K extends keyof AwaitableWorkflows>(
   args: {
     releaseSignalId: string;
-  } & WithSharedWorkflowParams<K, L>,
+  } & WithSharedWorkflowParams<K>,
 ) => Promise<void>;
 export const signalWithStartWaitWorkflow: CreateActivity<SignalWithStartWaitWorkflowActivity> =
   ({ injector }) =>
@@ -34,8 +31,6 @@ export const signalWithStartWaitWorkflow: CreateActivity<SignalWithStartWaitWork
         args: [
           {
             workflow: args.workflow,
-            postWorkflow: args.postWorkflow,
-            completeThreshold: args.completeThreshold,
           },
         ],
         signal: waitRequestSignal,

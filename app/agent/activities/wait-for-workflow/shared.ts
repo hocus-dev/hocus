@@ -20,8 +20,6 @@ export interface FinishedExecutionRequest {
 }
 
 export const waitRequestSignal = defineSignal<[WaitRequest]>("wait-requested");
-export const finishedExecutionSignal =
-  defineSignal<[FinishedExecutionRequest]>("finished-execution");
 
 export type AwaitableWorkflows = Omit<typeof Workflows, "runWaitForWorkflow">;
 export type AwaitableWorkflow = valueof<{
