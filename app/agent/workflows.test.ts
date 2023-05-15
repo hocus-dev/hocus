@@ -26,7 +26,9 @@ import {
   runDeleteRemovablePrebuilds,
   testLock,
   scheduleNewPrebuild,
+  cancellationTestWorkflow,
 } from "./workflows";
+import { Mutex } from "async-mutex";
 
 import { config } from "~/config";
 import { generateTemporalCodeBundle } from "~/temporal/bundle";
@@ -37,6 +39,7 @@ import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
 import { unwrap, waitForPromises, formatBranchName, numericSort } from "~/utils.shared";
+import { withActivityHeartbeat } from "./activities/utils";
 
 const provideActivities = (
   testFn: (args: {
@@ -798,6 +801,69 @@ test.concurrent(
       const handle = client.workflow.getHandle(prebuildWorkflowId);
       await handle.cancel();
       await expect(handle.result()).rejects.toThrow();
+    });
+  }),
+);
+
+test.concurrent(
+  "cancellationTest",
+  provideActivities(async ({ activities }) => {
+    const { client, nativeConnection } = testEnv;
+    const taskQueue = `test-${uuidv4()}`;
+    const locks = new Map(
+      await Promise.all(
+        ["1", "2", "3"].map(async (id) => {
+          const mutex = new Mutex();
+          const release = await mutex.acquire();
+          return [id, { mutex, release }] as const;
+        }),
+      ),
+    );
+
+    const worker = await Worker.create({
+      connection: nativeConnection,
+      taskQueue,
+      workflowsPath: require.resolve("./workflows"),
+      activities: {
+        ...activities,
+        cancellationTest: withActivityHeartbeat({ intervalMs: 250 }, async (result: string) => {
+          console.log("activity start", result);
+          const { mutex } = unwrap(locks.get(result));
+          const release = await mutex.acquire();
+          release();
+          console.log("activity result", result);
+          return result;
+        }),
+      },
+      dataConverter: {
+        payloadConverterPath: require.resolve("~/temporal/data-converter"),
+      },
+      workflowBundle,
+    });
+
+    await worker.runUntil(async () => {
+      const workflowId = uuidv4();
+      const handle = await client.workflow.start(cancellationTestWorkflow, {
+        workflowId,
+        taskQueue,
+        retry: { maximumAttempts: 1 },
+      });
+      unwrap(locks.get("1")).release();
+      await sleep(1000);
+      await handle.cancel();
+      console.log("cancelled");
+      await sleep(1000);
+      console.log((await handle.describe()).status.name);
+      // unwrap(locks.get("2")).release();
+      unwrap(locks.get("3")).release();
+      try {
+        await handle.result();
+      } finally {
+        console.log("got result");
+        for (const { release } of locks.values()) {
+          release();
+        }
+      }
     });
   }),
 );

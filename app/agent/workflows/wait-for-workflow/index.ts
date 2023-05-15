@@ -138,7 +138,7 @@ export async function withSharedWorkflow<K extends keyof Workflows>(
 
   assert(workflowResult !== void 0);
   if (workflowResult.ok) {
-    return workflowResult?.result as WorkflowResults[K];
+    return workflowResult.result as WorkflowResults[K];
   } else {
     throw wrapWorkflowError(workflowResult.error);
   }
