@@ -8,18 +8,9 @@ export const runActivityHeartbeat = <T>(
   fn: () => Promise<T>,
 ): Promise<T> => {
   return new Promise((resolve, reject) => {
-    let progress = 0;
     const interval = setInterval(() => {
-      Context.current().heartbeat(progress);
-      progress += options.intervalMs ?? 5000;
+      Context.current().heartbeat();
     }, options.intervalMs ?? 5000);
-
-    Context.current()
-      .cancelled.then(() => console.log("wtf"))
-      .catch((err) => {
-        console.log("activity got cancelled", err);
-      });
-    console.log("yo!");
 
     fn()
       .then((result) => {
