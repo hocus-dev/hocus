@@ -111,10 +111,10 @@ test.concurrent(
 test.concurrent(
   "startFirecrackerInstance",
   provideInjector(async ({ brService, runId }) => {
-    const im = await brService.loadImageFromRemoteRepo(testImages.test2, "AAAA");
-    const im2 = await brService.loadImageFromRemoteRepo(testImages.test3, "BBBB");
+    const im = await brService.loadImageFromRemoteRepo(testImages.test2, "AAAAA");
+    const im2 = await brService.loadImageFromRemoteRepo(testImages.test3, "BBBBB");
 
-    const c = await brService.createContainer(im, "AAAAAasdaasd");
+    const c = await brService.createContainer(im, "AAAAAasdaasddsf");
 
     //const im2 = await brService.commitContainer(c, "VVVVVVV");
 
@@ -122,8 +122,6 @@ test.concurrent(
     console.log(await brService.expose(im2, EXPOSE_METHOD.BLOCK_DEV));
     console.log(await brService.expose(im, EXPOSE_METHOD.BLOCK_DEV));
     console.log(await brService.expose(im, EXPOSE_METHOD.BLOCK_DEV));
-
-    await sleep(20_000);
 
     //console.log(await brService.expose(im2, EXPOSE_METHOD.BLOCK_DEV));
 

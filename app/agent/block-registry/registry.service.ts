@@ -225,6 +225,12 @@ export class BlockRegistryService {
       await cleanupF();
     }
 
+    // Ensure scsi scan is in sync mode, don't even try async more for Hocus...
+    const scanMode = await fs.readFile("/sys/module/scsi_mod/parameters/scan", "utf8");
+    if (scanMode !== "sync\n") {
+      throw new Error(`Kernel SCSI in ${scanMode} scan mode, Hocus refusing to operate`);
+    }
+
     // [TODO] We are after an restart, we need to check the state of block devices/mounts we are managing
   }
 
@@ -544,6 +550,16 @@ export class BlockRegistryService {
     return this._tcmuSubtype;
   }
 
+  private _tcmLoopHostBusTarget: string | undefined;
+  private async getTCMLoopHostBusTarget(): Promise<string> {
+    if (this._tcmLoopHostBusTarget === void 0) {
+      this._tcmLoopHostBusTarget = (
+        await fs.readFile(path.join(this.paths.tcmLoopTarget, "address"), "utf-8")
+      ).trim();
+    }
+    return this._tcmLoopHostBusTarget;
+  }
+
   // Based on https://raw.githubusercontent.com/mstdokumaci/string-hash-64/master/index.js
   public tcmuIdToLUN(tcmuStorageObjectId: string): string {
     let i = tcmuStorageObjectId.length;
@@ -557,6 +573,38 @@ export class BlockRegistryService {
     }
 
     return BigInt.asUintN(64, hash1 * 4096n + hash2).toString();
+  }
+
+  // Gets info about under which LUNs the given TCMU object was exposed on in the system
+  // This will almost certainly be only one LUN, but IF the above hash function
+  // (on kernels where we have less than 32 bits for the LUN id to work with)
+  // hits a collision there is a possibility of temporally returning more than one
+  // LUN, in that case the application should always proceed with the first LUN on the list
+  // The case when this list returns 2 members for a split second:
+  // 1. hash(A) === hash(B) && hash(hash(A)) != hash(hash(B))
+  // 2. expose(A) -> gets mapped to LUN hash(A)
+  // 3. race(hide(A), expose(B), expose(B))
+  // In that case it's possible for the first expose(B) call to get hash(B)
+  // and for the second call to get hash(hash(B))
+  // This is not a problem as we will always proceed with the first member from the list :)
+  // Essentially the kernel makes the consensus decision for us under which LUN we will find the object
+  private async getTCMUAluaMembers(tcmuStorageObjectId: string): Promise<string[]> {
+    const members = await fs.readFile(
+      path.join(this.paths.tcmuHBA, tcmuStorageObjectId, "alua/default_tg_pt_gp/members"),
+      "utf-8",
+    );
+    return members
+      .split("\n\x00")
+      .filter((member) => member.length > 0)
+      .map((member) => {
+        const prefix = `loopback/${HOCUS_TCM_LOOP_WWN}/${HOCUS_TCM_LOOP_PORT}/lun_`;
+        if (!member.startsWith(prefix)) {
+          throw new Error(
+            `TCMU object ${tcmuStorageObjectId} was exposed manually under unknown ${member}. Refusing to operate.`,
+          );
+        }
+        return member.substring(prefix.length);
+      });
   }
 
   expose(
@@ -584,112 +632,163 @@ export class BlockRegistryService {
         const tcmuSubtype = await this.getTCMUSubtype();
         const tcmuStorageObjectId = `${tcmuSubtype}_${what}`;
         const tcmuPath = path.join(this.paths.tcmuHBA, tcmuStorageObjectId);
-        // Create a storage object on that HBA
-        await fs.mkdir(tcmuPath).catch(catchAlreadyExists);
-        // Set the vendor for convenience, this is for filtering
-        // EINVAL is thrown when the storage object is already exposed on a LUN
-        //        cause after it is exposed the WWN becomes immutable
-        await fs
-          .writeFile(path.join(tcmuPath, "wwn/vpd_unit_serial"), `hocusbd-${tcmuStorageObjectId}`)
-          .catch(catchIgnore("EINVAL"));
-        // WARNING: The following actions will happen during the writes:
-        // 1. Kernel will create a new uio device for the storage object and send out an netlink notification to all tcmu processes
-        // 2. All notified processes will check whether they have a handler for the given tcmu subtype,
-        //    if so then they proceed to discover their dedicated UIO device, the discovery may fail
-        // 3. The chosen overlaybd process will read the provided config file and:
-        //    a) Open and set up a shared ring buffer using the UIO device
-        //    b) Open all layers, and combine them into one view
-        //    c) Write the result of the setup into the result file provided in the config
-        //       aka. <ROOT_DIR>/run/obd-result-<image_id or container_id>
-        // Those are a lot of moving parts and not everything may work:
-        // 1. If there is no TCMU process or the handler process never attaches
-        //    then linux for some unholy reason will falsely tell you that everything succeeded
-        // 2. If the handler attached but the handler failed setting up it's stuff then
-        //    the enable write will fail with ENOENT besides the file existing
-        // 3. If tcm_loop was attached to the tcmu storage object then you
-        //    can't reconfigure anything anymore and the config writes will fail
-        // 4. I managed to once get a case in bash where the enable write hanged forever
-        //    and was immune to `sudo kill -9` as the process hanged in kernel space not userspace
-        //    the only way for the hanged write to resume was to start a tcmu handler for that storage object
-        // For now assume that:
-        // 1. During a full restart all overlaybd result files were deleted
-        // 2. If the TCMU process crashes then we need to perform a full restart of the agent
-        // 3. If the result file tells us that the setup is ok then assume that the handler is present and attached successfully
-        // 4. The config writes will finish in finite time 🤞
-        await fs
-          .writeFile(
-            path.join(tcmuPath, "control"),
-            `dev_config=${tcmuSubtype}/${path.join(this.paths.blockConfig, what)}`,
-          )
-          .catch(catchAlreadyExists);
-
-        let tcmuAttachFailed = false;
-        await fs.writeFile(path.join(tcmuPath, "enable"), "1").catch((err: Error) => {
-          if (!err.message.startsWith("EEXIST") && !err.message.startsWith("ENOENT")) throw err;
-          // The TCMU process told us that he failed to set up his part of the deal
-          if (err.message.startsWith("ENOENT")) tcmuAttachFailed = true;
+        // Create a storage object on that HBA, if it already exists then check for a LUN
+        let aluaMembers: string[] = [];
+        await fs.mkdir(tcmuPath).catch(async (err: Error) => {
+          if (!err.message.startsWith("EEXIST")) throw err;
+          // Ok check for LUN
+          aluaMembers = await this.getTCMUAluaMembers(tcmuStorageObjectId);
         });
+        // Check if the device was not mapped to a LUN
+        if (aluaMembers.length === 0) {
+          // Set the vendor for convenience, this is for filtering
+          // EINVAL is thrown when the storage object is already exposed on a LUN
+          //        cause after it is exposed the WWN becomes immutable
+          //        this is not a problem due to idempotence
+          await fs
+            .writeFile(path.join(tcmuPath, "wwn/vpd_unit_serial"), `hocusbd-${tcmuStorageObjectId}`)
+            .catch(catchIgnore("EINVAL"));
+          // WARNING: The following actions will happen during the writes:
+          // 1. Kernel will create a new uio device for the storage object and send out an netlink notification to all tcmu processes
+          // 2. All notified processes will check whether they have a handler for the given tcmu subtype,
+          //    if so then they proceed to discover their dedicated UIO device, the discovery may fail
+          // 3. The chosen overlaybd process will read the provided config file and:
+          //    a) Open and set up a shared ring buffer using the UIO device
+          //    b) Open all layers, and combine them into one view
+          //    c) Write the result of the setup into the result file provided in the config
+          //       aka. <ROOT_DIR>/run/obd-result-<image_id or container_id>
+          // Those are a lot of moving parts and not everything may work:
+          // 1. If there is no TCMU process or the handler process never attaches
+          //    then linux for some unholy reason will falsely tell you that everything succeeded
+          // 2. If the handler attached but the handler failed setting up it's stuff then
+          //    the enable write will fail with ENOENT besides the file existing
+          // 3. If tcm_loop was attached to the tcmu storage object then you
+          //    can't reconfigure anything anymore and the config writes will fail
+          // 4. I managed to once get a case in bash where the enable write hanged forever
+          //    and was immune to `sudo kill -9` as the process hanged in kernel space not userspace
+          //    the only way for the hanged write to resume was to start a tcmu handler for that storage object
+          // For now assume that:
+          // 1. During a full restart all overlaybd result files were deleted
+          // 2. If the TCMU process crashes then we need to perform a full restart of the agent
+          // 3. If the result file tells us that the setup is ok then assume that the handler is present and attached successfully
+          // 4. The config writes will finish in finite time 🤞
+          await fs
+            .writeFile(
+              path.join(tcmuPath, "control"),
+              `dev_config=${tcmuSubtype}/${path.join(this.paths.blockConfig, what)}`,
+            )
+            .catch(catchAlreadyExists);
 
-        const obdResult = await fs.readFile(
-          path.join(this.paths.run, `obd-result-${what}`),
-          "utf-8",
+          let tcmuAttachFailed = false;
+          await fs.writeFile(path.join(tcmuPath, "enable"), "1").catch((err: Error) => {
+            if (!err.message.startsWith("EEXIST") && !err.message.startsWith("ENOENT")) throw err;
+            // The TCMU process told us that he failed to set up his part of the deal
+            if (err.message.startsWith("ENOENT")) tcmuAttachFailed = true;
+          });
+
+          const obdResult = await fs.readFile(
+            path.join(this.paths.run, `obd-result-${what}`),
+            "utf-8",
+          );
+          // tcmuAttachFailed is for the nice case where tcmu failed successfully
+          // I won't be surprised if that may happen here, better safe than sorry
+          if (obdResult !== "success" || tcmuAttachFailed) {
+            throw new Error(`overlaybd-tcmu failed to attach: ${obdResult}`);
+          }
+
+          // Great TCMU was set up, now we need to hook it into tcm_loop
+          // First create a new LUN, for that we need to map the tcmuStorageObjectId into a lun_id
+          // This mapping may be nondeterministic as the kernel will store the mapping for us:
+          // <CONFIG_FS>/target/core/<TCMU_HBA>/<TCMU_OBJECT_ID>/alua/default_tg_pt_gp/members
+          // IF due to races during hash collisions multiple LUN's were created
+          // we use the members file to make a consensus decision and clean up the remaining LUNs
+          let lunId = this.tcmuIdToLUN(tcmuStorageObjectId);
+          let hare: string | undefined = void 0;
+          let done = false;
+          while (!done) {
+            // LUN 2**64 - 1 is reserved
+            if (lunId !== (2n ** 64n - 1n).toString()) {
+              const lunPath = path.join(this.paths.tcmLoopTarget, "lun", `lun_${lunId}`);
+              await fs.mkdir(lunPath).catch(catchAlreadyExists);
+              await fs
+                .symlink(tcmuPath, path.join(lunPath, tcmuStorageObjectId))
+                .catch(catchAlreadyExists);
+              // Ok, time to ensure that symlink really exists
+              // In case of hash collisions we will get EEXIST from the kernel :)
+              // So let us stat the symlink, if it exists then we're done
+              // if it does not exist then we got a hash collision and need
+              // to start the tortoise and hare algorithm to not end up in an infinite loop
+              done = true;
+              try {
+                await fs.stat(path.join(lunPath, tcmuStorageObjectId));
+              } catch (err: any) {
+                if (!err.message.startsWith("ENOENT")) throw err;
+                // Hash collision
+                done = false;
+              }
+            }
+            if (!done) {
+              // Ok we got a hash collision or a reserved hash value
+              // Iterate the hash function
+              // This is important for 32 bit systems where due to
+              // the birthday paradox 2**16 entries will have a fairly high change of collision
+              // Remember that the birthday paradox tells us that when we have sqrt(2**bits) entries we need to worry about collisions
+              // I use the tortoise and the hare algorithm to ensure we won't end up in an infinite loop
+              if (hare === void 0) {
+                // Ok this is the first invocation
+                hare = this.tcmuIdToLUN(lunId);
+              }
+              lunId = this.tcmuIdToLUN(lunId);
+              hare = this.tcmuIdToLUN(this.tcmuIdToLUN(hare));
+              if (lunId === hare) {
+                throw new Error(
+                  `Failed to expose storage object ${tcmuStorageObjectId}, hash cycle detected hash("${tcmuStorageObjectId}") === hash(...hash("${tcmuStorageObjectId}")...)`,
+                );
+              }
+            }
+          }
+
+          // If collisions would not be of concern we would be done
+          // Unfortunately we may have races under hash collisions so we need to ask the kernel for a consensus decision
+          aluaMembers = await this.getTCMUAluaMembers(tcmuStorageObjectId);
+        }
+        if (aluaMembers.length === 0) {
+          throw new Error(
+            "Something went terribly wrong, no alua members after mapping a TCMU object to a LUN",
+          );
+        }
+        const finalLunId = aluaMembers[0];
+        if (aluaMembers.length > 1) {
+          // This is the absurdly improbable case of a double expose race under a hash collision
+          for (let i = 1; i < aluaMembers.length; i++) {
+            const lunPath = path.join(this.paths.tcmLoopTarget, "lun", `lun_${aluaMembers[i]}`);
+            const symlinkPath = path.join(lunPath, tcmuStorageObjectId);
+            await fs.unlink(symlinkPath).catch(catchIgnore("ENOENT"));
+          }
+        }
+
+        // Great! The LUN is final, now discover what block device maps to this LUN :)
+        const hostBusTargetAddr = await this.getTCMLoopHostBusTarget();
+        const fullSCSIAddr = `${hostBusTargetAddr}:${finalLunId}`;
+        const disksAndPartitions = await fs.readdir(
+          path.join("/sys/class/scsi_disk/", fullSCSIAddr, "device/block"),
         );
-        // tcmuAttachFailed is for the nice case where tcmu failed successfully
-        // I won't be surprised if that may happen here, better safe than sorry
-        if (obdResult !== "success" || tcmuAttachFailed) {
-          throw new Error(`overlaybd-tcmu failed to attach: ${obdResult}`);
+        if (disksAndPartitions.length === 0) {
+          throw new Error(
+            `Unable to find any block device for SCSI address ${fullSCSIAddr}.\n` +
+              `Does your kernel have async scsi scan enabled? Does your kernel have support for SCSI disks?`,
+          );
         }
 
-        // Great TCMU was set up, now we need to hook it into tcm_loop
-        // First create a new LUN, for that we need to deterministically map the tcmuStorageObjectId into a 64 bit lun_id
-        let lunId = this.tcmuIdToLUN(tcmuStorageObjectId);
-        console.log(lunId);
-        let hare: string | undefined = void 0;
-        let done = false;
-        while (!done) {
-          // LUN 2**64 - 1 is reserved
-          if (lunId !== (2n ** 64n - 1n).toString()) {
-            const lunPath = path.join(this.paths.tcmLoopTarget, "lun", `lun_${lunId}`);
-            await fs.mkdir(lunPath).catch(catchAlreadyExists);
-            await fs
-              .symlink(tcmuPath, path.join(lunPath, tcmuStorageObjectId))
-              .catch(catchAlreadyExists);
-            // Ok, time to ensure that symlink really exists
-            // In case of hash collisions we will get EEXIST from the kernel :)
-            // So let us stat the symlink, if it exists then we're done
-            // if it does not exist then we got a hash collision and need
-            // to start the tortoise and hare algorithm to not end up in an infinite loop
-            done = true;
-            try {
-              await fs.stat(path.join(lunPath, tcmuStorageObjectId));
-            } catch (err: any) {
-              if (!err.message.startsWith("ENOENT")) throw err;
-              // Hash collision
-              done = false;
-            }
-          }
-          if (!done) {
-            // Ok we got a hash collision or a reserved hash value
-            // Iterate the hash function
-            // This is important for 32 bit systems where due to
-            // the birthday paradox 2**16 entries will have a fairly high change of collision
-            // Remember that the birthday paradox tells us that when we have sqrt(2**bits) entries we need to worry about collisions
-            // I use the tortoise and the hare algorithm to ensure we won't end up in an infinite loop
-            if (hare === void 0) {
-              // Ok this is the first invocation
-              hare = this.tcmuIdToLUN(lunId);
-            }
-            lunId = this.tcmuIdToLUN(lunId);
-            hare = this.tcmuIdToLUN(this.tcmuIdToLUN(hare));
-            if (lunId === hare) {
-              throw new Error(
-                `Failed to expose storage object ${tcmuStorageObjectId}, hash cycle detected hash("${tcmuStorageObjectId}") === hash(...hash("${tcmuStorageObjectId}")...)`,
-              );
-            }
-          }
+        // Block devices may contain multiple partitions on them
+        // For now assume we only support a raw filesystem on the block device without a partition table
+        if (disksAndPartitions.length !== 1) {
+          throw new Error(`Found partitions ${disksAndPartitions}. Refusing to operate`);
         }
 
-        break;
+        return {
+          device: `/dev/${disksAndPartitions[0]}`,
+        };
       }
     }
   }
