@@ -1,3 +1,4 @@
+import { Context } from "@temporalio/activity";
 import { Worker } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 import { v4 as uuidv4 } from "uuid";
@@ -6,13 +7,23 @@ import { prepareTests } from "./utils";
 import { cancellationTestWorkflow } from "./wait-for-workflow/workflow";
 
 import { withActivityHeartbeat } from "~/agent/activities/utils";
-import { unwrap, sleep } from "~/utils.shared";
+import { unwrap } from "~/utils.shared";
 
 const { provideTestActivities, getWorkflowBundle, getTestEnv } = prepareTests();
 
 // Temporal worker setup is long
 jest.setTimeout(30 * 1000);
 
+// The purpose of this test was to see how cancellation works in Temporal.
+// What I've learned is that activity cancellation is not the same as workflow cancellation.
+// The programmer must manually check for cancellation in the activity and handle it. You do
+// this with Context.current().cancelled. If you don't check for cancellation, the activity
+// will just continue execution.
+// Also, the workflow must be configured to wait for activity cancellation to complete - otherwise
+// activities will be abandoned and will continue running in the background. You have to
+// use ActivityCancellationType.WAIT_CANCELLATION_COMPLETED in proxyActivities.
+// Also, if you cancel an activity with maximumAttempts > 1, the activity will not be retried after
+// cancellation.
 test.concurrent(
   "cancellationTest",
   provideTestActivities(async ({ activities }) => {
@@ -27,6 +38,8 @@ test.concurrent(
         }),
       ),
     );
+    const cancelLock = new Mutex();
+    const releaseCancelLock = await cancelLock.acquire();
 
     const worker = await Worker.create({
       connection: nativeConnection,
@@ -35,12 +48,12 @@ test.concurrent(
       activities: {
         ...activities,
         cancellationTest: withActivityHeartbeat({ intervalMs: 250 }, async (result: string) => {
-          console.log("activity start", result, new Date());
+          if (result === "2") {
+            releaseCancelLock();
+          }
           const { mutex } = unwrap(locks.get(result));
-          // const release = await Promise.race([mutex.acquire(), Context.current().cancelled]);
-          const release = await mutex.acquire();
+          const release = await Promise.race([mutex.acquire(), Context.current().cancelled]);
           release();
-          console.log("activity result", result, new Date());
           return result;
         }),
       },
@@ -58,17 +71,13 @@ test.concurrent(
         retry: { maximumAttempts: 1 },
       });
       unwrap(locks.get("1")).release();
-      await sleep(1000);
+      await cancelLock.acquire().then((release) => release());
       await handle.cancel();
-      console.log("cancelled");
-      await sleep(1000);
-      console.log((await handle.describe()).status.name);
-      // unwrap(locks.get("2")).release();
       unwrap(locks.get("3")).release();
       try {
-        await handle.result();
+        const result = await handle.result();
+        expect(result).toEqual(["1", "cancelled", "3"]);
       } finally {
-        console.log("got result");
         for (const { release } of locks.values()) {
           release();
         }

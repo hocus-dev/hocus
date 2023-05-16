@@ -9,29 +9,30 @@ import type { TestActivities } from "~/agent/workflows/tests/activities";
 
 const { cancellationTest } = proxyActivities<TestActivities>({
   startToCloseTimeout: "600 seconds",
-  heartbeatTimeout: "1 seconds",
+  heartbeatTimeout: "1 second",
   cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
   retry: {
-    maximumAttempts: 1,
+    maximumAttempts: 10,
   },
 });
 
-export async function cancellationTestWorkflow(): Promise<void> {
-  console.log("🎉 New Start ⭐️   ");
-  console.log("result", await cancellationTest("1"));
+export async function cancellationTestWorkflow(): Promise<string[]> {
+  const result: string[] = [];
+  const result1 = await cancellationTest("1");
+  result.push(result1);
   try {
-    console.log("result", await cancellationTest("2"));
+    const result2 = await cancellationTest("2");
+    result.push(result2);
   } catch (err) {
     if (isCancellation(err)) {
-      console.log("Cancelled error caught");
-      CancellationScope.current().cancel();
-      // throw wrapWorkflowError(err);
+      result.push("cancelled");
     } else {
       throw err;
     }
   }
-  console.log("gonna run 3");
   await CancellationScope.nonCancellable(async () => {
-    console.log("result", await cancellationTest("3"));
+    const result3 = await cancellationTest("3");
+    result.push(result3);
   });
+  return result;
 }
