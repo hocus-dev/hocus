@@ -123,6 +123,11 @@ test.concurrent(
     console.log(await brService.expose(im, EXPOSE_METHOD.BLOCK_DEV));
     console.log(await brService.expose(im, EXPOSE_METHOD.BLOCK_DEV));
 
+    console.log(await brService.expose(im2, EXPOSE_METHOD.HOST_MOUNT));
+    console.log(await brService.expose(im, EXPOSE_METHOD.HOST_MOUNT));
+
+    console.log(await brService.expose(c, EXPOSE_METHOD.HOST_MOUNT));
+
     //console.log(await brService.expose(im2, EXPOSE_METHOD.BLOCK_DEV));
 
     throw new Error("AAAA");

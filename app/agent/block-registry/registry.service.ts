@@ -53,6 +53,7 @@ export class BlockRegistryService {
     containers: string;
     images: string;
     run: string;
+    mounts: string;
     sharedOCIBlobsDir: string;
     tcmLoopTarget: string;
     tcmuHBA: string;
@@ -81,6 +82,8 @@ export class BlockRegistryService {
       // Directory for anything temporary which should be nuked after a restart
       // This can't be /tmp as I need the directory to be on the same partition as the registry
       run: path.join(root, "run"),
+      // Filesystem mounts
+      mounts: path.join(root, "mounts"),
       // OCI layout blob dir, used for downloading images from OCI registries
       sharedOCIBlobsDir: path.join(root, "blobs"),
       // ConfigFS tcm_loop
@@ -610,22 +613,31 @@ export class BlockRegistryService {
   expose(
     what: ImageId | ContainerId,
     method: typeof EXPOSE_METHOD.HOST_MOUNT,
-  ): Promise<{ mountpoint: string }>;
+  ): Promise<{ mountPoint: string; readonly: boolean }>;
   expose(
     what: ImageId | ContainerId,
     method: typeof EXPOSE_METHOD.BLOCK_DEV,
-  ): Promise<{ device: string }>;
+  ): Promise<{ device: string; readonly: boolean }>;
   async expose(
     what: ImageId | ContainerId,
     method: EXPOSE_METHOD,
-  ): Promise<{ device: string } | { mountpoint: string }> {
+  ): Promise<{ device: string; readonly: boolean } | { mountPoint: string; readonly: boolean }> {
     if (!what.startsWith("im_") && !what.startsWith("ct_")) {
       throw new Error(`Invalid id: ${what}`);
     }
+    const readonly = what.startsWith("im_");
     switch (method) {
       case EXPOSE_METHOD.HOST_MOUNT: {
         const bd = await this.expose(what, EXPOSE_METHOD.BLOCK_DEV);
-        break;
+        const mountPoint = path.join(this.paths.mounts, what);
+        await fs.mkdir(mountPoint).catch(catchAlreadyExists);
+        try {
+          let flags = readonly ? ["--read-only"] : ["--read-write"];
+          await execCmd("mount", ...flags, bd.device, mountPoint);
+        } catch (err) {
+          if (!(err as Error).message.includes("already mounted")) throw err;
+        }
+        return { mountPoint, readonly };
       }
       case EXPOSE_METHOD.BLOCK_DEV: {
         // Get the tcmuSubtype
@@ -787,7 +799,8 @@ export class BlockRegistryService {
         }
 
         return {
-          device: `/dev/${disksAndPartitions[0]}`,
+          device: `/dev/hocus/${disksAndPartitions[0]}`,
+          readonly,
         };
       }
     }
