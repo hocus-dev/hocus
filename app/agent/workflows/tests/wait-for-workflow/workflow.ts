@@ -5,11 +5,11 @@ import {
   ActivityCancellationType,
 } from "@temporalio/workflow";
 
-import type { Activities } from "~/agent/activities/list";
-import { wrapWorkflowError } from "~/temporal/utils";
+import type { TestActivities } from "~/agent/workflows/tests/activities";
 
-const { cancellationTest } = proxyActivities<Activities>({
-  startToCloseTimeout: "30 seconds",
+const { cancellationTest } = proxyActivities<TestActivities>({
+  startToCloseTimeout: "600 seconds",
+  heartbeatTimeout: "1 seconds",
   cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
   retry: {
     maximumAttempts: 1,
