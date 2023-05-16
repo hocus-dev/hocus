@@ -23,12 +23,15 @@ jest.setTimeout(30 * 1000);
 // use ActivityCancellationType.WAIT_CANCELLATION_COMPLETED in proxyActivities.
 // Also, if you cancel an activity with maximumAttempts > 1, the activity will not be retried after
 // cancellation.
+// I've also learned that once you cancel a workflow, all activities are cancelled. Even if you
+// handle one activity's cancellation, the other activities will still be cancelled. You have to use
+// CancellationScope.nonCancellable to prevent this.
 test.concurrent(
   "cancellationTest",
   provideTestActivities(async ({ createWorker }) => {
     const locks = new Map(
       await Promise.all(
-        ["1", "2", "3"].map(async (id) => {
+        ["1", "2", "3", "4"].map(async (id) => {
           const mutex = new Mutex();
           const release = await mutex.acquire();
           return [id, { mutex, release }] as const;
@@ -63,9 +66,10 @@ test.concurrent(
       await cancelLock.acquire().then((release) => release());
       await handle.cancel();
       unwrap(locks.get("3")).release();
+      unwrap(locks.get("4")).release();
       try {
         const result = await handle.result();
-        expect(result).toEqual(["1", "cancelled", "3"]);
+        expect(result).toEqual(["1", "cancelled", "3", "cancelled"]);
       } finally {
         for (const { release } of locks.values()) {
           release();

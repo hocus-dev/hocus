@@ -34,5 +34,15 @@ export async function cancellationTestWorkflow(): Promise<string[]> {
     const result3 = await cancellationTest("3");
     result.push(result3);
   });
+  try {
+    const result4 = await cancellationTest("4");
+    result.push(result4);
+  } catch (err) {
+    if (isCancellation(err)) {
+      result.push("cancelled");
+    } else {
+      throw err;
+    }
+  }
   return result;
 }
