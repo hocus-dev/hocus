@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { execCmd } from "../utils";
 
+import { HOCUS_TCMU_HBA, HOCUS_TCM_LOOP_PORT, HOCUS_TCM_LOOP_WWN } from "./registry.const";
 import type { OBDConfig, OCIDescriptor, OCIImageIndex, OCIImageManifest } from "./validators";
 import { OBDConfigValidator } from "./validators";
 import { OCIImageIndexValidator, OCIImageManifestValidator } from "./validators";
@@ -18,7 +19,6 @@ import type { Validator } from "~/schema/utils.server";
 import { Token } from "~/token";
 import type { valueof } from "~/types/utils";
 import { waitForPromises } from "~/utils.shared";
-import { HOCUS_TCMU_HBA, HOCUS_TCM_LOOP_PORT, HOCUS_TCM_LOOP_WWN } from "./registry.const";
 
 export type ImageId = A.Type<`im_${string}`, "image">;
 export type ContainerId = A.Type<`ct_${string}`, "container">;
@@ -194,7 +194,7 @@ export class BlockRegistryService {
       { flag: "w" },
     );
 
-    // [TODO] We are after an restart, we need to check the state of block devices we are managing
+    // [TODO] We are after an restart, we need to check the state of block devices/mounts we are managing
   }
 
   async loadImageFromDisk(ociDumpPath: string, outputId?: string): Promise<ImageId> {
@@ -253,7 +253,7 @@ export class BlockRegistryService {
     if (index.manifests.length > 1) {
       throw new Error("Unsupported multi platform and multi format images");
     }
-    const manifestDescriptor: OCIDescriptor = await index.manifests[0];
+    const manifestDescriptor: OCIDescriptor = index.manifests[0];
     const manifest: OCIImageManifest = await readJsonFileOfType(
       this.getPathToBlob(ociBlobsDir, manifestDescriptor),
       OCIImageManifestValidator,
@@ -537,15 +537,24 @@ export class BlockRegistryService {
           path.join(this.paths.tcmuHBA, tcmuStorageObjectId, "wwn/vpd_unit_serial"),
           `hocusbd-${tcmuStorageObjectId}`,
         );
-        // WARNING: This is no ordinary write, this write only returns success after the following steps were finished successfully:
+        // WARNING: The following actions will happen during the writes:
         // 1. Kernel will create a new uio device for the storage object and send out an netlink notification to all tcmu processes
         // 2. All notified processes will check whether they have a handler for the given tcmu subtype,
         //    if so then they proceed to discover their dedicated UIO device
         // 3. The chosen overlaybd process will read the provided config file and:
-        //    a) Opens and sets up shared ring buffers using the UIO device
-        //    b) Opens all layers, and tries to combine them into one view
-        //    c) Writes the result of the setup into the result file provided in the config
+        //    a) Open and set up a shared ring buffer using the UIO device
+        //    b) Open all layers, and combine them into one view
+        //    c) Write the result of the setup into the result file provided in the config
         //       aka. <ROOT_DIR>/run/obd-result-<image_id or container_id>
+        // There are some race conditions where we may falsely think the setup succeeded:
+        // 1. If there is no TCMU process or the handler process never attaches
+        //    then linux for some unholy reason will falsely tell you that everything succeeded
+        // 2. If the handler attached but the setup failed then one of the following writes will fail
+        // 3. If tcm_loop was attached to the storage object then you can't reconfigure anything anymore and the writes will fail
+        // Assume that:
+        // 1. During a full restart all overlaybd result files were deleted
+        // 2. If TCMU crashes then we need to perform a full restart of the agent
+        // 3. If the result file tells us that the setup is ok then assume that the handler is present and attached successfully
         await fs
           .writeFile(
             path.join(this.paths.tcmuHBA, tcmuStorageObjectId, "control"),
@@ -555,7 +564,17 @@ export class BlockRegistryService {
 
         await fs
           .writeFile(path.join(this.paths.tcmuHBA, tcmuStorageObjectId, "enable"), "1")
-          .catch(catchAlreadyExists);
+          .catch((e) => {
+            console.error("enable", e);
+          });
+
+        const obdResult = await fs.readFile(
+          path.join(this.paths.run, `obd-result-${what}`),
+          "utf-8",
+        );
+        if (obdResult !== "success") {
+          throw new Error(`overlaybd-tcmu failed to attach: ${obdResult}`);
+        }
 
         break;
       }

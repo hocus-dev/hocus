@@ -8,14 +8,15 @@ import testImages from "./test-data/test_images.json";
 import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
-import { EXPOSE_METHOD } from "./registry.service";
-import { ChildProcess, spawn } from "child_process";
+import { BlockRegistryService, EXPOSE_METHOD } from "./registry.service";
+import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from "child_process";
 import path from "path";
 import { sleep } from "~/utils.shared";
 
 const provideInjector = (
   testFn: (args: {
     injector: ReturnType<typeof createAgentInjector>;
+    brService: BlockRegistryService;
     runId: string;
   }) => Promise<void>,
 ): (() => Promise<void>) => {
@@ -30,39 +31,60 @@ const provideInjector = (
     },
   });
   const runId = uuidv4();
+  let shouldTerminate = false;
+  let tcmuSubprocess: [ChildProcessWithoutNullStreams, Promise<void>] | undefined = void 0;
+  let tcmuStdout = "";
+  let tcmuStderr = "";
   return printErrors(async () => {
     try {
-      await testFn({ injector, runId });
+      const brService = injector.resolve(Token.BlockRegistryService);
+      const config = injector.resolve(Token.Config);
+      await brService.initializeRegistry();
+      const cp = spawn("/opt/overlaybd/bin/overlaybd-tcmu", [
+        path.join(config.agent().blockRegistryRoot, "overlaybd.json"),
+      ]);
+      const cpWait = new Promise<void>((resolve, reject) => {
+        cp.stdout.on("data", (data) => {
+          tcmuStdout += data;
+        });
+        cp.stderr.on("data", (data) => {
+          tcmuStderr += data;
+        });
+        cp.on("close", (code) => {
+          if (!shouldTerminate) {
+            console.error(`overlaybd-tcmu exited prematurely with code ${code}`);
+            console.error(`overlaybd-tcmu STDOUT: ${tcmuStdout}`);
+            console.error(`overlaybd-tcmu STDERR: ${tcmuStderr}`);
+            console.error("Please consult the artifacts for more details");
+            reject("overlaybd-tcmu exited");
+          } else {
+            resolve(void 0);
+          }
+        });
+      });
+      tcmuSubprocess = [cp, cpWait];
+      const testPromise = testFn({ brService, injector, runId });
+      // Either the test finishes/crashes or overlaybd crashes/finishes
+      await Promise.race([testPromise, cpWait]);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(`Failed run id: ${runId}`);
       throw err;
     } finally {
       await injector.dispose();
+      if (tcmuSubprocess !== void 0) {
+        shouldTerminate = true;
+        tcmuSubprocess[0].kill("SIGINT");
+        await tcmuSubprocess[1];
+      }
     }
   });
 };
 
 test.concurrent(
   "startFirecrackerInstance",
-  provideInjector(async ({ injector, runId }) => {
-    const brService = injector.resolve(Token.BlockRegistryService);
-    const config = injector.resolve(Token.Config);
-    await brService.initializeRegistry();
-
+  provideInjector(async ({ brService, runId }) => {
     const im = await brService.loadImageFromRemoteRepo(testImages.test2, "AAAA");
-    const a = spawn("/opt/overlaybd/bin/overlaybd-tcmu", [
-      path.join(config.agent().blockRegistryRoot, "overlaybd.json"),
-    ]);
-    a.stdout.on("data", (data) => {
-      console.log(`stdout: ${data}`);
-    });
-    a.stderr.on("data", (data) => {
-      console.error(`stderr: ${data}`);
-    });
-    a.on("close", (code) => {
-      console.log(`child process exited with code ${code}`);
-    });
 
     await sleep(3000);
 
@@ -71,6 +93,7 @@ test.concurrent(
     const im2 = await brService.commitContainer(c, "VVVVVVV");
 
     console.log(await brService.expose(im, EXPOSE_METHOD.BLOCK_DEV));
+    console.log(await brService.expose(im2, EXPOSE_METHOD.BLOCK_DEV));
 
     throw new Error("AAAA");
     console.log("Hello world");
