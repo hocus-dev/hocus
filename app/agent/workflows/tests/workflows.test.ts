@@ -1,5 +1,4 @@
 import { Context } from "@temporalio/activity";
-import { Worker } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 import { v4 as uuidv4 } from "uuid";
 
@@ -9,7 +8,7 @@ import { cancellationTestWorkflow } from "./wait-for-workflow/workflow";
 import { withActivityHeartbeat } from "~/agent/activities/utils";
 import { unwrap } from "~/utils.shared";
 
-const { provideTestActivities, getWorkflowBundle, getTestEnv } = prepareTests();
+const { provideTestActivities } = prepareTests();
 
 // Temporal worker setup is long
 jest.setTimeout(30 * 1000);
@@ -26,9 +25,7 @@ jest.setTimeout(30 * 1000);
 // cancellation.
 test.concurrent(
   "cancellationTest",
-  provideTestActivities(async ({ activities }) => {
-    const { client, nativeConnection } = getTestEnv();
-    const taskQueue = `test-${uuidv4()}`;
+  provideTestActivities(async ({ createWorker }) => {
     const locks = new Map(
       await Promise.all(
         ["1", "2", "3"].map(async (id) => {
@@ -41,12 +38,8 @@ test.concurrent(
     const cancelLock = new Mutex();
     const releaseCancelLock = await cancelLock.acquire();
 
-    const worker = await Worker.create({
-      connection: nativeConnection,
-      taskQueue,
-      workflowsPath: require.resolve("./workflows"),
-      activities: {
-        ...activities,
+    const { worker, client, taskQueue } = await createWorker({
+      activityOverrides: {
         cancellationTest: withActivityHeartbeat({ intervalMs: 250 }, async (result: string) => {
           if (result === "2") {
             releaseCancelLock();
@@ -57,10 +50,6 @@ test.concurrent(
           return result;
         }),
       },
-      dataConverter: {
-        payloadConverterPath: require.resolve("~/temporal/data-converter"),
-      },
-      workflowBundle: getWorkflowBundle(),
     });
 
     await worker.runUntil(async () => {

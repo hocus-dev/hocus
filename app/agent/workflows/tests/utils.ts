@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
+import type { Client } from "@temporalio/client";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
-import { DefaultLogger, Runtime } from "@temporalio/worker";
+import { DefaultLogger, Runtime, Worker } from "@temporalio/worker";
+import { v4 as uuidv4 } from "uuid";
 import type { LogEntry } from "winston";
 
 import type { TestActivities } from "./activities";
@@ -13,11 +15,17 @@ import { printErrors } from "~/test-utils";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 
+type CreateWorkerFn = (args?: {
+  activityOverrides?: Partial<TestActivities>;
+  taskQueue?: string;
+}) => Promise<{ worker: Worker; client: Client; taskQueue: string }>;
+
 type ProvideTestActivities = (
   testFn: (args: {
     activities: TestActivities;
     db: Prisma.NonTransactionClient;
     injector: AgentInjector;
+    createWorker: CreateWorkerFn;
   }) => Promise<void>,
 ) => () => Promise<void>;
 
@@ -26,6 +34,9 @@ export const prepareTests = (): {
   getWorkflowBundle: () => any;
   provideTestActivities: ProvideTestActivities;
 } => {
+  let testEnv: TestWorkflowEnvironment = null as any;
+  let workflowBundle: any = null;
+
   const provideTestActivities: ProvideTestActivities = (testFn) => {
     const injector = createAgentInjector({
       [Token.Logger]: {
@@ -45,14 +56,34 @@ export const prepareTests = (): {
       },
     });
     return printErrors(
-      provideDb(async (db) =>
-        testFn({ activities: await createTestActivities(injector, db), db, injector }),
-      ),
+      provideDb(async (db) => {
+        const activities = await createTestActivities(injector, db);
+        const createWorker: CreateWorkerFn = async (args) => {
+          const taskQueue = args?.taskQueue ?? `test-${uuidv4()}`;
+          const { nativeConnection } = testEnv;
+          const worker = await Worker.create({
+            connection: nativeConnection,
+            taskQueue,
+            activities: {
+              ...activities,
+              ...args?.activityOverrides,
+            },
+            dataConverter: {
+              payloadConverterPath: require.resolve("~/temporal/data-converter"),
+            },
+            workflowBundle,
+          });
+          return { worker, client: testEnv.client, taskQueue };
+        };
+        return testFn({
+          activities,
+          db,
+          injector,
+          createWorker,
+        });
+      }),
     );
   };
-
-  let testEnv: TestWorkflowEnvironment = null as any;
-  let workflowBundle: any = null;
 
   beforeAll(async () => {
     // Use console.log instead of console.error to avoid red output
