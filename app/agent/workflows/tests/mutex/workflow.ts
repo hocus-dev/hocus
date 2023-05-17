@@ -1,11 +1,11 @@
 import { proxyActivities } from "@temporalio/workflow";
 
-import { withLock } from ".";
+import type { TestActivities } from "../activities";
 
-import type { Activities } from "~/agent/activities/list";
+import { withLock } from "~/agent/workflows/mutex";
 import { waitForPromisesWorkflow } from "~/temporal/utils";
 
-const { mutexTest } = proxyActivities<Activities>({
+const { mutexTest } = proxyActivities<TestActivities>({
   startToCloseTimeout: "1 minute",
 });
 

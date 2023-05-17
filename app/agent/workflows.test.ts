@@ -24,7 +24,6 @@ import {
   runDeleteWorkspace,
   runArchivePrebuild,
   runDeleteRemovablePrebuilds,
-  testLock,
   scheduleNewPrebuild,
 } from "./workflows";
 
@@ -683,73 +682,6 @@ test.concurrent(
       const { project: project2, gitRepository: gitRepository2 } = await runWorkflow();
       expect(project2.id).not.toBe(project.id);
       expect(gitRepository2.id).toBe(gitRepository.id);
-    });
-  }),
-);
-
-test.concurrent(
-  "withLock",
-  provideActivities(async ({ activities }) => {
-    const { client, nativeConnection } = testEnv;
-    const taskQueue = `test-${uuidv4()}`;
-    let counter = 0;
-    const mutexTest = (): number => {
-      return counter++;
-    };
-    const worker = await Worker.create({
-      connection: nativeConnection,
-      taskQueue,
-      workflowsPath: require.resolve("./workflows"),
-      activities: {
-        ...activities,
-        mutexTest,
-      },
-      dataConverter: {
-        payloadConverterPath: require.resolve("~/temporal/data-converter"),
-      },
-      workflowBundle,
-    });
-    await worker.runUntil(async () => {
-      const results = await waitForPromises(
-        [0, 1, 2].map(() =>
-          client.workflow.execute(testLock, {
-            workflowId: uuidv4(),
-            taskQueue,
-            retry: { maximumAttempts: 1 },
-            args: [],
-          }),
-        ),
-      );
-      expect(results).toHaveLength(3);
-      const parseResult = (workflowResult: string[], i: number): number => {
-        const acquire = workflowResult[i];
-        const activityResult = workflowResult[i + 1];
-        const release = workflowResult[i + 2];
-        expect(acquire).toMatch(/^acquire-\d+$/);
-        expect(activityResult).toMatch(/^result-\d+-\d+$/);
-        expect(release).toMatch(/^release-\d+$/);
-        const acquireId = parseInt(acquire.split("-")[1]);
-        const splitResult = activityResult.split("-");
-        const activityResultId = parseInt(splitResult[1]);
-        const activityResultValue = parseInt(splitResult[2]);
-        const releaseId = parseInt(release.split("-")[1]);
-        // Here we check that the inner lock works
-        expect(acquireId).toBe(releaseId);
-        expect(activityResultId).toBe(releaseId);
-        return activityResultValue;
-      };
-      for (const result of results) {
-        expect(result).toHaveLength(15);
-        const activityResults = Array.from({ length: result.length / 3 }).map((_, i) =>
-          parseResult(result, i * 3),
-        );
-        // Here we check that the outer lock works
-        for (let i = 0; i < activityResults.length - 1; i++) {
-          const curActivityResult = activityResults[i];
-          const nextActivityResult = activityResults[i + 1];
-          expect(curActivityResult + 1).toBe(nextActivityResult);
-        }
-      }
     });
   }),
 );

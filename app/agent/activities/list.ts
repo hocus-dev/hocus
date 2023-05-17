@@ -29,7 +29,6 @@ import { getWorkspaceInstanceStatus } from "./get-workspace-instance-status";
 import { initPrebuildEvents } from "./init-prebuild-events";
 import { getWorkflowStatus } from "./mutex/get-workflow-status";
 import { signalWithStartLockWorkflow } from "./mutex/signal-with-start-lock-workflow";
-import { mutexTest } from "./mutex/test-activity";
 import { prebuild } from "./prebuild";
 import { saveGitRepoConnectionStatus } from "./save-git-repo-connection-status";
 import { startWorkspace } from "./start-workspace";
@@ -74,7 +73,6 @@ const activities = {
   cleanUpAfterPrebuildError,
   cleanUpWorkspaceInstanceLocal,
   signalWithStartLockWorkflow,
-  mutexTest,
   getWorkflowStatus,
   cleanUpWorkspaceInstanceDb,
   createPrebuildEvent,
