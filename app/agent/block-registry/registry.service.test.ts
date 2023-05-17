@@ -44,9 +44,9 @@ const provideInjector = (
   let tcmuStdout = "";
   let tcmuStderr = "";
   return printErrors(async () => {
+    const brService = injector.resolve(Token.BlockRegistryService);
+    const config = injector.resolve(Token.Config);
     try {
-      const brService = injector.resolve(Token.BlockRegistryService);
-      const config = injector.resolve(Token.Config);
       let cpWait: Promise<void>;
       if (!opts.skipInit) {
         await brService.initializeRegistry();
@@ -84,12 +84,23 @@ const provideInjector = (
       console.error(`Failed run id: ${runId}`);
       throw err;
     } finally {
-      await injector.dispose();
+      if (!opts.skipInit) {
+        try {
+          // Check if we have the subtype
+          await brService.getTCMUSubtype();
+          await brService.hideEverything();
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error(`Failed to initialize registry ${(err as Error).message}`);
+        }
+      }
       if (tcmuSubprocess !== void 0) {
         shouldTerminate = true;
         tcmuSubprocess[0].kill("SIGINT");
         await tcmuSubprocess[1];
       }
+
+      await injector.dispose();
     }
   });
 };
@@ -127,6 +138,9 @@ test.concurrent(
     console.log(await brService.expose(im, EXPOSE_METHOD.HOST_MOUNT));
 
     console.log(await brService.expose(c, EXPOSE_METHOD.HOST_MOUNT));
+
+    console.log(await brService.hide(c));
+    console.log(await brService.hide(c));
 
     //console.log(await brService.expose(im2, EXPOSE_METHOD.BLOCK_DEV));
 

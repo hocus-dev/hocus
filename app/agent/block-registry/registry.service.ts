@@ -81,6 +81,8 @@ export class BlockRegistryService {
       images: path.join(root, "images"),
       // Directory for anything temporary which should be nuked after a restart
       // This can't be /tmp as I need the directory to be on the same partition as the registry
+      // I'm abusing hardlinks to create synchronization primitives
+      // The entire registry is fully lockless, wait free and all operations on it are idempotent
       run: path.join(root, "run"),
       // Filesystem mounts
       mounts: path.join(root, "mounts"),
@@ -199,10 +201,14 @@ export class BlockRegistryService {
       { flag: "w" },
     );
 
-    // Some versions of linux have a limitation of 255 LUNS per target, also the limit of LUNS per target may depend on the architecture
+    // Some kernels will have 2**16 luns to work with, some 2**8, some 2**64, sometimes it will depend on the kernel config :p
+    // For now I've hardcoded 64 bits which is true for new kernels but the rest of the code properly handles hash collisions
+    // when we have less than 2**64 luns to work with
+    // There may be up to 8 targets per HBA, also we may have multiple HBA's. If compatibility in 2**8 luns mode would be required
+    // then we may just have 8 HBA's each with 8 targets each with 256 luns which would give us 16k disks to work with.
+    // Also in 2**16 mode with 8 targets we would have 0.5kk disks to work with
     // https://access.redhat.com/solutions/5120951
-    // The rest of the code assumes that the LUN number has 64 bits
-    // Here i'm sanity checking that lun_18446744073709551615 works but lun_18446744073709551616 fails :)
+    // Here i'm sanity checking that lun_18446744073709551615 works but lun_18446744073709551616 fails so we're in 64 bit mode :)
     // the rest of the code treats lun_(2**64 - 1) as reserved and won't place any storage object there
     const shouldWorkLun = path.join(this.paths.tcmLoopTarget, `lun/lun_${2n ** 64n - 1n}`);
     const shouldNotWorkLun = path.join(this.paths.tcmLoopTarget, `lun/lun_${2n ** 64n}`);
@@ -221,20 +227,37 @@ export class BlockRegistryService {
         })
         .catch(catchIgnore("ERANGE"));
       await fs.mkdir(shouldWorkLun).catch((err: Error) => {
-        err.message = `Lun ID is smaller than 64 bits, please consult https://access.redhat.com/solutions/5120951.\n${err.message}`;
+        err.message = `Lun ID is smaller than 64 bits.\n${err.message}`;
         throw err;
       });
     } finally {
       await cleanupF();
     }
 
-    // Ensure scsi scan is in sync mode, don't even try async more for Hocus...
+    // Ensure scsi scan is in sync mode, don't even try async mode for Hocus...
     const scanMode = await fs.readFile("/sys/module/scsi_mod/parameters/scan", "utf8");
     if (scanMode !== "sync\n") {
-      throw new Error(`Kernel SCSI in ${scanMode} scan mode, Hocus refusing to operate`);
+      throw new Error(
+        `Kernel SCSI in ${scanMode} scan mode, Hocus refusing to operate. Please enable sync mode`,
+      );
     }
 
-    // [TODO] We are after an restart, we need to check the state of block devices/mounts we are managing
+    await this.hideEverything();
+  }
+
+  // Unmounts everything and hides all block devices
+  // Used during restart and for tests
+  async hideEverything(): Promise<void> {
+    // We are after an restart, we need to cleanup all block devices/mounts we were managing in the past
+    // For that do a full HBA scan
+    const tcmuSubtype = await this.getTCMUSubtype();
+    const dirs = await fs.readdir(this.paths.tcmuHBA);
+    await waitForPromises(
+      dirs
+        .filter((tcmuStorageObjectId) => tcmuStorageObjectId.startsWith(`${tcmuSubtype}_`))
+        .map((tcmuStorageObjectId) => tcmuStorageObjectId.substring(tcmuSubtype.length + 1))
+        .map((registryId) => this.hide(registryId as ImageId | ContainerId)),
+    );
   }
 
   async loadImageFromDisk(ociDumpPath: string, outputId?: string): Promise<ImageId> {
@@ -545,8 +568,8 @@ export class BlockRegistryService {
     return imageId;
   }
 
-  private _tcmuSubtype: string | undefined;
-  private async getTCMUSubtype(): Promise<string> {
+  public _tcmuSubtype: string | undefined;
+  public async getTCMUSubtype(): Promise<string> {
     if (this._tcmuSubtype === void 0) {
       this._tcmuSubtype = (await fs.readFile(this.paths.tcmuSubtype, "utf-8")).trim();
     }
@@ -722,6 +745,10 @@ export class BlockRegistryService {
             if (lunId !== (2n ** 64n - 1n).toString()) {
               const lunPath = path.join(this.paths.tcmLoopTarget, "lun", `lun_${lunId}`);
               await fs.mkdir(lunPath).catch(catchAlreadyExists);
+              // We don't care about the race where expose and hide happens on the same id at the same time
+              // The race is due to await fs.rmdir(lunPath) in hide. If that becomes a problem(it won't) then:
+              // - You may not remove the lun, only deleting the mapping is ok
+              // - FIXME: If the symlink call fails with ENOENT just retry mkdir :)
               await fs
                 .symlink(tcmuPath, path.join(lunPath, tcmuStorageObjectId))
                 .catch(catchAlreadyExists);
@@ -776,6 +803,8 @@ export class BlockRegistryService {
             const lunPath = path.join(this.paths.tcmLoopTarget, "lun", `lun_${aluaMembers[i]}`);
             const symlinkPath = path.join(lunPath, tcmuStorageObjectId);
             await fs.unlink(symlinkPath).catch(catchIgnore("ENOENT"));
+            // When not empty then some other process managed to claim the LUN, this is not a problem
+            await fs.rmdir(lunPath).catch(catchIgnore("ENOTEMPTY"));
           }
         }
 
@@ -806,5 +835,47 @@ export class BlockRegistryService {
     }
   }
 
-  hide(what: ImageId | ContainerId): void {}
+  async hide(what: ImageId | ContainerId): Promise<void> {
+    if (!what.startsWith("im_") && !what.startsWith("ct_")) {
+      throw new Error(`Invalid id: ${what}`);
+    }
+    // Ensure the device was unmounted
+    const mountPoint = path.join(this.paths.mounts, what);
+    const dirPresent = await fs
+      .stat(mountPoint)
+      .then(() => true)
+      .catch((err: Error) => {
+        if (!err.message.startsWith("ENOENT")) throw err;
+        return false;
+      });
+    if (dirPresent) {
+      try {
+        await execCmd("umount", mountPoint);
+      } catch (err) {
+        if (!(err as Error).message.includes("not mounted")) throw err;
+      }
+
+      await fs.rmdir(mountPoint);
+    }
+    // Remove the TCMU <-> LUN mapping
+    const tcmuSubtype = await this.getTCMUSubtype();
+    const tcmuStorageObjectId = `${tcmuSubtype}_${what}`;
+    const tcmuPath = path.join(this.paths.tcmuHBA, tcmuStorageObjectId);
+    const aluaMembers = await this.getTCMUAluaMembers(tcmuStorageObjectId).catch(
+      catchIgnore("ENOENT"),
+    );
+    if (aluaMembers === void 0) {
+      // The object was already deleted
+      return;
+    }
+    for (const member of aluaMembers) {
+      const lunPath = path.join(this.paths.tcmLoopTarget, "lun", `lun_${member}`);
+      const symlinkPath = path.join(lunPath, tcmuStorageObjectId);
+      await fs.unlink(symlinkPath).catch(catchIgnore("ENOENT"));
+      // When not empty then some other process managed to claim the LUN, this is not a problem
+      await fs.rmdir(lunPath).catch(catchIgnore("ENOTEMPTY"));
+    }
+    // Remove the TCMU storage object
+    await fs.rmdir(tcmuPath).catch(catchIgnore("ENOENT"));
+  }
 }
