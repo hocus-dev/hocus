@@ -55,6 +55,7 @@ export class BlockRegistryService {
     run: string;
     mounts: string;
     sharedOCIBlobsDir: string;
+    _sharedOCIBlobsDirSha256: string;
     tcmLoopTarget: string;
     tcmuHBA: string;
     logs: string;
@@ -88,6 +89,8 @@ export class BlockRegistryService {
       mounts: path.join(root, "mounts"),
       // OCI layout blob dir, used for downloading images from OCI registries
       sharedOCIBlobsDir: path.join(root, "blobs"),
+      // Only to create it ahead of time
+      _sharedOCIBlobsDirSha256: path.join(root, "blobs/sha256"),
       // ConfigFS tcm_loop
       tcmLoopTarget: path.join(
         configfs,
@@ -227,6 +230,7 @@ export class BlockRegistryService {
         })
         .catch(catchIgnore("ERANGE"));
       await fs.mkdir(shouldWorkLun).catch((err: Error) => {
+        if (err.message.startsWith("EEXIST")) return;
         err.message = `Lun ID is smaller than 64 bits.\n${err.message}`;
         throw err;
       });
@@ -513,6 +517,7 @@ export class BlockRegistryService {
       throw new Error("Expected container, found image");
     }
     // Sealing is not supported for sparse layers :P
+    // Sealing would improve the performance a lot as we would be able to instantly start using this container as a lower layer
     const layerPath = path.join(this.paths.containers, containerId, "layer.tar");
     await execCmd(
       "/opt/overlaybd/bin/overlaybd-commit",
