@@ -164,7 +164,7 @@ export class BlockRegistryService {
       JSON.stringify({
         tcmuSubtype: await this.getTCMUSubtype(),
         logConfig: {
-          logLevel: 1,
+          logLevel: 0,
           logPath: path.join(this.paths.logs, "overlaybd.log"),
         },
         cacheConfig: {

@@ -157,7 +157,7 @@ test.concurrent(
   ),
 );
 
-test(
+test.concurrent(
   "create => mkfs => mount => write => commit => create => write => commit",
   provideBlockRegistry(async ({ brService }) => {
     const testFile1 = "hello-world";
@@ -200,7 +200,7 @@ test(
   }),
 );
 
-test(
+test.concurrent(
   "Load image from registry",
   provideBlockRegistry(async ({ brService }) => {
     const im1 = await brService.loadImageFromRemoteRepo(testImages.test1);
