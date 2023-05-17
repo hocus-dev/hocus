@@ -513,26 +513,14 @@ export class BlockRegistryService {
       throw new Error("Expected container, found image");
     }
     // Sealing is not supported for sparse layers :P
-    const commitPath = path.join(this.paths.containers, containerId, "overlaybd.commit");
     const layerPath = path.join(this.paths.containers, containerId, "layer.tar");
     await execCmd(
       "/opt/overlaybd/bin/overlaybd-commit",
+      "-z",
+      "-t",
       obdConfig.upper.data,
       obdConfig.upper.index,
-      commitPath,
-    );
-    // For some reason the -t or seal option doesn't work in overlaybd-commit
-    await execCmd(
-      "tar",
-      "-cf",
       layerPath,
-      "-C",
-      `${path.join(this.paths.containers, containerId)}`,
-      "--sort=name",
-      "--owner=hocus:0",
-      "--group=hocus:0",
-      "--mtime='1970-01-01 00:00'",
-      "overlaybd.commit",
     );
     const layerDigest = `sha256:${
       (await execCmd("sha256sum", layerPath)).stdout.toString("utf8").split(" ")[0]
