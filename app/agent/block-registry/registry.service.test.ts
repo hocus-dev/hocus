@@ -17,6 +17,7 @@ import { config as defaultConfig } from "~/config";
 import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
+import { sleep } from "~/utils.shared";
 
 const provideBlockRegistry = (
   testFn: (args: {
@@ -92,6 +93,19 @@ const provideBlockRegistry = (
             }
           });
         });
+        // Wait for tcmu to overlaybd to fully initialize
+        for (let i = 0; i < 10; i += 1) {
+          try {
+            await fs.readFile(path.join(blockRegistryRoot, "logs", "overlaybd.log"), "utf-8");
+            break;
+          } catch (err) {
+            await sleep(10);
+          }
+          if (i == 9) {
+            throw new Error("TCMU failed to initialize");
+          }
+        }
+
         tcmuSubprocess = [cp, cpWait];
       } else {
         cpWait = Promise.resolve();
@@ -160,6 +174,7 @@ test.concurrent(
 test.concurrent(
   "create => mkfs => mount => write => commit => create => write => commit",
   provideBlockRegistry(async ({ brService }) => {
+    await sleep(5000);
     const testFile1 = "hello-world";
     const testContent1 = "Hello World!";
     const testFile2 = "hello-world-2";

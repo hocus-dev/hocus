@@ -18,7 +18,7 @@ import { type Config } from "~/config";
 import type { Validator } from "~/schema/utils.server";
 import { Token } from "~/token";
 import type { valueof } from "~/types/utils";
-import { waitForPromises } from "~/utils.shared";
+import { waitForPromises, sleep } from "~/utils.shared";
 
 export type ImageId = A.Type<`im_${string}`, "image">;
 export type ContainerId = A.Type<`ct_${string}`, "container">;
@@ -164,7 +164,7 @@ export class BlockRegistryService {
       JSON.stringify({
         tcmuSubtype: await this.getTCMUSubtype(),
         logConfig: {
-          logLevel: 0,
+          logLevel: 1,
           logPath: path.join(this.paths.logs, "overlaybd.log"),
         },
         cacheConfig: {
@@ -680,30 +680,37 @@ export class BlockRegistryService {
           // 1. Kernel will create a new uio device for the storage object and send out an netlink notification to all tcmu processes
           // 2. All notified processes will check whether they have a handler for the given tcmu subtype,
           //    if so then they proceed to discover their dedicated UIO device, the discovery may fail
+          //    If netlink reply is enabled(the default) all processes will send a netlink reply but only the first replay
+          //    will be processed by the kernel - this is why we disable netlink replies.
           // 3. The chosen overlaybd process will read the provided config file and:
           //    a) Open and set up a shared ring buffer using the UIO device
           //    b) Open all layers, and combine them into one view
           //    c) Write the result of the setup into the result file provided in the config
           //       aka. <ROOT_DIR>/run/obd-result-<image_id or container_id>
           // Those are a lot of moving parts and not everything may work:
-          // 1. If there is no TCMU process or the handler process never attaches
-          //    then linux for some unholy reason will falsely tell you that everything succeeded
-          // 2. If the handler attached but the handler failed setting up it's stuff then
+          // 1. If there is no TCMU process or the handler process never attaches we can't know that without extra info
+          // 2. If netlink replay is enabled and the handler attached but the handler failed setting up it's stuff then
           //    the enable write will fail with ENOENT besides the file existing
           // 3. If tcm_loop was attached to the tcmu storage object then you
           //    can't reconfigure anything anymore and the config writes will fail
           // 4. I managed to once get a case in bash where the enable write hanged forever
           //    and was immune to `sudo kill -9` as the process hanged in kernel space not userspace
           //    the only way for the hanged write to resume was to start a tcmu handler for that storage object
+          //    This was with netlink replies enabled - that's one of the reasons we disable it
           // For now assume that:
           // 1. During a full restart all overlaybd result files were deleted
           // 2. If the TCMU process crashes then we need to perform a full restart of the agent
           // 3. If the result file tells us that the setup is ok then assume that the handler is present and attached successfully
           // 4. The config writes will finish in finite time 🤞
+          // 5. The user won't race expose/hide calls with the same ID
+          // FIXME: Not all kernels will support nl_reply_supported .-. We should detect that in the initialization logic
           await fs
             .writeFile(
               path.join(tcmuPath, "control"),
-              `dev_config=${tcmuSubtype}/${path.join(this.paths.blockConfig, what)}`,
+              `dev_config=${tcmuSubtype}/${path.join(
+                this.paths.blockConfig,
+                what,
+              )},nl_reply_supported=-1`,
             )
             .catch(catchAlreadyExists);
 
@@ -714,10 +721,23 @@ export class BlockRegistryService {
             if (err.message.startsWith("ENOENT")) tcmuAttachFailed = true;
           });
 
-          const obdResult = await fs.readFile(
-            path.join(this.paths.run, `obd-result-${what}`),
-            "utf-8",
-          );
+          let obdResult: string | undefined = void 0;
+          // Wait up to half a second for overlaybd to setup the device
+          // https://linear.app/hocus-dev/issue/HOC-204/modify-overlaybd-tcmu-to-work-without-netlink-and-expose-a-grpc-api
+          for (let i = 0; i < 100; i += 1) {
+            try {
+              obdResult = await fs.readFile(
+                path.join(this.paths.run, `obd-result-${what}`),
+                "utf-8",
+              );
+            } catch (err) {
+              if (!(err as Error).message.startsWith("ENOENT")) throw err;
+              await sleep(5);
+            }
+          }
+          if (obdResult === void 0) {
+            throw new Error("Timed out waiting for overlaybd-tcmu");
+          }
           // tcmuAttachFailed is for the nice case where tcmu failed successfully
           // I won't be surprised if that may happen here, better safe than sorry
           if (obdResult !== "success" || tcmuAttachFailed) {
@@ -737,19 +757,26 @@ export class BlockRegistryService {
             // LUN 2**64 - 1 is reserved
             if (lunId !== (2n ** 64n - 1n).toString()) {
               const lunPath = path.join(this.paths.tcmLoopTarget, "lun", `lun_${lunId}`);
-              await fs.mkdir(lunPath).catch(catchAlreadyExists);
-              // We don't care about the race where expose and hide happens on the same id at the same time
-              // The race is due to await fs.rmdir(lunPath) in hide. If that becomes a problem(it won't) then:
-              // - You may not remove the lun, only deleting the mapping is ok
-              // - FIXME: If the symlink call fails with ENOENT just retry mkdir :)
-              await fs
-                .symlink(tcmuPath, path.join(lunPath, tcmuStorageObjectId))
-                .catch(catchAlreadyExists);
-              // Ok, time to ensure that symlink really exists
-              // In case of hash collisions we will get EEXIST from the kernel :)
+              // If a hide and expose operation happens for different containers at the same time
+              // Then when a hash collision occurs then it's possible that the lun get's deleted before we manage to claim it
+              // in that case we just retry the operation until we see that the lun is claimed :)
+              let lunClaimed = false;
+              while (!lunClaimed) {
+                await fs.mkdir(lunPath).catch(catchAlreadyExists);
+                try {
+                  await fs
+                    .symlink(tcmuPath, path.join(lunPath, tcmuStorageObjectId))
+                    .catch(catchAlreadyExists);
+                  lunClaimed = true;
+                } catch (err) {
+                  if (!(err as Error).message.includes("ENOENT")) throw err;
+                }
+              }
+              // Ok the above code ensured that the lun was claimed by someone
+              // time to ensure that we are the ones who claimed the LUN
               // So let us stat the symlink, if it exists then we're done
-              // if it does not exist then we got a hash collision and need
-              // to start the tortoise and hare algorithm to not end up in an infinite loop
+              // if it does not exist then we got a hash collision and need to move to another hash
+              // and start the tortoise and hare algorithm to not end up in an infinite loop
               done = true;
               try {
                 await fs.stat(path.join(lunPath, tcmuStorageObjectId));
@@ -870,5 +897,7 @@ export class BlockRegistryService {
     }
     // Remove the TCMU storage object
     await fs.rmdir(tcmuPath).catch(catchIgnore("ENOENT"));
+    // Remove the result file
+    await fs.unlink(path.join(this.paths.run, `obd-result-${what}`)).catch(catchIgnore("ENOENT"));
   }
 }
