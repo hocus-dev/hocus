@@ -68,7 +68,7 @@
     "@swc/core": "^1.2.241",
     "@swc/helpers": "^0.4.7",
     "@swc/jest": "^0.2.22",
-    "@temporalio/testing": "^1.4.4",
+    "@temporalio/testing": "^1.7.4",
     "@types/cookie-parser": "^1.4.3",
     "@types/cors": "2.8.8",
     "@types/csurf": "^1.11.2",

@@ -12,7 +12,8 @@ import {
 } from "@temporalio/workflow";
 
 import type { Activities } from "~/agent/activities/list";
-import { LockRequest, wakeSignal } from "~/agent/activities/mutex/shared";
+import type { LockRequest } from "~/agent/activities/mutex/shared";
+import { wakeSignal } from "~/agent/activities/mutex/shared";
 import { FINAL_WORKFLOW_EXECUTION_STATUS_NAMES } from "~/agent/activities/mutex/shared";
 import { currentWorkflowIdQuery, lockRequestSignal } from "~/agent/activities/mutex/shared";
 import { retryWorkflow } from "~/temporal/utils";
@@ -139,26 +140,13 @@ export async function withLock<T>(
 
   // Send a signal to the given lock Workflow to acquire the lock
   await signalWithStartLockWorkflow(options.resourceId, lockAcquiredSignalName);
-  console.log("signalled", options.resourceId);
   await condition(hasLock);
 
   await fn().finally(async () => {
-    console.log("considered cancelled", CancellationScope.current().consideredCancelled);
     await CancellationScope.nonCancellable(async () => {
       // Send a signal to the given lock Workflow to release the lock
       const handle = getExternalWorkflowHandle(options.resourceId);
-      console.log("signalling release", releaseSignalName);
-      try {
-        await handle.signal(releaseSignalName);
-      } catch (err) {
-        console.warn(err);
-        console.log("\n\n in catch block \n\n");
-        throw err;
-      } finally {
-        console.log("wtf!!");
-      }
-      console.log("signalled release", releaseSignalName);
+      await handle.signal(releaseSignalName);
     });
   });
-  console.log("exit");
 }

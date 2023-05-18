@@ -6,10 +6,10 @@ import { cancelLockSignal, isLockAcquiredQuery, releaseLockSignal } from "./mute
 import { prepareTests } from "./utils";
 import { testLock, cancellationTestWorkflow, acquireLockAndWaitForSignal } from "./workflows";
 
-import { withActivityHeartbeat } from "~/agent/activities/utils";
-import { sleep, unwrap, waitForPromises } from "~/utils.shared";
-import { retry } from "~/agent/utils";
 import { wakeSignal } from "~/agent/activities/mutex/shared";
+import { withActivityHeartbeat } from "~/agent/activities/utils";
+import { retry } from "~/agent/utils";
+import { sleep, unwrap, waitForPromises } from "~/utils.shared";
 
 const { provideTestActivities } = prepareTests();
 
@@ -215,11 +215,6 @@ test.concurrent(
       const handle8 = await scheduleAcquireLock(lockId4);
       await handle7.cancel();
       await handle8.signal(releaseLockSignal);
-      for (let i = 0; i < 10; i++) {
-        console.log("7", await getWorkflowStatus(handle7.workflowId));
-        await sleep(1000);
-      }
-
       await handle8.result();
     });
   }),

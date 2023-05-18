@@ -3,6 +3,8 @@ import {
   getExternalWorkflowHandle,
   setHandler,
   Trigger,
+  CancellationScope,
+  condition,
 } from "@temporalio/workflow";
 
 import type { TestActivities } from "../activities";
@@ -40,17 +42,17 @@ export async function signalWorkflow(workflowId: string, signalId: string): Prom
 
 export async function acquireLockAndWaitForSignal(lockId: string): Promise<void> {
   const released = new Trigger<void>();
-  const canceled = new Trigger<void>();
+  let canceled = false;
   let lockAcquired = false;
   await setHandler(releaseLockSignal, () => {
     released.resolve();
   });
   await setHandler(cancelLockSignal, () => {
-    canceled.resolve();
+    canceled = true;
   });
   await setHandler(isLockAcquiredQuery, () => lockAcquired);
   await Promise.race([
-    canceled,
+    CancellationScope.nonCancellable(() => condition(() => canceled)),
     withLock({ resourceId: lockId }, async () => {
       lockAcquired = true;
       await released;
