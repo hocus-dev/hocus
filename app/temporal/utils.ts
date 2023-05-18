@@ -21,6 +21,7 @@ export const retryWorkflow = async <T>(
   options: {
     maxRetries: number;
     retryIntervalMs: number;
+    maxRetryIntervalMs?: number;
     isRetriable?: (err: unknown) => boolean;
     // if true, retryIntervalMs will be doubled after each retry
     isExponential?: boolean;
@@ -41,6 +42,9 @@ export const retryWorkflow = async <T>(
         await sleep(retryIntervalMs);
         if (options.isExponential ?? false) {
           retryIntervalMs *= 2;
+          if (options.maxRetryIntervalMs != null) {
+            retryIntervalMs = Math.min(retryIntervalMs, options.maxRetryIntervalMs);
+          }
         }
       }
     }

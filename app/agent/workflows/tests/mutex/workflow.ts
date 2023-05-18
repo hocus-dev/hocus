@@ -1,6 +1,13 @@
-import { proxyActivities } from "@temporalio/workflow";
+import {
+  proxyActivities,
+  getExternalWorkflowHandle,
+  setHandler,
+  Trigger,
+} from "@temporalio/workflow";
 
 import type { TestActivities } from "../activities";
+
+import { cancelLockSignal, isLockAcquiredQuery, releaseLockSignal } from "./shared";
 
 import { withLock } from "~/agent/workflows/mutex";
 import { waitForPromisesWorkflow } from "~/temporal/utils";
@@ -24,4 +31,29 @@ export async function testLock(): Promise<string[]> {
     );
   });
   return results;
+}
+
+export async function signalWorkflow(workflowId: string, signalId: string): Promise<void> {
+  const handle = await getExternalWorkflowHandle(workflowId);
+  await handle.signal(signalId);
+}
+
+export async function acquireLockAndWaitForSignal(lockId: string): Promise<void> {
+  const released = new Trigger<void>();
+  const canceled = new Trigger<void>();
+  let lockAcquired = false;
+  await setHandler(releaseLockSignal, () => {
+    released.resolve();
+  });
+  await setHandler(cancelLockSignal, () => {
+    canceled.resolve();
+  });
+  await setHandler(isLockAcquiredQuery, () => lockAcquired);
+  await Promise.race([
+    canceled,
+    withLock({ resourceId: lockId }, async () => {
+      lockAcquired = true;
+      await released;
+    }),
+  ]);
 }

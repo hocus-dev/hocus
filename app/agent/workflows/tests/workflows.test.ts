@@ -2,11 +2,14 @@ import { Context } from "@temporalio/activity";
 import { Mutex } from "async-mutex";
 import { v4 as uuidv4 } from "uuid";
 
+import { cancelLockSignal, isLockAcquiredQuery, releaseLockSignal } from "./mutex/shared";
 import { prepareTests } from "./utils";
-import { testLock, cancellationTestWorkflow } from "./workflows";
+import { testLock, cancellationTestWorkflow, acquireLockAndWaitForSignal } from "./workflows";
 
 import { withActivityHeartbeat } from "~/agent/activities/utils";
-import { unwrap, waitForPromises } from "~/utils.shared";
+import { sleep, unwrap, waitForPromises } from "~/utils.shared";
+import { retry } from "~/agent/utils";
+import { wakeSignal } from "~/agent/activities/mutex/shared";
 
 const { provideTestActivities } = prepareTests();
 
@@ -132,6 +135,92 @@ test.concurrent(
           expect(curActivityResult + 1).toBe(nextActivityResult);
         }
       }
+    });
+  }),
+);
+
+// tests:
+// - workflow holding the lock is terminated and releases the lock eventually
+// - workflow holding the lock completes successfully, but does not release the lock by itself, releases the lock eventually
+// - workflow holding the lock is terminated and then deleted from history, the lock is released eventually
+// - workflow next in queue for the lock is terminated and does not break the lock sync workflow
+// - workflow next in queue for the lock is terminated and deleted from history and does not break the lock sync workflow
+// - workflow holding the lock is cancelled and releases the lock immediately
+test.concurrent(
+  "lock cancellation",
+  provideTestActivities(async ({ createWorker }) => {
+    const { worker, client, taskQueue } = await createWorker();
+
+    const scheduleAcquireLock = (lockId: string) =>
+      client.workflow.start(acquireLockAndWaitForSignal, {
+        workflowId: uuidv4(),
+        taskQueue,
+        args: [lockId],
+      });
+    const acquireLock = async (lockId: string) => {
+      const handle = await scheduleAcquireLock(lockId);
+      while (true) {
+        if (await handle.query(isLockAcquiredQuery).catch(() => false)) {
+          break;
+        }
+        await sleep(250);
+      }
+      return handle;
+    };
+    const wakeLockWorkflow = (lockId: string) =>
+      client.workflow.getHandle(lockId).signal(wakeSignal);
+    const getWorkflowStatus = (workflowId: string) =>
+      retry(
+        () =>
+          client.workflow
+            .getHandle(workflowId)
+            .describe()
+            .then((d) => d.status.name),
+        25,
+        100,
+      );
+    await worker.runUntil(async () => {
+      // case 1
+      const lockId1 = uuidv4();
+      const handle1 = await acquireLock(lockId1);
+      const handle2 = await scheduleAcquireLock(lockId1);
+      await handle1.terminate();
+      await wakeLockWorkflow(lockId1);
+      await handle2.signal(releaseLockSignal);
+      await handle2.result();
+
+      // case 2
+      const lockId2 = uuidv4();
+      const handle3 = await acquireLock(lockId2);
+      const handle4 = await scheduleAcquireLock(lockId2);
+      await handle3.signal(cancelLockSignal);
+      await handle3.result();
+      await wakeLockWorkflow(lockId2);
+      await handle4.signal(releaseLockSignal);
+      await handle4.result();
+
+      // case 4
+      const lockId3 = uuidv4();
+      const handle5 = await acquireLock(lockId3);
+      const handle6 = await scheduleAcquireLock(lockId3);
+      await handle6.terminate();
+      await handle5.signal(releaseLockSignal);
+      await handle5.result();
+      await sleep(1000);
+      expect(await getWorkflowStatus(lockId3)).toEqual("RUNNING");
+
+      // case 6
+      const lockId4 = uuidv4();
+      const handle7 = await acquireLock(lockId4);
+      const handle8 = await scheduleAcquireLock(lockId4);
+      await handle7.cancel();
+      await handle8.signal(releaseLockSignal);
+      for (let i = 0; i < 10; i++) {
+        console.log("7", await getWorkflowStatus(handle7.workflowId));
+        await sleep(1000);
+      }
+
+      await handle8.result();
     });
   }),
 );

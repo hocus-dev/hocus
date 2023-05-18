@@ -8,6 +8,7 @@ export interface LockRequest {
 
 export const currentWorkflowIdQuery = defineQuery<string | null>("current-workflow-id");
 export const lockRequestSignal = defineSignal<[LockRequest]>("lock-requested");
+export const wakeSignal = defineSignal<[]>("wake");
 
 export type FINAL_WORKFLOW_EXECUTION_STATUS_NAMES =
   (typeof FINAL_WORKFLOW_EXECUTION_STATUS_NAMES)[number];
@@ -17,6 +18,7 @@ export const FINAL_WORKFLOW_EXECUTION_STATUS_NAMES = [
   "CANCELLED",
   "TERMINATED",
   "TIMED_OUT",
+  "CUSTOM_NOT_FOUND",
 ] as const;
-const _typeCheck: Partial<WorkflowExecutionStatusName> =
+const _typeCheck: Partial<WorkflowExecutionStatusName | "CUSTOM_NOT_FOUND"> =
   "" as FINAL_WORKFLOW_EXECUTION_STATUS_NAMES;
