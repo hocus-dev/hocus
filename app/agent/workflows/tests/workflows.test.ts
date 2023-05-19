@@ -1,13 +1,20 @@
 import { Context } from "@temporalio/activity";
+import type { WorkflowExecutionStatusName, WorkflowHandle } from "@temporalio/client";
 import { Mutex } from "async-mutex";
 import { v4 as uuidv4 } from "uuid";
 
 import { cancelLockSignal, isLockAcquiredQuery, releaseLockSignal } from "./mutex/shared";
 import { prepareTests } from "./utils";
+import { runWaitForWorkflowTest } from "./wait-for-workflow/workflow";
 import { testLock, cancellationTestWorkflow, acquireLockAndWaitForSignal } from "./workflows";
 
 import { wakeSignal } from "~/agent/activities/mutex/shared";
 import { withActivityHeartbeat } from "~/agent/activities/utils";
+import {
+  getSharedWorkflowId,
+  getWaitingWorkflowId,
+  requestsQuery,
+} from "~/agent/activities/wait-for-workflow/shared";
 import { sleep, unwrap, waitForPromises } from "~/utils.shared";
 
 const { provideTestActivities } = prepareTests();
@@ -210,6 +217,111 @@ test.concurrent(
       expect(await activities.getWorkflowStatus("non-existent-workflow")).toEqual(
         "CUSTOM_NOT_FOUND",
       );
+    });
+  }),
+);
+
+// tests:
+// 1. workflows wait on the lock and obtain the same result
+// 2. cancelling one workflow does not affect the others
+// 3. cancelling all workflows cancels the shared workflow
+// TODO: 4. running shared workflow again after it completed works
+test.concurrent(
+  "withSharedWorkflow",
+  provideTestActivities(async ({ createWorker }) => {
+    const mutex = new Mutex();
+    let counter = 0;
+    let release = await mutex.acquire();
+    const { worker, client, taskQueue } = await createWorker({
+      activityOverrides: {
+        waitForWorkflowTestActivity: withActivityHeartbeat({ intervalMs: 100 }, async () => {
+          release = await Promise.race([mutex.acquire(), Context.current().cancelled]).catch(
+            (err) => {
+              mutex.cancel();
+              throw err;
+            },
+          );
+          counter += 1;
+          return counter;
+        }),
+      },
+    });
+    const waitForNumRequests = async (lockId: string, num: number) => {
+      const handle = client.workflow.getHandle(getWaitingWorkflowId(lockId));
+      while (true) {
+        try {
+          const result = await handle.query(requestsQuery);
+          if (result.length >= num) {
+            break;
+          }
+          await sleep(100);
+        } catch (err) {
+          continue;
+        }
+      }
+    };
+    const runTestWorkflow = (lockId: string) =>
+      client.workflow.start(runWaitForWorkflowTest, {
+        workflowId: uuidv4(),
+        taskQueue,
+        args: [lockId],
+      });
+    const waitForStatus = async (
+      handle: WorkflowHandle<any>,
+      status: WorkflowExecutionStatusName,
+      timeoutMs = 10000,
+    ) => {
+      const startedAt = Date.now();
+      while (true) {
+        if (Date.now() - startedAt > timeoutMs) {
+          throw new Error(
+            `Timed out waiting for status ${status} for workflow ${handle.workflowId}`,
+          );
+        }
+        const currentStatus = (await handle.describe()).status.name;
+        if (currentStatus === status) {
+          break;
+        }
+        await sleep(100);
+      }
+    };
+
+    await worker.runUntil(async () => {
+      // case 1
+      const lockId1 = uuidv4();
+      const handles1 = await waitForPromises(
+        Array.from({ length: 3 }).map(() => runTestWorkflow(lockId1)),
+      );
+      await waitForNumRequests(lockId1, 3);
+      release();
+      const results1 = await waitForPromises(handles1.map((h) => h.result()));
+      expect(results1.every((v) => v === 1)).toBe(true);
+
+      // case 2
+      const lockId2 = uuidv4();
+      const handles2 = await waitForPromises(
+        Array.from({ length: 4 }).map(() => runTestWorkflow(lockId2)),
+      );
+      await waitForNumRequests(lockId2, 4);
+      await handles2[0].cancel();
+      await waitForStatus(handles2[0], "CANCELLED");
+      release();
+      const results2 = await waitForPromises(handles2.map((h) => h.result().catch((e) => e)));
+      expect(results2.slice(1).every((v) => v === 2)).toBe(true);
+      expect(results2[0]?.cause?.name).toEqual("CancelledFailure");
+
+      // case 3
+      const lockId3 = uuidv4();
+      const handles3 = await waitForPromises(
+        Array.from({ length: 5 }).map(() => runTestWorkflow(lockId3)),
+      );
+      await waitForNumRequests(lockId3, 5);
+      await waitForPromises(handles3.map((h) => h.cancel()));
+      await waitForPromises(handles3.map((h) => waitForStatus(h, "CANCELLED")));
+      const waitingWorkflow3Handle = client.workflow.getHandle(getWaitingWorkflowId(lockId3));
+      await waitForStatus(waitingWorkflow3Handle, "COMPLETED");
+      const sharedWorkflow3Handle = client.workflow.getHandle(getSharedWorkflowId(lockId3));
+      await waitForStatus(sharedWorkflow3Handle, "CANCELLED");
     });
   }),
 );

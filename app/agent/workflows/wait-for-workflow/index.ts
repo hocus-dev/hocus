@@ -12,16 +12,18 @@ import {
   uuid4,
   isCancellation,
   defineSignal,
+  CancellationScope,
 } from "@temporalio/workflow";
 
 import type { Activities } from "~/agent/activities/list";
-import type { AwaitableWorkflows, WaitRequest } from "~/agent/activities/wait-for-workflow/shared";
+import type { WaitRequest } from "~/agent/activities/wait-for-workflow/shared";
+import { requestsQuery } from "~/agent/activities/wait-for-workflow/shared";
 import { WorkflowCancelledError } from "~/agent/activities/wait-for-workflow/shared";
 import { WaitRequestType } from "~/agent/activities/wait-for-workflow/shared";
 import { waitRequestSignal } from "~/agent/activities/wait-for-workflow/shared";
+import { retrySignal } from "~/agent/workflows-utils";
 import { wrapWorkflowError } from "~/temporal/utils";
 
-type Workflows = AwaitableWorkflows;
 type GetWorkflowResult =
   | { ok: true; result: unknown; error?: undefined }
   | { ok: false; result?: undefined; error: unknown };
@@ -33,19 +35,11 @@ const { signalWithStartWaitWorkflow } = proxyActivities<Activities>({
   },
 });
 
-export interface WithSharedWorkflowParams<K extends keyof Workflows> {
-  /** Workflows continue execution after this workflow finishes running. Should be idempotent. */
-  workflow: {
-    id: string;
-    name: K;
-    params: Parameters<Workflows[K]>;
-  };
-}
-
-export async function runWaitForWorkflow<K extends keyof Workflows>(
-  args: WithSharedWorkflowParams<K>,
-): Promise<void> {
-  const { workflow } = args;
+export async function runWaitForWorkflow(args: {
+  workflow: string;
+  params: unknown[];
+  workflowId: string;
+}): Promise<void> {
   const requests: WaitRequest[] = [];
 
   const cancelledTrigger = new Trigger<"cancelled">();
@@ -67,50 +61,61 @@ export async function runWaitForWorkflow<K extends keyof Workflows>(
       cancelledTrigger.resolve("cancelled");
     }
   });
-  const handle = await startChild(workflow.name, {
-    args: workflow.params as any,
-    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
-    workflowId: workflow.id,
-  });
-  const result: GetWorkflowResult | "cancelled" = await Promise.race([
-    cancelledTrigger,
-    handle
-      .result()
-      .then((result) => ({
-        ok: true as const,
-        result,
-      }))
-      .catch((error) => ({
-        ok: false as const,
-        error,
-      })),
-  ]);
-  if (result === "cancelled") {
-    const externalHandle = getExternalWorkflowHandle(workflow.id);
-    await externalHandle.cancel().catch((err) => {
-      console.warn(`Failed to cancel workflow with id ${workflow.id}`, err);
+  setHandler(requestsQuery, () => requests);
+  let result: GetWorkflowResult = {
+    ok: false,
+    error: new Error("Unknown shared workflow error"),
+  };
+  try {
+    const handle = await startChild(args.workflow, {
+      args: args.params as any,
+      parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+      workflowId: args.workflowId,
     });
-  }
-  const finalResult: GetWorkflowResult =
-    result === "cancelled" ? { ok: false, error: new WorkflowCancelledError() } : result;
-
-  while (requests.length > 0) {
-    const req = requests.shift()!;
-    if (req.type === WaitRequestType.CANCEL) {
-      continue;
+    const partialResult = await Promise.race([
+      cancelledTrigger,
+      handle
+        .result()
+        .then((result) => ({
+          ok: true as const,
+          result,
+        }))
+        .catch((error) => ({
+          ok: false as const,
+          error,
+        })),
+    ]);
+    if (partialResult === "cancelled") {
+      const externalHandle = getExternalWorkflowHandle(args.workflowId);
+      await externalHandle.cancel().catch((err) => {
+        console.warn(`Failed to cancel workflow with id ${args.workflowId}`, err);
+      });
     }
-    const handle = getExternalWorkflowHandle(req.initiatorWorkflowId);
-    await handle.signal(req.releaseSignalId, finalResult);
+    result =
+      partialResult === "cancelled"
+        ? { ok: false, error: new WorkflowCancelledError() }
+        : partialResult;
+  } catch (error) {
+    result = { ok: false, error };
+  } finally {
+    while (requests.length > 0) {
+      const req = requests.shift()!;
+      if (req.type === WaitRequestType.CANCEL) {
+        continue;
+      }
+      const handle = getExternalWorkflowHandle(req.initiatorWorkflowId);
+      await retrySignal(() => handle.signal(req.releaseSignalId, result)).catch((err) =>
+        console.warn(`Failed to release workflow ${req.initiatorWorkflowId}`, err),
+      );
+    }
   }
 }
 
-type WorkflowResults = {
-  [K in keyof Workflows]: Awaited<ReturnType<Workflows[K]>>;
-};
-
-export async function withSharedWorkflow<K extends keyof Workflows>(
-  args: WithSharedWorkflowParams<K>,
-): Promise<WorkflowResults[K]> {
+export async function withSharedWorkflow<W extends (...args: any[]) => Promise<any>>(args: {
+  lockId: string;
+  workflow: W;
+  params: Parameters<W>;
+}): Promise<Awaited<ReturnType<W>>> {
   const releaseSignalId = uuid4();
   const releaseSignal = defineSignal<[GetWorkflowResult]>(releaseSignalId);
   let workflowResult: undefined | GetWorkflowResult;
@@ -118,27 +123,33 @@ export async function withSharedWorkflow<K extends keyof Workflows>(
     workflowResult = result;
   });
 
+  const signalParams = {
+    releaseSignalId,
+    lockId: args.lockId,
+    workflow: args.workflow.name,
+    params: args.params,
+  };
   try {
     await signalWithStartWaitWorkflow({
-      ...args,
-      releaseSignalId,
+      ...signalParams,
       waitRequestType: WaitRequestType.WAIT,
     });
     await condition(() => workflowResult !== void 0);
   } catch (err) {
-    if (isCancellation(err)) {
-      await signalWithStartWaitWorkflow({
-        ...args,
-        releaseSignalId,
-        waitRequestType: WaitRequestType.CANCEL,
-      });
-      throw err;
-    }
+    await CancellationScope.nonCancellable(async () => {
+      if (isCancellation(err)) {
+        await signalWithStartWaitWorkflow({
+          ...signalParams,
+          waitRequestType: WaitRequestType.CANCEL,
+        }).catch((err) => console.warn("Failed to signal that the workflow is cancelled", err));
+      }
+    });
+    throw err;
   }
 
   assert(workflowResult !== void 0);
   if (workflowResult.ok) {
-    return workflowResult.result as WorkflowResults[K];
+    return workflowResult.result as Awaited<ReturnType<W>>;
   } else {
     throw wrapWorkflowError(workflowResult.error);
   }

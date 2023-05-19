@@ -2,20 +2,20 @@ import { Context } from "@temporalio/activity";
 
 import type { CreateActivity } from "../types";
 
-import { waitRequestSignal } from "./shared";
-import type { AwaitableWorkflows, WaitRequest } from "./shared";
+import { getSharedWorkflowId, getWaitingWorkflowId, waitRequestSignal } from "./shared";
+import type { WaitRequest } from "./shared";
 import type { WaitRequestType } from "./shared";
 
 import { runWaitForWorkflow } from "~/agent/workflows";
-import type { WithSharedWorkflowParams } from "~/agent/workflows/wait-for-workflow";
 import { Token } from "~/token";
 
-export type SignalWithStartWaitWorkflowActivity = <K extends keyof AwaitableWorkflows>(
-  args: {
-    releaseSignalId: string;
-    waitRequestType: WaitRequestType;
-  } & WithSharedWorkflowParams<K>,
-) => Promise<void>;
+export type SignalWithStartWaitWorkflowActivity = (args: {
+  releaseSignalId: string;
+  waitRequestType: WaitRequestType;
+  lockId: string;
+  workflow: string;
+  params: unknown[];
+}) => Promise<void>;
 export const signalWithStartWaitWorkflow: CreateActivity<SignalWithStartWaitWorkflowActivity> =
   ({ injector }) =>
   async (args) => {
@@ -28,10 +28,12 @@ export const signalWithStartWaitWorkflow: CreateActivity<SignalWithStartWaitWork
     await withClient(async (client) => {
       await client.workflow.signalWithStart(runWaitForWorkflow, {
         taskQueue: Context.current().info.taskQueue,
-        workflowId: `wait-${args.workflow.id}`,
+        workflowId: getWaitingWorkflowId(args.lockId),
         args: [
           {
             workflow: args.workflow,
+            params: args.params,
+            workflowId: getSharedWorkflowId(args.lockId),
           },
         ],
         signal: waitRequestSignal,
