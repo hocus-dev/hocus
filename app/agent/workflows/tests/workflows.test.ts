@@ -142,13 +142,12 @@ test.concurrent(
 // tests:
 // - workflow holding the lock is terminated and releases the lock eventually
 // - workflow holding the lock completes successfully, but does not release the lock by itself, releases the lock eventually
-// - workflow holding the lock is terminated and then deleted from history, the lock is released eventually
 // - workflow next in queue for the lock is terminated and does not break the lock sync workflow
-// - workflow next in queue for the lock is terminated and deleted from history and does not break the lock sync workflow
 // - workflow holding the lock is cancelled and releases the lock immediately
+// - getWorkflowStatus activity returns correct status for nonexistent workflow
 test.concurrent(
   "lock cancellation",
-  provideTestActivities(async ({ createWorker }) => {
+  provideTestActivities(async ({ createWorker, activities }) => {
     const { worker, client, taskQueue } = await createWorker();
 
     const scheduleAcquireLock = (lockId: string) =>
@@ -199,7 +198,7 @@ test.concurrent(
       await handle4.signal(releaseLockSignal);
       await handle4.result();
 
-      // case 4
+      // case 3
       const lockId3 = uuidv4();
       const handle5 = await acquireLock(lockId3);
       const handle6 = await scheduleAcquireLock(lockId3);
@@ -209,13 +208,18 @@ test.concurrent(
       await sleep(1000);
       expect(await getWorkflowStatus(lockId3)).toEqual("RUNNING");
 
-      // case 6
+      // case 4
       const lockId4 = uuidv4();
       const handle7 = await acquireLock(lockId4);
       const handle8 = await scheduleAcquireLock(lockId4);
       await handle7.cancel();
       await handle8.signal(releaseLockSignal);
       await handle8.result();
+
+      // case 5
+      expect(await activities.getWorkflowStatus("non-existent-workflow")).toEqual(
+        "CUSTOM_NOT_FOUND",
+      );
     });
   }),
 );
