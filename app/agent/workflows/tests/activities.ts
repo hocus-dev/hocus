@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
+import { cancellationTest } from "./cancellation-experiments/activity";
 import { mutexTest } from "./mutex/activity";
-import { cancellationTest } from "./wait-for-workflow/activity";
 
 import type { Activities } from "~/agent/activities/list";
 import { createActivities } from "~/agent/activities/list";

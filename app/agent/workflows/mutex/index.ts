@@ -17,7 +17,7 @@ import { lockReleaseSignal } from "~/agent/activities/mutex/shared";
 import { wakeSignal } from "~/agent/activities/mutex/shared";
 import { FINAL_WORKFLOW_EXECUTION_STATUS_NAMES } from "~/agent/activities/mutex/shared";
 import { currentWorkflowIdQuery, lockRequestSignal } from "~/agent/activities/mutex/shared";
-import { retryWorkflow } from "~/temporal/utils";
+import { retrySignal } from "~/agent/workflows-utils";
 
 const { signalWithStartLockWorkflow, getWorkflowStatus } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
@@ -74,18 +74,10 @@ export async function lockWorkflow(
     // the lock. The acquiring Workflow should signal a lock release signal with `releaseId` to
     // release the lock.
     try {
-      await retryWorkflow(
-        () =>
-          workflowRequestingLock.signal(defineSignal<[LockResponse]>(req.lockAcquiredSignalName), {
-            releaseId,
-          }),
-        {
-          maxRetries: 10,
-          retryIntervalMs: 250,
-          maxRetryIntervalMs: 60 * 1000,
-          isExponential: true,
-          isRetriable: (err: any) => err?.type !== WORKFLOW_EXECUTION_NOT_FOUND_ERR_TYPE,
-        },
+      await retrySignal(() =>
+        workflowRequestingLock.signal(defineSignal<[LockResponse]>(req.lockAcquiredSignalName), {
+          releaseId,
+        }),
       );
     } catch (err: any) {
       // If the workflow that acquired the lock has already completed or has been terminated,
