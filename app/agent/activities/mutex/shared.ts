@@ -6,8 +6,13 @@ export interface LockRequest {
   lockAcquiredSignalName: string;
 }
 
+export interface LockRelease {
+  releaseId: string;
+}
+
 export const currentWorkflowIdQuery = defineQuery<string | null>("current-workflow-id");
 export const lockRequestSignal = defineSignal<[LockRequest]>("lock-requested");
+export const lockReleaseSignal = defineSignal<[LockRelease]>("lock-released");
 export const wakeSignal = defineSignal<[]>("wake");
 
 export type FINAL_WORKFLOW_EXECUTION_STATUS_NAMES =
