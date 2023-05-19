@@ -8,7 +8,6 @@ import { testLock, cancellationTestWorkflow, acquireLockAndWaitForSignal } from 
 
 import { wakeSignal } from "~/agent/activities/mutex/shared";
 import { withActivityHeartbeat } from "~/agent/activities/utils";
-import { retry } from "~/agent/utils";
 import { sleep, unwrap, waitForPromises } from "~/utils.shared";
 
 const { provideTestActivities } = prepareTests();
@@ -168,16 +167,6 @@ test.concurrent(
     };
     const wakeLockWorkflow = (lockId: string) =>
       client.workflow.getHandle(lockId).signal(wakeSignal);
-    const getWorkflowStatus = (workflowId: string) =>
-      retry(
-        () =>
-          client.workflow
-            .getHandle(workflowId)
-            .describe()
-            .then((d) => d.status.name),
-        25,
-        100,
-      );
     await worker.runUntil(async () => {
       // case 1
       const lockId1 = uuidv4();
@@ -205,8 +194,9 @@ test.concurrent(
       await handle6.terminate();
       await handle5.signal(releaseLockSignal);
       await handle5.result();
-      await sleep(1000);
-      expect(await getWorkflowStatus(lockId3)).toEqual("RUNNING");
+      const handle6aux = await acquireLock(lockId3);
+      await handle6aux.signal(releaseLockSignal);
+      await handle6aux.result();
 
       // case 4
       const lockId4 = uuidv4();
