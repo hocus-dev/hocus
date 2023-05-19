@@ -961,7 +961,9 @@ export class BlockRegistryService {
       const symlinkPath = path.join(lunPath, tcmuStorageObjectId);
       await fs.unlink(symlinkPath).catch(catchIgnore("ENOENT"));
       // When not empty then some other process managed to claim the LUN, this is not a problem
-      await fs.rmdir(lunPath).catch(catchIgnore("ENOTEMPTY"));
+      await fs.rmdir(lunPath).catch((err: Error) => {
+        if (!err.message.startsWith("ENOENT") && !err.message.startsWith("ENOTEMPTY")) throw err;
+      });
     }
     // Remove the TCMU storage object
     await fs.rmdir(tcmuPath).catch(catchIgnore("ENOENT"));

@@ -455,14 +455,48 @@ test.concurrent.skip(
   provideBlockRegistry(async ({ brService }) => {}),
 );
 
-test.concurrent.skip(
+test.concurrent(
   "Concurrency and idempotence of expose",
-  provideBlockRegistry(async ({ brService }) => {}),
+  provideBlockRegistry(async ({ brService }) => {
+    const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
+    const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
+    const tasks: Promise<any>[][] = [[], [], [], []];
+    const N = 5;
+    for (let i = 0; i < N; i++) {
+      tasks[0].push(brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV));
+      tasks[1].push(brService.expose(c1, EXPOSE_METHOD.HOST_MOUNT));
+      tasks[2].push(brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV));
+      tasks[3].push(brService.expose(c2, EXPOSE_METHOD.HOST_MOUNT));
+    }
+    const res = await waitForPromises(tasks.map(waitForPromises));
+    expect(res).toEqual([
+      Array(N).fill(res[0][0]),
+      Array(N).fill(res[1][0]),
+      Array(N).fill(res[2][0]),
+      Array(N).fill(res[3][0]),
+    ]);
+  }),
 );
 
-test.concurrent.skip(
+test.concurrent(
   "Concurrency and idempotence of hide",
-  provideBlockRegistry(async ({ brService }) => {}),
+  provideBlockRegistry(async ({ brService }) => {
+    const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
+    const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
+    await waitForPromises([
+      brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV),
+      brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV),
+    ]);
+    const tasks: Promise<any>[] = [];
+    const N = 5;
+    for (let i = 0; i < N; i++) {
+      tasks.push(brService.hide(c1));
+      tasks.push(brService.hide(c2));
+    }
+    console.log("AAA");
+    await waitForPromises(tasks);
+    console.log("BBB");
+  }),
 );
 
 test.concurrent(
