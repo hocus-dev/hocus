@@ -1,4 +1,12 @@
-import type { SpawnSyncOptionsWithBufferEncoding, SpawnSyncReturns } from "child_process";
+import {
+  spawn,
+  SpawnOptions,
+  SpawnOptionsWithoutStdio,
+  SpawnOptionsWithStdioTuple,
+  SpawnSyncOptionsWithBufferEncoding,
+  SpawnSyncOptionsWithStringEncoding,
+  SpawnSyncReturns,
+} from "child_process";
 import { spawnSync } from "child_process";
 import { createHash } from "crypto";
 import fs from "fs";
@@ -15,6 +23,15 @@ import type { Object } from "ts-toolbelt";
 
 import { unwrap } from "~/utils.shared";
 
+export const execCmdAsync = async (
+  ...args: string[]
+): Promise<{ stdout: string; stderr: string }> => {
+  return await execCmdWithOptsAsync(args, {});
+};
+
+/**
+ * @deprecated Use execCmdAsync to not block the event loop
+ */
 export const execCmd = (...args: string[]): SpawnSyncReturns<Buffer> => {
   return execCmdWithOpts(args, {});
 };
@@ -25,6 +42,9 @@ export class ExecCmdError extends Error {
   }
 }
 
+/**
+ * @deprecated Use execCmdWithOptsAsync to not block the event loop
+ */
 export const execCmdWithOpts = (
   args: string[],
   options: Object.Modify<
@@ -42,6 +62,40 @@ export const execCmdWithOpts = (
     );
   }
   return output;
+};
+
+export const execCmdWithOptsAsync = async (
+  args: string[],
+  options: Object.Modify<SpawnOptionsWithoutStdio, { env?: Record<string, string | undefined> }>,
+): Promise<{ stdout: string; stderr: string }> => {
+  return await new Promise((resolve, reject) => {
+    const cp = spawn(args[0], args.slice(1), options as SpawnOptionsWithoutStdio);
+    let stdout = "";
+    let stderr = "";
+    cp.stdout.on("data", (data) => {
+      stdout += data;
+    });
+    cp.stderr.on("data", (data) => {
+      stderr += data;
+    });
+    cp.on("close", (status) => {
+      if (status !== 0) {
+        reject(
+          new ExecCmdError(
+            status,
+            `Command "${args.join(
+              " ",
+            )}" failed with status ${status}, stdout: "${stdout}", stderr: ${stderr}`,
+          ),
+        );
+      } else {
+        resolve({
+          stdout,
+          stderr,
+        });
+      }
+    });
+  });
 };
 
 /**

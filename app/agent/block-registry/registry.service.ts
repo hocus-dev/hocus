@@ -7,7 +7,7 @@ import { type DefaultLogger } from "@temporalio/worker";
 import type { A, Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
-import { execCmd } from "../utils";
+import { execCmdAsync } from "../utils";
 
 import { HOCUS_TCMU_HBA, HOCUS_TCM_LOOP_PORT, HOCUS_TCM_LOOP_WWN } from "./registry.const";
 import type { OBDConfig, OCIDescriptor, OCIImageIndex, OCIImageManifest } from "./validators";
@@ -130,7 +130,7 @@ export class BlockRegistryService {
   // Called once after agent restart/start
   async initializeRegistry(): Promise<void> {
     // We are after an restart, nuke anything temporary
-    await execCmd("rm", "-rf", this.paths.run);
+    await fs.rm(this.paths.run, { recursive: true, force: true });
 
     // Ensure the directory structure is ok and generate the TCMU subtype which will handle the registry
     const tasks = [];
@@ -281,7 +281,7 @@ export class BlockRegistryService {
       // This will only download blobs we actually need due to the shared blob dir <3
       // Also skopeo properly handles concurrent pulls with a shared blob dir <3
       // This will place the image index in a random directory
-      execCmd(
+      await execCmdAsync(
         "skopeo",
         "copy",
         "--multi-arch",
@@ -301,7 +301,7 @@ export class BlockRegistryService {
     } finally {
       // The only thing this directory holds is the index file :P
       // Nothing bad will happen if that index is not deleted
-      await execCmd("rm", "-rf", imageIndexDir);
+      await fs.rm(imageIndexDir, { force: true, recursive: true });
     }
   }
 
@@ -467,10 +467,15 @@ export class BlockRegistryService {
     }));
   }
 
-  public async createContainer(imageId?: ImageId, outputId?: string): Promise<ContainerId> {
+  public async createContainer(
+    imageId?: ImageId,
+    outputId?: string,
+    opts: { mkfs: boolean; sizeInGB: number } = { mkfs: false, sizeInGB: 64 },
+  ): Promise<ContainerId> {
     if (imageId !== void 0 && !imageId.startsWith("im_")) {
       throw new Error(`Invalid imageId: ${imageId}`);
     }
+    const t1 = performance.now();
     const containerId = this.genContainerId(outputId);
     const lowers = await this.imageIdToOBDLowers(imageId);
     const dataPath = path.join(this.paths.containers, containerId, "data");
@@ -480,7 +485,14 @@ export class BlockRegistryService {
       await this.withTmpFile(async (tmpIndexPath) => {
         // TODO: Set the parent uuid, the only reason i did not do it right now is that i don't want to rewrite the algo for converting layer_digest -> obd_uuid
         // FIXME: For now hardcode the size to 64GB as the base images are hardcoded to this size
-        await execCmd("/opt/overlaybd/bin/overlaybd-create", "-s", tmpDataPath, tmpIndexPath, "64");
+        await execCmdAsync(
+          "/opt/overlaybd/bin/overlaybd-create",
+          "-s",
+          ...(opts.mkfs ? ["--mkfs"] : []),
+          tmpDataPath,
+          tmpIndexPath,
+          opts.sizeInGB.toString(),
+        );
         await fs.link(tmpDataPath, dataPath).catch(catchAlreadyExists);
         await fs.link(tmpIndexPath, indexPath).catch(catchAlreadyExists);
       });
@@ -499,6 +511,12 @@ export class BlockRegistryService {
     ) {
       throw new Error(`Container with id ${containerId} already exists`);
     }
+
+    this.logger.info(
+      `Creation of ${containerId}${imageId ? " on top of " + imageId : ""} took: ${(
+        performance.now() - t1
+      ).toFixed(2)} ms`,
+    );
 
     return containerId;
   }
@@ -519,7 +537,8 @@ export class BlockRegistryService {
     // Sealing is not supported for sparse layers :P
     // Sealing would improve the performance a lot as we would be able to instantly start using this container as a lower layer
     const layerPath = path.join(this.paths.containers, containerId, "layer.tar");
-    await execCmd(
+    const t1 = performance.now();
+    await execCmdAsync(
       "/opt/overlaybd/bin/overlaybd-commit",
       "-z",
       "-t",
@@ -527,8 +546,11 @@ export class BlockRegistryService {
       obdConfig.upper.index,
       layerPath,
     );
+    this.logger.info(
+      `obd-commit for ${containerId} took: ${(performance.now() - t1).toFixed(2)} ms`,
+    );
     const layerDigest = `sha256:${
-      (await execCmd("sha256sum", layerPath)).stdout.toString("utf8").split(" ")[0]
+      (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
     }`;
     const layerSize = (await fs.stat(layerPath)).size;
     const image = obdConfig.hocusImageId as ImageId | undefined;
@@ -557,11 +579,11 @@ export class BlockRegistryService {
     manifest.layers.push(layerDescriptor);
 
     await this._loadLocalOCIImage(imageId, manifest, [[layerPath, layerDescriptor]]);
-    await execCmd("rm", "-rf", path.join(this.paths.containers, containerId));
+    await fs.rm(path.join(this.paths.containers, containerId), { recursive: true, force: true });
     return imageId;
   }
 
-  public _tcmuSubtype: string | undefined;
+  private _tcmuSubtype: string | undefined;
   public async getTCMUSubtype(): Promise<string> {
     if (this._tcmuSubtype === void 0) {
       this._tcmuSubtype = (await fs.readFile(this.paths.tcmuSubtype, "utf-8")).trim();
@@ -570,7 +592,7 @@ export class BlockRegistryService {
   }
 
   private _tcmLoopHostBusTarget: string | undefined;
-  private async getTCMLoopHostBusTarget(): Promise<string> {
+  public async getTCMLoopHostBusTarget(): Promise<string> {
     if (this._tcmLoopHostBusTarget === void 0) {
       this._tcmLoopHostBusTarget = (
         await fs.readFile(path.join(this.paths.tcmLoopTarget, "address"), "utf-8")
@@ -592,6 +614,14 @@ export class BlockRegistryService {
     }
 
     return BigInt.asUintN(64, hash1 * 4096n + hash2).toString();
+  }
+
+  // W-LUNS are special, if we place something on that lun
+  // then kernel won't create a disk for us
+  // https://github.com/torvalds/linux/blob/2d1bcbc6cd703e64caf8df314e3669b4786e008a/include/scsi/scsi.h#L61
+  // https://github.com/torvalds/linux/blob/2d1bcbc6cd703e64caf8df314e3669b4786e008a/drivers/scsi/scsi_scan.c#L918
+  public isWLun(lunId: string) {
+    return (BigInt(lunId) & 0xff00n) === 0xc100n;
   }
 
   // Gets info about under which LUNs the given TCMU object was exposed on in the system
@@ -649,13 +679,17 @@ export class BlockRegistryService {
         await fs.mkdir(mountPoint).catch(catchAlreadyExists);
         try {
           let flags = readonly ? ["--read-only"] : ["--read-write"];
-          await execCmd("mount", ...flags, bd.device, mountPoint);
+          const t1 = performance.now();
+          // TODO: Calling the mount syscall directly is much much more faster
+          await execCmdAsync("mount", ...flags, bd.device, mountPoint);
+          this.logger.info(`mount for ${what} took: ${(performance.now() - t1).toFixed(2)} ms`);
         } catch (err) {
           if (!(err as Error).message.includes("already mounted")) throw err;
         }
         return { mountPoint, readonly };
       }
       case EXPOSE_METHOD.BLOCK_DEV: {
+        const t1 = performance.now();
         // Get the tcmuSubtype
         const tcmuSubtype = await this.getTCMUSubtype();
         const tcmuStorageObjectId = `${tcmuSubtype}_${what}`;
@@ -751,11 +785,22 @@ export class BlockRegistryService {
           // IF due to races during hash collisions multiple LUN's were created
           // we use the members file to make a consensus decision and clean up the remaining LUNs
           let lunId = this.tcmuIdToLUN(tcmuStorageObjectId);
+          let lastChance: boolean = false;
+          let loopDetected: boolean = false;
           let hare: string | undefined = void 0;
           let done = false;
           while (!done) {
-            // LUN 2**64 - 1 is reserved
-            if (lunId !== (2n ** 64n - 1n).toString()) {
+            if (loopDetected && !lastChance) {
+              throw new Error(
+                `Failed to expose storage object ${tcmuStorageObjectId}, hash cycle detected hash("${tcmuStorageObjectId}") === hash(...hash("${tcmuStorageObjectId}")...)`,
+              );
+            }
+            if (lastChance) {
+              lastChance = false;
+            }
+
+            // LUN 2**64 - 1 and W-LUNs are reserved
+            if (lunId !== (2n ** 64n - 1n).toString() && !this.isWLun(lunId)) {
               const lunPath = path.join(this.paths.tcmLoopTarget, "lun", `lun_${lunId}`);
               // If a hide and expose operation happens for different containers at the same time
               // Then when a hash collision occurs then it's possible that the lun get's deleted before we manage to claim it
@@ -797,12 +842,15 @@ export class BlockRegistryService {
                 // Ok this is the first invocation
                 hare = this.tcmuIdToLUN(lunId);
               }
+              const prevLunId = lunId;
               lunId = this.tcmuIdToLUN(lunId);
               hare = this.tcmuIdToLUN(this.tcmuIdToLUN(hare));
-              if (lunId === hare) {
-                throw new Error(
-                  `Failed to expose storage object ${tcmuStorageObjectId}, hash cycle detected hash("${tcmuStorageObjectId}") === hash(...hash("${tcmuStorageObjectId}")...)`,
-                );
+              if (!loopDetected && lunId === hare && prevLunId !== lunId) {
+                loopDetected = true;
+                lastChance = true;
+              } else if (!loopDetected && lunId === hare) {
+                loopDetected = true;
+                lastChance = false;
               }
             }
           }
@@ -831,9 +879,23 @@ export class BlockRegistryService {
         // Great! The LUN is final, now discover what block device maps to this LUN :)
         const hostBusTargetAddr = await this.getTCMLoopHostBusTarget();
         const fullSCSIAddr = `${hostBusTargetAddr}:${finalLunId}`;
-        const disksAndPartitions = await fs.readdir(
-          path.join("/sys/class/scsi_disk/", fullSCSIAddr, "device/block"),
-        );
+        let disksAndPartitions: string[] = [];
+        // The disks should appear instantly
+        // If that's not the case and we get ENOENT then this means either:
+        // - We hit a LUN which isn't working
+        // - Async scsi mode is enabled
+        // In async mode wait for up to 0.5s
+        for (let i = 0; i < 100; i++) {
+          try {
+            disksAndPartitions = await fs.readdir(
+              path.join("/sys/class/scsi_disk/", fullSCSIAddr, "device/block"),
+            );
+            break;
+          } catch (err) {
+            if (!(err as Error).message.startsWith("ENOENT")) throw err;
+            await sleep(5);
+          }
+        }
         if (disksAndPartitions.length === 0) {
           throw new Error(
             `Unable to find any block device for SCSI address ${fullSCSIAddr}.\n` +
@@ -847,6 +909,10 @@ export class BlockRegistryService {
           throw new Error(`Found partitions ${disksAndPartitions}. Refusing to operate`);
         }
 
+        this.logger.info(
+          `Setting up block device for ${what} took: ${(performance.now() - t1).toFixed(2)} ms`,
+        );
+
         return {
           device: `/dev/hocus/${disksAndPartitions[0]}`,
           readonly,
@@ -859,6 +925,7 @@ export class BlockRegistryService {
     if (!what.startsWith("im_") && !what.startsWith("ct_")) {
       throw new Error(`Invalid id: ${what}`);
     }
+    const t1 = performance.now();
     // Ensure the device was unmounted
     const mountPoint = path.join(this.paths.mounts, what);
     const dirPresent = await fs
@@ -870,7 +937,8 @@ export class BlockRegistryService {
       });
     if (dirPresent) {
       try {
-        await execCmd("umount", mountPoint);
+        // TODO: Calling the umount syscall directly is much much more faster
+        await execCmdAsync("umount", mountPoint);
       } catch (err) {
         if (!(err as Error).message.includes("not mounted")) throw err;
       }
@@ -899,5 +967,6 @@ export class BlockRegistryService {
     await fs.rmdir(tcmuPath).catch(catchIgnore("ENOENT"));
     // Remove the result file
     await fs.unlink(path.join(this.paths.run, `obd-result-${what}`)).catch(catchIgnore("ENOENT"));
+    this.logger.info(`hide of ${what} took: ${(performance.now() - t1).toFixed(2)} ms`);
   }
 }

@@ -1,5 +1,5 @@
 {
-  "test1": "quay.io/gorbak25/hocus-block-registry-tests@sha256:ee8331e12ff12c53f1f1549247678b0b036694e8c7d0e58b55126b1f3c9e070b",
-  "test2": "quay.io/gorbak25/hocus-block-registry-tests@sha256:821d6f0f532d1f0e356787d1e6ffdced8fc133f432c2b6590591abfcc92ea47e",
-  "test3": "quay.io/gorbak25/hocus-block-registry-tests@sha256:7bd75b14205540fd670ab4d5c062ebd3dba4a96c0822de4eebcf52914a876c48"
+  "test1": "quay.io/gorbak25/hocus-block-registry-tests@sha256:97ec51df45d591f30db525fae7b15730d454df62e9094e0164b590e57849a9f6",
+  "test2": "quay.io/gorbak25/hocus-block-registry-tests@sha256:f243ee146a06c5101a210042abda3f632c753dd557f9a3b4fe386be6bbfdb781",
+  "test3": "quay.io/gorbak25/hocus-block-registry-tests@sha256:7ebf8235b9c46fdcf19b7fc9ba3a0083e4c50db8606ace26a8219b2b36b1749e"
 }

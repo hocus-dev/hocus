@@ -4,7 +4,7 @@ RUN apt-get update \
     && add-apt-repository "deb http://httpredir.debian.org/debian sid main" \
     && apt-get update \
     && apt-get -t sid install -y sudo cmake zlib1g-dev libcurl4-openssl-dev libssl3 libssl-dev libaio-dev libnl-3-dev libnl-genl-3-dev libgflags-dev libzstd-dev libext2fs-dev
-RUN git clone https://github.com/hocus-dev/overlaybd.git && cd overlaybd && git checkout 5735850ff0950f20172e829cc9ce3c47ceb3cd73
+RUN git clone https://github.com/hocus-dev/overlaybd.git && cd overlaybd && git checkout a52cabb627a5e3e50f3d364ac8a6a061b1bb6ff7
 RUN cd overlaybd && git submodule update --init
 RUN cd overlaybd && mkdir build && cd build && cmake .. && make && sudo make install
 
