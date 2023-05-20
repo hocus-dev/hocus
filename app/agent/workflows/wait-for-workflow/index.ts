@@ -17,6 +17,7 @@ import {
 
 import type { Activities } from "~/agent/activities/list";
 import type { WaitRequest } from "~/agent/activities/wait-for-workflow/shared";
+import { sharedWorkflowIdQuery } from "~/agent/activities/wait-for-workflow/shared";
 import { requestsQuery } from "~/agent/activities/wait-for-workflow/shared";
 import { WorkflowCancelledError } from "~/agent/activities/wait-for-workflow/shared";
 import { WaitRequestType } from "~/agent/activities/wait-for-workflow/shared";
@@ -38,10 +39,9 @@ const { signalWithStartWaitWorkflow } = proxyActivities<Activities>({
 export async function runWaitForWorkflow(args: {
   workflow: string;
   params: unknown[];
-  workflowId: string;
 }): Promise<void> {
   const requests: WaitRequest[] = [];
-
+  const workflowId = uuid4();
   const cancelledTrigger = new Trigger<"cancelled">();
   let cancelled = 0;
   setHandler(waitRequestSignal, (req: WaitRequest) => {
@@ -62,6 +62,7 @@ export async function runWaitForWorkflow(args: {
     }
   });
   setHandler(requestsQuery, () => requests);
+  setHandler(sharedWorkflowIdQuery, () => workflowId);
   let result: GetWorkflowResult = {
     ok: false,
     error: new Error("Unknown shared workflow error"),
@@ -70,7 +71,7 @@ export async function runWaitForWorkflow(args: {
     const handle = await startChild(args.workflow, {
       args: args.params as any,
       parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
-      workflowId: args.workflowId,
+      workflowId,
     });
     const partialResult = await Promise.race([
       cancelledTrigger,
@@ -86,9 +87,9 @@ export async function runWaitForWorkflow(args: {
         })),
     ]);
     if (partialResult === "cancelled") {
-      const externalHandle = getExternalWorkflowHandle(args.workflowId);
+      const externalHandle = getExternalWorkflowHandle(workflowId);
       await externalHandle.cancel().catch((err) => {
-        console.warn(`Failed to cancel workflow with id ${args.workflowId}`, err);
+        console.warn(`Failed to cancel workflow with id ${workflowId}`, err);
       });
     }
     result =

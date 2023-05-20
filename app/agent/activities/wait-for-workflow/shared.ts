@@ -20,11 +20,11 @@ export interface FinishedExecutionRequest {
 
 export const waitRequestSignal = defineSignal<[WaitRequest]>("wait-requested");
 export const requestsQuery = defineQuery<WaitRequest[]>("requests");
+export const sharedWorkflowIdQuery = defineQuery<string>("shared-workflow-id");
 
 export class WorkflowCancelledError extends Error {
   public readonly name = "WorkflowCancelledError";
   public readonly message = "Workflow was cancelled";
 }
 
-export const getSharedWorkflowId = (lockId: string) => `shared-${lockId}`;
 export const getWaitingWorkflowId = (lockId: string) => `waiting-${lockId}`;

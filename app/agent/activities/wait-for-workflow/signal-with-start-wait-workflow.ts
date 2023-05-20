@@ -2,7 +2,7 @@ import { Context } from "@temporalio/activity";
 
 import type { CreateActivity } from "../types";
 
-import { getSharedWorkflowId, getWaitingWorkflowId, waitRequestSignal } from "./shared";
+import { getWaitingWorkflowId, waitRequestSignal } from "./shared";
 import type { WaitRequest } from "./shared";
 import type { WaitRequestType } from "./shared";
 
@@ -33,7 +33,6 @@ export const signalWithStartWaitWorkflow: CreateActivity<SignalWithStartWaitWork
           {
             workflow: args.workflow,
             params: args.params,
-            workflowId: getSharedWorkflowId(args.lockId),
           },
         ],
         signal: waitRequestSignal,

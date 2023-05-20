@@ -11,9 +11,9 @@ import { testLock, cancellationTestWorkflow, acquireLockAndWaitForSignal } from 
 import { wakeSignal } from "~/agent/activities/mutex/shared";
 import { withActivityHeartbeat } from "~/agent/activities/utils";
 import {
-  getSharedWorkflowId,
   getWaitingWorkflowId,
   requestsQuery,
+  sharedWorkflowIdQuery,
 } from "~/agent/activities/wait-for-workflow/shared";
 import { sleep, unwrap, waitForPromises } from "~/utils.shared";
 
@@ -225,7 +225,8 @@ test.concurrent(
 // 1. workflows wait on the lock and obtain the same result
 // 2. cancelling one workflow does not affect the others
 // 3. cancelling all workflows cancels the shared workflow
-// TODO: 4. running shared workflow again after it completed works
+// 4. running shared workflow again after it was cancelled works
+// 5. running shared workflow again after it completed successfully works
 test.concurrent(
   "withSharedWorkflow",
   provideTestActivities(async ({ createWorker }) => {
@@ -320,8 +321,27 @@ test.concurrent(
       await waitForPromises(handles3.map((h) => waitForStatus(h, "CANCELLED")));
       const waitingWorkflow3Handle = client.workflow.getHandle(getWaitingWorkflowId(lockId3));
       await waitForStatus(waitingWorkflow3Handle, "COMPLETED");
-      const sharedWorkflow3Handle = client.workflow.getHandle(getSharedWorkflowId(lockId3));
+      const sharedWorkflowId = await waitingWorkflow3Handle.query(sharedWorkflowIdQuery);
+      const sharedWorkflow3Handle = client.workflow.getHandle(sharedWorkflowId);
       await waitForStatus(sharedWorkflow3Handle, "CANCELLED");
+
+      // case 4
+      const handles4 = await waitForPromises(
+        Array.from({ length: 3 }).map(() => runTestWorkflow(lockId3)),
+      );
+      await waitForNumRequests(lockId3, 3);
+      release();
+      const results4 = await waitForPromises(handles4.map((h) => h.result()));
+      expect(results4.every((v) => v === 3)).toBe(true);
+
+      // case 5
+      const handles5 = await waitForPromises(
+        Array.from({ length: 3 }).map(() => runTestWorkflow(lockId1)),
+      );
+      await waitForNumRequests(lockId1, 3);
+      release();
+      const results5 = await waitForPromises(handles5.map((h) => h.result()));
+      expect(results5.every((v) => v === 4)).toBe(true);
     });
   }),
 );
