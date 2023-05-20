@@ -60,7 +60,8 @@ export async function lockWorkflow(
   });
 
   while (workflowInfo().historyLength < MAX_WORKFLOW_HISTORY_LENGTH) {
-    await condition(() => requests.length > 0, "10 minutes");
+    await condition(() => requests.length > 0 || getWake(), "10 minutes");
+    wake = false;
     if (requests.length === 0) {
       // timeout occurred
       return;

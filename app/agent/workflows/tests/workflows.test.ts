@@ -145,12 +145,31 @@ test.concurrent(
   }),
 );
 
+const waitForStatus = async (
+  handle: WorkflowHandle<any>,
+  status: WorkflowExecutionStatusName,
+  timeoutMs = 10000,
+) => {
+  const startedAt = Date.now();
+  while (true) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error(`Timed out waiting for status ${status} for workflow ${handle.workflowId}`);
+    }
+    const currentStatus = (await handle.describe()).status.name;
+    if (currentStatus === status) {
+      break;
+    }
+    await sleep(100);
+  }
+};
+
 // tests:
 // - workflow holding the lock is terminated and releases the lock eventually
 // - workflow holding the lock completes successfully, but does not release the lock by itself, releases the lock eventually
 // - workflow next in queue for the lock is terminated and does not break the lock sync workflow
 // - workflow holding the lock is cancelled and releases the lock immediately
 // - getWorkflowStatus activity returns correct status for nonexistent workflow
+// - mutex lock can start again after completion
 test.concurrent(
   "lock cancellation",
   provideTestActivities(async ({ createWorker, activities }) => {
@@ -217,6 +236,14 @@ test.concurrent(
       expect(await activities.getWorkflowStatus("non-existent-workflow")).toEqual(
         "CUSTOM_NOT_FOUND",
       );
+
+      // case 6
+      await wakeLockWorkflow(lockId4);
+      const lock4Handle = client.workflow.getHandle(lockId4);
+      await waitForStatus(lock4Handle, "COMPLETED", 10000);
+      const handle9 = await acquireLock(lockId4);
+      await handle9.signal(releaseLockSignal);
+      await handle9.result();
     });
   }),
 );
@@ -267,25 +294,6 @@ test.concurrent(
         taskQueue,
         args: [lockId],
       });
-    const waitForStatus = async (
-      handle: WorkflowHandle<any>,
-      status: WorkflowExecutionStatusName,
-      timeoutMs = 10000,
-    ) => {
-      const startedAt = Date.now();
-      while (true) {
-        if (Date.now() - startedAt > timeoutMs) {
-          throw new Error(
-            `Timed out waiting for status ${status} for workflow ${handle.workflowId}`,
-          );
-        }
-        const currentStatus = (await handle.describe()).status.name;
-        if (currentStatus === status) {
-          break;
-        }
-        await sleep(100);
-      }
-    };
 
     await worker.runUntil(async () => {
       // case 1
