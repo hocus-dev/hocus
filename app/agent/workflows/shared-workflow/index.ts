@@ -36,7 +36,7 @@ const { signalWithStartWaitWorkflow } = proxyActivities<Activities>({
   },
 });
 
-export async function runWaitForWorkflow(args: {
+export async function runSharedWorkflow(args: {
   workflow: string;
   params: unknown[];
 }): Promise<void> {

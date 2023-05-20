@@ -6,7 +6,7 @@ import { getWaitingWorkflowId, waitRequestSignal } from "./shared";
 import type { WaitRequest } from "./shared";
 import type { WaitRequestType } from "./shared";
 
-import { runWaitForWorkflow } from "~/agent/workflows";
+import { runSharedWorkflow } from "~/agent/workflows";
 import { Token } from "~/token";
 
 export type SignalWithStartWaitWorkflowActivity = (args: {
@@ -26,7 +26,7 @@ export const signalWithStartWaitWorkflow: CreateActivity<SignalWithStartWaitWork
     };
     const withClient = injector.resolve(Token.TemporalClient);
     await withClient(async (client) => {
-      await client.workflow.signalWithStart(runWaitForWorkflow, {
+      await client.workflow.signalWithStart(runSharedWorkflow, {
         taskQueue: Context.current().info.taskQueue,
         workflowId: getWaitingWorkflowId(args.lockId),
         args: [

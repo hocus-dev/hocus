@@ -4,7 +4,7 @@ import { Mutex } from "async-mutex";
 import { v4 as uuidv4 } from "uuid";
 
 import { cancelLockSignal, isLockAcquiredQuery, releaseLockSignal } from "./mutex/shared";
-import { runWaitForWorkflowTest } from "./shared-workflow/workflow";
+import { runSharedWorkflowTest } from "./shared-workflow/workflow";
 import { prepareTests } from "./utils";
 import { testLock, cancellationTestWorkflow, acquireLockAndWaitForSignal } from "./workflows";
 
@@ -262,7 +262,7 @@ test.concurrent(
     let release = await mutex.acquire();
     const { worker, client, taskQueue } = await createWorker({
       activityOverrides: {
-        waitForWorkflowTestActivity: withActivityHeartbeat({ intervalMs: 100 }, async () => {
+        sharedWorkflowTestActivity: withActivityHeartbeat({ intervalMs: 100 }, async () => {
           release = await Promise.race([mutex.acquire(), Context.current().cancelled]).catch(
             (err) => {
               mutex.cancel();
@@ -289,7 +289,7 @@ test.concurrent(
       }
     };
     const runTestWorkflow = (lockId: string) =>
-      client.workflow.start(runWaitForWorkflowTest, {
+      client.workflow.start(runSharedWorkflowTest, {
         workflowId: uuidv4(),
         taskQueue,
         args: [lockId],

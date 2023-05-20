@@ -1,3 +1,3 @@
-export const waitForWorkflowTestActivity = async (): Promise<number> => {
+export const sharedWorkflowTestActivity = async (): Promise<number> => {
   throw new Error("placeholder");
 };
