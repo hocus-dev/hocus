@@ -31,12 +31,12 @@ import { getWorkflowStatus } from "./mutex/get-workflow-status";
 import { signalWithStartLockWorkflow } from "./mutex/signal-with-start-lock-workflow";
 import { prebuild } from "./prebuild";
 import { saveGitRepoConnectionStatus } from "./save-git-repo-connection-status";
+import { signalWithStartWaitWorkflow } from "./shared-workflow/signal-with-start-wait-workflow";
 import { startWorkspace } from "./start-workspace";
 import { stopWorkspace } from "./stop-workspace";
 import type { CreateActivity } from "./types";
 import { updateGitBranchesAndObjects } from "./update-git-branches-and-objects";
 import { waitForBuildfs } from "./wait-for-buildfs";
-import { signalWithStartWaitWorkflow } from "./wait-for-workflow/signal-with-start-wait-workflow";
 import { cleanUpWorkspaceInstanceDb } from "./workspace/clean-up-workspace-instance";
 import { cleanUpWorkspaceInstanceLocal } from "./workspace/clean-up-workspace-instance";
 

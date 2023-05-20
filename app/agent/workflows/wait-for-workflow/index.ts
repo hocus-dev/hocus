@@ -16,12 +16,12 @@ import {
 } from "@temporalio/workflow";
 
 import type { Activities } from "~/agent/activities/list";
-import type { WaitRequest } from "~/agent/activities/wait-for-workflow/shared";
-import { sharedWorkflowIdQuery } from "~/agent/activities/wait-for-workflow/shared";
-import { requestsQuery } from "~/agent/activities/wait-for-workflow/shared";
-import { WorkflowCancelledError } from "~/agent/activities/wait-for-workflow/shared";
-import { WaitRequestType } from "~/agent/activities/wait-for-workflow/shared";
-import { waitRequestSignal } from "~/agent/activities/wait-for-workflow/shared";
+import type { WaitRequest } from "~/agent/activities/shared-workflow/shared";
+import { sharedWorkflowIdQuery } from "~/agent/activities/shared-workflow/shared";
+import { requestsQuery } from "~/agent/activities/shared-workflow/shared";
+import { WorkflowCancelledError } from "~/agent/activities/shared-workflow/shared";
+import { WaitRequestType } from "~/agent/activities/shared-workflow/shared";
+import { waitRequestSignal } from "~/agent/activities/shared-workflow/shared";
 import { retrySignal } from "~/agent/workflows-utils";
 import { wrapWorkflowError } from "~/temporal/utils";
 

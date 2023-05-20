@@ -4,17 +4,17 @@ import { Mutex } from "async-mutex";
 import { v4 as uuidv4 } from "uuid";
 
 import { cancelLockSignal, isLockAcquiredQuery, releaseLockSignal } from "./mutex/shared";
+import { runWaitForWorkflowTest } from "./shared-workflow/workflow";
 import { prepareTests } from "./utils";
-import { runWaitForWorkflowTest } from "./wait-for-workflow/workflow";
 import { testLock, cancellationTestWorkflow, acquireLockAndWaitForSignal } from "./workflows";
 
 import { wakeSignal } from "~/agent/activities/mutex/shared";
-import { withActivityHeartbeat } from "~/agent/activities/utils";
 import {
   getWaitingWorkflowId,
   requestsQuery,
   sharedWorkflowIdQuery,
-} from "~/agent/activities/wait-for-workflow/shared";
+} from "~/agent/activities/shared-workflow/shared";
+import { withActivityHeartbeat } from "~/agent/activities/utils";
 import { sleep, unwrap, waitForPromises } from "~/utils.shared";
 
 const { provideTestActivities } = prepareTests();
