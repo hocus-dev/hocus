@@ -461,7 +461,7 @@ test.concurrent(
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
     const tasks: Promise<any>[][] = [[], [], [], []];
-    const N = 5;
+    const N = 100;
     for (let i = 0; i < N; i++) {
       tasks[0].push(brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV));
       tasks[1].push(brService.expose(c1, EXPOSE_METHOD.HOST_MOUNT));
@@ -488,14 +488,12 @@ test.concurrent(
       brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV),
     ]);
     const tasks: Promise<any>[] = [];
-    const N = 5;
+    const N = 100;
     for (let i = 0; i < N; i++) {
       tasks.push(brService.hide(c1));
       tasks.push(brService.hide(c2));
     }
-    console.log("AAA");
     await waitForPromises(tasks);
-    console.log("BBB");
   }),
 );
 
