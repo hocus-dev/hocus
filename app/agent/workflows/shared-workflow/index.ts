@@ -112,6 +112,10 @@ export async function runSharedWorkflow(args: {
   }
 }
 
+/**
+ * Ensure that only one workflow with the same lockId is running at the same time.
+ * If the workflow is already running, wait for it to finish and return its result.
+ */
 export async function withSharedWorkflow<W extends (...args: any[]) => Promise<any>>(args: {
   lockId: string;
   workflow: W;

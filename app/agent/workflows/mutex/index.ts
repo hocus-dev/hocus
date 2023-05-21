@@ -117,6 +117,9 @@ export async function lockWorkflow(
   }
 }
 
+/**
+ * Acquire an exclusive lock on a resource and execute the given function.
+ */
 export async function withLock<T>(
   options: {
     resourceId: string;
