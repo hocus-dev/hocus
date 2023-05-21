@@ -35,16 +35,19 @@ ID=$(docker run -d --rm \
   registry:2)
 
 clean_up() {
-  docker kill $ID
+ docker kill $ID
 }
 trap clean_up INT TERM EXIT
 
 # Move the built docker image to the temporary docker registry
 skopeo copy --dest-tls-verify=false docker-daemon:"${IMAGE_NAME}" docker://localhost:5000/${IMAGE_NAME}
 # Now we may convert the image to overlaybd layers .-.
+#resources/bin/convertor --plain --repository 127.0.0.1:5000/buildfs --input-tag ${IMAGE_TAG} --fastoci ${IMAGE_TAG}-foci
 resources/bin/convertor --plain --repository 127.0.0.1:5000/buildfs --input-tag ${IMAGE_TAG} --overlaybd ${IMAGE_TAG}-obd
 # Now we may extract the data from the registry...
 skopeo copy --src-tls-verify=false docker://localhost:5000/buildfs:${IMAGE_TAG}-obd dir:${REPO_DIR}/poc-dir-export
+#skopeo copy --src-tls-verify=false docker://localhost:5000/buildfs:${IMAGE_TAG}-foci dir:${REPO_DIR}/poc-dir-export-meta
+#skopeo copy --src-tls-verify=false docker://localhost:5000/buildfs:${IMAGE_TAG} dir:${REPO_DIR}/poc-dir-export-main
 
 # Create a 0.5TB writeble layer for overlaybd
 rm -rf ${REPO_DIR}/buildkite-obd-write-layer
@@ -52,10 +55,11 @@ mkdir ${REPO_DIR}/buildkite-obd-write-layer
 /opt/overlaybd/bin/overlaybd-create -s ${REPO_DIR}/buildkite-obd-write-layer/data ${REPO_DIR}/buildkite-obd-write-layer/index 512
 
 # Now write a config for overlaybd
+#node create_config.mjs | jq '.' > ${REPO_DIR}/overlaybd-buildkite.config.v1.json
 cat ${REPO_DIR}/poc-dir-export/manifest.json \
   | jq '.layers[].digest' \
   | sed "s@sha256:@${REPO_DIR}/poc-dir-export/@g" \
-  | jq -s ". | {lowers: map({file: .}), upper: {index: \"${REPO_DIR}/buildkite-obd-write-layer/index\", data: \"${REPO_DIR}/buildkite-obd-write-layer/data\"}, resultFile: \"/tmp/poc-result\"}" \
+  | jq -s ". | {lowers: map({file: .}), upper: {index: \"${REPO_DIR}/buildkite-obd-write-layer/index\", data: \"${REPO_DIR}/buildkite-obd-write-layer/data\"}, resultFile: \"/tmp/poc-result\", hocusManifest: \"AAAAAAA\"}" \
   > ${REPO_DIR}/overlaybd-buildkite.config.v1.json
 
 TCMU_CONFIG_FS="/sys/kernel/config/target/core"
@@ -84,7 +88,7 @@ mkdir ${TCMU_CONFIG_FS}/user_${TCMU_HBA_NUM}/${TCMU_STORAGE_OBJECT_NAME}
 BD_SERIAL=hocusbd-$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 8 || true)
 echo -n "$BD_SERIAL" > ${TCMU_CONFIG_FS}/user_${TCMU_HBA_NUM}/${TCMU_STORAGE_OBJECT_NAME}/wwn/vpd_unit_serial
 # Now configure the new storage object
-echo -n dev_config=overlaybd/${REPO_DIR}/overlaybd-buildkite.config.v1.json > ${TCMU_CONFIG_FS}/user_${TCMU_HBA_NUM}/${TCMU_STORAGE_OBJECT_NAME}/control
+echo -n dev_config=hellofromhocusa/${REPO_DIR}/overlaybd-buildkite.config.v1.json > ${TCMU_CONFIG_FS}/user_${TCMU_HBA_NUM}/${TCMU_STORAGE_OBJECT_NAME}/control
 # And enable it
 echo -n 1 > ${TCMU_CONFIG_FS}/user_${TCMU_HBA_NUM}/${TCMU_STORAGE_OBJECT_NAME}/enable
 
@@ -102,10 +106,10 @@ ln -s ${TCMU_CONFIG_FS}/user_${TCMU_HBA_NUM}/${TCMU_STORAGE_OBJECT_NAME} /sys/ke
 
 # Ok now we should finally have a block device
 # The problem is that we need to discover it first .-.
-#BLOCK_DEV_SCSI_ADDR="$(cat /sys/kernel/config/target/loopback/${TCM_LOOP_WWN}/tpgt_${TCM_LOOP_PORT}/address):${TCM_LOOP_LUN}"
+BLOCK_DEV_SCSI_ADDR="$(cat /sys/kernel/config/target/loopback/${TCM_LOOP_WWN}/tpgt_${TCM_LOOP_PORT}/address):${TCM_LOOP_LUN}"
 # WARNING - one SCSI device might expose multiple partitions - here we assume that there is only one entry!!!
-#BLOCK_DEV_NAME=$(ls /sys/class/scsi_device/${BLOCK_DEV_SCSI_ADDR}/device/block)
-BLOCK_DEV_NAME=hocus/${BD_SERIAL}
+BLOCK_DEV_NAME=$(ls /sys/class/scsi_device/${BLOCK_DEV_SCSI_ADDR}/device/block)
+#BLOCK_DEV_NAME=hocus/${BD_SERIAL}
 # Wait for udev to finish
 timeout 5 bash -c "while [ ! -e /dev/${BLOCK_DEV_NAME} ]; do sleep 0.1; done"
 
@@ -116,13 +120,13 @@ resize2fs /dev/${BLOCK_DEV_NAME}
 # Network cleanup
 ip link del name brbk0 type bridge || true
 ip tuntap del mode tap tapbk0 || true
-killall dnsmasq
+killall dnsmasq || true
 
 # Setup dhcp
 ip link add name brbk0 type bridge
 ip addr add 192.168.100.1/24 dev brbk0
-dnsmasq --interface=brbk0 --bind-interfaces --dhcp-range=192.168.100.50,192.168.100.254
 ip link set dev brbk0 up
+dnsmasq --interface=brbk0 --bind-interfaces --dhcp-range=192.168.100.50,192.168.100.254
 
 # Connect tap to bridge
 ip tuntap add mode tap tapbk0

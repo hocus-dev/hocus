@@ -23,3 +23,7 @@ overlaybd-buildkite.config.v1.json
 poc-dir-export/
 cloud-hypervisor-static
 ch-remote-static
+oci-dir-export/
+poc-dir-export-main/
+poc-dir-export-meta/
+
