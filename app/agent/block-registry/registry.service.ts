@@ -712,7 +712,7 @@ export class BlockRegistryService {
         const mountPoint = path.join(this.paths.mounts, what);
         await fs.mkdir(mountPoint).catch(catchAlreadyExists);
         try {
-          let flags = readonly ? ["--read-only"] : ["--read-write"];
+          let flags = readonly ? ["--read-only"] : ["--read-write", "-o", "discard"];
           const t1 = performance.now();
           // TODO: Calling the mount syscall directly is much much more faster
           await execCmdAsync("mount", ...flags, bd.device, mountPoint);
