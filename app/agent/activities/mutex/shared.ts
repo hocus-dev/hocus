@@ -15,6 +15,9 @@ export const lockRequestSignal = defineSignal<[LockRequest]>("lock-requested");
 export const lockReleaseSignal = defineSignal<[LockRelease]>("lock-released");
 export const wakeSignal = defineSignal<[]>("wake");
 
+export type NotFoundExecutionStatus = typeof NotFoundExecutionStatus;
+export const NotFoundExecutionStatus = "CUSTOM_NOT_FOUND" as const;
+
 export type FINAL_WORKFLOW_EXECUTION_STATUS_NAMES =
   (typeof FINAL_WORKFLOW_EXECUTION_STATUS_NAMES)[number];
 export const FINAL_WORKFLOW_EXECUTION_STATUS_NAMES = [
@@ -23,7 +26,7 @@ export const FINAL_WORKFLOW_EXECUTION_STATUS_NAMES = [
   "CANCELLED",
   "TERMINATED",
   "TIMED_OUT",
-  "CUSTOM_NOT_FOUND",
+  NotFoundExecutionStatus,
 ] as const;
-const _typeCheck: Partial<WorkflowExecutionStatusName | "CUSTOM_NOT_FOUND"> =
+const _typeCheck: Partial<WorkflowExecutionStatusName | NotFoundExecutionStatus> =
   "" as FINAL_WORKFLOW_EXECUTION_STATUS_NAMES;

@@ -8,7 +8,7 @@ import { runSharedWorkflowTest } from "./shared-workflow/workflow";
 import { prepareTests } from "./utils";
 import { testLock, cancellationTestWorkflow, acquireLockAndWaitForSignal } from "./workflows";
 
-import { wakeSignal } from "~/agent/activities/mutex/shared";
+import { NotFoundExecutionStatus, wakeSignal } from "~/agent/activities/mutex/shared";
 import {
   getWaitingWorkflowId,
   requestsQuery,
@@ -234,7 +234,7 @@ test.concurrent(
 
       // case 5
       expect(await activities.getWorkflowStatus("non-existent-workflow")).toEqual(
-        "CUSTOM_NOT_FOUND",
+        NotFoundExecutionStatus,
       );
 
       // case 6

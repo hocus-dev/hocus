@@ -2,11 +2,13 @@ import type { WorkflowExecutionStatusName } from "@temporalio/client";
 
 import type { CreateActivity } from "../types";
 
+import { NotFoundExecutionStatus } from "./shared";
+
 import { Token } from "~/token";
 
 export type GetWorkflowStatusActivity = (
   workflowId: string,
-) => Promise<WorkflowExecutionStatusName | "CUSTOM_NOT_FOUND">;
+) => Promise<WorkflowExecutionStatusName | NotFoundExecutionStatus>;
 export const getWorkflowStatus: CreateActivity<GetWorkflowStatusActivity> =
   ({ injector }) =>
   async (workflowId) => {
@@ -18,7 +20,7 @@ export const getWorkflowStatus: CreateActivity<GetWorkflowStatusActivity> =
         .then((d) => d.status.name)
         .catch((err) => {
           if (err?.name === "WorkflowNotFoundError") {
-            return "CUSTOM_NOT_FOUND";
+            return NotFoundExecutionStatus;
           }
           throw err;
         });
