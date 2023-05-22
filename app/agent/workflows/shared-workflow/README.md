@@ -42,6 +42,6 @@ sequenceDiagram
     Note over withSharedWorkflow2: ends
     the shared workflow->>-runSharedWorkflow: return result
     runSharedWorkflow-->>-withSharedWorkflow1: signal result (releaseSignal)
-    Note over runSharedWorkflow: ends
     Note over the shared workflow: ends
+    Note over runSharedWorkflow: ends
 ```
