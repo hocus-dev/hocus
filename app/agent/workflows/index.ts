@@ -7,10 +7,17 @@ import {
   ParentClosePolicy,
 } from "@temporalio/workflow";
 
-import { lockWorkflow } from "./mutex";
-import { runBuildfsAndPrebuilds, runPrebuild, runBuildfs, scheduleNewPrebuild } from "./prebuild";
-import { runSharedWorkflow } from "./shared-workflow";
-import {
+import { runBuildfsAndPrebuilds } from "./prebuild";
+
+import type { Activities } from "~/agent/activities/list";
+import { parseWorkflowError } from "~/agent/workflows-utils";
+import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
+import { numericSort } from "~/utils.shared";
+
+export { lockWorkflow } from "./mutex";
+export { runSharedWorkflow } from "./shared-workflow";
+export { runPrebuild, runBuildfs, scheduleNewPrebuild } from "./prebuild";
+export {
   runCreateWorkspace,
   runStartWorkspace,
   runStopWorkspace,
@@ -18,24 +25,7 @@ import {
   runDeleteWorkspace,
 } from "./workspace";
 
-import type { Activities } from "~/agent/activities/list";
-import { parseWorkflowError } from "~/agent/workflows-utils";
-import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
-import { numericSort } from "~/utils.shared";
-
-export {
-  runBuildfsAndPrebuilds,
-  runPrebuild,
-  runBuildfs,
-  runCreateWorkspace,
-  runStartWorkspace,
-  runStopWorkspace,
-  monitorWorkspaceInstance,
-  runDeleteWorkspace,
-  lockWorkflow,
-  scheduleNewPrebuild,
-  runSharedWorkflow,
-};
+export { runBuildfsAndPrebuilds };
 
 const {
   addProjectAndRepository,
