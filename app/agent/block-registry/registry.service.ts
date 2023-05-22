@@ -4,6 +4,7 @@ import * as path from "path";
 
 import type { Static, TSchema } from "@sinclair/typebox";
 import { type DefaultLogger } from "@temporalio/worker";
+import { flock } from "fs-ext";
 import type { A, Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
@@ -439,6 +440,7 @@ export class BlockRegistryService {
     });
   }
 
+  // TODO: Perhaps use open(..., O_TMPFILE | ...) here?
   private async withTmpFile<T>(fn: (tmpPath: string) => Promise<T>): Promise<T> {
     const tmpPath = path.join(this.paths.run, "tmp-" + this.genRandId());
     try {
@@ -703,6 +705,37 @@ export class BlockRegistryService {
         });
         // Check if the device was not mapped to a LUN
         if (aluaMembers.length === 0) {
+          // WARNING: The upstream kernel is borked and data corruption occurs when concurrent enable requests are made
+          //          There is no mutex in the kernel protecting concurrent setup
+          //          Due to this get an exclusive flock on the enable file
+          //          The fs-ext library is unmaintained and will stall the event loop when there are more than 3 concurrent flocks
+          //          waiting, due to this we request a flock in unblocking mode and sleep for some time.
+          //          TODO: Consider writing a rust addon for flocks cause there is no good library for this in node .-.
+          const enableFd = await fs.open(path.join(tcmuPath, "enable"));
+          try {
+            let flockAcquired = false;
+            while (!flockAcquired) {
+              try {
+                await new Promise((resolve, reject) => {
+                  flock(enableFd.fd, "exnb", (err) => {
+                    if (err === void 0) {
+                      resolve(void 0);
+                    } else {
+                      reject(err);
+                    }
+                  });
+                });
+              } catch (err) {
+                console.log(err);
+                flockAcquired = false;
+                continue;
+              }
+              flockAcquired = true;
+            }
+          } finally {
+            await enableFd.close();
+          }
+
           // Set the vendor for convenience, this is for filtering
           // EINVAL is thrown when the storage object is already exposed on a LUN
           //        cause after it is exposed the WWN becomes immutable
