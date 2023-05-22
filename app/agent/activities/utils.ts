@@ -24,14 +24,14 @@ export const runActivityHeartbeat = <T>(
   });
 };
 
-export const withActivityHeartbeat = <T, Args>(
+export const withActivityHeartbeat = <T, Args extends unknown[]>(
   options: {
     /** Default: 5000 */
     intervalMs?: number;
   },
-  fn: (args: Args) => Promise<T>,
-): ((args: Args) => Promise<T>) => {
-  return (args: Args) => {
-    return runActivityHeartbeat(options, () => fn(args));
+  fn: (...args: Args) => Promise<T>,
+): ((...args: Args) => Promise<T>) => {
+  return (...args: Args) => {
+    return runActivityHeartbeat(options, () => fn(...args));
   };
 };

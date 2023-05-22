@@ -8,12 +8,16 @@ import {
   setHandler,
   workflowInfo,
   uuid4,
+  CancellationScope,
 } from "@temporalio/workflow";
 
 import type { Activities } from "~/agent/activities/list";
 import type { LockRequest } from "~/agent/activities/mutex/shared";
+import { lockReleaseSignal } from "~/agent/activities/mutex/shared";
+import { wakeSignal } from "~/agent/activities/mutex/shared";
 import { FINAL_WORKFLOW_EXECUTION_STATUS_NAMES } from "~/agent/activities/mutex/shared";
 import { currentWorkflowIdQuery, lockRequestSignal } from "~/agent/activities/mutex/shared";
+import { retrySignal } from "~/agent/workflows-utils";
 
 const { signalWithStartLockWorkflow, getWorkflowStatus } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
@@ -25,14 +29,20 @@ const { signalWithStartLockWorkflow, getWorkflowStatus } = proxyActivities<Activ
 const MAX_WORKFLOW_HISTORY_LENGTH = 2000;
 
 interface LockResponse {
-  releaseSignalName: string;
+  releaseId: string;
 }
+
+const WORKFLOW_EXECUTION_NOT_FOUND_ERR_TYPE = "ExternalWorkflowExecutionNotFound";
 
 export async function lockWorkflow(
   requests = Array<LockRequest>(),
   seenAcquireIds = new Set<string>(),
+  releasedIds = new Set<string>(),
 ): Promise<void> {
+  let wake = false;
+  const getWake = () => wake;
   let currentWorkflowId: string | null = null;
+
   setHandler(lockRequestSignal, (req: LockRequest) => {
     if (seenAcquireIds.has(req.lockAcquiredSignalName)) {
       return;
@@ -40,40 +50,52 @@ export async function lockWorkflow(
     seenAcquireIds.add(req.lockAcquiredSignalName);
     requests.push(req);
   });
+  setHandler(lockReleaseSignal, (req) => {
+    releasedIds.add(req.releaseId);
+  });
   setHandler(currentWorkflowIdQuery, () => currentWorkflowId);
+  setHandler(wakeSignal, () => {
+    // only used for testing
+    wake = true;
+  });
+
   while (workflowInfo().historyLength < MAX_WORKFLOW_HISTORY_LENGTH) {
-    await condition(() => requests.length > 0, "10 minutes");
+    await condition(() => requests.length > 0 || getWake(), "10 minutes");
+    wake = false;
     if (requests.length === 0) {
       // timeout occurred
       return;
     }
-    const req = requests.shift();
-    // Check for `undefined` because otherwise TypeScript complains that `req`
-    // may be undefined.
-    if (req === undefined) {
-      continue;
-    }
+    const req = requests.shift()!;
     currentWorkflowId = req.initiatorWorkflowId;
     const workflowRequestingLock = getExternalWorkflowHandle(req.initiatorWorkflowId);
-    const releaseSignalName = uuid4();
+    const releaseId = uuid4();
 
-    let released = false;
-    setHandler(defineSignal(releaseSignalName), () => {
-      released = true;
-    });
-    // Send a unique secret `releaseSignalName` to the Workflow that acquired
-    // the lock. The acquiring Workflow should signal `releaseSignalName` to
+    // Send a unique secret `releaseId` to the Workflow that acquired
+    // the lock. The acquiring Workflow should signal a lock release signal with `releaseId` to
     // release the lock.
-    await workflowRequestingLock.signal(defineSignal<[LockResponse]>(req.lockAcquiredSignalName), {
-      releaseSignalName,
-    });
-
-    const isReleased = () => released;
-    while (!released) {
-      await condition(isReleased, "15 minutes");
-      if (released) {
-        break;
+    try {
+      await retrySignal(() =>
+        workflowRequestingLock.signal(defineSignal<[LockResponse]>(req.lockAcquiredSignalName), {
+          releaseId,
+        }),
+      );
+    } catch (err: any) {
+      // If the workflow that acquired the lock has already completed or has been terminated,
+      // the signal will fail with an error of type WORKFLOW_EXECUTION_NOT_FOUND_ERR_TYPE.
+      // That's fine, we just ignore it. Otherwise, we log the error.
+      if (err?.type !== WORKFLOW_EXECUTION_NOT_FOUND_ERR_TYPE) {
+        console.error(
+          `Cannot signal workflow with id ${workflowRequestingLock.workflowId} to acquire the lock. It it's still running, it will hang indefinitely.`,
+          err,
+        );
       }
+      currentWorkflowId = null;
+      continue;
+    }
+
+    const shouldWake = () => releasedIds.has(releaseId) || getWake();
+    while (!releasedIds.has(releaseId)) {
       const workflowRequestingLockStatus = await getWorkflowStatus(req.initiatorWorkflowId).catch(
         (err) => console.warn(err),
       );
@@ -83,15 +105,21 @@ export async function lockWorkflow(
         // or timed out. In this case, we release the lock and continue to prevent deadlock.
         break;
       }
+      await condition(shouldWake, "30 seconds");
+      wake = false;
     }
+    releasedIds.delete(releaseId);
     currentWorkflowId = null;
   }
   // carry over any pending requests to the next execution
   if (requests.length > 0) {
-    await continueAsNew<typeof lockWorkflow>(requests, seenAcquireIds);
+    await continueAsNew<typeof lockWorkflow>(requests, seenAcquireIds, releasedIds);
   }
 }
 
+/**
+ * Acquire an exclusive lock on a resource and execute the given function.
+ */
 export async function withLock<T>(
   options: {
     resourceId: string;
@@ -99,19 +127,22 @@ export async function withLock<T>(
   fn: () => Promise<T>,
 ): Promise<void> {
   const lockAcquiredSignalName = `lock-acquired-${uuid4()}`;
-  let releaseSignalName = "";
-  setHandler(defineSignal<[LockResponse]>(lockAcquiredSignalName), (lockResponse: LockResponse) => {
-    releaseSignalName = lockResponse.releaseSignalName;
+  let releaseId = "";
+  setHandler(defineSignal<[LockResponse]>(lockAcquiredSignalName), (lockResponse) => {
+    releaseId = lockResponse.releaseId;
   });
-  const hasLock = () => releaseSignalName !== "";
+  const hasLock = () => releaseId !== "";
 
   // Send a signal to the given lock Workflow to acquire the lock
   await signalWithStartLockWorkflow(options.resourceId, lockAcquiredSignalName);
-  await condition(hasLock);
-
-  await fn().finally(async () => {
-    // Send a signal to the given lock Workflow to release the lock
-    const handle = getExternalWorkflowHandle(options.resourceId);
-    await handle.signal(releaseSignalName);
-  });
+  try {
+    await condition(hasLock);
+    await fn();
+  } finally {
+    await CancellationScope.nonCancellable(async () => {
+      // Send a signal to the given lock Workflow to release the lock
+      const handle = getExternalWorkflowHandle(options.resourceId);
+      await handle.signal(lockReleaseSignal, { releaseId }).catch((err) => console.warn(err));
+    });
+  }
 }

@@ -8,8 +8,8 @@ import {
 } from "@temporalio/workflow";
 
 import { lockWorkflow } from "./mutex";
-import { testLock } from "./mutex/test-workflow";
 import { runBuildfsAndPrebuilds, runPrebuild, runBuildfs, scheduleNewPrebuild } from "./prebuild";
+import { runSharedWorkflow } from "./shared-workflow";
 import {
   runCreateWorkspace,
   runStartWorkspace,
@@ -33,8 +33,8 @@ export {
   monitorWorkspaceInstance,
   runDeleteWorkspace,
   lockWorkflow,
-  testLock,
   scheduleNewPrebuild,
+  runSharedWorkflow,
 };
 
 const {

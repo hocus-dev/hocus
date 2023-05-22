@@ -2050,7 +2050,7 @@
   dependencies:
     json-parse-even-better-errors "^2.3.1"
 
-"@opentelemetry/api@^1.3.0":
+"@opentelemetry/api@^1.4.1":
   version "1.4.1"
   resolved "https://registry.yarnpkg.com/@opentelemetry/api/-/api-1.4.1.tgz#ff22eb2e5d476fbc2450a196e40dd243cc20c28f"
   integrity sha512-O2yRJce1GOc6PAy3QxFM4NzFiWzvScDC1/5ihYBL6BUEVdq0XMWN01sppE+H6bBXbaFYipjwFLEWLg5PaSOThA==
@@ -2600,86 +2600,86 @@
   dependencies:
     defer-to-connect "^2.0.0"
 
-"@temporalio/activity@1.7.2":
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/@temporalio/activity/-/activity-1.7.2.tgz#ae639fc9a28853c428b34befe8cdac1b0d5274d2"
-  integrity sha512-hTYIErK2YyTYc1uEm5VQ4/5jp2G/0PnJmndmYnS/ulSAv/Ihm2ySsaDujBXCSNWrlb0znOKyAM27qtca0tep3Q==
+"@temporalio/activity@1.7.4":
+  version "1.7.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/activity/-/activity-1.7.4.tgz#e4f97bba93463fd815b148451b4bcda32d5a6081"
+  integrity sha512-66sA8LVxKizmySZRjlVrbp5B3b7w7KyC/QEIXbZfaEiDc/7uIyYDvw3vOHabuFKAAco695z3Bk7f9q5y8BmRbA==
   dependencies:
-    "@temporalio/common" "1.7.2"
+    "@temporalio/common" "1.7.4"
     abort-controller "^3.0.0"
 
-"@temporalio/client@1.7.2", "@temporalio/client@^1.5.2":
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/@temporalio/client/-/client-1.7.2.tgz#b4031291329480be756fd71eaba582ae3b4fc029"
-  integrity sha512-z2bz3Kn1t9gBxCe7nfWRgsA5Nk0CcS8FDvGU2fqfTFfG5V/WL8m8oNJLxBDhEiy5dGHoj/zlsp5zerVMFtt6lw==
+"@temporalio/client@1.7.4", "@temporalio/client@^1.7.4":
+  version "1.7.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/client/-/client-1.7.4.tgz#73b0466423c7a9a21e099bddba03c6ba8aa55b73"
+  integrity sha512-123B14aoTrb+idaYbpk+SlsVq/Nl8AfYezOiKrTfheu1geUK2BNRM0NT+fKOil4gUS0zeYd03O4Php5Q8sENpw==
   dependencies:
     "@grpc/grpc-js" "~1.7.3"
-    "@temporalio/common" "1.7.2"
-    "@temporalio/proto" "1.7.2"
+    "@temporalio/common" "1.7.4"
+    "@temporalio/proto" "1.7.4"
     abort-controller "^3.0.0"
     long "^5.2.0"
     uuid "^8.3.2"
 
-"@temporalio/common@1.7.2":
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/@temporalio/common/-/common-1.7.2.tgz#6d0ef7dd71646742a6be125e6f8e97aecf7bb9bf"
-  integrity sha512-wldCat3GokDRg3UOud+gsC1e8JjscYJ1UDuxahbyVP0ITvoQoLkqv+dErmG9zFEyf6fKhg38HuNRRo6WLIRNOg==
+"@temporalio/common@1.7.4":
+  version "1.7.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/common/-/common-1.7.4.tgz#47e3e1887f6195c07f43cfd44444f7b3b8352d5b"
+  integrity sha512-VeHrf/JtDntGtZvAMoUJKTjWJp5hzYW3P/+cgwDleTLPA853j5p8JSRn0USxs7heOyXBOlu86SORmEs3xQDpXg==
   dependencies:
-    "@opentelemetry/api" "^1.3.0"
-    "@temporalio/proto" "1.7.2"
+    "@opentelemetry/api" "^1.4.1"
+    "@temporalio/proto" "1.7.4"
     long "^5.2.0"
     ms "^2.1.3"
     proto3-json-serializer "^1.0.3"
     protobufjs "^7.0.0"
 
-"@temporalio/core-bridge@1.7.2":
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/@temporalio/core-bridge/-/core-bridge-1.7.2.tgz#3bf74fdf377c5948d7b2f8c476a1559aadba720a"
-  integrity sha512-994Uur+BBU/V9uT7CCt9w/cRXvQM1ElbR3rCC3jWd2LcEgKnlhvfd9vwtR7QdNHhAUf5ZrksVENF7W5tP5I/ww==
+"@temporalio/core-bridge@1.7.4":
+  version "1.7.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/core-bridge/-/core-bridge-1.7.4.tgz#05905d9edfe706aca40444ae1cbe084abb020693"
+  integrity sha512-NLPIw8uQBcRo71/0vCpFJPYGCV8b1uMEG1GYlivoel5LUy0wNpHXH5JlrVK7DsZiXfa1sUNIY+XHPUVEDqMRew==
   dependencies:
-    "@opentelemetry/api" "^1.3.0"
-    "@temporalio/common" "1.7.2"
+    "@opentelemetry/api" "^1.4.1"
+    "@temporalio/common" "1.7.4"
     arg "^5.0.2"
     cargo-cp-artifact "^0.1.6"
     which "^2.0.2"
 
-"@temporalio/proto@1.7.2":
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/@temporalio/proto/-/proto-1.7.2.tgz#b9f32ba269e6df7790b8c120f253e77b8a486b46"
-  integrity sha512-5GiGq+FiGRTKr7jbAPlLUFT5ZqoReBbOLtQx2h/6obtp10rwRPdX0d3C28g8t8fQx6/50uEIBXM3vlr34z7UTg==
+"@temporalio/proto@1.7.4":
+  version "1.7.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/proto/-/proto-1.7.4.tgz#905202847dee36e7c270c3848cdc3720dbb4d631"
+  integrity sha512-liIAsRiTrdOtTuqjzYXJxgOmctPnWk1YXVEqaXQgvxu5lpkeRuCdXOiCW7c/2cvl4gKCno5RDR1UI3yFXvECPg==
   dependencies:
     long "^5.2.0"
     protobufjs "^7.0.0"
 
-"@temporalio/testing@^1.4.4":
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/@temporalio/testing/-/testing-1.7.2.tgz#9d731611983ff6a51d48827cb34397537c3ec311"
-  integrity sha512-XELbnhj/+37XQiaQcnI2I2gm8ZgTnEn+ER2YCvs768tkan7jmsbZMVuS1AKMRET0VTgqB80SWoqmOURhtrMYAA==
+"@temporalio/testing@^1.7.4":
+  version "1.7.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/testing/-/testing-1.7.4.tgz#ad17361c04d29171adb9d7681e0e00d87d0c929d"
+  integrity sha512-GbYbuiDlx5/AcqyYsa0w2h/UjJehYYCUrgijPzAY8vMga0rNsIXgW2P+8VXdJYnmmlDqfTfZliWxCrMeZAaV3g==
   dependencies:
     "@grpc/grpc-js" "~1.7.3"
-    "@temporalio/activity" "1.7.2"
-    "@temporalio/client" "1.7.2"
-    "@temporalio/common" "1.7.2"
-    "@temporalio/core-bridge" "1.7.2"
-    "@temporalio/proto" "1.7.2"
-    "@temporalio/worker" "1.7.2"
-    "@temporalio/workflow" "1.7.2"
+    "@temporalio/activity" "1.7.4"
+    "@temporalio/client" "1.7.4"
+    "@temporalio/common" "1.7.4"
+    "@temporalio/core-bridge" "1.7.4"
+    "@temporalio/proto" "1.7.4"
+    "@temporalio/worker" "1.7.4"
+    "@temporalio/workflow" "1.7.4"
     abort-controller "^3.0.0"
     ms "^2.1.3"
 
-"@temporalio/worker@1.7.2", "@temporalio/worker@^1.5.2":
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/@temporalio/worker/-/worker-1.7.2.tgz#38bfc42a72a75b09eb07c2ecd5082ed5aeac886b"
-  integrity sha512-9xSZzcpVh0gYAsxCQsyfGLAfQcJXgme/tvxYt4pcRMlcaVRnP+SxTae1RLSyIRF31G/4wieC6+qwt+JTu3i6/w==
+"@temporalio/worker@1.7.4", "@temporalio/worker@^1.7.4":
+  version "1.7.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/worker/-/worker-1.7.4.tgz#c389a38a7d4d9f8cdf30d7197fedefcb8f497eba"
+  integrity sha512-nspvDRxlrmZXZIVAjZRdGRY52GyfV+dPRlmiXyiXTDN02cvlWDb09f9/MdilGdbcj9EGHGpK6ASGuZi/ARu+Ww==
   dependencies:
-    "@opentelemetry/api" "^1.3.0"
+    "@opentelemetry/api" "^1.4.1"
     "@swc/core" "^1.2.204"
-    "@temporalio/activity" "1.7.2"
-    "@temporalio/client" "1.7.2"
-    "@temporalio/common" "1.7.2"
-    "@temporalio/core-bridge" "1.7.2"
-    "@temporalio/proto" "1.7.2"
-    "@temporalio/workflow" "1.7.2"
+    "@temporalio/activity" "1.7.4"
+    "@temporalio/client" "1.7.4"
+    "@temporalio/common" "1.7.4"
+    "@temporalio/core-bridge" "1.7.4"
+    "@temporalio/proto" "1.7.4"
+    "@temporalio/workflow" "1.7.4"
     abort-controller "^3.0.0"
     cargo-cp-artifact "^0.1.6"
     heap-js "^2.2.0"
@@ -2692,13 +2692,13 @@
     unionfs "^4.4.0"
     webpack "^5.75.0"
 
-"@temporalio/workflow@1.7.2":
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/@temporalio/workflow/-/workflow-1.7.2.tgz#5da489e70919eca880b9bf3f57c8317dad5aae33"
-  integrity sha512-KIWU4GM2N5Btgk2vAvZq8venXCHrOtYmnv90GF37nxd74rFz84TFhms5EFMjOE+WOS/7E1PPtnq3uvHXiw7wSA==
+"@temporalio/workflow@1.7.4":
+  version "1.7.4"
+  resolved "https://registry.yarnpkg.com/@temporalio/workflow/-/workflow-1.7.4.tgz#68ea23d30c1bf67a1b6a1fe1e34c36db4a0dfc52"
+  integrity sha512-lDTwXH97aXRN8Fh41oFKrli85stsgLeOLgp0OdOiyeB2IdCOlVhqVMIH+BuMx64cvrGPcbhJw8QWXbctOcadmQ==
   dependencies:
-    "@temporalio/common" "1.7.2"
-    "@temporalio/proto" "1.7.2"
+    "@temporalio/common" "1.7.4"
+    "@temporalio/proto" "1.7.4"
 
 "@testing-library/dom@^8.11.1":
   version "8.17.1"

@@ -1,8 +1,10 @@
 import { bundleWorkflowCode, type WorkflowBundleWithSourceMap } from "@temporalio/worker";
 
-export async function generateTemporalCodeBundle(): Promise<WorkflowBundleWithSourceMap> {
+export async function generateTemporalCodeBundle(
+  workflowsPath = "~/agent/workflows",
+): Promise<WorkflowBundleWithSourceMap> {
   return await bundleWorkflowCode({
-    workflowsPath: require.resolve("~/agent/workflows"),
+    workflowsPath: require.resolve(workflowsPath),
     payloadConverterPath: require.resolve("~/temporal/data-converter"),
     webpackConfigHook: (config) => {
       ((config.resolve as any).alias as any)["~"] = "/app";
