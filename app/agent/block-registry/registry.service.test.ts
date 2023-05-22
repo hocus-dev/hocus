@@ -1,4 +1,4 @@
-import type { ChildProcessWithoutNullStreams } from "child_process";
+import { ChildProcessWithoutNullStreams, exec } from "child_process";
 import { spawn } from "child_process";
 import fs from "fs/promises";
 import path from "path";
@@ -7,7 +7,7 @@ import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import { createAgentInjector } from "../agent-injector";
-import { execCmdAsync } from "../utils";
+import { execCmdAsync, ExecCmdError } from "../utils";
 
 import type { BlockRegistryService, ContainerId, ImageId } from "./registry.service";
 import { EXPOSE_METHOD } from "./registry.service";
@@ -28,8 +28,8 @@ const provideBlockRegistry = (
   opts: {
     skipInit: boolean;
   } = {
-    skipInit: false,
-  },
+      skipInit: false,
+    },
 ): (() => Promise<void>) => {
   const runId = uuidv4();
   const testsDir = "/srv/jailer/tests/";
@@ -135,6 +135,9 @@ const provideBlockRegistry = (
       throw err;
     } finally {
       if (!opts.skipInit) {
+        // First check the kernel logs cause if we borked the kernel then 
+        // all sanity is gone and the cleanup will probably hang .-.
+        await ensureKernelDidNotBlewUp();
         try {
           // Check if we have the subtype
           await brService.getTCMUSubtype();
@@ -157,6 +160,18 @@ const provideBlockRegistry = (
     }
   });
 };
+
+// I have never suspected that I legitimately need to worry about this case
+async function ensureKernelDidNotBlewUp() {
+  try {
+    // Grep returns status 1 when no matches were found
+    await execCmdAsync("bash", "-c", "dmesg | grep -i -E \"Kernel BUG|invalid opcode|corruption|Code\"");
+    console.error((await execCmdAsync("dmesg")).stdout)
+    throw new Error("Looks like the kernel blew up, please reboot the CI machine...");
+  } catch (err) {
+    if (err instanceof ExecCmdError && (err as ExecCmdError).status !== 1) throw err
+  }
+}
 
 test.concurrent(
   "Stability of tcmuStorageObjectId => lunId mapping",
@@ -209,7 +224,6 @@ test.concurrent(
     const c1Mount = await brService.expose(c1, EXPOSE_METHOD.HOST_MOUNT);
     expect(c1Mount.readonly).toEqual(false);
     await fs.writeFile(path.join(c1Mount.mountPoint, testFile1), testContent1);
-    await brService.hide(c1);
 
     const im1 = await brService.commitContainer(c1, "im1");
 
@@ -225,7 +239,6 @@ test.concurrent(
     const c2 = await brService.createContainer(im1, "c2");
     const c2Mount = await brService.expose(c2, EXPOSE_METHOD.HOST_MOUNT);
     await fs.writeFile(path.join(c2Mount.mountPoint, testFile2), testContent2);
-    await brService.hide(c2);
     const im2 = await brService.commitContainer(c2, "im2");
     const im2Mount = await brService.expose(im2, EXPOSE_METHOD.HOST_MOUNT);
     await expect(fs.readFile(path.join(im2Mount.mountPoint, testFile1), "utf-8")).resolves.toEqual(
@@ -240,8 +253,8 @@ test.concurrent(
 test.concurrent(
   "Test loadImageFromRemoteRepo",
   provideBlockRegistry(async ({ brService }) => {
-    const im1 = await brService.loadImageFromRemoteRepo(testImages.test1);
-    const im2 = await brService.loadImageFromRemoteRepo(testImages.test2);
+    const im1 = await brService.loadImageFromRemoteRepo(testImages.test1, "im1");
+    const im2 = await brService.loadImageFromRemoteRepo(testImages.test2, "im2");
     const im1Mount = await brService.expose(im1, EXPOSE_METHOD.HOST_MOUNT);
     const im2Mount = await brService.expose(im2, EXPOSE_METHOD.HOST_MOUNT);
 
@@ -357,9 +370,8 @@ test.concurrent(
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
       const layerPath = path.join(brService["paths"].layers, dirName, "layer.tar");
-      const layerDigest = `sha256:${
-        (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
-      }`;
+      const layerDigest = `sha256:${(await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
+        }`;
       // Check for data corruption
       expect(layerDigest).toEqual(dirName);
       // Check if that layer is hardlinked to the shared oci dir
@@ -420,9 +432,8 @@ test.concurrent(
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
       const layerPath = path.join(brService["paths"].layers, dirName, "layer.tar");
-      const layerDigest = `sha256:${
-        (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
-      }`;
+      const layerDigest = `sha256:${(await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
+        }`;
       // Check for data corruption
       expect(layerDigest).toEqual(dirName);
       // Check if that layer is hardlinked to the shared oci dir and the original dir
@@ -445,14 +456,51 @@ test.concurrent(
   }),
 );
 
-test.concurrent.skip(
+test.concurrent(
   "Concurrency and idempotence of createContainer",
-  provideBlockRegistry(async ({ brService }) => {}),
+  provideBlockRegistry(async ({ brService }) => {
+    const tasks: Promise<any>[][] = [[], []];
+    const N = 5;
+    for (let i = 0; i < N; i++) {
+      tasks[0].push(brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 }));
+      tasks[1].push(brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 }));
+    }
+    const res = await waitForPromises(tasks.map(waitForPromises));
+    const c1 = res[0][0];
+    const c2 = res[1][0];
+    expect(res).toEqual([
+      Array(N).fill(c1),
+      Array(N).fill(c2),
+    ]);
+    // Sanity check the container works
+    await brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV);
+    await brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV)
+  }),
 );
 
-test.concurrent.skip(
+test.concurrent(
   "Concurrency and idempotence of commitContainer",
-  provideBlockRegistry(async ({ brService }) => {}),
+  provideBlockRegistry(async ({ brService }) => {
+    const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
+    const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
+    const tasks: Promise<any>[][] = [[], []];
+    // No need for heavy racing, this already tests the worst case
+    const N = 2;
+    for (let i = 0; i < N; i++) {
+      tasks[0].push(brService.commitContainer(c1, "im1"));
+      tasks[1].push(brService.commitContainer(c2, "im2"));
+    }
+    const res = await waitForPromises(tasks.map(waitForPromises));
+    const im1 = res[0][0];
+    const im2 = res[1][0];
+    expect(res).toEqual([
+      Array(N).fill(im1),
+      Array(N).fill(im2),
+    ]);
+    // Sanity check the image works
+    await brService.expose(im1, EXPOSE_METHOD.BLOCK_DEV);
+    await brService.expose(im2, EXPOSE_METHOD.BLOCK_DEV);
+  }),
 );
 
 test.concurrent(
@@ -460,21 +508,30 @@ test.concurrent(
   provideBlockRegistry(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
-    const tasks: Promise<any>[][] = [[], [], [], []];
-    const N = 5;
-    for (let i = 0; i < N; i++) {
-      tasks[0].push(brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV));
-      tasks[1].push(brService.expose(c1, EXPOSE_METHOD.HOST_MOUNT));
-      tasks[2].push(brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV));
-      tasks[3].push(brService.expose(c2, EXPOSE_METHOD.HOST_MOUNT));
+    // Do 5 runs to ensure we don't have races
+    // Especially when i first wrote this test the kernel literally blew up...
+    // https://lore.kernel.org/lkml/5f637569-36af-a8d0-e378-b27a63f08501@gmail.com/
+    for (let run = 0; run < 5; run++) {
+      const tasks: Promise<any>[][] = [[], [], [], []];
+      const N = 5;
+      for (let i = 0; i < N; i++) {
+        tasks[0].push(brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV));
+        tasks[1].push(brService.expose(c1, EXPOSE_METHOD.HOST_MOUNT));
+        tasks[2].push(brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV));
+        tasks[3].push(brService.expose(c2, EXPOSE_METHOD.HOST_MOUNT));
+      }
+      const res = await waitForPromises(tasks.map(waitForPromises));
+      expect(res).toEqual([
+        Array(N).fill(res[0][0]),
+        Array(N).fill(res[1][0]),
+        Array(N).fill(res[2][0]),
+        Array(N).fill(res[3][0]),
+      ]);
+      await waitForPromises([
+        brService.hide(c1),
+        brService.hide(c2),
+      ]);
     }
-    const res = await waitForPromises(tasks.map(waitForPromises));
-    expect(res).toEqual([
-      Array(N).fill(res[0][0]),
-      Array(N).fill(res[1][0]),
-      Array(N).fill(res[2][0]),
-      Array(N).fill(res[3][0]),
-    ]);
   }),
 );
 
@@ -483,17 +540,19 @@ test.concurrent(
   provideBlockRegistry(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
-    await waitForPromises([
-      brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV),
-      brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV),
-    ]);
-    const tasks: Promise<any>[] = [];
-    const N = 5;
-    for (let i = 0; i < N; i++) {
-      tasks.push(brService.hide(c1));
-      tasks.push(brService.hide(c2));
+    for (let run = 0; run < 5; run++) {
+      await waitForPromises([
+        brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV),
+        brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV),
+      ]);
+      const tasks: Promise<any>[] = [];
+      const N = 5;
+      for (let i = 0; i < N; i++) {
+        tasks.push(brService.hide(c1));
+        tasks.push(brService.hide(c2));
+      }
+      await waitForPromises(tasks);
     }
-    await waitForPromises(tasks);
   }),
 );
 
@@ -797,7 +856,6 @@ test.concurrent.skip(
       }
       const cMount = await brService.expose(ct, EXPOSE_METHOD.HOST_MOUNT);
       await fs.writeFile(path.join(cMount.mountPoint, `layer_${i}`), `Hello from layer ${i}`);
-      await brService.hide(ct);
       parentImgId = await brService.commitContainer(ct, `im${i}`);
     }
   }),

@@ -120,12 +120,12 @@ export class BlockRegistryService {
     return uuidv4();
   }
 
-  private genImageId(outputId?: string): ImageId {
-    return ("im_" + (outputId ?? this.genRandId())) as ImageId;
+  private genImageId(outputId: string): ImageId {
+    return ("im_" + outputId) as ImageId;
   }
 
-  private genContainerId(outputId?: string): ContainerId {
-    return ("ct_" + (outputId ?? this.genRandId())) as ContainerId;
+  private genContainerId(outputId: string): ContainerId {
+    return ("ct_" + outputId) as ContainerId;
   }
 
   // Called once after agent restart/start
@@ -265,7 +265,7 @@ export class BlockRegistryService {
     );
   }
 
-  async loadImageFromDisk(ociDumpPath: string, outputId?: string): Promise<ImageId> {
+  async loadImageFromDisk(ociDumpPath: string, outputId: string): Promise<ImageId> {
     return await this.loadLocalOCIImage(
       this.genImageId(outputId),
       `${path.join(ociDumpPath, "index.json")}`,
@@ -274,7 +274,7 @@ export class BlockRegistryService {
   }
 
   // Mostly for convenience :)
-  async loadImageFromRemoteRepo(ref: string, outputId?: string): Promise<ImageId> {
+  async loadImageFromRemoteRepo(ref: string, outputId: string): Promise<ImageId> {
     const imageId = this.genImageId(outputId);
     const imageIndexDir = path.join(this.paths.run, "ingest-" + this.genRandId());
     try {
@@ -337,7 +337,7 @@ export class BlockRegistryService {
         layerDescriptor.annotations === void 0 ||
         // This annotation is present with obd layers
         (layerDescriptor.annotations as any)["containerd.io/snapshot/overlaybd/blob-digest"] ===
-          void 0
+        void 0
       ) {
         throw new Error(`Unsupported layer ${JSON.stringify(layerDescriptor)}`);
       }
@@ -470,8 +470,8 @@ export class BlockRegistryService {
   }
 
   public async createContainer(
-    imageId?: ImageId,
-    outputId?: string,
+    imageId: ImageId | undefined,
+    outputId: string,
     opts: { mkfs: boolean; sizeInGB: number } = { mkfs: false, sizeInGB: 64 },
   ): Promise<ContainerId> {
     if (imageId !== void 0 && !imageId.startsWith("im_")) {
@@ -523,42 +523,73 @@ export class BlockRegistryService {
     return containerId;
   }
 
-  public async commitContainer(containerId: ContainerId, outputId?: string): Promise<ImageId> {
+  public async commitContainer(containerId: ContainerId, outputId: string): Promise<ImageId> {
     if (!containerId.startsWith("ct_")) {
       throw new Error(`Invalid containerId: ${containerId}`);
     }
-    // TODO: ensure container exists and is currently not exposed
     const imageId = this.genImageId(outputId);
+
+    // If the container does not exist and the output image exists we do nothing due to idempotence
+    const outputImageExists = await fs.stat(path.join(this.paths.images, imageId)).then(() => true).catch((err: Error) => {
+      if (!err.message.startsWith("ENOENT")) throw err;
+      return false;
+    })
+    const containerExists = await fs.stat(path.join(this.paths.containers, containerId)).then(() => true).catch((err: Error) => {
+      if (!err.message.startsWith("ENOENT")) throw err;
+      return false;
+    })
+    // We have 4 cases:
+    // - If the output image exists and we don't have the container then:
+    //   * We can't verify whether we have a imageId collision or we just restarted an interupted commit
+    //   * Assume there are no id collisions and we can tell the caller that the operation was done
+    // - If the output image exists and we have the container then:
+    //   * The rest of the code will ensure that the image was created as the result of the container
+    // - If we have no image but have an container:
+    //   * Just proceed with the commit as usual
+    // - If we have no image and no container
+    //   * Throw an error
+    if (outputImageExists && !containerExists) {
+      this.logger.info(`Assuming that the commit of ${containerExists} produced ${imageId}.`);
+      return imageId;
+    }
+    if (!outputImageExists && !containerExists) {
+      throw new Error(`Container ${containerId} not found. Nothing to commit.`)
+    }
+
+    // Ensure the container is hidden
+    await this.hide(containerId);
     const obdConfig: OBDConfig = await readJsonFileOfType(
       path.join(this.paths.blockConfig, containerId),
       OBDConfigValidator,
     );
-    if (obdConfig.upper === void 0) {
-      throw new Error("Expected container, found image");
-    }
+
     // Sealing is not supported for sparse layers :P
     // Sealing would improve the performance a lot as we would be able to instantly start using this container as a lower layer
-    const layerPath = path.join(this.paths.containers, containerId, "layer.tar");
-    const t1 = performance.now();
-    await execCmdAsync(
-      "/opt/overlaybd/bin/overlaybd-commit",
-      "-z",
-      "-t",
-      obdConfig.upper.data,
-      obdConfig.upper.index,
-      layerPath,
-    );
-    this.logger.info(
-      `obd-commit for ${containerId} took: ${(performance.now() - t1).toFixed(2)} ms`,
-    );
-    const layerDigest = `sha256:${
-      (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
-    }`;
-    const layerSize = (await fs.stat(layerPath)).size;
-    const image = obdConfig.hocusImageId as ImageId | undefined;
-    let manifest: OCIImageManifest = image
-      ? await readJsonFileOfType(path.join(this.paths.images, image), OCIImageManifestValidator)
-      : {
+    // And asynchronously commit the container to the blob store
+    return await this.withTmpFile(async (layerPath) => {
+      if (obdConfig.upper === void 0) {
+        throw new Error("Expected container, found image");
+      }
+
+      const t1 = performance.now();
+      await execCmdAsync(
+        "/opt/overlaybd/bin/overlaybd-commit",
+        "-z",
+        "-t",
+        obdConfig.upper.data,
+        obdConfig.upper.index,
+        layerPath,
+      );
+      this.logger.info(
+        `obd-commit for ${containerId} took: ${(performance.now() - t1).toFixed(2)} ms`,
+      );
+      const layerDigest = `sha256:${(await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
+        }`;
+      const layerSize = (await fs.stat(layerPath)).size;
+      const image = obdConfig.hocusImageId as ImageId | undefined;
+      let manifest: OCIImageManifest = image
+        ? await readJsonFileOfType(path.join(this.paths.images, image), OCIImageManifestValidator)
+        : {
           schemaVersion: 2,
           mediaType: "application/vnd.oci.image.manifest.v1+json",
           // fake config
@@ -569,20 +600,21 @@ export class BlockRegistryService {
           },
           layers: [],
         };
-    const layerDescriptor: OCIDescriptor = {
-      mediaType: "application/vnd.oci.image.layer.v1.tar",
-      digest: layerDigest,
-      size: layerSize,
-      annotations: {
-        "containerd.io/snapshot/overlaybd/blob-digest": layerDigest,
-        "containerd.io/snapshot/overlaybd/blob-size": layerSize.toString(),
-      },
-    };
-    manifest.layers.push(layerDescriptor);
+      const layerDescriptor: OCIDescriptor = {
+        mediaType: "application/vnd.oci.image.layer.v1.tar",
+        digest: layerDigest,
+        size: layerSize,
+        annotations: {
+          "containerd.io/snapshot/overlaybd/blob-digest": layerDigest,
+          "containerd.io/snapshot/overlaybd/blob-size": layerSize.toString(),
+        },
+      };
+      manifest.layers.push(layerDescriptor);
 
-    await this._loadLocalOCIImage(imageId, manifest, [[layerPath, layerDescriptor]]);
-    await fs.rm(path.join(this.paths.containers, containerId), { recursive: true, force: true });
-    return imageId;
+      await this._loadLocalOCIImage(imageId, manifest, [[layerPath, layerDescriptor]]);
+      await fs.rm(path.join(this.paths.containers, containerId), { recursive: true, force: true });
+      return imageId;
+    })
   }
 
   private _tcmuSubtype: string | undefined;
@@ -706,19 +738,20 @@ export class BlockRegistryService {
         // Check if the device was not mapped to a LUN
         if (aluaMembers.length === 0) {
           // WARNING: The upstream kernel is borked and data corruption occurs when concurrent enable requests are made
-          //          There is no mutex in the kernel protecting concurrent setup
+          //          There is no mutex in the kernel protecting concurrent enable requests
           //          Due to this get an exclusive flock on the enable file
           //          The fs-ext library is unmaintained and will stall the event loop when there are more than 3 concurrent flocks
           //          waiting, due to this we request a flock in unblocking mode and sleep for some time.
           //          TODO: Consider writing a rust addon for flocks cause there is no good library for this in node .-.
-          const enableFd = await fs.open(path.join(tcmuPath, "enable"));
+          const enableFd = await fs.open(path.join(tcmuPath, "enable"), "w");
+          let tcmuAttachFailed = false;
           try {
             let flockAcquired = false;
             while (!flockAcquired) {
               try {
                 await new Promise((resolve, reject) => {
                   flock(enableFd.fd, "exnb", (err) => {
-                    if (err === void 0) {
+                    if (err === void 0 || err === null) {
                       resolve(void 0);
                     } else {
                       reject(err);
@@ -726,68 +759,76 @@ export class BlockRegistryService {
                   });
                 });
               } catch (err) {
-                console.log(err);
+                if (
+                  !(err as Error).message.startsWith("EAGAIN") &&
+                  !(err as Error).message.startsWith("EWOULDBLOCK")
+                )
+                  throw err;
                 flockAcquired = false;
+                await sleep(5);
                 continue;
               }
               flockAcquired = true;
             }
+            // Ok we got the flock, time to proceed with the setup
+            // Set the vendor for convenience, this is for filtering
+            // EINVAL is thrown when the storage object is already exposed on a LUN
+            //        cause after it is exposed the WWN becomes immutable
+            //        this is not a problem due to idempotence
+            await fs
+              .writeFile(
+                path.join(tcmuPath, "wwn/vpd_unit_serial"),
+                `hocusbd-${tcmuStorageObjectId}`,
+              )
+              .catch(catchIgnore("EINVAL"));
+            // WARNING: The following actions will happen during the writes:
+            // 1. Kernel will create a new uio device for the storage object and send out an netlink notification to all tcmu processes
+            // 2. All notified processes will check whether they have a handler for the given tcmu subtype,
+            //    if so then they proceed to discover their dedicated UIO device, the discovery may fail
+            //    If netlink reply is enabled(the default) all processes will send a netlink reply but only the first replay
+            //    will be processed by the kernel - this is why we disable netlink replies.
+            // 3. The chosen overlaybd process will read the provided config file and:
+            //    a) Open and set up a shared ring buffer using the UIO device
+            //    b) Open all layers, and combine them into one view
+            //    c) Write the result of the setup into the result file provided in the config
+            //       aka. <ROOT_DIR>/run/obd-result-<image_id or container_id>
+            // Those are a lot of moving parts and not everything may work:
+            // 1. If there is no TCMU process or the handler process never attaches we can't know that without extra info
+            // 2. If netlink replay is enabled and the handler attached but the handler failed setting up it's stuff then
+            //    the enable write will fail with ENOENT besides the file existing
+            // 3. If tcm_loop was attached to the tcmu storage object then you
+            //    can't reconfigure anything anymore and the config writes will fail
+            // 4. I managed to once get a case in bash where the enable write hanged forever
+            //    and was immune to `sudo kill -9` as the process hanged in kernel space not userspace
+            //    the only way for the hanged write to resume was to start a tcmu handler for that storage object
+            //    This was with netlink replies enabled - that's one of the reasons we disable it
+            // For now assume that:
+            // 1. During a full restart all overlaybd result files were deleted
+            // 2. If the TCMU process crashes then we need to perform a full restart of the agent
+            // 3. If the result file tells us that the setup is ok then assume that the handler is present and attached successfully
+            // 4. The config writes will finish in finite time 🤞
+            // 5. The user won't race expose/hide calls with the same ID
+            // FIXME: Not all kernels will support nl_reply_supported .-. We should detect that in the initialization logic
+            await fs
+              .writeFile(
+                path.join(tcmuPath, "control"),
+                `dev_config=${tcmuSubtype}/${path.join(
+                  this.paths.blockConfig,
+                  what,
+                )},nl_reply_supported=-1`,
+              )
+              .catch(catchAlreadyExists);
+
+            await enableFd.write("1").catch((err: Error) => {
+              if (!err.message.startsWith("EEXIST") && !err.message.startsWith("ENOENT")) throw err;
+              // The TCMU process told us that he failed to set up his part of the deal
+              if (err.message.startsWith("ENOENT")) tcmuAttachFailed = true;
+            });
           } finally {
             await enableFd.close();
           }
 
-          // Set the vendor for convenience, this is for filtering
-          // EINVAL is thrown when the storage object is already exposed on a LUN
-          //        cause after it is exposed the WWN becomes immutable
-          //        this is not a problem due to idempotence
-          await fs
-            .writeFile(path.join(tcmuPath, "wwn/vpd_unit_serial"), `hocusbd-${tcmuStorageObjectId}`)
-            .catch(catchIgnore("EINVAL"));
-          // WARNING: The following actions will happen during the writes:
-          // 1. Kernel will create a new uio device for the storage object and send out an netlink notification to all tcmu processes
-          // 2. All notified processes will check whether they have a handler for the given tcmu subtype,
-          //    if so then they proceed to discover their dedicated UIO device, the discovery may fail
-          //    If netlink reply is enabled(the default) all processes will send a netlink reply but only the first replay
-          //    will be processed by the kernel - this is why we disable netlink replies.
-          // 3. The chosen overlaybd process will read the provided config file and:
-          //    a) Open and set up a shared ring buffer using the UIO device
-          //    b) Open all layers, and combine them into one view
-          //    c) Write the result of the setup into the result file provided in the config
-          //       aka. <ROOT_DIR>/run/obd-result-<image_id or container_id>
-          // Those are a lot of moving parts and not everything may work:
-          // 1. If there is no TCMU process or the handler process never attaches we can't know that without extra info
-          // 2. If netlink replay is enabled and the handler attached but the handler failed setting up it's stuff then
-          //    the enable write will fail with ENOENT besides the file existing
-          // 3. If tcm_loop was attached to the tcmu storage object then you
-          //    can't reconfigure anything anymore and the config writes will fail
-          // 4. I managed to once get a case in bash where the enable write hanged forever
-          //    and was immune to `sudo kill -9` as the process hanged in kernel space not userspace
-          //    the only way for the hanged write to resume was to start a tcmu handler for that storage object
-          //    This was with netlink replies enabled - that's one of the reasons we disable it
-          // For now assume that:
-          // 1. During a full restart all overlaybd result files were deleted
-          // 2. If the TCMU process crashes then we need to perform a full restart of the agent
-          // 3. If the result file tells us that the setup is ok then assume that the handler is present and attached successfully
-          // 4. The config writes will finish in finite time 🤞
-          // 5. The user won't race expose/hide calls with the same ID
-          // FIXME: Not all kernels will support nl_reply_supported .-. We should detect that in the initialization logic
-          await fs
-            .writeFile(
-              path.join(tcmuPath, "control"),
-              `dev_config=${tcmuSubtype}/${path.join(
-                this.paths.blockConfig,
-                what,
-              )},nl_reply_supported=-1`,
-            )
-            .catch(catchAlreadyExists);
-
-          let tcmuAttachFailed = false;
-          await fs.writeFile(path.join(tcmuPath, "enable"), "1").catch((err: Error) => {
-            if (!err.message.startsWith("EEXIST") && !err.message.startsWith("ENOENT")) throw err;
-            // The TCMU process told us that he failed to set up his part of the deal
-            if (err.message.startsWith("ENOENT")) tcmuAttachFailed = true;
-          });
-
+          // Ok the device was enabled, check if obd succeeded :)
           let obdResult: string | undefined = void 0;
           // Wait up to half a second for overlaybd to setup the device
           // https://linear.app/hocus-dev/issue/HOC-204/modify-overlaybd-tcmu-to-work-without-netlink-and-expose-a-grpc-api
@@ -811,7 +852,7 @@ export class BlockRegistryService {
             throw new Error(`overlaybd-tcmu failed to attach: ${obdResult}`);
           }
 
-          // Great TCMU was set up, now we need to hook it into tcm_loop
+          // Great TCMU was set up and OBD attached, now we need to hook the storage object into tcm_loop
           // First create a new LUN, for that we need to map the tcmuStorageObjectId into a lun_id
           // This mapping may be nondeterministic as the kernel will store the mapping for us:
           // <CONFIG_FS>/target/core/<TCMU_HBA>/<TCMU_OBJECT_ID>/alua/default_tg_pt_gp/members
@@ -932,7 +973,7 @@ export class BlockRegistryService {
         if (disksAndPartitions.length === 0) {
           throw new Error(
             `Unable to find any block device for SCSI address ${fullSCSIAddr}.\n` +
-              `Does your kernel have async scsi scan enabled? Does your kernel have support for SCSI disks?`,
+            `Does your kernel have async scsi scan enabled? Does your kernel have support for SCSI disks?`,
           );
         }
 
