@@ -18,6 +18,7 @@ import { HttpError } from "~/http-error.server";
 import { getPrebuildPath, ProjectPathTabId } from "~/page-paths.shared";
 import { PrebuildQueryValidator } from "~/schema/prebuild-query.validator.server";
 import { UuidValidator } from "~/schema/uuid.validator.server";
+import { getLogsFromGroup } from "~/utils.server";
 import { formatBranchName, numericSort, unwrap } from "~/utils.shared";
 
 export const loader = async ({ context: { db, req } }: LoaderArgs) => {
@@ -108,12 +109,9 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
     if (activeTask.command === systemErrorCommand) {
       activeTaskLogs = unwrap(prebuildEvent.PrebuildEventSystemError).message;
     } else {
-      const logs = await db.log.findMany({
-        where: { logGroupId: unwrap(activeTask.logGroupId) },
-        orderBy: { idx: "desc" },
-        take: 150,
-      });
-      activeTaskLogs = Buffer.concat(logs.map((log) => log.content).reverse()).toString("utf8");
+      activeTaskLogs = await getLogsFromGroup(db, unwrap(activeTask.logGroupId), 150).then((buf) =>
+        buf.toString("utf8"),
+      );
     }
   }
 

@@ -16,7 +16,14 @@ import { numericSort } from "~/utils.shared";
 
 export { lockWorkflow } from "./mutex";
 export { runSharedWorkflow } from "./shared-workflow";
-export { runPrebuild, runBuildfs, scheduleNewPrebuild } from "./prebuild";
+export {
+  runPrebuild,
+  runBuildfs,
+  scheduleNewPrebuild,
+  runFetchRepository,
+  runCheckoutAndInspect,
+  runSingleBuildfsAndPrebuild,
+} from "./prebuild";
 export {
   runCreateWorkspace,
   runStartWorkspace,
