@@ -1,8 +1,7 @@
 /* eslint-disable no-console */
-import type { GitRepository, PrebuildEvent, Prisma } from "@prisma/client";
+import type { PrebuildEvent, Prisma } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
-import { SshKeyPairType } from "@prisma/client";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
 import type { LogEntry } from "@temporalio/worker";
 import { Worker, Runtime, DefaultLogger } from "@temporalio/worker";
@@ -26,11 +25,12 @@ import {
   runDeleteRemovablePrebuilds,
   scheduleNewPrebuild,
 } from "./workflows";
+import { createTestRepo } from "./workflows/tests/utils";
 
 import { config } from "~/config";
 import { generateTemporalCodeBundle } from "~/temporal/bundle";
 import { printErrors } from "~/test-utils";
-import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
+import { TESTS_REPO_URL } from "~/test-utils/constants";
 import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
@@ -136,24 +136,6 @@ afterAll(async () => {
 test.concurrent("HOST_PERSISTENT_DIR has no trailing slash", async () => {
   expect(HOST_PERSISTENT_DIR).not.toMatch(/\/$/);
 });
-
-const createTestRepo = async (
-  db: Prisma.NonTransactionClient,
-  injector: AgentInjector,
-): Promise<GitRepository> => {
-  const gitService = injector.resolve(Token.GitService);
-  const sshKeyService = injector.resolve(Token.SshKeyService);
-
-  const pair = await sshKeyService.createSshKeyPair(
-    db,
-    TESTS_PRIVATE_SSH_KEY,
-    SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
-  );
-  const repo = await db.$transaction((tdb) =>
-    gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
-  );
-  return repo;
-};
 
 test.concurrent(
   "runBuildfsAndPrebuilds",

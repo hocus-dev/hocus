@@ -247,7 +247,12 @@ test(
     for (const prebuildEvent of prebuildEvents) {
       const errorMessage = `error-${prebuildEvent.status}`;
       await db.$transaction(async (tdb) => {
-        await prebuildService.cleanupDbAfterPrebuildError(tdb, prebuildEvent.id, errorMessage);
+        await prebuildService.cleanupDbAfterPrebuildError({
+          db: tdb,
+          prebuildEventId: prebuildEvent.id,
+          errorMessage,
+          cancelled: false,
+        });
       });
       const updatedPrebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
         where: {

@@ -1,5 +1,6 @@
 import path from "path";
 
+import type { PrebuildEventStatus } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
@@ -10,6 +11,7 @@ import moment from "moment";
 import { AppPage } from "~/components/app-page";
 import { BackToProjectLink } from "~/components/projects/back-to-project-link";
 import { PrebuildArchiveButton } from "~/components/projects/prebuilds/archive-button";
+import { PrebuildCancelButton } from "~/components/projects/prebuilds/cancel-button";
 import { PrebuildStatus } from "~/components/projects/prebuilds/prebuild-status";
 import { PrebuildRetryButton } from "~/components/projects/prebuilds/retry-button";
 import { TaskViewer } from "~/components/projects/prebuilds/task-viewer";
@@ -18,7 +20,17 @@ import { HttpError } from "~/http-error.server";
 import { getPrebuildPath, ProjectPathTabId } from "~/page-paths.shared";
 import { PrebuildQueryValidator } from "~/schema/prebuild-query.validator.server";
 import { UuidValidator } from "~/schema/uuid.validator.server";
+import { getLogsFromGroup } from "~/utils.server";
 import { formatBranchName, numericSort, unwrap } from "~/utils.shared";
+
+const CANCELLABLE_PREBUILD_STATUSES = [
+  "PREBUILD_EVENT_STATUS_PENDING_INIT",
+  "PREBUILD_EVENT_STATUS_PENDING_READY",
+  "PREBUILD_EVENT_STATUS_RUNNING",
+] as const;
+const _typeCheck: (typeof CANCELLABLE_PREBUILD_STATUSES)[number] extends PrebuildEventStatus
+  ? 1
+  : 0 = 1;
 
 export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   const { success, value: prebuildExternalId } = UuidValidator.SafeParse(
@@ -108,12 +120,9 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
     if (activeTask.command === systemErrorCommand) {
       activeTaskLogs = unwrap(prebuildEvent.PrebuildEventSystemError).message;
     } else {
-      const logs = await db.log.findMany({
-        where: { logGroupId: unwrap(activeTask.logGroupId) },
-        orderBy: { idx: "desc" },
-        take: 150,
-      });
-      activeTaskLogs = Buffer.concat(logs.map((log) => log.content).reverse()).toString("utf8");
+      activeTaskLogs = await getLogsFromGroup(db, unwrap(activeTask.logGroupId), 150).then((buf) =>
+        buf.toString("utf8"),
+      );
     }
   }
 
@@ -169,6 +178,9 @@ export default function PrebuildRoute(): JSX.Element {
             projectExternalId={project.externalId}
             gitObjectHash={prebuild.gitHash}
           />
+          {CANCELLABLE_PREBUILD_STATUSES.includes(prebuild.status as any) && (
+            <PrebuildCancelButton prebuildExternalId={prebuild.externalId} />
+          )}
         </div>
       </div>
       <h3 className="text-gray-400 mt-2 mb-2">

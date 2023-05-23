@@ -6,6 +6,7 @@ import type {
   PrebuildEventFiles,
   PrebuildEventReservation,
   Prisma,
+  Project,
   VmTask,
 } from "@prisma/client";
 import { PrebuildEventReservationType } from "@prisma/client";
@@ -77,7 +78,7 @@ export class PrebuildService {
   async createPrebuildEvent(
     db: Prisma.TransactionClient,
     args: { projectId: bigint; gitObjectId: bigint; externalId?: string; archiveAfter?: Date },
-  ): Promise<PrebuildEvent> {
+  ): Promise<PrebuildEvent & { project: Project }> {
     const { projectId, gitObjectId, archiveAfter } = args;
     const data = {
       projectId,
@@ -95,9 +96,10 @@ export class PrebuildService {
         where: {
           externalId: args.externalId,
         },
+        include: { project: true },
       });
     }
-    return await db.prebuildEvent.create({ data });
+    return await db.prebuildEvent.create({ data, include: { project: true } });
   }
 
   async initPrebuildEvent(
@@ -569,11 +571,14 @@ export class PrebuildService {
     });
   }
 
-  async cleanupDbAfterPrebuildError(
-    db: Prisma.TransactionClient,
-    prebuildEventId: bigint,
-    errorMessage?: string,
-  ): Promise<void> {
+  async cleanupDbAfterPrebuildError(args: {
+    db: Prisma.TransactionClient;
+    prebuildEventId: bigint;
+    errorMessage?: string;
+    cancelled: boolean;
+  }): Promise<void> {
+    const { db, prebuildEventId, errorMessage, cancelled } = args;
+
     const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
       where: { id: prebuildEventId },
       include: {
@@ -604,7 +609,11 @@ export class PrebuildService {
 
     await db.prebuildEvent.update({
       where: { id: prebuildEventId },
-      data: { status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_ERROR },
+      data: {
+        status: cancelled
+          ? PrebuildEventStatus.PREBUILD_EVENT_STATUS_CANCELLED
+          : PrebuildEventStatus.PREBUILD_EVENT_STATUS_ERROR,
+      },
     });
     if (errorMessage != null) {
       await db.prebuildEventSystemError.create({

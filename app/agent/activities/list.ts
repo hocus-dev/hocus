@@ -11,7 +11,6 @@ import { removePrebuildEventReservation } from "./archive-prebuild-event/remove-
 import { reservePrebuildEvent } from "./archive-prebuild-event/reserve-prebuild-event";
 import { waitForPrebuildEventReservations } from "./archive-prebuild-event/wait-for-prebuild-event-reservations";
 import { buildfs } from "./buildfs";
-import { cancelPrebuilds } from "./cancel-prebuilds";
 import { changePrebuildEventStatus } from "./change-prebuild-event-status";
 import { checkoutAndInspect } from "./checkout-and-inspect";
 import { cleanUpAfterPrebuildError } from "./clean-up-after-prebuild-error";
@@ -36,7 +35,6 @@ import { startWorkspace } from "./start-workspace";
 import { stopWorkspace } from "./stop-workspace";
 import type { CreateActivity } from "./types";
 import { updateGitBranchesAndObjects } from "./update-git-branches-and-objects";
-import { waitForBuildfs } from "./wait-for-buildfs";
 import { cleanUpWorkspaceInstanceDb } from "./workspace/clean-up-workspace-instance";
 import { cleanUpWorkspaceInstanceLocal } from "./workspace/clean-up-workspace-instance";
 
@@ -45,7 +43,6 @@ const activities = {
   buildfs,
   checkoutAndInspect,
   prebuild,
-  cancelPrebuilds,
   changePrebuildEventStatus,
   createWorkspace,
   startWorkspace,
@@ -61,7 +58,6 @@ const activities = {
   getOrCreatePrebuildEvents,
   initPrebuildEvents,
   getPrebuildEvents,
-  waitForBuildfs,
   reservePrebuildEvent,
   removePrebuildEventReservation,
   waitForPrebuildEventReservations,

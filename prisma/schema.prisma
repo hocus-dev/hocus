@@ -82,6 +82,7 @@ model PrebuildEvent {
   // Nah, until https://github.com/prisma/prisma/issues/4263 gets fixed then just leave it...
   workspaceTasksCommand String[]
   workspaceTasksShell   String[]
+  workflowId            String              @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
 
   archiveAfter             DateTime                   @default(now()) @db.Timestamptz(3)
   createdAt                DateTime                   @default(now()) @db.Timestamptz(3)

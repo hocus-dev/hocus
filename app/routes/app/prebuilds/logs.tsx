@@ -4,6 +4,7 @@ import { StatusCodes } from "http-status-codes";
 
 import { HttpError } from "~/http-error.server";
 import { PrebuildLogsValidator } from "~/schema/prebuild-logs.validator.server";
+import { getLogsFromGroup } from "~/utils.server";
 
 export const loader = async ({ context: { db, req } }: LoaderArgs) => {
   const { success, value: query } = PrebuildLogsValidator.SafeParse(req.query);
@@ -38,16 +39,7 @@ export const loader = async ({ context: { db, req } }: LoaderArgs) => {
     throw new HttpError(StatusCodes.NOT_FOUND, "Task not found");
   }
 
-  const logs = await db.log.findMany({
-    where: {
-      logGroupId: vmTask.logGroupId,
-    },
-    orderBy: {
-      idx: "asc",
-    },
-  });
-
-  const body = Buffer.concat(logs.map((log) => log.content));
+  const body = await getLogsFromGroup(db, vmTask.logGroupId);
   return new Response(body, {
     status: StatusCodes.OK,
     headers: {

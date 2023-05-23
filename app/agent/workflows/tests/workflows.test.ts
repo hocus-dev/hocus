@@ -1,3 +1,4 @@
+import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
 import { Context } from "@temporalio/activity";
 import type { WorkflowExecutionStatusName, WorkflowHandle } from "@temporalio/client";
 import { Mutex } from "async-mutex";
@@ -5,8 +6,13 @@ import { v4 as uuidv4 } from "uuid";
 
 import { cancelLockSignal, isLockAcquiredQuery, releaseLockSignal } from "./mutex/shared";
 import { runSharedWorkflowTest } from "./shared-workflow/workflow";
-import { prepareTests } from "./utils";
-import { testLock, cancellationTestWorkflow, acquireLockAndWaitForSignal } from "./workflows";
+import { createTestRepo, prepareTests } from "./utils";
+import {
+  testLock,
+  cancellationTestWorkflow,
+  acquireLockAndWaitForSignal,
+  scheduleNewPrebuild,
+} from "./workflows";
 
 import { NotFoundExecutionStatus, wakeSignal } from "~/agent/activities/mutex/shared";
 import {
@@ -15,12 +21,13 @@ import {
   sharedWorkflowIdQuery,
 } from "~/agent/activities/shared-workflow/shared";
 import { withActivityHeartbeat } from "~/agent/activities/utils";
+import { Token } from "~/token";
 import { sleep, unwrap, waitForPromises } from "~/utils.shared";
 
 const { provideTestActivities } = prepareTests();
 
 // Temporal worker setup is long
-jest.setTimeout(30 * 1000);
+jest.setTimeout(300 * 1000);
 
 // The purpose of this test was to see how cancellation works in Temporal.
 // What I've learned is that activity cancellation is not the same as workflow cancellation.
@@ -350,6 +357,83 @@ test.concurrent(
       release();
       const results5 = await waitForPromises(handles5.map((h) => h.result()));
       expect(results5.every((v) => v === 4)).toBe(true);
+    });
+  }),
+);
+
+test.concurrent(
+  "cancel prebuild",
+  provideTestActivities(async ({ createWorker, injector, db }) => {
+    const { worker, client, taskQueue } = await createWorker();
+    const projectService = injector.resolve(Token.ProjectService);
+    const agentGitService = injector.resolve(Token.AgentGitService);
+
+    await worker.runUntil(async () => {
+      const repo = await createTestRepo(db, injector);
+      const project = await db.$transaction((tdb) =>
+        projectService.createProject(tdb, {
+          gitRepositoryId: repo.id,
+          rootDirectoryPath: "/",
+          name: "test1",
+        }),
+      );
+      await db.project.update({
+        where: { id: project.id },
+        data: {
+          maxPrebuildRamMib: 1024,
+          maxPrebuildVCPUCount: 1,
+          maxPrebuildRootDriveSizeMib: 1024,
+        },
+      });
+      await agentGitService.updateBranches(db, repo.id);
+      const branch = unwrap(
+        await db.gitBranch.findFirst({
+          where: {
+            gitRepositoryId: repo.id,
+            name: "refs/heads/cancel-prebuild-test",
+          },
+        }),
+      );
+      const { prebuildEvent } = await client.workflow.execute(scheduleNewPrebuild, {
+        args: [{ projectId: project.id, gitObjectId: branch.gitObjectId }],
+        taskQueue,
+        workflowId: uuidv4(),
+      });
+      const getUpdated = () =>
+        db.prebuildEvent.findUniqueOrThrow({
+          where: {
+            id: prebuildEvent.id,
+          },
+          include: {
+            tasks: {
+              include: {
+                vmTask: true,
+              },
+            },
+          },
+        });
+      while (true) {
+        const prebuild = await getUpdated();
+        const task = prebuild.tasks.length > 0 ? prebuild.tasks[0].vmTask : null;
+        if (task?.status === VmTaskStatus.VM_TASK_STATUS_RUNNING) {
+          break;
+        }
+        await sleep(500);
+      }
+      const handle = client.workflow.getHandle(prebuildEvent.workflowId);
+      await handle.cancel();
+      await handle.result().catch(() => {
+        // ignore
+      });
+      const prebuild = await getUpdated();
+      expect(prebuild.status).toEqual(PrebuildEventStatus.PREBUILD_EVENT_STATUS_CANCELLED);
+      expect(prebuild.tasks.length).toEqual(2);
+      for (const task of prebuild.tasks) {
+        expect([
+          VmTaskStatus.VM_TASK_STATUS_ERROR,
+          VmTaskStatus.VM_TASK_STATUS_CANCELLED,
+        ]).toContain(task.vmTask.status);
+      }
     });
   }),
 );

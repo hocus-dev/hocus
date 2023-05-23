@@ -13,6 +13,7 @@ import { doesFileExist, execSshCmd, withFileLock } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
+import { getLogsFromGroup } from "~/utils.server";
 import { unwrap } from "~/utils.shared";
 
 export interface GetOrCreateBuildfsEventsReturnType {
@@ -261,7 +262,7 @@ export class BuildfsService {
     db: Prisma.NonTransactionClient;
     firecrackerService: FirecrackerService;
     buildfsEventId: bigint;
-  }): Promise<{ buildSuccessful: boolean }> {
+  }): Promise<{ buildSuccessful: boolean; error?: string }> {
     const agentInstance = await args.db.$transaction((tdb) =>
       this.agentUtilService.getOrCreateSoloAgentInstance(tdb),
     );
@@ -274,6 +275,7 @@ export class BuildfsService {
             projectFile: true,
           },
         },
+        vmTask: true,
         project: true,
       },
     });
@@ -322,8 +324,17 @@ export class BuildfsService {
           return taskResults[0];
         },
       );
-
-      return { buildSuccessful: result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS };
+      const buildSuccessful = result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS;
+      if (buildSuccessful) {
+        return { buildSuccessful };
+      } else {
+        return {
+          buildSuccessful,
+          error: await getLogsFromGroup(args.db, buildfsEvent.vmTask.logGroupId).then((b) =>
+            b.toString("utf-8"),
+          ),
+        };
+      }
     });
   }
 }
