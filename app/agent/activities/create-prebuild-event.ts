@@ -1,4 +1,4 @@
-import type { PrebuildEvent } from "@prisma/client";
+import type { PrebuildEvent, Project } from "@prisma/client";
 
 import type { CreateActivity } from "./types";
 import { withActivityHeartbeat } from "./utils";
@@ -10,7 +10,7 @@ export type CreatePrebuildEventActivity = (args: {
   gitObjectId: bigint;
   externalId: string;
   archiveAfter?: Date;
-}) => Promise<PrebuildEvent>;
+}) => Promise<PrebuildEvent & { project: Project }>;
 export const createPrebuildEvent: CreateActivity<CreatePrebuildEventActivity> = ({
   injector,
   db,

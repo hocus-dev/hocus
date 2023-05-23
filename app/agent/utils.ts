@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 
 import type { Log } from "@prisma/client";
+import { Context } from "@temporalio/activity";
 import { Mutex } from "async-mutex";
 import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from "node-ssh";
 import { NodeSSH } from "node-ssh";
@@ -111,10 +112,32 @@ export const withSsh = async <T>(
     15,
     500,
   );
+
+  const context = getActivityContext();
+  let finish: () => void = () => {};
+  const finished = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+
+  if (context != null) {
+    Promise.race([context.cancelled, finished]).catch(() => {
+      try {
+        ssh.connection?.destroy();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(`Failed to destroy SSH connection: ${err}`);
+      }
+    });
+  }
+
   try {
-    return await fn(ssh);
+    try {
+      return await fn(ssh);
+    } finally {
+      ssh.dispose();
+    }
   } finally {
-    ssh.dispose();
+    finish();
   }
 };
 
@@ -300,4 +323,13 @@ export const logErrors = <T extends (...args: any[]) => Promise<any>>(fn: T): T 
 /** Sorts the logs argument, concatenates logs, and returns a string. */
 export const parseVmTaskLogs = (logs: Log[]): string => {
   return Buffer.concat(logs.sort((a, b) => a.idx - b.idx).map((l) => l.content)).toString("utf8");
+};
+
+/** Returns null if not running inside an activity. */
+export const getActivityContext = (): Context | null => {
+  try {
+    return Context.current();
+  } catch (err) {
+    return null;
+  }
 };

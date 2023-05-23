@@ -6,6 +6,8 @@ import {
   ApplicationFailure,
   startChild,
   ParentClosePolicy,
+  CancellationScope,
+  ActivityCancellationType,
 } from "@temporalio/workflow";
 import path from "path-browserify";
 
@@ -27,6 +29,7 @@ const { checkoutAndInspect, fetchRepository, prebuild, createPrebuildFiles } =
     retry: {
       maximumAttempts: 1,
     },
+    cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
   });
 
 const { buildfs } = proxyActivities<Activities>({
@@ -35,6 +38,7 @@ const { buildfs } = proxyActivities<Activities>({
   retry: {
     maximumAttempts: 10,
   },
+  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
 });
 
 const { createPrebuildEvent } = proxyActivities<Activities>({
@@ -43,6 +47,7 @@ const { createPrebuildEvent } = proxyActivities<Activities>({
   retry: {
     maximumAttempts: 10,
   },
+  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
 });
 
 const {
@@ -190,7 +195,7 @@ async function runSingleBuildfsAndPrebuildInner(
 
 export async function runSingleBuildfsAndPrebuild(args: {
   prebuildEventId: bigint;
-  batch?: {
+  batch: {
     id: string;
     projectConfigPaths: string[];
   };
@@ -203,15 +208,23 @@ export async function runSingleBuildfsAndPrebuild(args: {
     batchId,
     batchProjectConfigPaths,
   ).catch(async (err) => {
-    const errorMessage = parseWorkflowError(err);
-    await retryWorkflow(
-      () => cleanUpAfterPrebuildError({ prebuildEventIds: [args.prebuildEventId], errorMessage }),
-      {
-        retryIntervalMs: 1000,
-        isExponential: true,
-        maxRetries: 6,
-      },
-    );
+    const cancelled = CancellationScope.current().consideredCancelled;
+    await CancellationScope.nonCancellable(async () => {
+      const errorMessage = parseWorkflowError(err);
+      await retryWorkflow(
+        () =>
+          cleanUpAfterPrebuildError({
+            prebuildEventIds: [args.prebuildEventId],
+            errorMessage,
+            cancelled,
+          }),
+        {
+          retryIntervalMs: 1000,
+          isExponential: true,
+          maxRetries: 6,
+        },
+      );
+    });
     throw err;
   });
 }
@@ -227,6 +240,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
       executeChild(runSingleBuildfsAndPrebuild, {
         args: [{ prebuildEventId: e.id, batch }],
         parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+        workflowId: e.workflowId,
       }),
     ),
   ).catch(() => {
@@ -245,11 +259,18 @@ export async function scheduleNewPrebuild(args: {
     externalId,
     archiveAfter: twentyFourHoursInTheFuture,
   });
-  const prebuildWorkflowId = uuid4();
   await startChild(runSingleBuildfsAndPrebuild, {
-    args: [{ prebuildEventId: prebuildEvent.id }],
+    args: [
+      {
+        prebuildEventId: prebuildEvent.id,
+        batch: {
+          id: uuid4(),
+          projectConfigPaths: [prebuildEvent.project.rootDirectoryPath],
+        },
+      },
+    ],
     parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
-    workflowId: prebuildWorkflowId,
+    workflowId: prebuildEvent.workflowId,
   });
-  return { prebuildEvent, prebuildWorkflowId };
+  return { prebuildEvent, prebuildWorkflowId: prebuildEvent.workflowId };
 }
