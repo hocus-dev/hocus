@@ -119,8 +119,9 @@ export const withSsh = async <T>(
     finish = resolve;
   });
 
+  let cancellationHandled: Promise<void> | null = null;
   if (context != null) {
-    Promise.race([context.cancelled, finished]).catch(() => {
+    cancellationHandled = Promise.race([context.cancelled, finished]).catch(() => {
       try {
         ssh.connection?.destroy();
       } catch (err) {
@@ -138,6 +139,7 @@ export const withSsh = async <T>(
     }
   } finally {
     finish();
+    await cancellationHandled;
   }
 };
 
