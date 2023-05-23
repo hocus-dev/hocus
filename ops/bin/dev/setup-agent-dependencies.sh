@@ -17,7 +17,7 @@ if ! mountpoint -q /sys/kernel/config/; then
 fi
 # Check if kernel has target_core_user compiled in
 if ! [ -d /sys/kernel/config/target ] ; then
-    echo "Please run a workspace with the target_core_user module compiled in"; 
+    echo "Please run a workspace with the target_core_user module compiled in";
     exit 1
 fi
 # Check if kernel has tcm_loop compiled in
@@ -26,13 +26,13 @@ if ! [ -d /sys/kernel/config/target/loopback/ ] ; then
     mkdir /sys/kernel/config/target/loopback/ || true
     # If the directory is not there then the kernel doesn't have tcm_loop
     if ! [ -d /sys/kernel/config/target/loopback/ ] ; then
-        echo "Please run a workspace with the tcm_loop module compiled in"; 
+        echo "Please run a workspace with the tcm_loop module compiled in";
         exit 1
     fi
 fi
 # Check if kernel has scsi disk support
 if ! [ -d /sys/bus/scsi/drivers/sd ] ; then
-    echo "No scsi disk support detected"; 
+    echo "No scsi disk support detected";
     exit 1
 fi
 

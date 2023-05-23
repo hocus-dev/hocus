@@ -112,15 +112,10 @@
         },
         "type": {
           "type": "string",
-          "enum": [
-            "layers"
-          ]
+          "enum": ["layers"]
         }
       },
-      "required": [
-        "diff_ids",
-        "type"
-      ]
+      "required": ["diff_ids", "type"]
     },
     "history": {
       "type": "array",
@@ -147,9 +142,5 @@
       }
     }
   },
-  "required": [
-    "architecture",
-    "os",
-    "rootfs"
-  ]
+  "required": ["architecture", "os", "rootfs"]
 }

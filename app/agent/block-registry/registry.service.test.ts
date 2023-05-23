@@ -1,7 +1,8 @@
-import { ChildProcessWithoutNullStreams, exec } from "child_process";
+import type { ChildProcessWithoutNullStreams } from "child_process";
 import { spawn } from "child_process";
 import fs from "fs/promises";
 import path from "path";
+import { formatWithOptions } from "util";
 
 import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
@@ -18,7 +19,6 @@ import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
 import { sleep, waitForPromises } from "~/utils.shared";
-import { formatWithOptions } from "util";
 
 const provideBlockRegistry = (
   testFn: (args: {
@@ -180,6 +180,7 @@ async function ensureKernelDidNotBlewUp() {
       "-c",
       'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption|Code:"',
     );
+    // eslint-disable-next-line no-console
     console.error((await execCmdAsync("dmesg")).stdout);
     throw new Error("Looks like the kernel blew up, please reboot the CI machine...");
   } catch (err) {

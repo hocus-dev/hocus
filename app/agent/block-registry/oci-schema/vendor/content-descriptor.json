@@ -33,9 +33,5 @@
       "$ref": "defs-descriptor.json#/definitions/annotations"
     }
   },
-  "required": [
-    "mediaType",
-    "size",
-    "digest"
-  ]
+  "required": ["mediaType", "size", "digest"]
 }

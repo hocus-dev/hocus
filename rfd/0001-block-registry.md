@@ -33,6 +33,7 @@ OverlayBD is an OCI-compatible container format from Alibaba that meets our requ
 OverlayBD uses TCMU under the hood, which is a suitable choice for Hocus. In the future, we may easily build a custom storage format using TCMU, and the rest of our code will be compatible. All block devices created by the block registry using TCMU MUST have a SCSI Serial starting with `hocusbd-`, e.g., `hocusbd-39d3ea09-234b-4169-982b-8ceaa638062e`. The WWN of the TCM loop device for the block registry MUST be `naa.726163636f6f6e73`. All TCMU storage objects will be exposed under a single SAS HBA (`user_726163636`) and will be forwarded to a single TCM loop target (`tpgt_1`) under different LUNs. OverlayBD will be forked to allow changing the TCMU subtype and UIO path in runtime, enabling multiple block registries to run on the same host simultaneously (important for CI). The path of the UIO devices will be nonstandard (`/dev/hocus/uio*`). The registry MUST NOT assume it has exclusivity over the TCMU HBA or the TCM LOOP HBA/TARGET. The names of storage objects under the shared TCMU HBA MUST start with the subtype of the registry (for ex. `<subtype>_<internal_registry_name>`), this way it's possible to distinguish different Hocus instances on a single host. The LUN under which a given TCMU storage object is exposed must be derived from the storage object name using a hash function. The block registry MUST NOT place any TCMU objects under Well Known LUNs or the last LUN available on the system. The block registry MUST consider that the hash function mapping from the storage object name to the lunId might have collisions possibly with another block registry on the same machine. The block registry MUST use the mapping hash function ONLY for exposing an TCMU object to the system, all other methods must retrieve the mapping from reading the alua members (`<config_fs>/target/core/user_726163636/<tcmu_subtype>_<internal_registry_name>/alua/default_tg_pt_gp/members`).
 
 ### Exposing TCMU to the Agent Container
+
 Hocus agent requires access to `configfs` and `devtmpfs`, both of which are bind mounted into the agent container from the host. `devtmpfs` should be present at `/dev/hocus` and `configfs` at `/sys/kernel/config`. Limiting privilidges using udev is not sensible as the agent container MUST run in priviledged mode in order to create and manage network namespaces for the workspaces and udev introduces additionaly complexity and latency to the system. The block registry MUST consider that multiple agents might be running on the same computer, and it DOES NOT have exclusivity over `/dev/hocus` or `/sys/kernel/config`.
 
 ### Block Registry Interface
@@ -72,7 +73,7 @@ interface BlockRegistry {
   // Gets the TCMU subtype of the registry
   getTCMUSubtype(): Promise<string>
   // Gets the Host Bus Target address of the block devices managed by the registry
-  // Given this address and the lun id of a TCMU storage object block device one might uniquely determine the corresponding block device 
+  // Given this address and the lun id of a TCMU storage object block device one might uniquely determine the corresponding block device
   getTCMLoopHostBusTarget(): Promise<string>
 
   // Exposes the given Image/Container to the host system. Images will be exposed as RO block devices, Containers as RW block devices.
@@ -108,7 +109,9 @@ Use virtio-fs:
 3. Agent loads the image into the block registry using loadImageFromDisk
 
 ### OverlayBD Block Registry Storage
+
 This is the current implementation using OverlayBD.
+
 ```bash
 <BLOCK_REGISTRY_DIR>/tcmu_subtype # TCMU subtype for this registry
 <BLOCK_REGISTRY_DIR>/block_config/<ImageId or ContainerId> # OverlayBD configs for block devices

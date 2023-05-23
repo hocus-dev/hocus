@@ -1,12 +1,9 @@
-import {
-  spawn,
-  SpawnOptions,
+import type {
   SpawnOptionsWithoutStdio,
-  SpawnOptionsWithStdioTuple,
   SpawnSyncOptionsWithBufferEncoding,
-  SpawnSyncOptionsWithStringEncoding,
   SpawnSyncReturns,
 } from "child_process";
+import { spawn } from "child_process";
 import { spawnSync } from "child_process";
 import { createHash } from "crypto";
 import fs from "fs";

@@ -16,11 +16,11 @@ import { OBDConfigValidator } from "./validators";
 import { OCIImageIndexValidator, OCIImageManifestValidator } from "./validators";
 
 import { type Config } from "~/config";
+import { GroupError } from "~/group-error";
 import type { Validator } from "~/schema/utils.server";
 import { Token } from "~/token";
 import type { valueof } from "~/types/utils";
 import { waitForPromises, sleep } from "~/utils.shared";
-import { GroupError } from "~/group-error";
 
 export type ImageId = A.Type<`im_${string}`, "image">;
 export type ContainerId = A.Type<`ct_${string}`, "container">;

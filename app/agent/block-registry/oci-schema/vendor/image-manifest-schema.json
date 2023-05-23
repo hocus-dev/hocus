@@ -37,9 +37,5 @@
       "$ref": "defs-descriptor.json#/definitions/annotations"
     }
   },
-  "required": [
-    "schemaVersion",
-    "config",
-    "layers"
-  ]
+  "required": ["schemaVersion", "config", "layers"]
 }

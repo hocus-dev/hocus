@@ -20,11 +20,7 @@
       "items": {
         "id": "https://opencontainers.org/schema/image/manifestDescriptor",
         "type": "object",
-        "required": [
-          "mediaType",
-          "size",
-          "digest"
-        ],
+        "required": ["mediaType", "size", "digest"],
         "properties": {
           "mediaType": {
             "description": "the mediatype of the referenced object",
@@ -45,10 +41,7 @@
           "platform": {
             "id": "https://opencontainers.org/schema/image/platform",
             "type": "object",
-            "required": [
-              "architecture",
-              "os"
-            ],
+            "required": ["architecture", "os"],
             "properties": {
               "architecture": {
                 "id": "https://opencontainers.org/schema/image/platform/architecture",
@@ -86,8 +79,5 @@
       "$ref": "defs-descriptor.json#/definitions/annotations"
     }
   },
-  "required": [
-    "schemaVersion",
-    "manifests"
-  ]
+  "required": ["schemaVersion", "manifests"]
 }

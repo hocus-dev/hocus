@@ -28,36 +28,36 @@ THE SOFTWARE.
 
 export namespace Formatter {
   export function Includes(line: string, token: string) {
-    return line.includes(token)
+    return line.includes(token);
   }
   function IntentBefore(line: string) {
-    if (Includes(line, '({') && Includes(line, '})')) return 0
-    if (Includes(line, '([') && Includes(line, '])')) return 0
-    if (Includes(line, '{') && Includes(line, '}')) return 0
-    if (Includes(line, '])')) return -1
-    if (Includes(line, '})')) return -1
-    if (Includes(line, '}')) return -1
-    if (Includes(line, ']')) return -1
-    return 0
+    if (Includes(line, "({") && Includes(line, "})")) return 0;
+    if (Includes(line, "([") && Includes(line, "])")) return 0;
+    if (Includes(line, "{") && Includes(line, "}")) return 0;
+    if (Includes(line, "])")) return -1;
+    if (Includes(line, "})")) return -1;
+    if (Includes(line, "}")) return -1;
+    if (Includes(line, "]")) return -1;
+    return 0;
   }
   function IndentAfter(line: string) {
-    if (Includes(line, '({') && Includes(line, '})')) return 0
-    if (Includes(line, '([') && Includes(line, '])')) return 0
-    if (Includes(line, '{') && Includes(line, '}')) return 0
-    if (Includes(line, '([')) return 1
-    if (Includes(line, '({')) return 1
-    if (Includes(line, '{')) return 1
-    if (Includes(line, '[')) return 1
-    return 0
+    if (Includes(line, "({") && Includes(line, "})")) return 0;
+    if (Includes(line, "([") && Includes(line, "])")) return 0;
+    if (Includes(line, "{") && Includes(line, "}")) return 0;
+    if (Includes(line, "([")) return 1;
+    if (Includes(line, "({")) return 1;
+    if (Includes(line, "{")) return 1;
+    if (Includes(line, "[")) return 1;
+    return 0;
   }
   export function Format(input: string): string {
-    const output: string[] = []
-    let indent = 0
-    for (const line of input.split('\n').map((n) => n.trim())) {
-      indent += IntentBefore(line)
-      output.push(`${''.padStart(indent * 2, ' ')}${line}`)
-      indent += IndentAfter(line)
+    const output: string[] = [];
+    let indent = 0;
+    for (const line of input.split("\n").map((n) => n.trim())) {
+      indent += IntentBefore(line);
+      output.push(`${"".padStart(indent * 2, " ")}${line}`);
+      indent += IndentAfter(line);
     }
-    return output.join('\n')
+    return output.join("\n");
   }
 }

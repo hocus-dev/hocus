@@ -1,6 +1,5 @@
 // Source: https://github.com/sinclairzx81/typebox/tree/8ca61abeb5f66a19493b06847c7c9c48bf5a2397/example/formats
-import { Type, FormatRegistry } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
+import { FormatRegistry } from "@sinclair/typebox";
 
 /** Configures TypeBox for additional string formats */
 export namespace AdditionalFormats {
