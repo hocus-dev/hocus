@@ -9,7 +9,7 @@ export DOCKER_BUILDKIT=1
 SCRIPT_DIR="$(dirname "$0")"
 
 EXISTING_TOKEN=$(cat ~/.docker/config.json 2>/dev/null | jq '.auths."quay.io".auth' 2>/dev/null)
-if [[ ! -f "$HOME/.docker/config.json" ]] || [[ "$EXISTING_TOKEN" = "null" ]]; then  
+if [[ ! -f "$HOME/.docker/config.json" ]] || [[ "$EXISTING_TOKEN" = "null" ]]; then
   echo "$EXISTING_TOKEN"
   docker login quay.io -u gorbak25
 fi
