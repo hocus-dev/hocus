@@ -20,6 +20,7 @@ import type { Validator } from "~/schema/utils.server";
 import { Token } from "~/token";
 import type { valueof } from "~/types/utils";
 import { waitForPromises, sleep } from "~/utils.shared";
+import { GroupError } from "~/group-error";
 
 export type ImageId = A.Type<`im_${string}`, "image">;
 export type ContainerId = A.Type<`ct_${string}`, "container">;
@@ -130,6 +131,39 @@ export class BlockRegistryService {
 
   // Called once after agent restart/start
   async initializeRegistry(): Promise<void> {
+    // Before doing anything first ensure the environment is properly set up
+    // Otherwise we will hang forever, we want to early exit if the agent
+    // is improperly set up and prone to hang forever
+    // 1. Check if /sys/kernel/config is a mount point
+    const configFSPath = this.agentConfig.blockRegistryConfigFsPath;
+    try {
+      await execCmdAsync("mountpoint", "-q", configFSPath);
+    } catch (err) {
+      const msg = `Unable to find ConfigFS at ${configFSPath}`;
+      this.logger.error(msg);
+      throw new GroupError([new Error(msg), err]);
+    }
+    // 2. Check if target_core_user kernel module was loaded
+    try {
+      const version = await fs.readFile(path.join(configFSPath, "target", "version"));
+      this.logger.info(`Found TCMU: ${version}`);
+    } catch (err) {
+      const msg = `Looks like target_core_user was not loaded`;
+      this.logger.error(msg);
+      throw new GroupError([new Error(msg), err]);
+    }
+
+    // 3. Check if tcm_loop kernel module was loaded
+    try {
+      const version = await fs.readFile(path.join(configFSPath, "target", "loopback", "version"));
+      this.logger.info(`Found TCM LOOP: ${version}`);
+    } catch (err) {
+      const msg = `Looks like tcm_loop was not loaded`;
+      this.logger.error(msg);
+      throw new GroupError([new Error(msg), err]);
+    }
+
+    // Now proceed with the setup, it should not hang
     // We are after an restart, nuke anything temporary
     await fs.rm(this.paths.run, { recursive: true, force: true });
 
@@ -337,7 +371,7 @@ export class BlockRegistryService {
         layerDescriptor.annotations === void 0 ||
         // This annotation is present with obd layers
         (layerDescriptor.annotations as any)["containerd.io/snapshot/overlaybd/blob-digest"] ===
-        void 0
+          void 0
       ) {
         throw new Error(`Unsupported layer ${JSON.stringify(layerDescriptor)}`);
       }
@@ -530,14 +564,20 @@ export class BlockRegistryService {
     const imageId = this.genImageId(outputId);
 
     // If the container does not exist and the output image exists we do nothing due to idempotence
-    const outputImageExists = await fs.stat(path.join(this.paths.images, imageId)).then(() => true).catch((err: Error) => {
-      if (!err.message.startsWith("ENOENT")) throw err;
-      return false;
-    })
-    const containerExists = await fs.stat(path.join(this.paths.containers, containerId)).then(() => true).catch((err: Error) => {
-      if (!err.message.startsWith("ENOENT")) throw err;
-      return false;
-    })
+    const outputImageExists = await fs
+      .stat(path.join(this.paths.images, imageId))
+      .then(() => true)
+      .catch((err: Error) => {
+        if (!err.message.startsWith("ENOENT")) throw err;
+        return false;
+      });
+    const containerExists = await fs
+      .stat(path.join(this.paths.containers, containerId))
+      .then(() => true)
+      .catch((err: Error) => {
+        if (!err.message.startsWith("ENOENT")) throw err;
+        return false;
+      });
     // We have 4 cases:
     // - If the output image exists and we don't have the container then:
     //   * We can't verify whether we have a imageId collision or we just restarted an interupted commit
@@ -553,7 +593,7 @@ export class BlockRegistryService {
       return imageId;
     }
     if (!outputImageExists && !containerExists) {
-      throw new Error(`Container ${containerId} not found. Nothing to commit.`)
+      throw new Error(`Container ${containerId} not found. Nothing to commit.`);
     }
 
     // Ensure the container is hidden
@@ -583,23 +623,24 @@ export class BlockRegistryService {
       this.logger.info(
         `obd-commit for ${containerId} took: ${(performance.now() - t1).toFixed(2)} ms`,
       );
-      const layerDigest = `sha256:${(await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
-        }`;
+      const layerDigest = `sha256:${
+        (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
+      }`;
       const layerSize = (await fs.stat(layerPath)).size;
       const image = obdConfig.hocusImageId as ImageId | undefined;
       let manifest: OCIImageManifest = image
         ? await readJsonFileOfType(path.join(this.paths.images, image), OCIImageManifestValidator)
         : {
-          schemaVersion: 2,
-          mediaType: "application/vnd.oci.image.manifest.v1+json",
-          // fake config
-          config: {
-            mediaType: "application/vnd.oci.image.config.v1+json",
-            digest: "sha256:e7c9d53532bd3d8a83a967b0331a52e1cfc2ef87873503e3967893926206801d",
-            size: 1337,
-          },
-          layers: [],
-        };
+            schemaVersion: 2,
+            mediaType: "application/vnd.oci.image.manifest.v1+json",
+            // fake config
+            config: {
+              mediaType: "application/vnd.oci.image.config.v1+json",
+              digest: "sha256:e7c9d53532bd3d8a83a967b0331a52e1cfc2ef87873503e3967893926206801d",
+              size: 1337,
+            },
+            layers: [],
+          };
       const layerDescriptor: OCIDescriptor = {
         mediaType: "application/vnd.oci.image.layer.v1.tar",
         digest: layerDigest,
@@ -614,7 +655,7 @@ export class BlockRegistryService {
       await this._loadLocalOCIImage(imageId, manifest, [[layerPath, layerDescriptor]]);
       await fs.rm(path.join(this.paths.containers, containerId), { recursive: true, force: true });
       return imageId;
-    })
+    });
   }
 
   private _tcmuSubtype: string | undefined;
@@ -973,7 +1014,7 @@ export class BlockRegistryService {
         if (disksAndPartitions.length === 0) {
           throw new Error(
             `Unable to find any block device for SCSI address ${fullSCSIAddr}.\n` +
-            `Does your kernel have async scsi scan enabled? Does your kernel have support for SCSI disks?`,
+              `Does your kernel have async scsi scan enabled? Does your kernel have support for SCSI disks?`,
           );
         }
 
