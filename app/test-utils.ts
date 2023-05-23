@@ -29,7 +29,7 @@ export const provideRunId = <T>(
   };
 };
 
-export const printErrors = <T>(testFn: () => Promise<T>): (() => Promise<T>) => {
+export const printErrors = <T>(testFn: () => Promise<T>, runId?: string): (() => Promise<T>) => {
   return async () => {
     try {
       return await testFn();
@@ -37,19 +37,21 @@ export const printErrors = <T>(testFn: () => Promise<T>): (() => Promise<T>) => 
       /* eslint-disable no-console */
       if (err instanceof ResponseError) {
         console.error(
-          `Status: ${err.response.status} ${err.response.statusText}\n${await err.response.text()}`,
+          `[${runId}] Status: ${err.response.status} ${
+            err.response.statusText
+          }\n${await err.response.text()}`,
         );
       } else if (err instanceof FetchError) {
-        console.error(err.cause);
+        console.error(`[${runId}] ${JSON.stringify(err.cause)}`);
       } else if (err instanceof GroupError) {
         for (const innerError of err.errors) {
-          console.error(innerError);
+          console.error(`[${runId}] ${JSON.stringify(innerError)}`);
         }
         if (err.errors.length === 0) {
-          console.error(err);
+          console.error(`[${runId}] ${JSON.stringify(err)}`);
         }
       } else {
-        console.error(err);
+        console.error(`[${runId}] ${JSON.stringify(err)}`);
       }
       /* eslint-enable no-console */
       throw err;

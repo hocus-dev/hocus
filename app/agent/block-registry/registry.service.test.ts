@@ -7,7 +7,7 @@ import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import { createAgentInjector } from "../agent-injector";
-import { execCmdAsync, ExecCmdError } from "../utils";
+import { execCmdAsync, ExecCmdError, execCmdWithOptsAsync } from "../utils";
 
 import type { BlockRegistryService, ContainerId, ImageId } from "./registry.service";
 import { EXPOSE_METHOD } from "./registry.service";
@@ -18,6 +18,7 @@ import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
 import { sleep, waitForPromises } from "~/utils.shared";
+import { formatWithOptions } from "util";
 
 const provideBlockRegistry = (
   testFn: (args: {
@@ -39,7 +40,14 @@ const provideBlockRegistry = (
     [Token.Logger]: {
       provide: {
         factory: function () {
-          return new DefaultLogger("ERROR");
+          const format = formatWithOptions.bind(undefined, { colors: true });
+          return new DefaultLogger("ERROR", (entry) => {
+            entry.meta = entry.meta === void 0 ? {} : entry.meta;
+            entry.meta["runId"] = runId;
+            const { level, timestampNanos, message, meta } = entry;
+            const date = new Date(Number(timestampNanos / 1000000n));
+            process.stderr.write(`${format(date)} [${level}] [${format(meta)}] ${message} \n`);
+          });
         },
       },
       scope: Scope.Transient,
@@ -80,13 +88,13 @@ const provideBlockRegistry = (
           cp.on("close", (code) => {
             if (!shouldTerminate) {
               // eslint-disable-next-line no-console
-              console.error(`overlaybd-tcmu exited prematurely with code ${code}`);
+              console.error(`[${runId}] overlaybd-tcmu exited prematurely with code ${code}`);
               // eslint-disable-next-line no-console
-              console.error(`overlaybd-tcmu STDOUT: ${tcmuStdout}`);
+              console.error(`[${runId}] overlaybd-tcmu STDOUT: ${tcmuStdout}`);
               // eslint-disable-next-line no-console
-              console.error(`overlaybd-tcmu STDERR: ${tcmuStderr}`);
+              console.error(`[${runId}] overlaybd-tcmu STDERR: ${tcmuStderr}`);
               // eslint-disable-next-line no-console
-              console.error("Please consult the artifacts for more details");
+              console.error(`[${runId}] Please consult the artifacts for more details`);
               reject("overlaybd-tcmu exited");
             } else {
               resolve(void 0);
@@ -117,14 +125,16 @@ const provideBlockRegistry = (
       if (process.env["BUILDKITE_AGENT_ACCESS_TOKEN"] !== void 0) {
         const archivePath = testRunDir + ".tar.gz";
         // TODO: Perhaps only upload the logs?
-        await execCmdAsync("tar", "-zcf", archivePath, testRunDir);
+        await execCmdAsync("tar", "-zcf", archivePath, "-C", testsDir, runId);
         try {
-          await execCmdAsync("buildkite-agent", "artifact", "upload", archivePath);
+          await execCmdWithOptsAsync(["buildkite-agent", "artifact", "upload", runId + ".tar.gz"], {
+            cwd: testsDir,
+          });
         } finally {
           await fs.unlink(archivePath);
         }
         // eslint-disable-next-line no-console
-        console.error(`Failed run id: ${runId}. Please consult ${runId}.tar.gz`);
+        console.error(`Failed run id: ${runId}. Please consult the artifact ${runId}.tar.gz`);
       } else {
         // eslint-disable-next-line no-console
         console.error(
@@ -144,7 +154,7 @@ const provideBlockRegistry = (
           await brService.hideEverything();
         } catch (err) {
           // eslint-disable-next-line no-console
-          console.error(`Failed to cleanup registry ${(err as Error).message}`);
+          console.error(`[${runId}] Failed to cleanup registry ${(err as Error).message}`);
         }
         if (!keepStorage) {
           await fs.rm(testRunDir, { recursive: true, force: true });
@@ -158,7 +168,7 @@ const provideBlockRegistry = (
 
       await injector.dispose();
     }
-  });
+  }, runId);
 };
 
 // I have never suspected that I legitimately need to worry about this case
