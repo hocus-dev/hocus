@@ -274,16 +274,16 @@ test.concurrent(
     const im2Mount = await brService.expose(im2, EXPOSE_METHOD.HOST_MOUNT);
 
     await expect(fs.readFile(path.join(im1Mount.mountPoint, "fileA"), "utf-8")).resolves.toEqual(
-      "This is layer 1",
+      "This is layer 1\n",
     );
     await expect(fs.readFile(path.join(im1Mount.mountPoint, "fileBA"), "utf-8")).resolves.toEqual(
-      "This is layer 2a",
+      "This is layer 2a\n",
     );
     await expect(fs.readFile(path.join(im2Mount.mountPoint, "fileA"), "utf-8")).resolves.toEqual(
-      "This is layer 1",
+      "This is layer 1\n",
     );
     await expect(fs.readFile(path.join(im2Mount.mountPoint, "fileBB"), "utf-8")).resolves.toEqual(
-      "This is layer 2b",
+      "This is layer 2b\n",
     );
 
     // Ensure layers aren't duplicated in storage
@@ -322,16 +322,16 @@ test.concurrent(
     const im2Mount = await brService.expose(im2, EXPOSE_METHOD.HOST_MOUNT);
 
     await expect(fs.readFile(path.join(im1Mount.mountPoint, "fileA"), "utf-8")).resolves.toEqual(
-      "This is layer 1",
+      "This is layer 1\n",
     );
     await expect(fs.readFile(path.join(im1Mount.mountPoint, "fileBA"), "utf-8")).resolves.toEqual(
-      "This is layer 2a",
+      "This is layer 2a\n",
     );
     await expect(fs.readFile(path.join(im2Mount.mountPoint, "fileA"), "utf-8")).resolves.toEqual(
-      "This is layer 1",
+      "This is layer 1\n",
     );
     await expect(fs.readFile(path.join(im2Mount.mountPoint, "fileBB"), "utf-8")).resolves.toEqual(
-      "This is layer 2b",
+      "This is layer 2b\n",
     );
 
     // Ensure layers aren't duplicated in storage

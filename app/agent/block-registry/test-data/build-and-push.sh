@@ -1,8 +1,6 @@
 #!/bin/bash
-set -o errexit
 set -o pipefail
 set -o xtrace
-
 
 export DOCKER_BUILDKIT=1
 
@@ -13,6 +11,8 @@ if [[ ! -f "$HOME/.docker/config.json" ]] || [[ "$EXISTING_TOKEN" = "null" ]]; t
   echo "$EXISTING_TOKEN"
   docker login quay.io -u gorbak25
 fi
+
+set -o errexit
 
 TMP_NAME=block-repo-tmp
 QUAY_REPO=quay.io/gorbak25/hocus-block-registry-tests
