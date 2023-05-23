@@ -28,8 +28,8 @@ const provideBlockRegistry = (
   opts: {
     skipInit: boolean;
   } = {
-      skipInit: false,
-    },
+    skipInit: false,
+  },
 ): (() => Promise<void>) => {
   const runId = uuidv4();
   const testsDir = "/srv/jailer/tests/";
@@ -135,7 +135,7 @@ const provideBlockRegistry = (
       throw err;
     } finally {
       if (!opts.skipInit) {
-        // First check the kernel logs cause if we borked the kernel then 
+        // First check the kernel logs cause if we borked the kernel then
         // all sanity is gone and the cleanup will probably hang .-.
         await ensureKernelDidNotBlewUp();
         try {
@@ -165,11 +165,15 @@ const provideBlockRegistry = (
 async function ensureKernelDidNotBlewUp() {
   try {
     // Grep returns status 1 when no matches were found
-    await execCmdAsync("bash", "-c", "dmesg | grep -i -E \"Kernel BUG|invalid opcode|corruption|Code\"");
-    console.error((await execCmdAsync("dmesg")).stdout)
+    await execCmdAsync(
+      "bash",
+      "-c",
+      'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption|Code:"',
+    );
+    console.error((await execCmdAsync("dmesg")).stdout);
     throw new Error("Looks like the kernel blew up, please reboot the CI machine...");
   } catch (err) {
-    if (err instanceof ExecCmdError && (err as ExecCmdError).status !== 1) throw err
+    if (err instanceof ExecCmdError && (err as ExecCmdError).status !== 1) throw err;
   }
 }
 
@@ -370,8 +374,9 @@ test.concurrent(
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
       const layerPath = path.join(brService["paths"].layers, dirName, "layer.tar");
-      const layerDigest = `sha256:${(await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
-        }`;
+      const layerDigest = `sha256:${
+        (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
+      }`;
       // Check for data corruption
       expect(layerDigest).toEqual(dirName);
       // Check if that layer is hardlinked to the shared oci dir
@@ -432,8 +437,9 @@ test.concurrent(
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
       const layerPath = path.join(brService["paths"].layers, dirName, "layer.tar");
-      const layerDigest = `sha256:${(await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
-        }`;
+      const layerDigest = `sha256:${
+        (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
+      }`;
       // Check for data corruption
       expect(layerDigest).toEqual(dirName);
       // Check if that layer is hardlinked to the shared oci dir and the original dir
@@ -468,13 +474,10 @@ test.concurrent(
     const res = await waitForPromises(tasks.map(waitForPromises));
     const c1 = res[0][0];
     const c2 = res[1][0];
-    expect(res).toEqual([
-      Array(N).fill(c1),
-      Array(N).fill(c2),
-    ]);
+    expect(res).toEqual([Array(N).fill(c1), Array(N).fill(c2)]);
     // Sanity check the container works
     await brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV);
-    await brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV)
+    await brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV);
   }),
 );
 
@@ -493,10 +496,7 @@ test.concurrent(
     const res = await waitForPromises(tasks.map(waitForPromises));
     const im1 = res[0][0];
     const im2 = res[1][0];
-    expect(res).toEqual([
-      Array(N).fill(im1),
-      Array(N).fill(im2),
-    ]);
+    expect(res).toEqual([Array(N).fill(im1), Array(N).fill(im2)]);
     // Sanity check the image works
     await brService.expose(im1, EXPOSE_METHOD.BLOCK_DEV);
     await brService.expose(im2, EXPOSE_METHOD.BLOCK_DEV);
@@ -527,10 +527,7 @@ test.concurrent(
         Array(N).fill(res[2][0]),
         Array(N).fill(res[3][0]),
       ]);
-      await waitForPromises([
-        brService.hide(c1),
-        brService.hide(c2),
-      ]);
+      await waitForPromises([brService.hide(c1), brService.hide(c2)]);
     }
   }),
 );
