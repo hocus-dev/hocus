@@ -34,7 +34,7 @@ OverlayBD uses TCMU under the hood, which is a suitable choice for Hocus. In the
 
 ### Exposing TCMU to the Agent Container
 
-Hocus agent requires access to `configfs` and `devtmpfs`, both of which are bind mounted into the agent container from the host. `devtmpfs` should be present at `/dev/hocus` and `configfs` at `/sys/kernel/config`. Limiting privilidges using udev is not sensible as the agent container MUST run in priviledged mode in order to create and manage network namespaces for the workspaces and udev introduces additionaly complexity and latency to the system. The block registry MUST consider that multiple agents might be running on the same computer, and it DOES NOT have exclusivity over `/dev/hocus` or `/sys/kernel/config`.
+Hocus agent requires access to `configfs` and `devtmpfs`, both of which are bind mounted into the agent container from the host. `devtmpfs` should be present at `/dev/hocus` and `configfs` at `/sys/kernel/config`. Limiting privileges using udev is not sensible as the agent container MUST run in privileged mode in order to create and manage network namespaces for the workspaces and udev introduces additionaly complexity and latency to the system. The block registry MUST consider that multiple agents might be running on the same computer, and it DOES NOT have exclusivity over `/dev/hocus` or `/sys/kernel/config`.
 
 ### Block Registry Interface
 

@@ -5,7 +5,7 @@ To regenerate the code after updating the json schema:
 
 1. make -j
 1. The typebox codegen is slightly bugged, please manually fix the generated code
-   1. Reorder the exports(the converter sometimes uses an token which is defined later)
+   1. Reorder the exports(the converter sometimes uses a token which is defined later)
    1. Change in one place `Type.Tuple([<SYMBOL>, Type.Rest()])` to `Type.Array(<SYMBOL>)`
    1. Format using prettier
 1. Due to [this bug](https://github.com/sinclairzx81/typebox/pull/434) in Typebox temporarily change `additionalProperties: Type.String()` to `additionalProperties: true`

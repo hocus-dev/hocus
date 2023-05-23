@@ -31,8 +31,8 @@ export const EXPOSE_METHOD = {
 } as const;
 export type EXPOSE_METHOD = valueof<typeof EXPOSE_METHOD>;
 
-const catchIgnore = (toIgnore: string) => (err: Error) => {
-  if (!err.message.startsWith(toIgnore)) throw err;
+const catchIgnore = (toIgnore: string) => (err: any) => {
+  if (!err?.message?.startsWith(toIgnore)) throw err;
 };
 
 const catchAlreadyExists = catchIgnore("EEXIST");
@@ -173,7 +173,7 @@ export class BlockRegistryService {
     }
 
     // Now proceed with the setup, it should not hang
-    // We are after an restart, nuke anything temporary
+    // We are after a restart, nuke anything temporary
     await fs.rm(this.paths.run, { recursive: true, force: true });
 
     // Ensure the directory structure is ok and generate the TCMU subtype which will handle the registry
@@ -182,8 +182,8 @@ export class BlockRegistryService {
       const key = _key as keyof typeof this.paths;
       const requiredPath = this.paths[key];
       tasks.push(
-        fs.stat(requiredPath).catch(async (err: Error) => {
-          if (!err.message.startsWith("ENOENT")) throw err;
+        fs.stat(requiredPath).catch(async (err: any) => {
+          if (!err?.message?.startsWith("ENOENT")) throw err;
           await fs.mkdir(path.dirname(requiredPath), { recursive: true }).catch(catchAlreadyExists);
           if (key === "tcmuSubtype")
             await fs
@@ -273,8 +273,8 @@ export class BlockRegistryService {
           throw new Error("Lun ID is bigger than 64 bits");
         })
         .catch(catchIgnore("ERANGE"));
-      await fs.mkdir(shouldWorkLun).catch((err: Error) => {
-        if (err.message.startsWith("EEXIST")) return;
+      await fs.mkdir(shouldWorkLun).catch((err: any) => {
+        if (err?.message?.startsWith("EEXIST")) return;
         err.message = `Lun ID is smaller than 64 bits.\n${err.message}`;
         throw err;
       });
@@ -417,7 +417,7 @@ export class BlockRegistryService {
       throw new Error(`Image with id ${imageId} already exists`);
     }
 
-    // Ok, almost done, generate an config for OBD
+    // Ok, almost done, generate a config for OBD
     await this.idempotentConfigWrite<OBDConfig>(
       {
         lowers: this.imageManifestToOBDLowers(manifest),
@@ -439,8 +439,8 @@ export class BlockRegistryService {
     const dstPath = path.join(dstDir, "layer.tar");
     // Hardlink the blob from the src to the layers directory
     if (srcPath !== dstPath) {
-      await fs.link(srcPath, dstPath).catch(async (err: Error) => {
-        if (!err.message.startsWith("EEXIST")) throw err;
+      await fs.link(srcPath, dstPath).catch(async (err) => {
+        if (!err?.message?.startsWith("EEXIST")) throw err;
         await this.forceReplaceWithHardlink(dstPath, srcPath);
       });
     }
@@ -472,8 +472,8 @@ export class BlockRegistryService {
         .then(() => {
           return true;
         })
-        .catch(async (err: Error) => {
-          if (!err.message.startsWith("EEXIST")) throw err;
+        .catch(async (err) => {
+          if (!err?.message?.startsWith("EEXIST")) throw err;
           // Check for idempotence
           if (content === (await fs.readFile(dstPath, "utf-8"))) {
             return true;
@@ -589,7 +589,7 @@ export class BlockRegistryService {
       });
     // We have 4 cases:
     // - If the output image exists and we don't have the container then:
-    //   * We can't verify whether we have a imageId collision or we just restarted an interupted commit
+    //   * We can't verify whether we have an imageId collision or we just restarted an interrupted commit
     //   * Assume there are no id collisions and we can tell the caller that the operation was done
     // - If the output image exists and we have the container then:
     //   * The rest of the code will ensure that the image was created as the result of the container
@@ -764,11 +764,11 @@ export class BlockRegistryService {
         try {
           let flags = readonly ? ["--read-only"] : ["--read-write", "-o", "discard"];
           const t1 = performance.now();
-          // TODO: Calling the mount syscall directly is much much more faster
+          // TODO: Calling the mount syscall directly is much much faster
           await execCmdAsync("mount", ...flags, bd.device, mountPoint);
           this.logger.info(`mount for ${what} took: ${(performance.now() - t1).toFixed(2)} ms`);
         } catch (err) {
-          if (!(err as Error).message.includes("already mounted")) throw err;
+          if (!err?.message?.includes("already mounted")) throw err;
         }
         return { mountPoint, readonly };
       }
@@ -780,8 +780,8 @@ export class BlockRegistryService {
         const tcmuPath = path.join(this.paths.tcmuHBA, tcmuStorageObjectId);
         // Create a storage object on that HBA, if it already exists then check for a LUN
         let aluaMembers: string[] = [];
-        await fs.mkdir(tcmuPath).catch(async (err: Error) => {
-          if (!err.message.startsWith("EEXIST")) throw err;
+        await fs.mkdir(tcmuPath).catch(async (err) => {
+          if (!err?.message?.startsWith("EEXIST")) throw err;
           // Ok check for LUN
           aluaMembers = await this.getTCMUAluaMembers(tcmuStorageObjectId);
         });
@@ -810,8 +810,8 @@ export class BlockRegistryService {
                 });
               } catch (err) {
                 if (
-                  !(err as Error).message.startsWith("EAGAIN") &&
-                  !(err as Error).message.startsWith("EWOULDBLOCK")
+                  !err?.message?.startsWith("EAGAIN") &&
+                  !err?.message?.startsWith("EWOULDBLOCK")
                 )
                   throw err;
                 flockAcquired = false;
@@ -844,7 +844,7 @@ export class BlockRegistryService {
             //       aka. <ROOT_DIR>/run/obd-result-<image_id or container_id>
             // Those are a lot of moving parts and not everything may work:
             // 1. If there is no TCMU process or the handler process never attaches we can't know that without extra info
-            // 2. If netlink replay is enabled and the handler attached but the handler failed setting up it's stuff then
+            // 2. If netlink replay is enabled and the handler attached but the handler failed setting up its stuff then
             //    the enable write will fail with ENOENT besides the file existing
             // 3. If tcm_loop was attached to the tcmu storage object then you
             //    can't reconfigure anything anymore and the config writes will fail
@@ -869,10 +869,10 @@ export class BlockRegistryService {
               )
               .catch(catchAlreadyExists);
 
-            await enableFd.write("1").catch((err: Error) => {
-              if (!err.message.startsWith("EEXIST") && !err.message.startsWith("ENOENT")) throw err;
+            await enableFd.write("1").catch((err) => {
+              if (!err?.message?.startsWith("EEXIST") && !err?.message?.startsWith("ENOENT")) throw err;
               // The TCMU process told us that he failed to set up his part of the deal
-              if (err.message.startsWith("ENOENT")) tcmuAttachFailed = true;
+              if (err?.message?.startsWith("ENOENT")) tcmuAttachFailed = true;
             });
           } finally {
             await enableFd.close();
@@ -927,7 +927,7 @@ export class BlockRegistryService {
             if (lunId !== (2n ** 64n - 1n).toString() && !this.isWLun(lunId)) {
               const lunPath = path.join(this.paths.tcmLoopTarget, "lun", `lun_${lunId}`);
               // If a hide and expose operation happens for different containers at the same time
-              // Then when a hash collision occurs then it's possible that the lun get's deleted before we manage to claim it
+              // Then when a hash collision occurs then it's possible that the lun gets deleted before we manage to claim it
               // in that case we just retry the operation until we see that the lun is claimed :)
               let lunClaimed = false;
               while (!lunClaimed) {
@@ -938,7 +938,7 @@ export class BlockRegistryService {
                     .catch(catchAlreadyExists);
                   lunClaimed = true;
                 } catch (err) {
-                  if (!(err as Error).message.includes("ENOENT")) throw err;
+                  if (!err?.message?.includes("ENOENT")) throw err;
                 }
               }
               // Ok the above code ensured that the lun was claimed by someone
@@ -950,7 +950,7 @@ export class BlockRegistryService {
               try {
                 await fs.stat(path.join(lunPath, tcmuStorageObjectId));
               } catch (err: any) {
-                if (!err.message.startsWith("ENOENT")) throw err;
+                if (err?.message?.startsWith("ENOENT")) throw err;
                 // Hash collision
                 done = false;
               }
@@ -1016,7 +1016,7 @@ export class BlockRegistryService {
             );
             break;
           } catch (err) {
-            if (!(err as Error).message.startsWith("ENOENT")) throw err;
+            if (!err?.message?.startsWith("ENOENT")) throw err;
             await sleep(5);
           }
         }
@@ -1056,7 +1056,7 @@ export class BlockRegistryService {
       .stat(mountPoint)
       .then(() => true)
       .catch((err: Error) => {
-        if (!err.message.startsWith("ENOENT")) throw err;
+        if (!err?.message?.startsWith("ENOENT")) throw err;
         return false;
       });
     if (dirPresent) {
@@ -1064,7 +1064,7 @@ export class BlockRegistryService {
         // TODO: Calling the umount syscall directly is much much more faster
         await execCmdAsync("umount", mountPoint);
       } catch (err) {
-        if (!(err as Error).message.includes("not mounted")) throw err;
+        if (!err?.message?.includes("not mounted")) throw err;
       }
 
       await fs.rmdir(mountPoint);
@@ -1085,8 +1085,8 @@ export class BlockRegistryService {
       const symlinkPath = path.join(lunPath, tcmuStorageObjectId);
       await fs.unlink(symlinkPath).catch(catchIgnore("ENOENT"));
       // When not empty then some other process managed to claim the LUN, this is not a problem
-      await fs.rmdir(lunPath).catch((err: Error) => {
-        if (!err.message.startsWith("ENOENT") && !err.message.startsWith("ENOTEMPTY")) throw err;
+      await fs.rmdir(lunPath).catch((err) => {
+        if (!err?.message?.startsWith("ENOENT") && !err?.message?.startsWith("ENOTEMPTY")) throw err;
       });
     }
     // Remove the TCMU storage object

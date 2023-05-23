@@ -78,6 +78,7 @@ export const execCmdWithOptsAsync = async (
     cp.stderr.on("data", (data) => {
       stderr += data;
     });
+    cp.on("error", reject);
     cp.on("close", (status) => {
       if (status !== 0) {
         reject(

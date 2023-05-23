@@ -85,6 +85,7 @@ const provideBlockRegistry = (
           cp.stderr.on("data", (data) => {
             tcmuStderr += data;
           });
+          cp.on("error", reject);
           cp.on("close", (code) => {
             if (!shouldTerminate) {
               // eslint-disable-next-line no-console
@@ -147,7 +148,7 @@ const provideBlockRegistry = (
       if (!opts.skipInit) {
         // First check the kernel logs cause if we borked the kernel then
         // all sanity is gone and the cleanup will probably hang .-.
-        await ensureKernelDidNotBlewUp();
+        await ensureKernelDidNotBlowUp();
         try {
           // Check if we have the subtype
           await brService.getTCMUSubtype();
@@ -172,7 +173,7 @@ const provideBlockRegistry = (
 };
 
 // I have never suspected that I legitimately need to worry about this case
-async function ensureKernelDidNotBlewUp() {
+async function ensureKernelDidNotBlowUp() {
   try {
     // Grep returns status 1 when no matches were found
     await execCmdAsync(
