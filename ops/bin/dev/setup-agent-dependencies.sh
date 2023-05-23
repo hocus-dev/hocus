@@ -30,6 +30,11 @@ if ! [ -d /sys/kernel/config/target/loopback/ ] ; then
         exit 1
     fi
 fi
+# Check if kernel has scsi disk support
+if ! [ -d /sys/bus/scsi/drivers/sd ] ; then
+    echo "No scsi disk support detected"; 
+    exit 1
+fi
 
 # Just a sanity check
 cat /sys/kernel/config/target/version

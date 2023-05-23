@@ -163,6 +163,15 @@ export class BlockRegistryService {
       throw new GroupError([new Error(msg), err]);
     }
 
+    // 4. Check that the kernel has support for scsi disks
+    try {
+      await fs.stat("/sys/bus/scsi/drivers/sd");
+    } catch (err) {
+      const msg = `Looks like the kernel does not support scsi disks`;
+      this.logger.error(msg);
+      throw new GroupError([new Error(msg), err]);
+    }
+
     // Now proceed with the setup, it should not hang
     // We are after an restart, nuke anything temporary
     await fs.rm(this.paths.run, { recursive: true, force: true });
