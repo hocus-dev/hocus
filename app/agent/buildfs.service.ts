@@ -91,7 +91,8 @@ export class BuildfsService {
     const result = await db.$queryRaw<[{ id: bigint }]>`
       INSERT INTO "File" ("agentInstanceId", "path")
       VALUES (${args.agentInstanceId}, ${args.projectFilePath})
-      ON CONFLICT DO NOTHING
+      ON CONFLICT ("agentInstanceId", "path")
+      DO UPDATE SET "agentInstanceId" = ${args.agentInstanceId}
       RETURNING id`;
     const projectFileId = BigInt(result[0].id);
     const outputFile = await db.file.create({
