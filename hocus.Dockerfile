@@ -49,4 +49,4 @@ RUN curl -fsSL https://dprint.dev/install.sh | sudo bash && fish -c "set -U fish
 # YQ
 RUN cd ~/ && mkdir ./yq-dl && wget https://github.com/mikefarah/yq/releases/download/v4.33.3/yq_linux_amd64.tar.gz -O ./yq-dl/yq.tar.gz && tar -xvf ./yq-dl/yq.tar.gz -C ./yq-dl && sudo cp ./yq-dl/yq_linux_amd64 /usr/bin/yq && rm -r ./yq-dl
 # Crane
-RUN VERSION=$(curl -s "https://api.github.com/repos/google/go-containerregistry/releases/latest" | jq -r '.tag_name') OSARCH=Linux_x86_64 wget -O - "https://github.com/google/go-containerregistry/releases/download/${VERSION}/go-containerregistry_${OSARCH}.tar.gz" | sudo tar -zxvf - -C /usr/local/bin/ crane
+RUN VERSION=$(curl -s "https://api.github.com/repos/google/go-containerregistry/releases/latest" | jq -r '.tag_name') OSARCH=Linux_x86_64 bash -c 'wget -O - "https://github.com/google/go-containerregistry/releases/download/${VERSION}/go-containerregistry_${OSARCH}.tar.gz" | sudo tar -zxvf - -C /usr/local/bin/ crane'
