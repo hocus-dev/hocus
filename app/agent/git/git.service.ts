@@ -311,8 +311,8 @@ export class AgentGitService {
               guestMountPath: outputDir,
             },
           ],
-          memSizeMib: 1024,
-          vcpuCount: 1,
+          memSizeMib: 4096,
+          vcpuCount: 2,
         },
         async ({ ssh }) => {
           const repositoryDir = path.join(outputDir, PROJECT_DIR);
