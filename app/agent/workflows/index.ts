@@ -35,37 +35,31 @@ export {
 export { runBuildfsAndPrebuilds };
 
 const {
-  addProjectAndRepository,
-  reservePrebuildEvent,
-  waitForPrebuildEventReservations,
-  markPrebuildEventAsArchived,
-  deleteLocalPrebuildEventFiles,
-  deleteRemovablePrebuildEvents,
-  getArchivablePrebuildEvents,
-} = proxyActivities<Activities>({
-  // Setting this too low may cause activities such as buildfs to fail.
-  // Buildfs in particular waits on a file lock to obtain a lock on its
-  // project filesystem, so if several buildfs activities for the same project
-  // are running at the same time, it may take a long time for all of them
-  // to finish.
-  startToCloseTimeout: "24 hours",
-  retry: {
-    maximumAttempts: 1,
-  },
-});
-
-const {
   getRepositoryProjects,
   updateGitBranchesAndObjects,
   getOrCreatePrebuildEvents,
   getDefaultBranch,
   saveGitRepoConnectionStatus,
+  markPrebuildEventAsArchived,
+  deleteRemovablePrebuildEvents,
+  getArchivablePrebuildEvents,
+  addProjectAndRepository,
+  reservePrebuildEvent,
 } = proxyActivities<Activities>({
-  startToCloseTimeout: "1 minute",
+  startToCloseTimeout: "15 seconds",
   retry: {
     maximumAttempts: 1,
   },
 });
+
+const { deleteLocalPrebuildEventFiles, waitForPrebuildEventReservations } =
+  proxyActivities<Activities>({
+    startToCloseTimeout: "1 hour",
+    heartbeatTimeout: "10 seconds",
+    retry: {
+      maximumAttempts: 10,
+    },
+  });
 
 export async function runSyncGitRepository(
   gitRepositoryId: bigint,
@@ -184,7 +178,7 @@ export async function runArchivePrebuild(args: { prebuildEventId: bigint }): Pro
       timeoutMs: oneHour,
     }),
   );
-  await retry(() => deleteLocalPrebuildEventFiles({ prebuildEventId: args.prebuildEventId }));
+  await deleteLocalPrebuildEventFiles({ prebuildEventId: args.prebuildEventId });
   await retry(() => markPrebuildEventAsArchived({ prebuildEventId: args.prebuildEventId }));
 }
 

@@ -1,4 +1,5 @@
 import type { CreateActivity } from "../types";
+import { withActivityHeartbeat } from "../utils";
 
 import { SOLO_AGENT_INSTANCE_ID } from "~/agent/constants";
 import { Token } from "~/token";
@@ -7,9 +8,10 @@ import { unwrap } from "~/utils.shared";
 export type DeleteLocalPrebuildEventFilesActivity = (args: {
   prebuildEventId: bigint;
 }) => Promise<void>;
-export const deleteLocalPrebuildEventFiles: CreateActivity<DeleteLocalPrebuildEventFilesActivity> =
-  ({ injector, db }) =>
-  async (args) => {
+export const deleteLocalPrebuildEventFiles: CreateActivity<
+  DeleteLocalPrebuildEventFilesActivity
+> = ({ injector, db }) =>
+  withActivityHeartbeat({ intervalMs: 1000 }, async (args) => {
     const prebuildService = injector.resolve(Token.PrebuildService);
     const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
       where: { id: args.prebuildEventId },
@@ -32,4 +34,4 @@ export const deleteLocalPrebuildEventFiles: CreateActivity<DeleteLocalPrebuildEv
       fsDrivePath: files.fsFile.path,
       projectDrivePath: files.projectFile.path,
     });
-  };
+  });
