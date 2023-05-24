@@ -169,6 +169,9 @@ export class FirecrackerService {
       this.logger.error(`firecracker process errored: ${displayError(err)}`);
     });
     child.on("close", (code) => {
+      void childStdin.close();
+      void childStdout.close();
+      void childStderr.close();
       this.logger.warn(`firecracker process with pid ${child.pid} closed: ${code}`);
     });
 
