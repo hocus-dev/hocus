@@ -124,8 +124,8 @@ export const execSshCmd = async (
     }
     return output;
   } finally {
-    if (logFile != null && writeStream != null) {
-      await promisify(writeStream.close)();
+    if (logFile != null) {
+      await new Promise((resolve) => writeStream?.end(() => resolve));
       await logFile.close();
     }
   }
