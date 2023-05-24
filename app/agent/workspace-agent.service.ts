@@ -324,6 +324,9 @@ export class WorkspaceAgentService {
           if (cfg === null) {
             throw new Error("Config not found");
           }
+          if (cfg instanceof Error) {
+            throw cfg;
+          }
           await execSshCmd({ ssh }, ["ln", "-sf", cfg[1], WORKSPACE_CONFIG_SYMLINK_PATH]);
 
           // In case the VM gets OOM there will be a stale socket during startup
