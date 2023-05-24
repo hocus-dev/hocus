@@ -21,7 +21,7 @@ import {
 import type { FirecrackerService } from "./firecracker.service";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { SSHGatewayService } from "./ssh-gateway.service";
-import { doesFileExist, execSshCmd } from "./utils";
+import { doesFileExist, execCmdAsync, execSshCmd } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
@@ -88,8 +88,20 @@ export class WorkspaceAgentService {
         .map((f) => path.dirname(f.path))
         .map((dir) => fs.mkdir(dir, { recursive: true })),
     );
-    await fs.copyFile(prebuildEventFiles.fsFile.path, workspace.rootFsFile.path);
-    await fs.copyFile(prebuildEventFiles.projectFile.path, workspace.projectFile.path);
+    await waitForPromises([
+      await execCmdAsync(
+        "cp",
+        "--sparse=always",
+        prebuildEventFiles.fsFile.path,
+        workspace.rootFsFile.path,
+      ),
+      await execCmdAsync(
+        "cp",
+        "--sparse=always",
+        prebuildEventFiles.projectFile.path,
+        workspace.projectFile.path,
+      ),
+    ]);
 
     const project = workspace.prebuildEvent.project;
     const prevRootfsDriveSize = await this.agentUtilService.getFileSizeInMib(

@@ -24,7 +24,7 @@ import { VmInfoValidator } from "./vm-info.validator";
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
-import { displayError, numericSort, unwrap } from "~/utils.shared";
+import { displayError, numericSort, unwrap, waitForPromises } from "~/utils.shared";
 
 const IP_PREFIX = "10.231.";
 const NS_PREFIX = ["ip", "netns", "exec", "vms"] as const;
@@ -302,7 +302,7 @@ export class FirecrackerService {
 
   private async copyToJailerChroot(filePath: string, relativePathInChroot: string): Promise<void> {
     const chrootPath = path.join(this.instanceDirRoot, relativePathInChroot);
-    await fs.copyFile(filePath, chrootPath);
+    await execCmdAsync("cp", "--sparse=always", filePath, chrootPath);
     await fs.chown(chrootPath, JAILER_USER_ID, JAILER_GROUP_ID);
   }
 
@@ -340,55 +340,69 @@ export class FirecrackerService {
     const chrootRootFsPath = "/rootfs.ext4";
 
     const t1 = performance.now();
-    await this.linkToJailerChroot(cfg.kernelPath, chrootKernelPath);
+    const fsTasks: Promise<void>[] = [];
+    fsTasks.push(this.linkToJailerChroot(cfg.kernelPath, chrootKernelPath));
     const shouldCopyRootFs = cfg.copyRootFs ?? false;
     if (shouldCopyRootFs) {
-      await this.copyToJailerChroot(cfg.rootFsPath, chrootRootFsPath);
+      fsTasks.push(this.copyToJailerChroot(cfg.rootFsPath, chrootRootFsPath));
     } else {
-      await this.linkToJailerChroot(cfg.rootFsPath, chrootRootFsPath);
+      fsTasks.push(this.linkToJailerChroot(cfg.rootFsPath, chrootRootFsPath));
     }
     for (const [idx, drive] of cfg.extraDrives.entries()) {
       const shouldCopyFs = drive.copy ?? false;
       if (shouldCopyFs) {
-        await this.copyToJailerChroot(drive.pathOnHost, `/drive${idx}`);
+        fsTasks.push(this.copyToJailerChroot(drive.pathOnHost, `/drive${idx}`));
       } else {
-        await this.linkToJailerChroot(drive.pathOnHost, `/drive${idx}`);
+        fsTasks.push(this.linkToJailerChroot(drive.pathOnHost, `/drive${idx}`));
       }
     }
+    await waitForPromises(fsTasks);
     this.logger.info(`Setting up the FS took ${(performance.now() - t1).toFixed(2)}`);
 
-    await this.api.putGuestBootSource({
-      body: {
-        kernelImagePath: chrootKernelPath,
-        bootArgs: `ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on ${ipArg}`,
-      },
-    });
-    await this.api.putGuestDriveByID({
-      driveId: "rootfs",
-      body: {
+    const cfgTasks: Promise<void>[] = [];
+    cfgTasks.push(
+      this.api.putGuestBootSource({
+        body: {
+          kernelImagePath: chrootKernelPath,
+          bootArgs: `ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on ${ipArg}`,
+        },
+      }),
+    );
+    cfgTasks.push(
+      this.api.putGuestDriveByID({
         driveId: "rootfs",
-        pathOnHost: chrootRootFsPath,
-        isReadOnly: false,
-        isRootDevice: true,
-      },
-    });
+        body: {
+          driveId: "rootfs",
+          pathOnHost: chrootRootFsPath,
+          isReadOnly: false,
+          isRootDevice: true,
+        },
+      }),
+    );
     for (const [idx, drive] of cfg.extraDrives.entries()) {
-      await this.api.putGuestDriveByID({
-        driveId: drive.driveId,
-        body: { ...drive, pathOnHost: `/drive${idx}` },
-      });
+      cfgTasks.push(
+        this.api.putGuestDriveByID({
+          driveId: drive.driveId,
+          body: { ...drive, pathOnHost: `/drive${idx}` },
+        }),
+      );
     }
-    await this.api.putGuestNetworkInterfaceByID({
-      ifaceId: "eth0",
-      body: { ifaceId: "eth0", hostDevName: cfg.tapDeviceName },
-    });
-    await this.api.putMachineConfiguration({
-      body: {
-        vcpuCount: cfg.vcpuCount,
-        memSizeMib: cfg.memSizeMib,
-        smt: true,
-      },
-    });
+    cfgTasks.push(
+      this.api.putGuestNetworkInterfaceByID({
+        ifaceId: "eth0",
+        body: { ifaceId: "eth0", hostDevName: cfg.tapDeviceName },
+      }),
+    );
+    cfgTasks.push(
+      this.api.putMachineConfiguration({
+        body: {
+          vcpuCount: cfg.vcpuCount,
+          memSizeMib: cfg.memSizeMib,
+          smt: true,
+        },
+      }),
+    );
+    await waitForPromises(cfgTasks);
     await this.api.createSyncAction({
       info: {
         actionType: "InstanceStart",
@@ -501,6 +515,7 @@ export class FirecrackerService {
         tapDeviceIp: tapDeviceIp,
         tapDeviceCidr: TAP_DEVICE_CIDR,
       });
+
       await this.createVM({
         kernelPath: kernelPath,
         rootFsPath: config.rootFsPath,
@@ -519,6 +534,7 @@ export class FirecrackerService {
         memSizeMib: config.memSizeMib,
         vcpuCount: config.vcpuCount,
       });
+
       vmStarted = true;
       const t3 = performance.now();
       this.logger.info(
@@ -530,14 +546,18 @@ export class FirecrackerService {
       const sshConfig = { ...config.ssh, host: vmIp };
       return await withSsh(sshConfig, async (ssh) => {
         const useSudo = config.ssh.username !== "root";
+        const mountTasks: Promise<void>[] = [];
         for (const drive of extraDrives) {
-          await this.agentUtilService.mountDriveAtPath(
-            ssh,
-            drive.pathOnHost,
-            drive.guestMountPath,
-            useSudo,
+          mountTasks.push(
+            this.agentUtilService.mountDriveAtPath(
+              ssh,
+              drive.pathOnHost,
+              drive.guestMountPath,
+              useSudo,
+            ),
           );
         }
+        await waitForPromises(mountTasks);
         const r = await fn({
           ssh,
           sshConfig,

@@ -33,7 +33,7 @@ import {
 } from "./prebuild-constants";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
-import { doesFileExist, execSshCmd, sha256, withFileLock } from "./utils";
+import { doesFileExist, execCmdAsync, execSshCmd, sha256, withFileLock } from "./utils";
 
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
@@ -189,8 +189,13 @@ export class PrebuildService {
       fs.mkdir(path.dirname(args.outputFsDrivePath), { recursive: true }),
     ]);
     await waitForPromises([
-      fs.copyFile(args.sourceProjectDrivePath, args.outputProjectDrivePath),
-      fs.copyFile(args.sourceFsDrivePath, args.outputFsDrivePath),
+      execCmdAsync(
+        "cp",
+        "--sparse=always",
+        args.sourceProjectDrivePath,
+        args.outputProjectDrivePath,
+      ),
+      execCmdAsync("cp", "--sparse=always", args.sourceFsDrivePath, args.outputFsDrivePath),
     ]);
   }
 
@@ -314,7 +319,7 @@ export class PrebuildService {
     }
     await fs.mkdir(path.dirname(args.outputDrivePath), { recursive: true });
     await withFileLock(args.repositoryDrivePath, async () => {
-      await fs.copyFile(args.repositoryDrivePath, args.outputDrivePath);
+      await execCmdAsync("cp", "--sparse=always", args.repositoryDrivePath, args.outputDrivePath);
     });
     const workdir = "/tmp/workdir";
     try {

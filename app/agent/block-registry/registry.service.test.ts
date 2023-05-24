@@ -179,7 +179,7 @@ async function ensureKernelDidNotBlowUp() {
     await execCmdAsync(
       "bash",
       "-c",
-      'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption|Code:"',
+      'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption|RIP:"',
     );
     // eslint-disable-next-line no-console
     console.error((await execCmdAsync("dmesg")).stdout);

@@ -9,7 +9,7 @@ import type { NodeSSH } from "node-ssh";
 import type { AgentUtilService } from "./agent-util.service";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import type { FirecrackerService } from "./firecracker.service";
-import { doesFileExist, execSshCmd, withFileLock } from "./utils";
+import { doesFileExist, execCmdAsync, execSshCmd, withFileLock } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
@@ -214,7 +214,7 @@ export class BuildfsService {
       if (await doesFileExist(drivePath)) {
         return drivePath;
       }
-      await fs.copyFile(this.agentConfig.buildfsRootFs, drivePath);
+      await execCmdAsync("cp", "--sparse=always", this.agentConfig.buildfsRootFs, drivePath);
       // We keep the drive image small to reduce the time it takes to copy it.
       // Copying 50GB would take a long time, like more than 30s. On the other hand,
       // expansion is fast, like less than a second fast, so we do it here.
