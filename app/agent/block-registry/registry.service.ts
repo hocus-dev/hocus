@@ -768,7 +768,7 @@ export class BlockRegistryService {
           await execCmdAsync("mount", ...flags, bd.device, mountPoint);
           this.logger.info(`mount for ${what} took: ${(performance.now() - t1).toFixed(2)} ms`);
         } catch (err) {
-          if (!err?.message?.includes("already mounted")) throw err;
+          if (err instanceof Error && !err?.message?.includes("already mounted")) throw err;
         }
         return { mountPoint, readonly };
       }
@@ -810,6 +810,7 @@ export class BlockRegistryService {
                 });
               } catch (err) {
                 if (
+                  err instanceof Error &&
                   !err?.message?.startsWith("EAGAIN") &&
                   !err?.message?.startsWith("EWOULDBLOCK")
                 )
@@ -870,7 +871,8 @@ export class BlockRegistryService {
               .catch(catchAlreadyExists);
 
             await enableFd.write("1").catch((err) => {
-              if (!err?.message?.startsWith("EEXIST") && !err?.message?.startsWith("ENOENT")) throw err;
+              if (!err?.message?.startsWith("EEXIST") && !err?.message?.startsWith("ENOENT"))
+                throw err;
               // The TCMU process told us that he failed to set up his part of the deal
               if (err?.message?.startsWith("ENOENT")) tcmuAttachFailed = true;
             });
@@ -938,7 +940,7 @@ export class BlockRegistryService {
                     .catch(catchAlreadyExists);
                   lunClaimed = true;
                 } catch (err) {
-                  if (!err?.message?.includes("ENOENT")) throw err;
+                  if (err instanceof Error && !err?.message?.includes("ENOENT")) throw err;
                 }
               }
               // Ok the above code ensured that the lun was claimed by someone
@@ -1016,7 +1018,7 @@ export class BlockRegistryService {
             );
             break;
           } catch (err) {
-            if (!err?.message?.startsWith("ENOENT")) throw err;
+            if (err instanceof Error && !err?.message?.startsWith("ENOENT")) throw err;
             await sleep(5);
           }
         }
@@ -1064,7 +1066,7 @@ export class BlockRegistryService {
         // TODO: Calling the umount syscall directly is much much more faster
         await execCmdAsync("umount", mountPoint);
       } catch (err) {
-        if (!err?.message?.includes("not mounted")) throw err;
+        if (err instanceof Error && !err?.message?.includes("not mounted")) throw err;
       }
 
       await fs.rmdir(mountPoint);
@@ -1086,7 +1088,8 @@ export class BlockRegistryService {
       await fs.unlink(symlinkPath).catch(catchIgnore("ENOENT"));
       // When not empty then some other process managed to claim the LUN, this is not a problem
       await fs.rmdir(lunPath).catch((err) => {
-        if (!err?.message?.startsWith("ENOENT") && !err?.message?.startsWith("ENOTEMPTY")) throw err;
+        if (!err?.message?.startsWith("ENOENT") && !err?.message?.startsWith("ENOTEMPTY"))
+          throw err;
       });
     }
     // Remove the TCMU storage object
