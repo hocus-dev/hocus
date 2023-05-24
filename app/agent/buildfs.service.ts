@@ -88,20 +88,12 @@ export class BuildfsService {
       buildfsEventId: bigint;
     },
   ): Promise<BuildfsEventFiles> {
-    const projectFile = await db.file.upsert({
-      where: {
-        // eslint-disable-next-line camelcase
-        agentInstanceId_path: {
-          agentInstanceId: args.agentInstanceId,
-          path: args.projectFilePath,
-        },
-      },
-      create: {
-        agentInstanceId: args.agentInstanceId,
-        path: args.projectFilePath,
-      },
-      update: {},
-    });
+    const { id: projectFileIdStr } = await db.$queryRaw<{ id: string }>`
+      INSERT INTO "File" ("agentInstanceId", "path")
+      VALUES (${args.agentInstanceId}, ${args.projectFilePath})
+      ON CONFLICT DO NOTHING
+      RETURNING id`;
+    const projectFileId = BigInt(projectFileIdStr);
     const outputFile = await db.file.create({
       data: {
         agentInstanceId: args.agentInstanceId,
@@ -111,7 +103,7 @@ export class BuildfsService {
     return await db.buildfsEventFiles.create({
       data: {
         buildfsEventId: args.buildfsEventId,
-        projectFileId: projectFile.id,
+        projectFileId,
         outputFileId: outputFile.id,
         agentInstanceId: args.agentInstanceId,
       },
