@@ -113,7 +113,7 @@ const REQUIRED_SSH_VERSION: Record<SSH_VENDOR, SSHVersionSpec> = {
   [SSH_VENDOR.OPENSSH_FOR_WINDOWS]: {
     // What I tested manually ¯\_(ツ)_/¯
     // 9.2.0.0, 9.1.0.0, 8.9.1.0 works out of the box
-    // 8.6.0.0 connected but the agent forwading was borked
+    // 8.6.0.0 connected but the agent forwarding was borked
     // TODO: Test manually 8.9.0.0, 8.1.0.0, 8.0.0.0, 7.9.0.0, 7.7.2.0, 7.7.1.0, 7.7.0.0, 7.6.1.0, 7.6.0.1, 7.6.0.0
     hard: {
       blacklist: [],
@@ -152,7 +152,7 @@ async function discoverSshClientVersionString(): Promise<string> {
     if ((err as any).code === "ENOENT") {
       const opt1 = "How to install it?";
       const opt2 = "But I have it installed";
-      // Delibrate floating promise
+      // Deliberate floating promise
       void vscode.window
         .showErrorMessage(
           `SSH client not found. Please install OpenSSH`,
@@ -181,7 +181,7 @@ async function discoverSshClientVersionString(): Promise<string> {
     else {
       console.error(err);
       const opt1 = "Bug report";
-      // Delibrate floating promise
+      // Deliberate floating promise
       void vscode.window
         .showErrorMessage(
           `Unable to probe the SSH version`,
@@ -217,7 +217,7 @@ async function detectSshClient(): Promise<SSHClient> {
   ];
   if (matches.length !== 1) {
     const opt1 = "Bug report";
-    // Delibrate floating promise
+    // Deliberate floating promise
     void vscode.window
       .showErrorMessage(
         `Unable to parse the SSH version slug`,
@@ -245,7 +245,7 @@ async function detectSshClient(): Promise<SSHClient> {
   if (isWindows && vendor === SSH_VENDOR.CORE_PORTABLE) {
     vendor = SSH_VENDOR.GIT_FOR_WINDOWS;
 
-    // If the next probe fails then assume we're runing GIT_FOR_WINDOWS
+    // If the next probe fails then assume we're running GIT_FOR_WINDOWS
     // We need more probes cause OPENSSH_FOR_WINDOWS didn't always use "OpenSSH_for_Windows_" for the slug .-.
     try {
       // This resolves the absolute path to the ssh binary.
@@ -285,7 +285,7 @@ async function ensureSshNewEnough(sshClient: SSHClient): Promise<void> {
       constraints.blacklist.find((x) => sshVersionCmp(x, sshClient.version) === 0) !== void 0
     ) {
       const opt1 = "How to upgrade?";
-      // Delibrate floating promise
+      // Deliberate floating promise
       void vscode.window
         .showErrorMessage(
           `Unsupported SSH version :(`,

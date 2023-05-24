@@ -13,7 +13,7 @@ export const mapenum =
     map;
 
 /**
- * Removes the traling slash from a url.
+ * Removes the trailing slash from a url.
  */
 export const removeTrailingSlash = (url: string): string => {
   if (url.slice(-1) === "/") {

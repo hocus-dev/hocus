@@ -57,7 +57,7 @@ function attachVscodeTerminalToTask(task: WorkspaceTask): vscode.Terminal {
 
 // Turns out term.creationOptions is very unreliable. The info is lost after a window reload
 // What is preserved is the PID of the terminal. Use it to read from /proc directly :)
-// BBQ Driven Developement here we come :)
+// BBQ Driven Development here we come :)
 async function getTerminalCmdLine(term: vscode.Terminal): Promise<string | undefined> {
   const pid = await term.processId;
   return (await fs.readFile(`/proc/${pid}/cmdline`, "utf-8")).split("\x00")[1];

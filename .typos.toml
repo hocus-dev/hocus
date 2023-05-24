@@ -5,6 +5,8 @@ extend-ignore-re = [
     "(?s)-----BEGIN OPENSSH PRIVATE KEY-----.*-----END OPENSSH PRIVATE KEY-----",
     # JWT
     "\"([a-zA-Z0-9_=]+)\\.([a-zA-Z0-9_=]+)\\.([a-zA-Z0-9_\\-\\+/=]*)\"",
+    "\"fileBA\"",
+    "\"fileBB\"",
 ]
 
 [files]
@@ -12,7 +14,11 @@ extend-exclude = [
     ".clinic",
     "public/font-awesome/*",
     "public/fonts/*",
-    "ops/docker/resources/keycloak-db-dump.sql"
+    "ops/docker/resources/keycloak-db-dump.sql",
+    "deps/firecracker-client/",
+    "app/agent/block-registry/oci-schema/typebox/typescript-to-typebox.ts",
+    "app/agent/block-registry/test-data/*.Dockerfile",
+    "app/agent/block-registry/test-data/resources",
 ]
 
 [type.excalidraw]

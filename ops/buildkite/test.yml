@@ -123,9 +123,6 @@ steps:
           - docker#v5.6.0:
               command: ["."]
               image: "imunew/typos-cli:latest"
-        # TODO: This will be fixed in a separate PR xd
-        soft_fail:
-          - exit_status: 2
 
       - label: ":man_in_lotus_position::skin-tone-6: vale"
         plugins:
