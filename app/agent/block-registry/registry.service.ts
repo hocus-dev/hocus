@@ -85,7 +85,9 @@ export class BlockRegistryService {
       // Directory for anything temporary which should be nuked after a restart
       // This can't be /tmp as I need the directory to be on the same partition as the registry
       // I'm abusing hardlinks to create synchronization primitives
-      // The entire registry is fully lockless, wait free and all operations on it are idempotent
+      // The entire registry is mostly lockless
+      // (We have a per imageId/containerId flock on configfs in the expose method, due to a data corruption kernel bug),
+      // wait free and all operations on it are idempotent
       run: path.join(root, "run"),
       // Filesystem mounts
       mounts: path.join(root, "mounts"),
@@ -197,7 +199,12 @@ export class BlockRegistryService {
     }
     await waitForPromises(tasks);
 
-    // Play some starcraft, i found ZERO info what is the nexus in tcm_loop .-. I have no idea what this does
+    // This sets the SCSI-iSCSI IT Nexus to the TCM_LOOP WWN
+    // I have no idea why this is necessary but no block device will appear
+    // without setting the Nexus. Good to play some starcraft :)
+    // Please don't remove this line or things will break.
+    // If you dear reader know what this does then please
+    // send us a PR updating this comment :)
     await fs
       .writeFile(path.join(this.paths.tcmLoopTarget, "nexus"), HOCUS_TCM_LOOP_WWN)
       .catch(catchAlreadyExists);
@@ -767,8 +774,8 @@ export class BlockRegistryService {
           // TODO: Calling the mount syscall directly is much much faster
           await execCmdAsync("mount", ...flags, bd.device, mountPoint);
           this.logger.info(`mount for ${what} took: ${(performance.now() - t1).toFixed(2)} ms`);
-        } catch (err) {
-          if (err instanceof Error && !err?.message?.includes("already mounted")) throw err;
+        } catch (err: any) {
+          if (!err?.message?.includes("already mounted")) throw err;
         }
         return { mountPoint, readonly };
       }
@@ -808,12 +815,8 @@ export class BlockRegistryService {
                     }
                   });
                 });
-              } catch (err) {
-                if (
-                  err instanceof Error &&
-                  !err?.message?.startsWith("EAGAIN") &&
-                  !err?.message?.startsWith("EWOULDBLOCK")
-                )
+              } catch (err: any) {
+                if (!err?.message?.startsWith("EAGAIN") && !err?.message?.startsWith("EWOULDBLOCK"))
                   throw err;
                 flockAcquired = false;
                 await sleep(5);
@@ -939,8 +942,8 @@ export class BlockRegistryService {
                     .symlink(tcmuPath, path.join(lunPath, tcmuStorageObjectId))
                     .catch(catchAlreadyExists);
                   lunClaimed = true;
-                } catch (err) {
-                  if (err instanceof Error && !err?.message?.includes("ENOENT")) throw err;
+                } catch (err: any) {
+                  if (!err?.message?.includes("ENOENT")) throw err;
                 }
               }
               // Ok the above code ensured that the lun was claimed by someone
@@ -952,7 +955,7 @@ export class BlockRegistryService {
               try {
                 await fs.stat(path.join(lunPath, tcmuStorageObjectId));
               } catch (err: any) {
-                if (err?.message?.startsWith("ENOENT")) throw err;
+                if (!err?.message?.startsWith("ENOENT")) throw err;
                 // Hash collision
                 done = false;
               }
@@ -1017,8 +1020,8 @@ export class BlockRegistryService {
               path.join("/sys/class/scsi_disk/", fullSCSIAddr, "device/block"),
             );
             break;
-          } catch (err) {
-            if (err instanceof Error && !err?.message?.startsWith("ENOENT")) throw err;
+          } catch (err: any) {
+            if (!err?.message?.startsWith("ENOENT")) throw err;
             await sleep(5);
           }
         }
@@ -1065,8 +1068,8 @@ export class BlockRegistryService {
       try {
         // TODO: Calling the umount syscall directly is much much more faster
         await execCmdAsync("umount", mountPoint);
-      } catch (err) {
-        if (err instanceof Error && !err?.message?.includes("not mounted")) throw err;
+      } catch (err: any) {
+        if (!err?.message?.includes("not mounted")) throw err;
       }
 
       await fs.rmdir(mountPoint);
