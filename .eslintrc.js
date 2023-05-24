@@ -1,5 +1,5 @@
 module.exports = {
-  plugins: ["filename-rules"],
+  plugins: ["filename-rules", "eslint-plugin-n"],
   ignorePatterns: [
     "node_modules/**/*",
     "public/**/*",
@@ -45,6 +45,20 @@ module.exports = {
         project: ["./tsconfig.json"], // Specify it only for TypeScript files
       },
       rules: {
+        "n/no-sync": ["error", { allowAtRootLevel: true }],
+        "n/prefer-global/console": ["error", "always"],
+        "n/prefer-global/process": ["error", "always"],
+        "n/prefer-global/text-decoder": ["error", "always"],
+        "n/prefer-global/text-encoder": ["error", "always"],
+        "n/prefer-global/url": ["error", "always"],
+        "n/prefer-global/url-search-params": ["error", "always"],
+        "n/prefer-promises/fs": "error",
+        "n/prefer-promises/dns": "error",
+        "n/no-unsupported-features/node-builtins": ["error"],
+        "n/no-unsupported-features/es-syntax": ["error"],
+        "n/no-unsupported-features/es-builtins": ["error"],
+        "n/no-path-concat": ["error"],
+        "n/no-deprecated-api": ["error"],
         "@typescript-eslint/no-unused-vars": [
           "warn",
           { args: "after-used", argsIgnorePattern: "^_", varsIgnorePattern: "^_" },

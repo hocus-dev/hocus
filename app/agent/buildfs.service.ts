@@ -278,7 +278,7 @@ export class BuildfsService {
     const outputFile = files.outputFile;
     const projectFile = files.projectFile;
 
-    this.agentUtilService.createExt4Image(
+    await this.agentUtilService.createExt4Image(
       outputFile.path,
       buildfsEvent.project.maxPrebuildRootDriveSizeMib,
       true,

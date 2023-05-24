@@ -1,4 +1,3 @@
-import type { SpawnSyncReturns } from "child_process";
 import fs from "fs/promises";
 
 import type { Prisma } from "@prisma/client";
@@ -10,7 +9,7 @@ import { createAgentInjector } from "./agent-injector";
 import type { AgentInjector } from "./agent-injector";
 import type { FirecrackerService } from "./firecracker.service";
 import { SSH_PROXY_IP } from "./test-constants";
-import { execCmd } from "./utils";
+import { execCmdAsync } from "./utils";
 
 import type { Config } from "~/config";
 import { Scope } from "~/di/injector.server";
@@ -74,12 +73,12 @@ export const execSshCmdThroughProxy = async (args: {
   vmIp: string;
   privateKey: string;
   cmd: string;
-}): Promise<SpawnSyncReturns<Buffer>> => {
+}): Promise<{ stdout: string; stderr: string }> => {
   const keyPath = `/tmp/${uuidv4()}.key` as const;
   try {
     await fs.writeFile(keyPath, args.privateKey);
-    execCmd("chmod", "600", keyPath);
-    return execCmd(
+    await fs.chmod(keyPath, "600");
+    return await execCmdAsync(
       "ip",
       "netns",
       "exec",

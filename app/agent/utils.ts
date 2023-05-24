@@ -1,12 +1,7 @@
-import type {
-  SpawnOptionsWithoutStdio,
-  SpawnSyncOptionsWithBufferEncoding,
-  SpawnSyncReturns,
-} from "child_process";
+import type { SpawnOptionsWithoutStdio } from "child_process";
 import { spawn } from "child_process";
-import { spawnSync } from "child_process";
 import { createHash } from "crypto";
-import fs from "fs";
+import fs, { type FileHandle } from "fs/promises";
 import path from "path";
 
 import type { Log } from "@prisma/client";
@@ -26,40 +21,11 @@ export const execCmdAsync = async (
   return await execCmdWithOptsAsync(args, {});
 };
 
-/**
- * @deprecated Use execCmdAsync to not block the event loop
- */
-export const execCmd = (...args: string[]): SpawnSyncReturns<Buffer> => {
-  return execCmdWithOpts(args, {});
-};
-
 export class ExecCmdError extends Error {
   constructor(public readonly status: number | null, public readonly message: string) {
     super(message);
   }
 }
-
-/**
- * @deprecated Use execCmdWithOptsAsync to not block the event loop
- */
-export const execCmdWithOpts = (
-  args: string[],
-  options: Object.Modify<
-    SpawnSyncOptionsWithBufferEncoding,
-    { env?: Record<string, string | undefined> }
-  >,
-): SpawnSyncReturns<Buffer> => {
-  const output = spawnSync(args[0], args.slice(1), options as SpawnSyncOptionsWithBufferEncoding);
-  if (output.status !== 0) {
-    throw new ExecCmdError(
-      output.status,
-      `Command "${args.join(" ")}" failed with status ${output.status}, error name: "${
-        output.error?.name
-      }", error message: "${output.error?.message}", and output:\n${output.output?.toString()}`,
-    );
-  }
-  return output;
-};
 
 export const execCmdWithOptsAsync = async (
   args: string[],
@@ -123,18 +89,18 @@ export const execSshCmd = async (
   args: string[],
 ): Promise<SSHExecCommandResponse> => {
   const { ssh, opts, logFilePath, allowNonZeroExitCode } = options;
-  let logFile: number | undefined = void 0;
+  let logFile: FileHandle | undefined = void 0;
   try {
     if (logFilePath != null) {
-      logFile = fs.openSync(logFilePath, "w");
+      logFile = await fs.open(logFilePath, "w");
     }
     const output = await ssh.exec(args[0], args.slice(1), {
       ...opts,
       stream: "both",
       ...(logFile != null
         ? {
-            onStdout: (chunk) => fs.writeSync(unwrap(logFile), chunk),
-            onStderr: (chunk) => fs.writeSync(unwrap(logFile), chunk),
+            onStdout: async (chunk) => await unwrap(logFile).write(chunk),
+            onStderr: async (chunk) => await unwrap(logFile).write(chunk),
           }
         : {}),
     });
@@ -148,7 +114,7 @@ export const execSshCmd = async (
     return output;
   } finally {
     if (logFile != null) {
-      fs.closeSync(logFile);
+      await logFile.close();
     }
   }
 };
@@ -278,7 +244,7 @@ export const retry = async <T>(
 
 export const doesFileExist = async (filePath: string): Promise<boolean> => {
   try {
-    await fs.promises.access(filePath);
+    await fs.access(filePath);
     return true;
   } catch (err: any) {
     if (err?.code === "ENOENT") {
@@ -336,8 +302,8 @@ export const withFileLockCreateIfNotExists = async <T>(
 ): Promise<T> => {
   const exists = await doesFileExist(lockFilePath);
   if (!exists) {
-    await fs.promises.mkdir(path.dirname(lockFilePath), { recursive: true });
-    await fs.promises.appendFile(lockFilePath, "");
+    await fs.mkdir(path.dirname(lockFilePath), { recursive: true });
+    await fs.appendFile(lockFilePath, "");
   }
   return await withFileLock(lockFilePath, fn);
 };

@@ -1,7 +1,7 @@
 // must be the first import
 import "./prisma-export-patch.server";
 
-import fs from "fs";
+import fs from "fs/promises";
 
 import { Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
@@ -10,7 +10,6 @@ import { Client as PgClient } from "pg";
 import * as build from "prisma/build";
 import { v4 as uuidv4 } from "uuid";
 
-import "process";
 import { waitForPromises } from "~/utils.shared";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
@@ -40,11 +39,11 @@ export const provideDb = (
       },
     });
     const schemaPath = `prisma/tmp-${dbName}.prisma`;
-    const schemaContents = fs
-      .readFileSync("prisma/schema.prisma")
-      .toString()
-      .replace(`env("PRISMA_DATABASE_URL")`, `"${dbUrl}"`);
-    fs.writeFileSync(schemaPath, schemaContents);
+    const schemaContents = (await fs.readFile("prisma/schema.prisma", "utf-8")).replace(
+      `env("PRISMA_DATABASE_URL")`,
+      `"${dbUrl}"`,
+    );
+    await fs.writeFile(schemaPath, schemaContents);
 
     await build.ensureDatabaseExists("apply", true, schemaPath);
     const migrate = new build.Migrate(schemaPath);
@@ -52,7 +51,7 @@ export const provideDb = (
     // eslint-disable-next-line no-console
     console.info = () => {};
     await migrate.applyMigrations();
-    fs.unlinkSync(schemaPath);
+    await fs.unlink(schemaPath);
 
     migrate.stop();
 
