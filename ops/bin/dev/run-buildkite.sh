@@ -15,7 +15,7 @@ export DOCKERFILE_DIR="${REPO_DIR}/resources/docker"
 rm -f buildkite.ext4
 ops/bin/buildfs.sh "$DOCKERFILE_DIR/buildkite-agent.Dockerfile" "buildkite.ext4" "$REPO_DIR/resources" 524288
 
-wget --continue --retry-connrefused --waitretry=1 --timeout=20 --tries=3 -O "./vmlinux-6.2-x86_64.bin" https://github.com/hocus-dev/linux-kernel/releases/download/0.0.4/vmlinux-6.2-x86_64.bin
+wget --continue --retry-connrefused --waitretry=1 --timeout=20 --tries=3 -O "./vmlinux-6.2-x86_64.bin" https://github.com/hocus-dev/linux-kernel/releases/download/0.0.5/vmlinux-6.2-x86_64.bin
 
 total_cores=$(nproc)
 allocated_cores=$((total_cores / 2))

@@ -1,6 +1,7 @@
 import { DefaultLogger } from "@temporalio/worker";
 
 import { AgentUtilService } from "./agent-util.service";
+import { BlockRegistryService } from "./block-registry/registry.service";
 import { BuildfsService } from "./buildfs.service";
 import { factoryFirecrackerService } from "./firecracker.service";
 import { AgentGitService } from "./git/git.service";
@@ -49,6 +50,7 @@ const providers = [
   { token: Token.FirecrackerService, provide: { factory: factoryFirecrackerService } },
   { token: Token.WorkspaceAgentService, provide: { class: WorkspaceAgentService } },
   { token: Token.TemporalClient, provide: { factory: clientFactory } },
+  { token: Token.BlockRegistryService, provide: { class: BlockRegistryService } },
 ] as const;
 
 export const createAgentInjector = (overrides?: ProviderOverrides): AgentInjector => {

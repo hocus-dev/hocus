@@ -41,12 +41,56 @@ services:
         ops/bin/buildfs.sh resources/docker/default-workspace.Dockerfile /agent_data/resources/default-workspace.ext4 resources/ 1500
         ops/bin/buildfs.sh resources/docker/buildfs.Dockerfile /agent_data/resources/buildfs.ext4 resources/ 1000
         ops/bin/buildfs.sh resources/docker/fetchrepo.Dockerfile /agent_data/resources/fetchrepo.ext4 resources 2500
-        curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 https://github.com/hocus-dev/linux-kernel/releases/download/0.0.4/vmlinux-6.2-x86_64.bin -z /agent_data/resources/vmlinux-6.2-x86_64.bin -o /agent_data/resources/vmlinux-6.2-x86_64.bin --location
+        curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 https://github.com/hocus-dev/linux-kernel/releases/download/0.0.5/vmlinux-6.2-x86_64.bin -z /agent_data/resources/vmlinux-6.2-x86_64.bin -o /agent_data/resources/vmlinux-6.2-x86_64.bin --location
         ops/bin/dev/build-test-buildfs.sh /agent_data/resources
       "
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - agent-test-data:/agent_data:rw
+
+  setup-tcmu:
+    image: alpine:3.14
+    privileged: true
+    restart: "no"
+    command: |
+      sh -o errexit -o nounset -o pipefail -o xtrace -c "
+        # First check whether we need to load target_core_user
+        if ! [ -d /sys/kernel/config/target ] ; then
+          if [ -f /proc/modules ] ; then
+            echo \"Trying to load target_core_user\";
+            modprobe target_core_user;
+          fi;
+          # Check if loading target_core_user worked
+          if ! [ -d /sys/kernel/config/target ] ; then
+            echo \"Kernel module target_core_user is not available\";
+            exit 1
+          fi;
+        fi;
+
+        # Secondly check whether we need to load tcm_loop
+        if ! [ -d /sys/kernel/config/target/loopback/ ] ; then
+            echo \"Trying to load tcm_loop\";
+            # Oh perhaps the module is there but not started?
+            mkdir /sys/kernel/config/target/loopback/ || true
+            # If the directory is not there then the kernel doesn't have tcm_loop
+            if ! [ -d /sys/kernel/config/target/loopback/ ] ; then
+                echo \"Kernel module tcm_loop is not available\";
+                exit 1
+            fi
+        fi
+
+        # Check for scsi disk support
+        if ! [ -d /sys/bus/scsi/drivers/sd ] ; then
+          # TODO: try to load the module
+          #       please note that 99% of kernels should have this available
+          #       cause otherwise one cannot boot from an hdd ;)
+          echo \"No scsi disk support detected\";
+          exit 1
+        fi
+      "
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      - /sys/kernel/config:/sys/kernel/config
 
   agent:
     build:
@@ -57,6 +101,8 @@ services:
         condition: service_healthy
       setup-vm-images:
         condition: service_completed_successfully
+      setup-tcmu:
+        condition: service_completed_successfully
     restart: "no"
     privileged: true
     ports:
@@ -66,4 +112,6 @@ services:
     volumes:
       - "agent-test-data:/srv/jailer"
       - /dev/kvm:/dev/kvm
+      - /dev:/dev/hocus
+      - /sys/kernel/config:/sys/kernel/config
     command: sleep infinity

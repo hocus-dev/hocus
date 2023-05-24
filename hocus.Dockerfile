@@ -4,7 +4,7 @@ RUN apt-get update \
     && add-apt-repository "deb http://httpredir.debian.org/debian sid main" \
     && apt-get update \
     && apt-get -t sid install -y sudo cmake zlib1g-dev libcurl4-openssl-dev libssl3 libssl-dev libaio-dev libnl-3-dev libnl-genl-3-dev libgflags-dev libzstd-dev libext2fs-dev
-RUN git clone https://github.com/containerd/overlaybd.git
+RUN git clone https://github.com/hocus-dev/overlaybd.git && cd overlaybd && git checkout a52cabb627a5e3e50f3d364ac8a6a061b1bb6ff7
 RUN cd overlaybd && git submodule update --init
 RUN cd overlaybd && mkdir build && cd build && cmake .. && make && sudo make install
 
@@ -14,7 +14,7 @@ RUN cd accelerated-container-image && make bin/convertor && cp ./bin/convertor /
 
 FROM hocusdev/workspace
 RUN { curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 -fsSL https://deb.nodesource.com/setup_18.x | sudo bash -; } \
-    && DEBIAN_FRONTEND=noninteractive sudo apt-get install -y nodejs qemu-system psmisc expect unzip skopeo jq \
+    && DEBIAN_FRONTEND=noninteractive sudo apt-get install -y cmake nodejs qemu-system psmisc expect unzip skopeo jq \
     && sudo npm install --global yarn \
     && fish -c "set -U fish_user_paths \$fish_user_paths ~/.yarn/bin" \
     && echo 'export PATH="~/.yarn/bin:$PATH"' >> ~/.bashrc \
@@ -48,3 +48,5 @@ RUN cd ~/ && mkdir ./vale-dl && wget https://github.com/errata-ai/vale/releases/
 RUN curl -fsSL https://dprint.dev/install.sh | sudo bash && fish -c "set -U fish_user_paths \$fish_user_paths ~/.dprint/bin" && echo 'export PATH="~/.dprint/bin:$PATH"' >> ~/.bashrc
 # YQ
 RUN cd ~/ && mkdir ./yq-dl && wget https://github.com/mikefarah/yq/releases/download/v4.33.3/yq_linux_amd64.tar.gz -O ./yq-dl/yq.tar.gz && tar -xvf ./yq-dl/yq.tar.gz -C ./yq-dl && sudo cp ./yq-dl/yq_linux_amd64 /usr/bin/yq && rm -r ./yq-dl
+# Crane
+RUN VERSION=$(curl -s "https://api.github.com/repos/google/go-containerregistry/releases/latest" | jq -r '.tag_name') OSARCH=Linux_x86_64 bash -c 'wget -O - "https://github.com/google/go-containerregistry/releases/download/${VERSION}/go-containerregistry_${OSARCH}.tar.gz" | sudo tar -zxvf - -C /usr/local/bin/ crane'

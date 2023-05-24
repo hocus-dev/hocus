@@ -33,7 +33,7 @@ function parse<T extends TSchema>(this: TypeCheck<T>, value: unknown): SchemaVal
   if (this.Check(value)) {
     return value as SchemaValueType<T>;
   }
-  throw new ValidationError(this.Errors(value));
+  throw new ValidationError(this.Errors(value)[Symbol.iterator]());
 }
 
 /**
@@ -49,7 +49,7 @@ function safeParse<T extends TSchema>(
   if (this.Check(value)) {
     return { success: true, value: value as SchemaValueType<T> };
   }
-  return { success: false, error: new ValidationError(this.Errors(value)) };
+  return { success: false, error: new ValidationError(this.Errors(value)[Symbol.iterator]()) };
 }
 
 export const compileSchema = <T extends TSchema>(schema: T): Validator<T> => {

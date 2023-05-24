@@ -22,7 +22,7 @@ services:
         ops/bin/buildfs.sh resources/docker/default-workspace.Dockerfile /agent_data/resources/default-workspace.ext4 resources/ 1500
         ops/bin/buildfs.sh resources/docker/buildfs.Dockerfile /agent_data/resources/buildfs.ext4 resources/ 1000
         ops/bin/buildfs.sh resources/docker/fetchrepo.Dockerfile /agent_data/resources/fetchrepo.ext4 resources 2500
-        curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 https://github.com/hocus-dev/linux-kernel/releases/download/0.0.4/vmlinux-6.2-x86_64.bin -z /agent_data/resources/vmlinux-6.2-x86_64.bin -o /agent_data/resources/vmlinux-6.2-x86_64.bin --location
+        curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 https://github.com/hocus-dev/linux-kernel/releases/download/0.0.5/vmlinux-6.2-x86_64.bin -z /agent_data/resources/vmlinux-6.2-x86_64.bin -o /agent_data/resources/vmlinux-6.2-x86_64.bin --location
       "
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

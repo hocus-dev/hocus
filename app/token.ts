@@ -32,4 +32,5 @@ export const Token = {
   TimeService: "TimeServiceT",
   PerfService: "PerfServiceT",
   InitService: "InitServiceT",
+  BlockRegistryService: "BlockRegistryServiceT",
 } as const;
