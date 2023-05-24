@@ -9,16 +9,19 @@ import { HOCUS_CONFIG_FILE_NAMES } from "./constants";
 import type { ProjectConfig } from "./validator";
 import { ProjectConfigValidator } from "./validator";
 
+import type { ValidationError } from "~/schema/utils.server";
+
 export class ProjectConfigService {
   /**
    * Returns `[ProjectConfig, projectConfigPath]` for the given repository
-   * if a hocus config file is present. Otherwise, returns `null`.
+   * if a hocus config file is present. If the config file is invalid, returns an error,
+   * Otherwise, returns `null`.
    */
   async getConfig(
     ssh: NodeSSH,
     repositoryPath: string,
     rootDirectoryPath: string,
-  ): Promise<[ProjectConfig, string] | null> {
+  ): Promise<[ProjectConfig, string] | null | ValidationError> {
     const configDir = path.join(repositoryPath, rootDirectoryPath);
     let configString: string | null = null;
     let configPath: string | null = null;
@@ -41,6 +44,11 @@ export class ProjectConfigService {
       return null;
     }
     const config = yaml.parse(configString);
-    return [ProjectConfigValidator.Parse(config), configPath];
+    const { success, error, value: parsedConfig } = ProjectConfigValidator.SafeParse(config);
+    if (!success) {
+      return error;
+    } else {
+      return [parsedConfig, configPath];
+    }
   }
 }

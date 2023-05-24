@@ -234,7 +234,7 @@ test.concurrent(
           {
             project: projects[1],
             buildfsStatus: null,
-            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS,
+            prebuildStatus: PrebuildEventStatus.PREBUILD_EVENT_STATUS_ERROR,
           },
         ],
       },
@@ -242,7 +242,7 @@ test.concurrent(
     const testBranches = [
       "refs/heads/run-buildfs-and-prebuilds-test-1",
       "refs/heads/run-buildfs-and-prebuilds-test-2",
-      "refs/heads/run-buildfs-and-prebuilds-test-3-error",
+      "refs/heads/run-buildfs-and-prebuilds-test-4-error",
     ].map((name) => unwrap(updates.newGitBranches.find((b) => b.name === name)));
     await worker.runUntil(async () => {
       const gitObjectIds = Array.from(new Set(testBranches.map((b) => b.gitObjectId)));

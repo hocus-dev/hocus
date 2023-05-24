@@ -143,6 +143,9 @@ async function runSingleBuildfsAndPrebuildInner(
       },
     ],
   }).then((r) => r[inspectResultIdx]);
+  if (inspection instanceof Error) {
+    throw new ApplicationFailure(`Failed to parse project config:\n${inspection.message}`);
+  }
   let buildfsEvent: GetOrCreateBuildfsEventsReturnType | null = null;
   if (inspection != null) {
     const buildfsEventsArgs = {

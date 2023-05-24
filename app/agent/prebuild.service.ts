@@ -37,6 +37,7 @@ import { doesFileExist, execSshCmd, sha256, withFileLock } from "./utils";
 
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
+import { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
 import { displayError, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
@@ -289,7 +290,7 @@ export class PrebuildService {
    * Copies the contents of `repositoryDrivePath` into `outputDrivePath`, and checks
    * out the given branch there.
    *
-   * Returns an array of `ProjectConfig`s or `null`s corresponding to the
+   * Returns an array of `ProjectConfig`s, `null`s, or validation errors corresponding to the
    * `projectConfigPaths` argument. If a hocus config file is not present in a directory,
    * `null` is returned.
    */
@@ -303,7 +304,9 @@ export class PrebuildService {
     outputDrivePath: string;
     /** Relative paths to directories where `hocus.yml` files are located in the repository. */
     projectConfigPaths: string[];
-  }): Promise<({ projectConfig: ProjectConfig; imageFileHash: string | null } | null)[]> {
+  }): Promise<
+    ({ projectConfig: ProjectConfig; imageFileHash: string | null } | null | ValidationError)[]
+  > {
     if (await doesFileExist(args.outputDrivePath)) {
       this.logger.warn(
         `output drive already exists at "${args.outputDrivePath}", it will be overwritten`,
@@ -336,55 +339,54 @@ export class PrebuildService {
             "checkout",
             args.targetBranch,
           ]);
-          const configs: (ProjectConfig | null)[] = mapOverNull(
+          const configs: (ProjectConfig | null | ValidationError)[] = mapOverNull(
             await waitForPromises(
               args.projectConfigPaths.map((p) =>
                 this.projectConfigService.getConfig(ssh, repoPath, p),
               ),
             ),
-            (c) => c[0],
+            (c) => {
+              if (c instanceof ValidationError || c == null) {
+                return c;
+              }
+              return c[0];
+            },
           );
-          const imageFiles = await waitForPromises(
-            mapOverNull(configs, (c, idx) => {
+          return await waitForPromises(
+            configs.map(async (config, idx) => {
+              if (config == null || config instanceof ValidationError) {
+                return config;
+              }
               const pathToImageFile = path.join(
                 repoPath,
                 args.projectConfigPaths[idx],
-                c.image.file,
+                config.image.file,
               );
-              return this.agentUtilService.readFile(ssh, pathToImageFile);
-            }),
-          );
-          const externalFilePaths = await waitForPromises(
-            mapOverNull(imageFiles, (fileContent) => {
+              const imageFile = await this.agentUtilService.readFile(ssh, pathToImageFile);
+              let externalFilesHash: null | string = null;
               try {
-                return this.buildfsService.getExternalFilePathsFromDockerfile(fileContent);
+                const externalFilesPaths =
+                  this.buildfsService.getExternalFilePathsFromDockerfile(imageFile);
+                const absoluteFilePaths = externalFilesPaths.map((p) =>
+                  path.join(repoPath, args.projectConfigPaths[idx], config.image.buildContext, p),
+                );
+                externalFilesHash = await this.buildfsService.getSha256FromFiles(
+                  ssh,
+                  repoPath,
+                  absoluteFilePaths,
+                );
               } catch (err) {
                 this.logger.error(displayError(err));
-                return null;
               }
+              const imageFileHash = sha256(imageFile);
+
+              return {
+                projectConfig: config,
+                imageFileHash:
+                  externalFilesHash === null ? null : imageFileHash + externalFilesHash,
+              };
             }),
           );
-          const externalFilesHashes = await waitForPromises(
-            mapOverNull(externalFilePaths, (filePaths, idx) => {
-              const absoluteFilePaths = filePaths.map((p) =>
-                path.join(
-                  repoPath,
-                  args.projectConfigPaths[idx],
-                  unwrap(configs[idx]).image.buildContext,
-                  p,
-                ),
-              );
-              return this.buildfsService.getSha256FromFiles(ssh, repoPath, absoluteFilePaths);
-            }),
-          );
-          return mapOverNull(configs, (c, idx) => {
-            const imageFileHash = sha256(unwrap(imageFiles[idx]));
-            const externalFilesHash = externalFilesHashes[idx];
-            return {
-              projectConfig: c,
-              imageFileHash: externalFilesHash === null ? null : imageFileHash + externalFilesHash,
-            };
-          });
         },
       );
     } catch (err) {
