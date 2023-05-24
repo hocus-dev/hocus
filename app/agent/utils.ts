@@ -14,6 +14,8 @@ import { Tail } from "tail";
 import type { Object } from "ts-toolbelt";
 
 import { unwrap } from "~/utils.shared";
+import { WriteStream } from "fs";
+import { promisify } from "util";
 
 export const execCmdAsync = async (
   ...args: string[]
@@ -90,17 +92,26 @@ export const execSshCmd = async (
 ): Promise<SSHExecCommandResponse> => {
   const { ssh, opts, logFilePath, allowNonZeroExitCode } = options;
   let logFile: FileHandle | undefined = void 0;
+  let writeStream: WriteStream | undefined = void 0;
+  const writeF = (chunk: Buffer) => {
+    if (!unwrap(writeStream).write(chunk)) {
+      unwrap(writeStream).once("drain", () => {
+        writeF(chunk);
+      });
+    }
+  };
   try {
     if (logFilePath != null) {
       logFile = await fs.open(logFilePath, "w");
+      writeStream = logFile.createWriteStream();
     }
     const output = await ssh.exec(args[0], args.slice(1), {
       ...opts,
       stream: "both",
       ...(logFile != null
         ? {
-            onStdout: async (chunk) => await unwrap(logFile).write(chunk),
-            onStderr: async (chunk) => await unwrap(logFile).write(chunk),
+            onStdout: writeF,
+            onStderr: writeF,
           }
         : {}),
     });
@@ -113,7 +124,8 @@ export const execSshCmd = async (
     }
     return output;
   } finally {
-    if (logFile != null) {
+    if (logFile != null && writeStream != null) {
+      await promisify(writeStream.close)();
       await logFile.close();
     }
   }
