@@ -1,6 +1,7 @@
 import type { SpawnOptionsWithoutStdio } from "child_process";
 import { spawn } from "child_process";
 import { createHash } from "crypto";
+import type { WriteStream } from "fs";
 import fs, { type FileHandle } from "fs/promises";
 import path from "path";
 
@@ -14,8 +15,6 @@ import { Tail } from "tail";
 import type { Object } from "ts-toolbelt";
 
 import { unwrap } from "~/utils.shared";
-import { WriteStream } from "fs";
-import { promisify } from "util";
 
 export const execCmdAsync = async (
   ...args: string[]
