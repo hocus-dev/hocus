@@ -77,7 +77,7 @@ export const execSshCmdThroughProxy = async (args: {
   const keyPath = `/tmp/${uuidv4()}.key` as const;
   try {
     await fs.writeFile(keyPath, args.privateKey);
-    await fs.chmod(keyPath, "600");
+    await fs.chmod(keyPath, 0o600);
     return await execCmdAsync(
       "ip",
       "netns",

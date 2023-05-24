@@ -12,7 +12,7 @@ export class SSHGatewayService {
       await fs.mkdir(sshDirectory, { recursive: true });
       await fs.appendFile(authorizedKeysPath, "");
       await execCmdAsync("chown", "-R", `${gatewayUser}:${gatewayUser}`, sshDirectory);
-      await fs.chmod(authorizedKeysPath, "600");
+      await fs.chmod(authorizedKeysPath, 0o600);
     }
 
     const fileContents = await fs.readFile(authorizedKeysPath, "utf-8");
