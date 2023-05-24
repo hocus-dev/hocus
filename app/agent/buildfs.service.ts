@@ -88,12 +88,12 @@ export class BuildfsService {
       buildfsEventId: bigint;
     },
   ): Promise<BuildfsEventFiles> {
-    const { id: projectFileIdStr } = await db.$queryRaw<{ id: string }>`
+    const result = await db.$queryRaw<[{ id: bigint }]>`
       INSERT INTO "File" ("agentInstanceId", "path")
       VALUES (${args.agentInstanceId}, ${args.projectFilePath})
       ON CONFLICT DO NOTHING
       RETURNING id`;
-    const projectFileId = BigInt(projectFileIdStr);
+    const projectFileId = BigInt(result[0].id);
     const outputFile = await db.file.create({
       data: {
         agentInstanceId: args.agentInstanceId,
