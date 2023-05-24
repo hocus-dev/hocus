@@ -1,4 +1,5 @@
 import type { PrebuildEvent } from "@prisma/client";
+import { PrebuildEventStatus } from "@prisma/client";
 
 import type { CreateActivity } from "./types";
 
@@ -25,6 +26,14 @@ export const getOrCreatePrebuildEvents: CreateActivity<GetOrCreatePrebuildEvents
       where: {
         projectId: args.projectId,
         gitObjectId: { in: gitObjectIds },
+        status: {
+          notIn: [
+            PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED,
+            PrebuildEventStatus.PREBUILD_EVENT_STATUS_PENDING_ARCHIVE,
+            PrebuildEventStatus.PREBUILD_EVENT_STATUS_CANCELLED,
+            PrebuildEventStatus.PREBUILD_EVENT_STATUS_ERROR,
+          ],
+        },
       },
     });
     const foundEventsByGitObjectId = new Map(found.map((event) => [event.gitObjectId, event]));
