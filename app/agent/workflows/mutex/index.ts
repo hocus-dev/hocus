@@ -36,7 +36,6 @@ const WORKFLOW_EXECUTION_NOT_FOUND_ERR_TYPE = "ExternalWorkflowExecutionNotFound
 
 export async function lockWorkflow(
   requests = Array<LockRequest>(),
-  seenAcquireIds = new Set<string>(),
   releasedIds = new Set<string>(),
 ): Promise<void> {
   let wake = false;
@@ -44,10 +43,6 @@ export async function lockWorkflow(
   let currentWorkflowId: string | null = null;
 
   setHandler(lockRequestSignal, (req: LockRequest) => {
-    if (seenAcquireIds.has(req.lockAcquiredSignalName)) {
-      return;
-    }
-    seenAcquireIds.add(req.lockAcquiredSignalName);
     requests.push(req);
   });
   setHandler(lockReleaseSignal, (req) => {
@@ -113,7 +108,7 @@ export async function lockWorkflow(
   }
   // carry over any pending requests to the next execution
   if (requests.length > 0) {
-    await continueAsNew<typeof lockWorkflow>(requests, seenAcquireIds, releasedIds);
+    await continueAsNew<typeof lockWorkflow>(requests, releasedIds);
   }
 }
 
@@ -125,7 +120,7 @@ export async function withLock<T>(
     resourceId: string;
   },
   fn: () => Promise<T>,
-): Promise<void> {
+): Promise<T> {
   const lockAcquiredSignalName = `lock-acquired-${uuid4()}`;
   let releaseId = "";
   setHandler(defineSignal<[LockResponse]>(lockAcquiredSignalName), (lockResponse) => {
@@ -137,7 +132,7 @@ export async function withLock<T>(
   await signalWithStartLockWorkflow(options.resourceId, lockAcquiredSignalName);
   try {
     await condition(hasLock);
-    await fn();
+    return await fn();
   } finally {
     await CancellationScope.nonCancellable(async () => {
       // Send a signal to the given lock Workflow to release the lock
