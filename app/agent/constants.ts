@@ -23,7 +23,7 @@ ${task}
 `;
 
 /*
- * I'm including the boot time and a new line so one may easily distinguing
+ * I'm including the boot time and a new line so one may easily distinguish
  * logs from different boots - I've decided to do so after starting and stopping the vm multiple times :)
  */
 export const TASK_INPUT_TEMPLATE = (task: string, cwd: string) =>
