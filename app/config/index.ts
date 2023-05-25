@@ -63,12 +63,12 @@ export const config = makeConfig()({
 
     // If set then the agent will setup projects for running hocus in hocus when starting
     createHocusProjects: (process.env.AGENT_DEV_CREATE_HOCUS_PROJECTS ?? "false") === "true",
-    // If set then the agent will setup projects for hocus developement
+    // If set then the agent will setup projects for hocus development
     // Those projects should be used for developing Hocus
     // For now those projects are private and we hardcoded a private key in the codebase
     // They will be public soon anyway :)
-    createDevelopementProjects:
-      (process.env.AGENT_DEV_CREATE_DEVELOPEMENT_PROJECTS ?? "false") === "true",
+    createDevelopmentProjects:
+      (process.env.AGENT_DEV_CREATE_DEVELOPMENT_PROJECTS ?? "false") === "true",
     blockRegistryRoot: "/srv/jailer/block-registry/",
     blockRegistryConfigFsPath: "/sys/kernel/config",
   }),

@@ -2,14 +2,14 @@
 
 if [ $# -lt 2 ]; then
     echo "usage:$0 dev output_dir [iodepth]"
-    echo "example 1: Testing the whole block device. Attention: That will destory the filesystem on the target block device"
+    echo "example 1: Testing the whole block device. Attention: That will destroy the filesystem on the target block device"
     echo "./run_fio.sh /dev/sdb fio_test"
     echo ""
-    echo "example 2: Testing a file, but not destory filesystem. Suppose the target device mount on /data"
+    echo "example 2: Testing a file, but not destroy filesystem. Suppose the target device mount on /data"
     echo "dd if=/dev/urandom bs=1M count=16384 status=progress of=/data/test.dat && sync"
     echo "./run_fio.sh /data/test.dat fio_test"
     echo ""
-    echo "Finally, it will genarate a certain result into the output_dir, like 'fio_test/fio_test.result"
+    echo "Finally, it will generate a certain result into the output_dir, like 'fio_test/fio_test.result"
     exit 1
 fi
 

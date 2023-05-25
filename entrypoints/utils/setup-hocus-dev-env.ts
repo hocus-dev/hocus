@@ -42,9 +42,9 @@ async function setupDevUser(db: PrismaClient, injector: AppInjector) {
   });
 }
 
-async function setupDevelopementProjects(db: PrismaClient, client: Client, injector: AppInjector) {
+async function setupDevelopmentProjects(db: PrismaClient, client: Client, injector: AppInjector) {
   const sshKeyService = injector.resolve(Token.SshKeyService);
-  console.log("Creating projects for Hocus developement");
+  console.log("Creating projects for Hocus development");
 
   const testsKeyPair = await sshKeyService.createSshKeyPair(
     db,
@@ -109,9 +109,9 @@ export async function setupHocusDevEnv() {
   const withClient = injector.resolve(Token.TemporalClient);
   await withClient(async (client) => {
     await waitForPromises([
-      !agentConfig.createDevelopementProjects
+      !agentConfig.createDevelopmentProjects
         ? Promise.resolve()
-        : setupDevelopementProjects(db, client, injector),
+        : setupDevelopmentProjects(db, client, injector),
       !agentConfig.createHocusProjects
         ? Promise.resolve()
         : setupHocusProjects(db, client, injector),

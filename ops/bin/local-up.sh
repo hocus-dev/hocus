@@ -158,7 +158,7 @@ build_service () {
   fi
 }
 
-# Buidling images
+# Building images
 echo "Building docker images 👷📦"
 build_service setup-vm-images vm-builder
 build_service setup-keycloak db-autosetup

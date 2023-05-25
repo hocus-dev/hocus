@@ -14,7 +14,7 @@ async function run() {
   const injector = createAgentInjector();
   const agentConfig = injector.resolve(Token.Config).agent();
 
-  if (agentConfig.createHocusProjects || agentConfig.createDevelopementProjects) {
+  if (agentConfig.createHocusProjects || agentConfig.createDevelopmentProjects) {
     // eslint-disable-next-line no-console
     console.log("Setting up projects automatically");
     // eslint-disable-next-line no-console
