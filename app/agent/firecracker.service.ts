@@ -17,7 +17,14 @@ import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "./
 import { FifoFlags } from "./fifo-flags";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import type { StorageService } from "./storage/storage.service";
-import { execCmdAsync, execSshCmd, retry, watchFileUntilLineMatches, withSsh } from "./utils";
+import {
+  doesFileExist,
+  execCmdAsync,
+  execSshCmd,
+  retry,
+  watchFileUntilLineMatches,
+  withSsh,
+} from "./utils";
 import type { VmInfo } from "./vm-info.validator";
 import { VmInfoValidator } from "./vm-info.validator";
 
@@ -112,13 +119,7 @@ export class FirecrackerService {
     const stdinPath = this.getStdinPath();
     const logPath = this.getVMLogsPath();
     for (const path of [stdinPath, logPath, this.pathToSocket]) {
-      const pathExists = await fs
-        .stat(path)
-        .then(() => true)
-        .catch((err: Error) => {
-          if (!err.message.startsWith("ENOENT")) throw err;
-          return false;
-        });
+      const pathExists = await doesFileExist(path);
       if (pathExists) {
         this.logger.info(`file already exists at ${path}, deleting`);
         await fs.unlink(path);

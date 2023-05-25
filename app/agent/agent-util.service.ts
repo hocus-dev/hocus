@@ -14,7 +14,7 @@ import {
   TASK_INPUT_TEMPLATE,
   ATTACH_TO_TASK_SCRIPT_TEMPLATE,
 } from "./constants";
-import { execCmdAsync, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
+import { doesFileExist, execCmdAsync, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
 
 import type { Config } from "~/config";
 import { config } from "~/config";
@@ -35,13 +35,7 @@ export class AgentUtilService {
     sizeMiB: number,
     overwrite: boolean = false,
   ): Promise<void> {
-    const fileExists = await fs
-      .stat(imagePath)
-      .then(() => true)
-      .catch((err: Error) => {
-        if (!err.message.startsWith("ENOENT")) throw err;
-        return false;
-      });
+    const fileExists = await doesFileExist(imagePath);
     if (overwrite) {
       if (fileExists) {
         this.logger.warn(`file already exists at "${imagePath}", it will be overwritten`);
