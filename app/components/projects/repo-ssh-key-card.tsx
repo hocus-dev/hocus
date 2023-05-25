@@ -44,7 +44,7 @@ export const RepoSshKeyCard = (props: { publicKey: string }): JSX.Element => {
         <h2 className="text-white text-lg font-bold leading-5">Connect Git Repository</h2>
         <div>
           <p className="mb-2">
-            Please give this SSH public key read access to the repository. Either:
+            Please give the following SSH public key read access to the repository. Either:
           </p>
           <ul className="list-disc pl-4">
             <li>add it to the repository's deploy keys, or;</li>
