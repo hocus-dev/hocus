@@ -9,7 +9,7 @@ import { createAgentInjector } from "./agent-injector";
 import type { AgentInjector } from "./agent-injector";
 import type { FirecrackerService } from "./firecracker.service";
 import { SSH_PROXY_IP } from "./test-constants";
-import { execCmdAsync } from "./utils";
+import { execCmd } from "./utils";
 
 import type { Config } from "~/config";
 import { Scope } from "~/di/injector.server";
@@ -78,7 +78,7 @@ export const execSshCmdThroughProxy = async (args: {
   try {
     await fs.writeFile(keyPath, args.privateKey);
     await fs.chmod(keyPath, 0o600);
-    return await execCmdAsync(
+    return await execCmd(
       "ip",
       "netns",
       "exec",

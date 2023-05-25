@@ -14,7 +14,7 @@ import {
   TASK_INPUT_TEMPLATE,
   ATTACH_TO_TASK_SCRIPT_TEMPLATE,
 } from "./constants";
-import { doesFileExist, execCmdAsync, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
+import { doesFileExist, execCmd, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
 
 import type { Config } from "~/config";
 import { config } from "~/config";
@@ -45,19 +45,12 @@ export class AgentUtilService {
       throw new Error(`Image file "${imagePath}" already exists`);
     }
     await fs.mkdir(path.dirname(imagePath), { recursive: true });
-    await execCmdAsync(
-      "dd",
-      "if=/dev/zero",
-      `of=${imagePath}`,
-      "bs=1M",
-      "count=0",
-      `seek=${sizeMiB}`,
-    );
-    await execCmdAsync("mkfs.ext4", imagePath);
+    await execCmd("dd", "if=/dev/zero", `of=${imagePath}`, "bs=1M", "count=0", `seek=${sizeMiB}`);
+    await execCmd("mkfs.ext4", imagePath);
   }
 
   async expandDriveImage(drivePath: string, appendSizeMiB: number): Promise<void> {
-    await execCmdAsync(
+    await execCmd(
       "dd",
       "if=/dev/zero",
       `of=${drivePath}`,
@@ -66,13 +59,13 @@ export class AgentUtilService {
       `seek=${appendSizeMiB}`,
     );
     try {
-      await execCmdAsync("resize2fs", drivePath);
+      await execCmd("resize2fs", drivePath);
     } catch (err) {
       if (!(err instanceof Error && err.message.includes("e2fsck"))) {
         throw err;
       }
       try {
-        await execCmdAsync("e2fsck", "-fp", drivePath);
+        await execCmd("e2fsck", "-fp", drivePath);
       } catch (e2fsckErr) {
         // status code meaning from e2fsck man page:
         // 1 - File system errors corrected
@@ -81,12 +74,12 @@ export class AgentUtilService {
           throw e2fsckErr;
         }
       }
-      await execCmdAsync("resize2fs", drivePath);
+      await execCmd("resize2fs", drivePath);
     }
   }
 
   async getDriveUuid(drivePath: string): Promise<string> {
-    const fileOutput = (await execCmdAsync("blkid", drivePath)).stdout.toString();
+    const fileOutput = (await execCmd("blkid", drivePath)).stdout.toString();
     const uuidMatch = fileOutput.match(/UUID="([^"]+)"/);
     if (!uuidMatch) {
       throw new Error(`Could not find UUID for drive "${drivePath}"`);

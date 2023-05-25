@@ -19,7 +19,7 @@ import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import type { StorageService } from "./storage/storage.service";
 import {
   doesFileExist,
-  execCmdAsync,
+  execCmd,
   execSshCmd,
   retry,
   watchFileUntilLineMatches,
@@ -126,7 +126,7 @@ export class FirecrackerService {
       }
     }
     this.logger.info("opening stdin");
-    await execCmdAsync("mkfifo", stdinPath);
+    await execCmd("mkfifo", stdinPath);
     // The pipe is opened with O_RDWR even though the firecracker process only reads from it.
     // This is because of how FIFOs work in linux - when the last writer closes the pipe,
     // the reader gets an EOF. When the VM receives an EOF on the stdin, it detaches
@@ -253,35 +253,21 @@ export class FirecrackerService {
     tapDeviceCidr: number;
   }): Promise<void> {
     try {
-      await execCmdAsync(...NS_PREFIX, "ip", "link", "del", args.tapDeviceName);
+      await execCmd(...NS_PREFIX, "ip", "link", "del", args.tapDeviceName);
     } catch (err) {
       if (!(err instanceof Error && err.message.includes("Cannot find device"))) {
         throw err;
       }
     }
-    await execCmdAsync(
-      ...NS_PREFIX,
-      "ip",
-      "tuntap",
-      "add",
-      "dev",
-      args.tapDeviceName,
-      "mode",
-      "tap",
-    );
-    await execCmdAsync(
-      ...NS_PREFIX,
-      "sysctl",
-      "-w",
-      `net.ipv4.conf.${args.tapDeviceName}.proxy_arp=1`,
-    );
-    await execCmdAsync(
+    await execCmd(...NS_PREFIX, "ip", "tuntap", "add", "dev", args.tapDeviceName, "mode", "tap");
+    await execCmd(...NS_PREFIX, "sysctl", "-w", `net.ipv4.conf.${args.tapDeviceName}.proxy_arp=1`);
+    await execCmd(
       ...NS_PREFIX,
       "sysctl",
       "-w",
       `net.ipv6.conf.${args.tapDeviceName}.disable_ipv6=1`,
     );
-    await execCmdAsync(
+    await execCmd(
       ...NS_PREFIX,
       "ip",
       "addr",
@@ -290,7 +276,7 @@ export class FirecrackerService {
       "dev",
       args.tapDeviceName,
     );
-    await execCmdAsync(...NS_PREFIX, "ip", "link", "set", "dev", args.tapDeviceName, "up");
+    await execCmd(...NS_PREFIX, "ip", "link", "set", "dev", args.tapDeviceName, "up");
 
     return;
   }
@@ -303,7 +289,7 @@ export class FirecrackerService {
 
   private async copyToJailerChroot(filePath: string, relativePathInChroot: string): Promise<void> {
     const chrootPath = path.join(this.instanceDirRoot, relativePathInChroot);
-    await execCmdAsync("cp", "--sparse=always", filePath, chrootPath);
+    await execCmd("cp", "--sparse=always", filePath, chrootPath);
     await fs.chown(chrootPath, JAILER_USER_ID, JAILER_GROUP_ID);
   }
 
@@ -627,7 +613,7 @@ export class FirecrackerService {
       `iptables ${action} FORWARD -i vpeer-ssh-vms -o vm${ipBlockId} -p tcp --dport 22 -j ACCEPT`,
       `iptables ${action} FORWARD -i vm${ipBlockId} -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT`,
     ]) {
-      await execCmdAsync(...NS_PREFIX, ...cmd.split(" "));
+      await execCmd(...NS_PREFIX, ...cmd.split(" "));
     }
   }
 

@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 
-import { doesFileExist, execCmdAsync } from "./utils";
+import { doesFileExist, execCmd } from "./utils";
 
 export class SSHGatewayService {
   async addPublicKeysToAuthorizedKeys(keys: string[]): Promise<void> {
@@ -11,7 +11,7 @@ export class SSHGatewayService {
     if (!fileExists) {
       await fs.mkdir(sshDirectory, { recursive: true });
       await fs.appendFile(authorizedKeysPath, "");
-      await execCmdAsync("chown", "-R", `${gatewayUser}:${gatewayUser}`, sshDirectory);
+      await execCmd("chown", "-R", `${gatewayUser}:${gatewayUser}`, sshDirectory);
       await fs.chmod(authorizedKeysPath, 0o600);
     }
 

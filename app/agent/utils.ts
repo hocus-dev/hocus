@@ -16,10 +16,8 @@ import type { Object } from "ts-toolbelt";
 
 import { unwrap } from "~/utils.shared";
 
-export const execCmdAsync = async (
-  ...args: string[]
-): Promise<{ stdout: string; stderr: string }> => {
-  return await execCmdWithOptsAsync(args, {});
+export const execCmd = async (...args: string[]): Promise<{ stdout: string; stderr: string }> => {
+  return await execCmdWithOpts(args, {});
 };
 
 export class ExecCmdError extends Error {
@@ -28,7 +26,7 @@ export class ExecCmdError extends Error {
   }
 }
 
-export const execCmdWithOptsAsync = async (
+export const execCmdWithOpts = async (
   args: string[],
   options: Object.Modify<
     SpawnOptionsWithoutStdio,

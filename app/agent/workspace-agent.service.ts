@@ -21,7 +21,7 @@ import {
 import type { FirecrackerService } from "./firecracker.service";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { SSHGatewayService } from "./ssh-gateway.service";
-import { doesFileExist, execCmdAsync, execSshCmd } from "./utils";
+import { doesFileExist, execCmd, execSshCmd } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
@@ -89,13 +89,13 @@ export class WorkspaceAgentService {
         .map((dir) => fs.mkdir(dir, { recursive: true })),
     );
     await waitForPromises([
-      await execCmdAsync(
+      await execCmd(
         "cp",
         "--sparse=always",
         prebuildEventFiles.fsFile.path,
         workspace.rootFsFile.path,
       ),
-      await execCmdAsync(
+      await execCmd(
         "cp",
         "--sparse=always",
         prebuildEventFiles.projectFile.path,

@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { AgentUtilService } from "../agent-util.service";
 import { HOST_PERSISTENT_DIR, PROJECT_DIR } from "../constants";
 import type { FirecrackerService } from "../firecracker.service";
-import { doesFileExist, execCmdWithOptsAsync, execSshCmd, withFileLock } from "../utils";
+import { doesFileExist, execCmdWithOpts, execSshCmd, withFileLock } from "../utils";
 
 import { RemoteInfoTupleValidator } from "./validator";
 
@@ -103,7 +103,7 @@ export class AgentGitService {
     const pathToPrivateKey = `/tmp/${uuidv4()}.key`;
     try {
       await this.writeKey(pathToPrivateKey, privateKey);
-      const output = await execCmdWithOptsAsync(["git", "ls-remote", repositoryUrl], {
+      const output = await execCmdWithOpts(["git", "ls-remote", repositoryUrl], {
         // TODO: allow the user to specify a known_hosts file.
         env: { GIT_SSH_COMMAND: `ssh -i "${pathToPrivateKey}" -o StrictHostKeyChecking=no` },
       });

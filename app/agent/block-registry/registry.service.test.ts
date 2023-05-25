@@ -8,7 +8,7 @@ import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import { createAgentInjector } from "../agent-injector";
-import { execCmdAsync, ExecCmdError, execCmdWithOptsAsync } from "../utils";
+import { execCmd, ExecCmdError, execCmdWithOpts } from "../utils";
 
 import type { BlockRegistryService, ContainerId, ImageId } from "./registry.service";
 import { EXPOSE_METHOD } from "./registry.service";
@@ -126,9 +126,9 @@ const provideBlockRegistry = (
       if (process.env["BUILDKITE_AGENT_ACCESS_TOKEN"] !== void 0) {
         const archivePath = testRunDir + ".tar.gz";
         // TODO: Perhaps only upload the logs?
-        await execCmdAsync("tar", "-zcf", archivePath, "-C", testsDir, runId);
+        await execCmd("tar", "-zcf", archivePath, "-C", testsDir, runId);
         try {
-          await execCmdWithOptsAsync(["buildkite-agent", "artifact", "upload", runId + ".tar.gz"], {
+          await execCmdWithOpts(["buildkite-agent", "artifact", "upload", runId + ".tar.gz"], {
             cwd: testsDir,
           });
         } finally {
@@ -176,13 +176,9 @@ const provideBlockRegistry = (
 async function ensureKernelDidNotBlowUp() {
   try {
     // Grep returns status 1 when no matches were found
-    await execCmdAsync(
-      "bash",
-      "-c",
-      'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption|RIP:"',
-    );
+    await execCmd("bash", "-c", 'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption|RIP:"');
     // eslint-disable-next-line no-console
-    console.error((await execCmdAsync("dmesg")).stdout);
+    console.error((await execCmd("dmesg")).stdout);
     throw new Error("Looks like the kernel blew up, please reboot the CI machine...");
   } catch (err) {
     if (err instanceof ExecCmdError && (err as ExecCmdError).status !== 1) throw err;
@@ -303,7 +299,7 @@ test.concurrent(
   provideBlockRegistry(async ({ brService }) => {
     const loadF = async (tag: string, id: string) => {
       const p = path.join(brService["paths"].root, "../", id);
-      await execCmdAsync(
+      await execCmd(
         "skopeo",
         "copy",
         "--multi-arch",
@@ -386,9 +382,7 @@ test.concurrent(
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
       const layerPath = path.join(brService["paths"].layers, dirName, "layer.tar");
-      const layerDigest = `sha256:${
-        (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
-      }`;
+      const layerDigest = `sha256:${(await execCmd("sha256sum", layerPath)).stdout.split(" ")[0]}`;
       // Check for data corruption
       expect(layerDigest).toEqual(dirName);
       // Check if that layer is hardlinked to the shared oci dir
@@ -405,7 +399,7 @@ test.concurrent(
   provideBlockRegistry(async ({ brService }) => {
     const loadF = async (tag: string, id: string) => {
       const p = path.join(brService["paths"].root, "../", id);
-      await execCmdAsync(
+      await execCmd(
         "skopeo",
         "copy",
         "--multi-arch",
@@ -449,9 +443,7 @@ test.concurrent(
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
       const layerPath = path.join(brService["paths"].layers, dirName, "layer.tar");
-      const layerDigest = `sha256:${
-        (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
-      }`;
+      const layerDigest = `sha256:${(await execCmd("sha256sum", layerPath)).stdout.split(" ")[0]}`;
       // Check for data corruption
       expect(layerDigest).toEqual(dirName);
       // Check if that layer is hardlinked to the shared oci dir and the original dir

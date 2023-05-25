@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { createAgentInjector } from "./agent-injector";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
-import { execCmdAsync, execSshCmd, sleep } from "./utils";
+import { execCmd, execSshCmd, sleep } from "./utils";
 
 import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
@@ -53,7 +53,7 @@ test.concurrent(
       // we wait for a bit to make sure the instance does not exit
       await sleep(250);
       // check that the process is still running
-      await execCmdAsync("ps", "-p", pid.toString());
+      await execCmd("ps", "-p", pid.toString());
     } finally {
       if (pid != null) {
         process.kill(pid);
