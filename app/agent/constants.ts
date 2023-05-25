@@ -51,8 +51,8 @@ oBAgM=
 -----END OPENSSH PRIVATE KEY-----
 `;
 
-export const JAILER_USER_ID = "162137";
-export const JAILER_GROUP_ID = "162137";
+export const JAILER_USER_ID = 162137;
+export const JAILER_GROUP_ID = 162137;
 /*
  * Experience showed that paths longer than 102 don't work, even though
  * https://blog.8-p.info/en/2020/06/11/unix-domain-socket-length/ states

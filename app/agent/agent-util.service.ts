@@ -1,4 +1,3 @@
-import fsSync from "fs";
 import fs from "fs/promises";
 import path from "path";
 
@@ -15,7 +14,7 @@ import {
   TASK_INPUT_TEMPLATE,
   ATTACH_TO_TASK_SCRIPT_TEMPLATE,
 } from "./constants";
-import { execCmd, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
+import { doesFileExist, execCmd, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
 
 import type { Config } from "~/config";
 import { config } from "~/config";
@@ -31,31 +30,42 @@ export class AgentUtilService {
     this.agentConfig = config.agent();
   }
 
-  createExt4Image(imagePath: string, sizeMiB: number, overwrite: boolean = false): void {
-    const fileExists = fsSync.existsSync(imagePath);
+  async createExt4Image(
+    imagePath: string,
+    sizeMiB: number,
+    overwrite: boolean = false,
+  ): Promise<void> {
+    const fileExists = await doesFileExist(imagePath);
     if (overwrite) {
       if (fileExists) {
         this.logger.warn(`file already exists at "${imagePath}", it will be overwritten`);
       }
-      execCmd("rm", "-f", imagePath);
+      await fs.rm(imagePath, { force: true });
     } else if (fileExists) {
       throw new Error(`Image file "${imagePath}" already exists`);
     }
-    fsSync.mkdirSync(path.dirname(imagePath), { recursive: true });
-    execCmd("dd", "if=/dev/zero", `of=${imagePath}`, "bs=1M", "count=0", `seek=${sizeMiB}`);
-    execCmd("mkfs.ext4", imagePath);
+    await fs.mkdir(path.dirname(imagePath), { recursive: true });
+    await execCmd("dd", "if=/dev/zero", `of=${imagePath}`, "bs=1M", "count=0", `seek=${sizeMiB}`);
+    await execCmd("mkfs.ext4", imagePath);
   }
 
   async expandDriveImage(drivePath: string, appendSizeMiB: number): Promise<void> {
-    execCmd("dd", "if=/dev/zero", `of=${drivePath}`, "bs=1M", "count=0", `seek=${appendSizeMiB}`);
+    await execCmd(
+      "dd",
+      "if=/dev/zero",
+      `of=${drivePath}`,
+      "bs=1M",
+      "count=0",
+      `seek=${appendSizeMiB}`,
+    );
     try {
-      execCmd("resize2fs", drivePath);
+      await execCmd("resize2fs", drivePath);
     } catch (err) {
       if (!(err instanceof Error && err.message.includes("e2fsck"))) {
         throw err;
       }
       try {
-        execCmd("e2fsck", "-fp", drivePath);
+        await execCmd("e2fsck", "-fp", drivePath);
       } catch (e2fsckErr) {
         // status code meaning from e2fsck man page:
         // 1 - File system errors corrected
@@ -64,12 +74,12 @@ export class AgentUtilService {
           throw e2fsckErr;
         }
       }
-      execCmd("resize2fs", drivePath);
+      await execCmd("resize2fs", drivePath);
     }
   }
 
-  getDriveUuid(drivePath: string): string {
-    const fileOutput = execCmd("blkid", drivePath).stdout.toString();
+  async getDriveUuid(drivePath: string): Promise<string> {
+    const fileOutput = (await execCmd("blkid", drivePath)).stdout.toString();
     const uuidMatch = fileOutput.match(/UUID="([^"]+)"/);
     if (!uuidMatch) {
       throw new Error(`Could not find UUID for drive "${drivePath}"`);
@@ -85,7 +95,7 @@ export class AgentUtilService {
   ): Promise<void> {
     try {
       const cmdPrefix = useSudo ? ["sudo"] : [];
-      const driveUuid = this.getDriveUuid(hostDrivePath);
+      const driveUuid = await this.getDriveUuid(hostDrivePath);
       await execSshCmd({ ssh }, [...cmdPrefix, "mkdir", "-p", guestMountPath]);
       await execSshCmd({ ssh }, [...cmdPrefix, "mount", `UUID=${driveUuid}`, guestMountPath]);
     } catch (err) {

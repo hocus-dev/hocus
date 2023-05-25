@@ -1,6 +1,5 @@
 import { spawn } from "child_process";
-import fs from "fs";
-import fsAsync from "fs/promises";
+import fs from "fs/promises";
 import path from "path";
 
 import type { DefaultLogger } from "@temporalio/worker";
@@ -18,14 +17,21 @@ import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "./
 import { FifoFlags } from "./fifo-flags";
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import type { StorageService } from "./storage/storage.service";
-import { execCmd, execSshCmd, retry, watchFileUntilLineMatches, withSsh } from "./utils";
+import {
+  doesFileExist,
+  execCmd,
+  execSshCmd,
+  retry,
+  watchFileUntilLineMatches,
+  withSsh,
+} from "./utils";
 import type { VmInfo } from "./vm-info.validator";
 import { VmInfoValidator } from "./vm-info.validator";
 
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
-import { displayError, numericSort, unwrap } from "~/utils.shared";
+import { displayError, numericSort, unwrap, waitForPromises } from "~/utils.shared";
 
 const IP_PREFIX = "10.231.";
 const NS_PREFIX = ["ip", "netns", "exec", "vms"] as const;
@@ -113,13 +119,14 @@ export class FirecrackerService {
     const stdinPath = this.getStdinPath();
     const logPath = this.getVMLogsPath();
     for (const path of [stdinPath, logPath, this.pathToSocket]) {
-      if (fs.existsSync(path)) {
+      const pathExists = await doesFileExist(path);
+      if (pathExists) {
         this.logger.info(`file already exists at ${path}, deleting`);
-        fs.unlinkSync(path);
+        await fs.unlink(path);
       }
     }
     this.logger.info("opening stdin");
-    execCmd("mkfifo", stdinPath);
+    await execCmd("mkfifo", stdinPath);
     // The pipe is opened with O_RDWR even though the firecracker process only reads from it.
     // This is because of how FIFOs work in linux - when the last writer closes the pipe,
     // the reader gets an EOF. When the VM receives an EOF on the stdin, it detaches
@@ -131,18 +138,18 @@ export class FirecrackerService {
     //
     // Learned how to open a FIFO here: https://github.com/firecracker-microvm/firecracker-go-sdk/blob/9a0d3b28f7f7ae1ac96e970dec4d28a09f10c4a9/machine.go#L742
     // Learned about read/write/EOF behaviour here: https://stackoverflow.com/a/40390938
-    const childStdin = fs.openSync(stdinPath, FifoFlags.O_NONBLOCK | FifoFlags.O_RDWR, "0600");
-    const childStdout = fs.openSync(logPath, "a");
-    const childStderr = fs.openSync(logPath, "a");
+    const childStdin = await fs.open(stdinPath, FifoFlags.O_NONBLOCK | FifoFlags.O_RDWR, "0600");
+    const childStdout = await fs.open(logPath, "a");
+    const childStderr = await fs.open(logPath, "a");
     const child = spawn(
       "jailer",
       [
         "--id",
         this.instanceId,
         "--uid",
-        JAILER_USER_ID,
+        JAILER_USER_ID.toString(),
         "--gid",
-        JAILER_GROUP_ID,
+        JAILER_GROUP_ID.toString(),
         "--netns",
         "/var/run/netns/vms",
         "--exec-file",
@@ -152,7 +159,7 @@ export class FirecrackerService {
         CHROOT_PATH_TO_SOCK,
       ],
       {
-        stdio: [childStdin, childStdout, childStderr],
+        stdio: [childStdin.fd, childStdout.fd, childStderr.fd],
         detached: true,
       },
     );
@@ -163,6 +170,9 @@ export class FirecrackerService {
       this.logger.error(`firecracker process errored: ${displayError(err)}`);
     });
     child.on("close", (code) => {
+      void childStdin.close();
+      void childStdout.close();
+      void childStderr.close();
       this.logger.warn(`firecracker process with pid ${child.pid} closed: ${code}`);
     });
 
@@ -175,7 +185,7 @@ export class FirecrackerService {
     // Wait for the socket to be created
     try {
       // TODO: use innotify for this
-      await retry(async () => await fsAsync.stat(this.pathToSocket), 1000, 5);
+      await retry(async () => await fs.stat(this.pathToSocket), 1000, 5);
     } catch (err) {
       this.logger.error(
         `Timeout waiting for firecracker to create a socket at ${this.pathToSocket}`,
@@ -237,22 +247,27 @@ export class FirecrackerService {
     return `${TAP_DEVICE_NAME_PREFIX}${ipId}`;
   }
 
-  setupNetworking(args: {
+  async setupNetworking(args: {
     tapDeviceName: string;
     tapDeviceIp: string;
     tapDeviceCidr: number;
-  }): void {
+  }): Promise<void> {
     try {
-      execCmd(...NS_PREFIX, "ip", "link", "del", args.tapDeviceName);
+      await execCmd(...NS_PREFIX, "ip", "link", "del", args.tapDeviceName);
     } catch (err) {
       if (!(err instanceof Error && err.message.includes("Cannot find device"))) {
         throw err;
       }
     }
-    execCmd(...NS_PREFIX, "ip", "tuntap", "add", "dev", args.tapDeviceName, "mode", "tap");
-    execCmd(...NS_PREFIX, "sysctl", "-w", `net.ipv4.conf.${args.tapDeviceName}.proxy_arp=1`);
-    execCmd(...NS_PREFIX, "sysctl", "-w", `net.ipv6.conf.${args.tapDeviceName}.disable_ipv6=1`);
-    execCmd(
+    await execCmd(...NS_PREFIX, "ip", "tuntap", "add", "dev", args.tapDeviceName, "mode", "tap");
+    await execCmd(...NS_PREFIX, "sysctl", "-w", `net.ipv4.conf.${args.tapDeviceName}.proxy_arp=1`);
+    await execCmd(
+      ...NS_PREFIX,
+      "sysctl",
+      "-w",
+      `net.ipv6.conf.${args.tapDeviceName}.disable_ipv6=1`,
+    );
+    await execCmd(
       ...NS_PREFIX,
       "ip",
       "addr",
@@ -261,21 +276,21 @@ export class FirecrackerService {
       "dev",
       args.tapDeviceName,
     );
-    execCmd(...NS_PREFIX, "ip", "link", "set", "dev", args.tapDeviceName, "up");
+    await execCmd(...NS_PREFIX, "ip", "link", "set", "dev", args.tapDeviceName, "up");
 
     return;
   }
 
-  private linkToJailerChroot(filePath: string, relativePathInChroot: string): void {
+  private async linkToJailerChroot(filePath: string, relativePathInChroot: string): Promise<void> {
     const chrootPath = path.join(this.instanceDirRoot, relativePathInChroot);
-    execCmd("ln", filePath, chrootPath);
-    execCmd("chown", `${JAILER_USER_ID}:${JAILER_GROUP_ID}`, chrootPath);
+    await fs.link(filePath, chrootPath);
+    await fs.chown(chrootPath, JAILER_USER_ID, JAILER_GROUP_ID);
   }
 
-  private copyToJailerChroot(filePath: string, relativePathInChroot: string): void {
+  private async copyToJailerChroot(filePath: string, relativePathInChroot: string): Promise<void> {
     const chrootPath = path.join(this.instanceDirRoot, relativePathInChroot);
-    execCmd("cp", filePath, chrootPath);
-    execCmd("chown", `${JAILER_USER_ID}:${JAILER_GROUP_ID}`, chrootPath);
+    await execCmd("cp", "--sparse=always", filePath, chrootPath);
+    await fs.chown(chrootPath, JAILER_USER_ID, JAILER_GROUP_ID);
   }
 
   /**
@@ -312,55 +327,69 @@ export class FirecrackerService {
     const chrootRootFsPath = "/rootfs.ext4";
 
     const t1 = performance.now();
-    this.linkToJailerChroot(cfg.kernelPath, chrootKernelPath);
+    const fsTasks: Promise<void>[] = [];
+    fsTasks.push(this.linkToJailerChroot(cfg.kernelPath, chrootKernelPath));
     const shouldCopyRootFs = cfg.copyRootFs ?? false;
     if (shouldCopyRootFs) {
-      this.copyToJailerChroot(cfg.rootFsPath, chrootRootFsPath);
+      fsTasks.push(this.copyToJailerChroot(cfg.rootFsPath, chrootRootFsPath));
     } else {
-      this.linkToJailerChroot(cfg.rootFsPath, chrootRootFsPath);
+      fsTasks.push(this.linkToJailerChroot(cfg.rootFsPath, chrootRootFsPath));
     }
     for (const [idx, drive] of cfg.extraDrives.entries()) {
       const shouldCopyFs = drive.copy ?? false;
       if (shouldCopyFs) {
-        this.copyToJailerChroot(drive.pathOnHost, `/drive${idx}`);
+        fsTasks.push(this.copyToJailerChroot(drive.pathOnHost, `/drive${idx}`));
       } else {
-        this.linkToJailerChroot(drive.pathOnHost, `/drive${idx}`);
+        fsTasks.push(this.linkToJailerChroot(drive.pathOnHost, `/drive${idx}`));
       }
     }
+    await waitForPromises(fsTasks);
     this.logger.info(`Setting up the FS took ${(performance.now() - t1).toFixed(2)}`);
 
-    await this.api.putGuestBootSource({
-      body: {
-        kernelImagePath: chrootKernelPath,
-        bootArgs: `ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on ${ipArg}`,
-      },
-    });
-    await this.api.putGuestDriveByID({
-      driveId: "rootfs",
-      body: {
+    const cfgTasks: Promise<void>[] = [];
+    cfgTasks.push(
+      this.api.putGuestBootSource({
+        body: {
+          kernelImagePath: chrootKernelPath,
+          bootArgs: `ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on ${ipArg}`,
+        },
+      }),
+    );
+    cfgTasks.push(
+      this.api.putGuestDriveByID({
         driveId: "rootfs",
-        pathOnHost: chrootRootFsPath,
-        isReadOnly: false,
-        isRootDevice: true,
-      },
-    });
+        body: {
+          driveId: "rootfs",
+          pathOnHost: chrootRootFsPath,
+          isReadOnly: false,
+          isRootDevice: true,
+        },
+      }),
+    );
     for (const [idx, drive] of cfg.extraDrives.entries()) {
-      await this.api.putGuestDriveByID({
-        driveId: drive.driveId,
-        body: { ...drive, pathOnHost: `/drive${idx}` },
-      });
+      cfgTasks.push(
+        this.api.putGuestDriveByID({
+          driveId: drive.driveId,
+          body: { ...drive, pathOnHost: `/drive${idx}` },
+        }),
+      );
     }
-    await this.api.putGuestNetworkInterfaceByID({
-      ifaceId: "eth0",
-      body: { ifaceId: "eth0", hostDevName: cfg.tapDeviceName },
-    });
-    await this.api.putMachineConfiguration({
-      body: {
-        vcpuCount: cfg.vcpuCount,
-        memSizeMib: cfg.memSizeMib,
-        smt: true,
-      },
-    });
+    cfgTasks.push(
+      this.api.putGuestNetworkInterfaceByID({
+        ifaceId: "eth0",
+        body: { ifaceId: "eth0", hostDevName: cfg.tapDeviceName },
+      }),
+    );
+    cfgTasks.push(
+      this.api.putMachineConfiguration({
+        body: {
+          vcpuCount: cfg.vcpuCount,
+          memSizeMib: cfg.memSizeMib,
+          smt: true,
+        },
+      }),
+    );
+    await waitForPromises(cfgTasks);
     await this.api.createSyncAction({
       info: {
         actionType: "InstanceStart",
@@ -377,11 +406,11 @@ export class FirecrackerService {
       ...args,
       instanceId: this.instanceId,
     };
-    await fsAsync.writeFile(this.vmInfoFilePath, JSON.stringify(vmInfo));
+    await fs.writeFile(this.vmInfoFilePath, JSON.stringify(vmInfo));
   }
 
   async readVmInfoFile(): Promise<VmInfo> {
-    const contents = await fsAsync.readFile(this.vmInfoFilePath);
+    const contents = await fs.readFile(this.vmInfoFilePath);
     return VmInfoValidator.Parse(JSON.parse(contents.toString()));
   }
 
@@ -468,11 +497,12 @@ export class FirecrackerService {
       ipBlockId = await this.getFreeIpBlockId();
       const { vmIp, tapDeviceIp } = this.getIpsFromIpId(ipBlockId);
       const tapDeviceName = this.getTapDeviceName(ipBlockId);
-      this.setupNetworking({
+      await this.setupNetworking({
         tapDeviceName: tapDeviceName,
         tapDeviceIp: tapDeviceIp,
         tapDeviceCidr: TAP_DEVICE_CIDR,
       });
+
       await this.createVM({
         kernelPath: kernelPath,
         rootFsPath: config.rootFsPath,
@@ -491,6 +521,7 @@ export class FirecrackerService {
         memSizeMib: config.memSizeMib,
         vcpuCount: config.vcpuCount,
       });
+
       vmStarted = true;
       const t3 = performance.now();
       this.logger.info(
@@ -502,14 +533,18 @@ export class FirecrackerService {
       const sshConfig = { ...config.ssh, host: vmIp };
       return await withSsh(sshConfig, async (ssh) => {
         const useSudo = config.ssh.username !== "root";
+        const mountTasks: Promise<void>[] = [];
         for (const drive of extraDrives) {
-          await this.agentUtilService.mountDriveAtPath(
-            ssh,
-            drive.pathOnHost,
-            drive.guestMountPath,
-            useSudo,
+          mountTasks.push(
+            this.agentUtilService.mountDriveAtPath(
+              ssh,
+              drive.pathOnHost,
+              drive.guestMountPath,
+              useSudo,
+            ),
           );
         }
+        await waitForPromises(mountTasks);
         const r = await fn({
           ssh,
           sshConfig,
@@ -566,16 +601,19 @@ export class FirecrackerService {
   }
 
   async deleteVMDir(): Promise<void> {
-    await fsAsync.rm(this.instanceDir, { recursive: true, force: true });
+    await fs.rm(this.instanceDir, { recursive: true, force: true });
   }
 
-  changeVMNetworkVisibility(ipBlockId: number, changeTo: "public" | "private"): void {
+  async changeVMNetworkVisibility(
+    ipBlockId: number,
+    changeTo: "public" | "private",
+  ): Promise<void> {
     const action = changeTo === "public" ? "-A" : "-D";
     for (const cmd of [
       `iptables ${action} FORWARD -i vpeer-ssh-vms -o vm${ipBlockId} -p tcp --dport 22 -j ACCEPT`,
       `iptables ${action} FORWARD -i vm${ipBlockId} -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT`,
     ]) {
-      execCmd(...NS_PREFIX, ...cmd.split(" "));
+      await execCmd(...NS_PREFIX, ...cmd.split(" "));
     }
   }
 

@@ -291,7 +291,7 @@ export class AgentGitService {
     const outputDriveExists = await doesFileExist(outputDrive.pathOnHost);
     if (!outputDriveExists) {
       await fs.mkdir(path.dirname(outputDrive.pathOnHost), { recursive: true });
-      this.agentUtilService.createExt4Image(outputDrive.pathOnHost, outputDrive.maxSizeMiB);
+      await this.agentUtilService.createExt4Image(outputDrive.pathOnHost, outputDrive.maxSizeMiB);
       this.logger.info(`empty output image created at ${outputDrive.pathOnHost}`);
     }
     const outputDir = "/tmp/output";

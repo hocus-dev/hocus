@@ -1,4 +1,3 @@
-import type { SpawnSyncReturns } from "child_process";
 import fs from "fs/promises";
 
 import type { Prisma } from "@prisma/client";
@@ -74,12 +73,12 @@ export const execSshCmdThroughProxy = async (args: {
   vmIp: string;
   privateKey: string;
   cmd: string;
-}): Promise<SpawnSyncReturns<Buffer>> => {
+}): Promise<{ stdout: string; stderr: string }> => {
   const keyPath = `/tmp/${uuidv4()}.key` as const;
   try {
     await fs.writeFile(keyPath, args.privateKey);
-    execCmd("chmod", "600", keyPath);
-    return execCmd(
+    await fs.chmod(keyPath, 0o600);
+    return await execCmd(
       "ip",
       "netns",
       "exec",

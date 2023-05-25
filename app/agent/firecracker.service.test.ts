@@ -53,7 +53,7 @@ test.concurrent(
       // we wait for a bit to make sure the instance does not exit
       await sleep(250);
       // check that the process is still running
-      execCmd("ps", "-p", pid.toString());
+      await execCmd("ps", "-p", pid.toString());
     } finally {
       if (pid != null) {
         process.kill(pid);
@@ -100,7 +100,7 @@ test.concurrent(
           vcpuCount: 1,
         },
         async ({ ssh, firecrackerPid }) => {
-          await execCmd("kill", "-9", firecrackerPid.toString());
+          process.kill(firecrackerPid, "SIGKILL");
           const now = Date.now();
           await execSshCmd({ ssh }, ["bash", "-c", "echo hey"]).catch(() => {
             sshCommandExitedWithin = Date.now() - now;

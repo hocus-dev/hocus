@@ -8,7 +8,7 @@ import { flock } from "fs-ext";
 import type { A, Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
-import { execCmdAsync } from "../utils";
+import { doesFileExist, execCmd } from "../utils";
 
 import { HOCUS_TCMU_HBA, HOCUS_TCM_LOOP_PORT, HOCUS_TCM_LOOP_WWN } from "./registry.const";
 import type { OBDConfig, OCIDescriptor, OCIImageIndex, OCIImageManifest } from "./validators";
@@ -139,7 +139,7 @@ export class BlockRegistryService {
     // 1. Check if /sys/kernel/config is a mount point
     const configFSPath = this.agentConfig.blockRegistryConfigFsPath;
     try {
-      await execCmdAsync("mountpoint", "-q", configFSPath);
+      await execCmd("mountpoint", "-q", configFSPath);
     } catch (err) {
       const msg = `Unable to find ConfigFS at ${configFSPath}`;
       this.logger.error(msg);
@@ -332,7 +332,7 @@ export class BlockRegistryService {
       // This will only download blobs we actually need due to the shared blob dir <3
       // Also skopeo properly handles concurrent pulls with a shared blob dir <3
       // This will place the image index in a random directory
-      await execCmdAsync(
+      await execCmd(
         "skopeo",
         "copy",
         "--multi-arch",
@@ -537,7 +537,7 @@ export class BlockRegistryService {
       await this.withTmpFile(async (tmpIndexPath) => {
         // TODO: Set the parent uuid, the only reason i did not do it right now is that i don't want to rewrite the algo for converting layer_digest -> obd_uuid
         // FIXME: For now hardcode the size to 64GB as the base images are hardcoded to this size
-        await execCmdAsync(
+        await execCmd(
           "/opt/overlaybd/bin/overlaybd-create",
           "-s",
           ...(opts.mkfs ? ["--mkfs"] : []),
@@ -580,20 +580,9 @@ export class BlockRegistryService {
     const imageId = this.genImageId(outputId);
 
     // If the container does not exist and the output image exists we do nothing due to idempotence
-    const outputImageExists = await fs
-      .stat(path.join(this.paths.images, imageId))
-      .then(() => true)
-      .catch((err: Error) => {
-        if (!err.message.startsWith("ENOENT")) throw err;
-        return false;
-      });
-    const containerExists = await fs
-      .stat(path.join(this.paths.containers, containerId))
-      .then(() => true)
-      .catch((err: Error) => {
-        if (!err.message.startsWith("ENOENT")) throw err;
-        return false;
-      });
+    const outputImageExists = await doesFileExist(path.join(this.paths.images, imageId));
+    const containerExists = await doesFileExist(path.join(this.paths.containers, containerId));
+
     // We have 4 cases:
     // - If the output image exists and we don't have the container then:
     //   * We can't verify whether we have an imageId collision or we just restarted an interrupted commit
@@ -628,7 +617,7 @@ export class BlockRegistryService {
       }
 
       const t1 = performance.now();
-      await execCmdAsync(
+      await execCmd(
         "/opt/overlaybd/bin/overlaybd-commit",
         "-z",
         "-t",
@@ -639,9 +628,7 @@ export class BlockRegistryService {
       this.logger.info(
         `obd-commit for ${containerId} took: ${(performance.now() - t1).toFixed(2)} ms`,
       );
-      const layerDigest = `sha256:${
-        (await execCmdAsync("sha256sum", layerPath)).stdout.split(" ")[0]
-      }`;
+      const layerDigest = `sha256:${(await execCmd("sha256sum", layerPath)).stdout.split(" ")[0]}`;
       const layerSize = (await fs.stat(layerPath)).size;
       const image = obdConfig.hocusImageId as ImageId | undefined;
       let manifest: OCIImageManifest = image
@@ -772,7 +759,7 @@ export class BlockRegistryService {
           let flags = readonly ? ["--read-only"] : ["--read-write", "-o", "discard"];
           const t1 = performance.now();
           // TODO: Calling the mount syscall directly is much much faster
-          await execCmdAsync("mount", ...flags, bd.device, mountPoint);
+          await execCmd("mount", ...flags, bd.device, mountPoint);
           this.logger.info(`mount for ${what} took: ${(performance.now() - t1).toFixed(2)} ms`);
         } catch (err: any) {
           if (!err?.message?.includes("already mounted")) throw err;
@@ -948,17 +935,10 @@ export class BlockRegistryService {
               }
               // Ok the above code ensured that the lun was claimed by someone
               // time to ensure that we are the ones who claimed the LUN
-              // So let us stat the symlink, if it exists then we're done
+              // So let us check the symlink, if it exists then we're done
               // if it does not exist then we got a hash collision and need to move to another hash
               // and start the tortoise and hare algorithm to not end up in an infinite loop
-              done = true;
-              try {
-                await fs.stat(path.join(lunPath, tcmuStorageObjectId));
-              } catch (err: any) {
-                if (!err?.message?.startsWith("ENOENT")) throw err;
-                // Hash collision
-                done = false;
-              }
+              done = await doesFileExist(path.join(lunPath, tcmuStorageObjectId));
             }
             if (!done) {
               // Ok we got a hash collision or a reserved hash value
@@ -1057,17 +1037,11 @@ export class BlockRegistryService {
     const t1 = performance.now();
     // Ensure the device was unmounted
     const mountPoint = path.join(this.paths.mounts, what);
-    const dirPresent = await fs
-      .stat(mountPoint)
-      .then(() => true)
-      .catch((err: Error) => {
-        if (!err?.message?.startsWith("ENOENT")) throw err;
-        return false;
-      });
+    const dirPresent = await doesFileExist(mountPoint);
     if (dirPresent) {
       try {
         // TODO: Calling the umount syscall directly is much much more faster
-        await execCmdAsync("umount", mountPoint);
+        await execCmd("umount", mountPoint);
       } catch (err: any) {
         if (!err?.message?.includes("not mounted")) throw err;
       }

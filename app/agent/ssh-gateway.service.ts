@@ -11,8 +11,8 @@ export class SSHGatewayService {
     if (!fileExists) {
       await fs.mkdir(sshDirectory, { recursive: true });
       await fs.appendFile(authorizedKeysPath, "");
-      execCmd("chown", "-R", `${gatewayUser}:${gatewayUser}`, sshDirectory);
-      execCmd("chmod", "600", authorizedKeysPath);
+      await execCmd("chown", "-R", `${gatewayUser}:${gatewayUser}`, sshDirectory);
+      await fs.chmod(authorizedKeysPath, 0o600);
     }
 
     const fileContents = await fs.readFile(authorizedKeysPath, "utf-8");
