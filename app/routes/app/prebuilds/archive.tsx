@@ -19,6 +19,9 @@ export const action = async ({ context: { app, db, req } }: ActionArgs) => {
   }
   const prebuild = await db.prebuildEvent.findUnique({
     where: { externalId: prebuildInfo.prebuildExternalId },
+    include: {
+      project: true,
+    },
   });
   if (prebuild == null) {
     throw new HttpError(StatusCodes.BAD_REQUEST, "Prebuild not found");
@@ -29,7 +32,13 @@ export const action = async ({ context: { app, db, req } }: ActionArgs) => {
       workflowId: uuidv4(),
       taskQueue: MAIN_TEMPORAL_QUEUE,
       retry: { maximumAttempts: 1 },
-      args: [{ prebuildEventId: prebuild.id }],
+      args: [
+        {
+          prebuildEventId: prebuild.id,
+          waitForDeletion: true,
+          gitRepoIdForLock: prebuild.project.gitRepositoryId,
+        },
+      ],
     }),
   );
 

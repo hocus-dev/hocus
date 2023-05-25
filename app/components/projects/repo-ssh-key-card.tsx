@@ -41,18 +41,18 @@ export const RepoSshKeyCard = (props: { publicKey: string }): JSX.Element => {
   return (
     <div className="text-gray-400 text-sm">
       <Card>
-        <h2 className="text-white text-lg font-bold">Connect Git Repository</h2>
-        <p>
-          Please give the following public SSH key read access to the repository. If the repository
-          is public, the key must be made known to the provider.{" "}
-          <a
-            className="underline hover:text-gray-300"
-            target="_blank noopener noreferrer"
-            href="https://docs.github.com/en/developers/overview/managing-deploy-keys#deploy-keys"
-          >
-            On GitHub you can for example add it to another repository's deploy keys.
-          </a>
-        </p>
+        <h2 className="text-white text-lg font-bold leading-5">Connect Git Repository</h2>
+        <div>
+          <p className="mb-2">
+            Please give the following SSH public key read access to the repository. On GitHub or
+            GitLab, you can either:
+          </p>
+          <ul className="list-disc pl-4">
+            <li>add it to the repository's deploy keys, or</li>
+            <li>add it to your account, or</li>
+            <li>if the repository is public, add it to another repository's deploy keys.</li>
+          </ul>
+        </div>
         <button
           onClick={copyPublicKeyToClipboard}
           tabIndex={-1}

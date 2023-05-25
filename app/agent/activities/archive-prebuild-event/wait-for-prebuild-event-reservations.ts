@@ -1,6 +1,7 @@
 import { PrebuildEventReservationType } from "@prisma/client";
 
 import type { CreateActivity } from "../types";
+import { withActivityHeartbeat } from "../utils";
 
 import { sleep } from "~/utils.shared";
 
@@ -10,9 +11,8 @@ export type WaitForPrebuildEventReservationsActivity = (args: {
 }) => Promise<void>;
 export const waitForPrebuildEventReservations: CreateActivity<
   WaitForPrebuildEventReservationsActivity
-> =
-  ({ db }) =>
-  async (args) => {
+> = ({ db }) =>
+  withActivityHeartbeat({ intervalMs: 1000 }, async (args) => {
     const start = Date.now();
     while (true) {
       const now = new Date();
@@ -36,4 +36,4 @@ export const waitForPrebuildEventReservations: CreateActivity<
       }
       await sleep(2000);
     }
-  };
+  });
