@@ -2,12 +2,15 @@ import type { Project, GitRepository } from "@prisma/client";
 import {
   proxyActivities,
   startChild,
+  executeChild,
   sleep,
   continueAsNew,
   ParentClosePolicy,
 } from "@temporalio/workflow";
 
+import { withLock } from "./mutex";
 import { runBuildfsAndPrebuilds } from "./prebuild";
+import { getArchivePrebuildLockId } from "./utils";
 
 import type { Activities } from "~/agent/activities/list";
 import { parseWorkflowError } from "~/agent/workflows-utils";
@@ -45,6 +48,7 @@ const {
   getArchivablePrebuildEvents,
   addProjectAndRepository,
   reservePrebuildEvent,
+  getProjectsRepository,
 } = proxyActivities<Activities>({
   startToCloseTimeout: "15 seconds",
   retry: {
@@ -67,7 +71,10 @@ export async function runSyncGitRepository(
 ): Promise<void> {
   for (let i = 0; i < 1000; i++) {
     try {
-      const updates = await updateGitBranchesAndObjects(gitRepositoryId);
+      const updates = await withLock(
+        { resourceId: getArchivePrebuildLockId(gitRepositoryId) },
+        () => updateGitBranchesAndObjects(gitRepositoryId),
+      );
       const projects = await getRepositoryProjects(gitRepositoryId);
       const seenProjects = projects.filter((p) => seenProjectIds.has(p.id));
       const newProjects = projects.filter((p) => !seenProjectIds.has(p.id));
@@ -160,18 +167,11 @@ export async function runAddProjectAndRepository(args: {
  * 3. Delete prebuild files from disk
  * 4. Mark prebuild as archived and remove reservation
  */
-export async function runArchivePrebuild(args: { prebuildEventId: bigint }): Promise<void> {
-  const now = Date.now();
+export async function runDeletePrebuildFiles(args: { prebuildEventId: bigint }): Promise<void> {
   const oneHour = 60 * 60 * 1000;
-  const twentyFourHours = 24 * oneHour;
   const retry = <T>(fn: () => Promise<T>) =>
     retryWorkflow(fn, { maxRetries: 10, retryIntervalMs: 1000 });
 
-  await reservePrebuildEvent({
-    prebuildEventId: args.prebuildEventId,
-    reservationType: "PREBUILD_EVENT_RESERVATION_TYPE_ARCHIVE_PREBUILD",
-    validUntil: new Date(now + twentyFourHours),
-  });
   await retry(() =>
     waitForPrebuildEventReservations({
       prebuildEventId: args.prebuildEventId,
@@ -180,6 +180,53 @@ export async function runArchivePrebuild(args: { prebuildEventId: bigint }): Pro
   );
   await deleteLocalPrebuildEventFiles({ prebuildEventId: args.prebuildEventId });
   await retry(() => markPrebuildEventAsArchived({ prebuildEventId: args.prebuildEventId }));
+}
+/**
+ * Here's what this workflow does:
+ * 1. Reserve prebuild for archival
+ * 2. Schedule a prebuild to delete prebuild files from disk
+ */
+export async function runArchivePrebuild(args: {
+  prebuildEventId: bigint;
+  waitForDeletion?: boolean;
+  /**
+   * If a user were to run this manually without a lock, a somewhat harmless and rare race condition could occur.
+   * If a new branch is added to the project's repository, and that branch is pointing to the
+   * same git object that the prebuild event that's being archived does, here's what can happen:
+   *
+   * 1. The branch gets connected to the git object id of the prebuild event
+   * 2. The prebuild event is not archived yet, so `getOrCreatePrebuildEvents` run by "runSyncGitRepository" finds it instead of creating a new one
+   * 3. Archival of the prebuild event is scheduled manually by the user
+   * 4. The prebuild event is archived
+   * 5. The new branch doesn't have a prebuild event that can be used to create a new workspace, and a new one is NOT created
+   *
+   * This is not a big deal, because the user can just schedule a new prebuild for the branch manually.
+   * Anyway, this lock is here to prevent this from happening.
+   */
+  gitRepoIdForLock?: bigint;
+}): Promise<void> {
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  const twentyFourHours = 24 * oneHour;
+
+  const reserve = () =>
+    reservePrebuildEvent({
+      prebuildEventId: args.prebuildEventId,
+      reservationType: "PREBUILD_EVENT_RESERVATION_TYPE_ARCHIVE_PREBUILD",
+      validUntil: new Date(now + twentyFourHours),
+    });
+
+  if (args.gitRepoIdForLock != null) {
+    await withLock({ resourceId: getArchivePrebuildLockId(args.gitRepoIdForLock) }, reserve);
+  } else {
+    await reserve();
+  }
+
+  const execFn = args.waitForDeletion ?? false ? executeChild : startChild;
+  await execFn(runDeletePrebuildFiles, {
+    args: [args],
+    parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+  });
 }
 
 export async function runDeleteRemovablePrebuilds(projectId: bigint): Promise<void> {
@@ -197,20 +244,43 @@ export async function runMonitorArchivablePrebuilds(args: {
   projectId: bigint;
   recentlyArchivedPrebuildEventIds: Map<bigint, number>;
 }): Promise<void> {
+  let gitRepoId: bigint | null = null;
   for (let i = 0; i < 1000; i++) {
     try {
-      const archivablePrebuildEvents = await getArchivablePrebuildEvents(args.projectId);
-      const prebuildEventIdsToArchive = archivablePrebuildEvents
-        .map((e) => e.id)
-        .filter((id) => !args.recentlyArchivedPrebuildEventIds.has(id));
+      gitRepoId =
+        gitRepoId == null
+          ? await getProjectsRepository(args.projectId).then((g) => g.id)
+          : gitRepoId;
+
       const now = Date.now();
-      for (const prebuildEventId of prebuildEventIdsToArchive) {
-        await startChild(runArchivePrebuild, {
-          args: [{ prebuildEventId }],
-          parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
-        });
-        args.recentlyArchivedPrebuildEventIds.set(prebuildEventId, now);
-      }
+      // This mutex guards against the following, rare race condition:
+      // - let's consider a git commit identified as A
+      // - let's consider a branch B that is based on A
+      // - let's consider a prebuild for commit A that is in the success state
+      // - there are no other branches based on commit A
+      // - now someone pushes a commit C to branch B
+      // - runSyncGitRepo runs and updates the db
+      // - monitorArchivablePrebuilds runs and finds that prebuild for commit A is archivable
+      // - at the same time, someone creates branch D based on A
+      // - runSyncGitRepo runs and updates the db but does not schedule a prebuild for commit A because there is already a prebuild for A
+      // - monitorArchivablePrebuilds archives the prebuild for commit A
+      // - branch D has no prebuild for commit A, so a user can't create a workspace for branch D
+      await withLock({ resourceId: getArchivePrebuildLockId(gitRepoId!) }, async () => {
+        const archivablePrebuildEvents = await getArchivablePrebuildEvents(args.projectId);
+        const prebuildEventIdsToArchive = archivablePrebuildEvents
+          .map((e) => e.id)
+          .filter((id) => !args.recentlyArchivedPrebuildEventIds.has(id));
+
+        await waitForPromisesWorkflow(
+          prebuildEventIdsToArchive.map(async (prebuildEventId) => {
+            await executeChild(runArchivePrebuild, {
+              args: [{ prebuildEventId }],
+              parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON,
+            });
+            args.recentlyArchivedPrebuildEventIds.set(prebuildEventId, now);
+          }),
+        );
+      });
       const oneHour = 60 * 60 * 1000;
       args.recentlyArchivedPrebuildEventIds = new Map(
         Array.from(args.recentlyArchivedPrebuildEventIds.entries()).filter(([_, timestamp]) => {

@@ -574,7 +574,7 @@ test.concurrent(
             workflowId: uuidv4(),
             taskQueue,
             retry: { maximumAttempts: 1 },
-            args: [{ prebuildEventId: e.id }],
+            args: [{ prebuildEventId: e.id, waitForDeletion: true }],
           });
           expect(await doPrebuildFilesExist()).toEqual([false, false]);
           const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({

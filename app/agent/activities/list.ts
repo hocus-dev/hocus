@@ -23,6 +23,7 @@ import { getDefaultBranch } from "./get-default-branch";
 import { getOrCreateBuildfsEvents } from "./get-or-create-buildfs-events";
 import { getOrCreatePrebuildEvents } from "./get-or-create-prebuild-events";
 import { getPrebuildEvents } from "./get-prebuild-events";
+import { getProjectsRepository } from "./get-projects-repository";
 import { getRepositoryProjects } from "./get-repository-projects";
 import { getWorkspaceInstanceStatus } from "./get-workspace-instance-status";
 import { initPrebuildEvents } from "./init-prebuild-events";
@@ -73,6 +74,7 @@ const activities = {
   cleanUpWorkspaceInstanceDb,
   createPrebuildEvent,
   signalWithStartWaitWorkflow,
+  getProjectsRepository,
 } as const;
 
 const _typeCheck: typeof activities extends Record<string, CreateActivity<any>> ? 1 : 0 = 1;
