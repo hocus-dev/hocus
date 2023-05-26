@@ -11,7 +11,7 @@ REPO_DIR="$SCRIPT_DIR"/../../../../
 "$REPO_DIR"/ops/bin/dev/quay-login.sh
 
 TMP_NAME=block-repo-tmp
-QUAY_REPO=quay.io/gorbak25/hocus-block-registry-tests
+QUAY_REPO=quay.io/hocus/hocus-block-registry-tests
 function build_and_push()
 {
   local TEST_NAME=$(basename "$1" | sed 's/\.Dockerfile//')
