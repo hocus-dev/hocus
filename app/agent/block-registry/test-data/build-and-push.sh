@@ -1,21 +1,17 @@
 #!/bin/bash
 set -o pipefail
 set -o xtrace
+set -o errexit
 
 export DOCKER_BUILDKIT=1
 
 SCRIPT_DIR="$(dirname "$0")"
+REPO_DIR="$SCRIPT_DIR"/../../../../
 
-EXISTING_TOKEN=$(cat ~/.docker/config.json 2>/dev/null | jq '.auths."quay.io".auth' 2>/dev/null)
-if [[ ! -f "$HOME/.docker/config.json" ]] || [[ "$EXISTING_TOKEN" = "null" ]]; then
-  echo "$EXISTING_TOKEN"
-  docker login quay.io -u gorbak25
-fi
-
-set -o errexit
+"$REPO_DIR"/ops/bin/dev/quay-login.sh
 
 TMP_NAME=block-repo-tmp
-QUAY_REPO=quay.io/gorbak25/hocus-block-registry-tests
+QUAY_REPO=quay.io/hocus/hocus-block-registry-tests
 function build_and_push()
 {
   local TEST_NAME=$(basename "$1" | sed 's/\.Dockerfile//')
