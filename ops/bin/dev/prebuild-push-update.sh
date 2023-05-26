@@ -5,7 +5,7 @@ set -o errexit
 
 export DOCKER_BUILDKIT=1
 
-# We redeploy hocus way to often, obd takes a long time to compile
+# We redeploy hocus way too often, obd takes a long time to compile
 # Temporarily just push some images we need to quay
 export SCRIPT_DIR="$(dirname "$0")"
 export REPO_DIR="$(realpath "${SCRIPT_DIR}/../../..")"
