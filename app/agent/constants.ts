@@ -22,16 +22,19 @@ set -o xtrace
 ${task}
 `;
 
+const PASTE_START_ESCAPE_CODE = "\x1b[200~";
+const PASTE_END_ESCAPE_CODE = "\x1b[201~";
+
 /*
  * I'm including the boot time and a new line so one may easily distinguish
  * logs from different boots - I've decided to do so after starting and stopping the vm multiple times :)
  */
 export const TASK_INPUT_TEMPLATE = (task: string, cwd: string) =>
   `
-# Hocus task boot time ${Date.now()}
+${PASTE_START_ESCAPE_CODE}# Time: ${new Date().toLocaleString()}
 source "${WORKSPACE_ENV_SCRIPT_PATH}"
-cd ${cwd}
-${task}
+cd ${cwd}${PASTE_END_ESCAPE_CODE}
+${PASTE_START_ESCAPE_CODE}${task}${PASTE_END_ESCAPE_CODE}
 `;
 
 export const ATTACH_TO_TASK_SCRIPT_TEMPLATE = (socketPath: string, logPath: string) => `#!/bin/bash
