@@ -55,6 +55,7 @@ RUN echo '\nif [ -v SSH_CONNECTION ] || [ -v SSH_CLIENT ] || [ -v SSH_TTY ]; the
 
 FROM workspace-base as workspace
 
+USER root
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     iputils-ping \
@@ -74,6 +75,8 @@ RUN apt-get update \
     && yes | unminimize
 RUN systemctl enable ssh docker && \
     usermod -aG docker hocus
+
+USER hocus
 # This adds github.com as a known host - this is vulnerable to MITM but good enough for now
 RUN ssh-keyscan -H github.com >> /home/hocus/.ssh/known_hosts
 # Ensure shells use ~/.ssh/ssh_auth_sock when used over ssh
