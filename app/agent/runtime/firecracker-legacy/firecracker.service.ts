@@ -12,11 +12,9 @@ import type { Config as SSHConfig, NodeSSH } from "node-ssh";
 import { match } from "ts-pattern";
 import { fetch, Agent } from "undici";
 
-import type { AgentUtilService } from "./agent-util.service";
-import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "./constants";
-import { FifoFlags } from "./fifo-flags";
-import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
-import type { StorageService } from "./storage/storage.service";
+import type { AgentUtilService } from "../../agent-util.service";
+import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "../../constants";
+import { FifoFlags } from "../../fifo-flags";
 import {
   doesFileExist,
   execCmd,
@@ -24,44 +22,43 @@ import {
   retry,
   watchFileUntilLineMatches,
   withSsh,
-} from "./utils";
+} from "../../utils";
+
 import type { VmInfo } from "./vm-info.validator";
 import { VmInfoValidator } from "./vm-info.validator";
 
+import type { IpBlockId, WorkspaceNetworkService } from "~/agent/network/workspace-network.service";
+import { VMS_NS_PATH } from "~/agent/network/workspace-network.service";
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
-import { displayError, numericSort, unwrap, waitForPromises } from "~/utils.shared";
+import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
-const IP_PREFIX = "10.231.";
-const NS_PREFIX = ["ip", "netns", "exec", "vms"] as const;
-const TAP_DEVICE_NAME_PREFIX = "vm";
-const TAP_DEVICE_CIDR = 30;
 const CHROOT_PATH_TO_SOCK = "/run/sock";
 
 export function factoryFirecrackerService(
-  storageService: StorageService,
   agentUtilService: AgentUtilService,
   logger: DefaultLogger,
   config: Config,
   perfService: PerfService,
+  networkService: WorkspaceNetworkService,
 ): (instanceId: string) => FirecrackerService {
   return (instanceId: string) =>
     new FirecrackerService(
-      storageService,
       agentUtilService,
       logger,
       config,
       perfService,
+      networkService,
       instanceId,
     );
 }
 factoryFirecrackerService.inject = [
-  Token.StorageService,
   Token.AgentUtilService,
   Token.Logger,
   Token.Config,
   Token.PerfService,
+  Token.WorkspaceNetworkService,
 ] as const;
 
 export class FirecrackerService {
@@ -73,11 +70,11 @@ export class FirecrackerService {
   private readonly agentConfig: ReturnType<Config["agent"]>;
 
   constructor(
-    private readonly storageService: StorageService,
     private readonly agentUtilService: AgentUtilService,
     private readonly logger: DefaultLogger,
     private readonly config: Config,
     private readonly perfService: PerfService,
+    private readonly networkService: WorkspaceNetworkService,
     public readonly instanceId: string,
   ) {
     this.agentConfig = config.agent();
@@ -151,7 +148,7 @@ export class FirecrackerService {
         "--gid",
         JAILER_GROUP_ID.toString(),
         "--netns",
-        "/var/run/netns/vms",
+        VMS_NS_PATH,
         "--exec-file",
         "/usr/local/bin/firecracker",
         "--",
@@ -197,90 +194,6 @@ export class FirecrackerService {
     return child.pid;
   }
 
-  private async getFreeIpBlockId(): Promise<number> {
-    const ipId = await this.storageService.withStorage(async (storage) => {
-      const container = await storage.readStorage();
-      const busyIpBlockIds = container.busyIpBlockIds;
-      busyIpBlockIds.sort(numericSort);
-      let nextFreeIpId = MINIMUM_IP_ID;
-      for (const busyIpBlockId of busyIpBlockIds) {
-        if (busyIpBlockId !== nextFreeIpId) {
-          break;
-        }
-        nextFreeIpId++;
-      }
-      if (nextFreeIpId > MAXIMUM_IP_ID) {
-        throw new Error("No free IP addresses");
-      }
-      busyIpBlockIds.push(nextFreeIpId);
-      await storage.writeStorage(container);
-      return nextFreeIpId;
-    });
-    return ipId;
-  }
-
-  private async releaseIpBlockId(ipBlockId: number): Promise<void> {
-    await this.storageService.withStorage(async (storage) => {
-      const container = await storage.readStorage();
-      container.busyIpBlockIds = container.busyIpBlockIds.filter((id) => id !== ipBlockId);
-      await storage.writeStorage(container);
-    });
-  }
-
-  private getIpsFromIpId(ipId: number): { tapDeviceIp: string; vmIp: string } {
-    const netIpId = 4 * ipId;
-    const tapDeviceIpId = netIpId + 1;
-    const vmIpId = netIpId + 2;
-
-    const tapFirstIpPart = (tapDeviceIpId & ((2 ** 8 - 1) << 8)) >> 8;
-    const tapSecondIpPart = tapDeviceIpId & (2 ** 8 - 1);
-    const vmFirstIpPart = (vmIpId & ((2 ** 8 - 1) << 8)) >> 8;
-    const vmSecondIpPart = vmIpId & (2 ** 8 - 1);
-
-    return {
-      tapDeviceIp: `${IP_PREFIX}${tapFirstIpPart}.${tapSecondIpPart}`,
-      vmIp: `${IP_PREFIX}${vmFirstIpPart}.${vmSecondIpPart}`,
-    };
-  }
-
-  private getTapDeviceName(ipId: number): string {
-    return `${TAP_DEVICE_NAME_PREFIX}${ipId}`;
-  }
-
-  async setupNetworking(args: {
-    tapDeviceName: string;
-    tapDeviceIp: string;
-    tapDeviceCidr: number;
-  }): Promise<void> {
-    try {
-      await execCmd(...NS_PREFIX, "ip", "link", "del", args.tapDeviceName);
-    } catch (err) {
-      if (!(err instanceof Error && err.message.includes("Cannot find device"))) {
-        throw err;
-      }
-    }
-    await execCmd(...NS_PREFIX, "ip", "tuntap", "add", "dev", args.tapDeviceName, "mode", "tap");
-    await execCmd(...NS_PREFIX, "sysctl", "-w", `net.ipv4.conf.${args.tapDeviceName}.proxy_arp=1`);
-    await execCmd(
-      ...NS_PREFIX,
-      "sysctl",
-      "-w",
-      `net.ipv6.conf.${args.tapDeviceName}.disable_ipv6=1`,
-    );
-    await execCmd(
-      ...NS_PREFIX,
-      "ip",
-      "addr",
-      "add",
-      `${args.tapDeviceIp}/${args.tapDeviceCidr}`,
-      "dev",
-      args.tapDeviceName,
-    );
-    await execCmd(...NS_PREFIX, "ip", "link", "set", "dev", args.tapDeviceName, "up");
-
-    return;
-  }
-
   private async linkToJailerChroot(filePath: string, relativePathInChroot: string): Promise<void> {
     const chrootPath = path.join(this.instanceDirRoot, relativePathInChroot);
     await fs.link(filePath, chrootPath);
@@ -302,9 +215,9 @@ export class FirecrackerService {
     kernelPath: string;
     rootFsPath: string;
     vmIp: string;
-    tapDeviceIp: string;
-    tapDeviceName: string;
-    tapDeviceCidr: number;
+    tapIfIp: string;
+    tapIfName: string;
+    tapIfCidr: number;
     extraDrives: (PutGuestDriveByIDRequest["body"] & {
       /**
        * By default the drive is hard linked into a firecracker-managed directory.
@@ -320,8 +233,8 @@ export class FirecrackerService {
     memSizeMib: number;
     vcpuCount: number;
   }): Promise<FullVmConfiguration> {
-    const mask = new Netmask(`255.255.255.255/${cfg.tapDeviceCidr}`).mask;
-    const ipArg = `ip=${cfg.vmIp}::${cfg.tapDeviceIp}:${mask}::eth0:off`;
+    const mask = new Netmask(`255.255.255.255/${cfg.tapIfCidr}`).mask;
+    const ipArg = `ip=${cfg.vmIp}::${cfg.tapIfIp}:${mask}::eth0:off`;
 
     const chrootKernelPath = "/kernel.bin";
     const chrootRootFsPath = "/rootfs.ext4";
@@ -377,7 +290,7 @@ export class FirecrackerService {
     cfgTasks.push(
       this.api.putGuestNetworkInterfaceByID({
         ifaceId: "eth0",
-        body: { ifaceId: "eth0", hostDevName: cfg.tapDeviceName },
+        body: { ifaceId: "eth0", hostDevName: cfg.tapIfName },
       }),
     );
     cfgTasks.push(
@@ -479,7 +392,7 @@ export class FirecrackerService {
       sshConfig: SSHConfig;
       firecrackerPid: number;
       vmIp: string;
-      ipBlockId: number;
+      ipBlockId: IpBlockId;
     }) => Promise<T>,
   ): Promise<T> {
     const kernelPath = config.kernelPath ?? this.agentConfig.defaultKernel;
@@ -492,24 +405,20 @@ export class FirecrackerService {
     this.logger.info(
       `Starting firecracker process with pid ${fcPid} took: ${(t2 - t1).toFixed(2)} ms`,
     );
-    let ipBlockId: null | number = null;
+    let ipBlockId: null | IpBlockId = null;
     try {
-      ipBlockId = await this.getFreeIpBlockId();
-      const { vmIp, tapDeviceIp } = this.getIpsFromIpId(ipBlockId);
-      const tapDeviceName = this.getTapDeviceName(ipBlockId);
-      await this.setupNetworking({
-        tapDeviceName: tapDeviceName,
-        tapDeviceIp: tapDeviceIp,
-        tapDeviceCidr: TAP_DEVICE_CIDR,
-      });
+      ipBlockId = await this.networkService.allocateIpBlock();
+      const { tapIfCidr, tapIfIp, tapIfName, vmIp } = await this.networkService.setupInterfaces(
+        ipBlockId,
+      );
 
       await this.createVM({
         kernelPath: kernelPath,
         rootFsPath: config.rootFsPath,
         vmIp,
-        tapDeviceIp,
-        tapDeviceName,
-        tapDeviceCidr: TAP_DEVICE_CIDR,
+        tapIfIp,
+        tapIfName,
+        tapIfCidr,
         copyRootFs: config.copyRootFs,
         extraDrives: extraDrives.map(({ pathOnHost, copy }, idx) => ({
           driveId: `drive${idx}`,
@@ -564,7 +473,7 @@ export class FirecrackerService {
         await this.shutdownVM();
       }
       if (shouldPoweroff && ipBlockId !== null) {
-        await this.releaseVmResources(ipBlockId);
+        await this.networkService.freeIpBlock(ipBlockId);
       }
       if (shouldPoweroff && config.removeVmDirAfterPoweroff !== false) {
         await this.deleteVMDir();
@@ -589,32 +498,8 @@ export class FirecrackerService {
     await watchFileUntilLineMatches(/reboot: Restarting system/, this.getVMLogsPath(), 30000);
   }
 
-  async releaseVmResources(ipBlockId: number): Promise<void> {
-    try {
-      await this.changeVMNetworkVisibility(ipBlockId, "private");
-    } catch (err) {
-      if (!(err instanceof Error && err.message.includes("Bad rule"))) {
-        throw err;
-      }
-    }
-    await this.releaseIpBlockId(ipBlockId);
-  }
-
   async deleteVMDir(): Promise<void> {
     await fs.rm(this.instanceDir, { recursive: true, force: true });
-  }
-
-  async changeVMNetworkVisibility(
-    ipBlockId: number,
-    changeTo: "public" | "private",
-  ): Promise<void> {
-    const action = changeTo === "public" ? "-A" : "-D";
-    for (const cmd of [
-      `iptables ${action} FORWARD -i vpeer-ssh-vms -o vm${ipBlockId} -p tcp --dport 22 -j ACCEPT`,
-      `iptables ${action} FORWARD -i vm${ipBlockId} -o vpeer-ssh-vms -m state --state ESTABLISHED,RELATED -j ACCEPT`,
-    ]) {
-      await execCmd(...NS_PREFIX, ...cmd.split(" "));
-    }
   }
 
   /** Stops the VM and cleans up its resources. Idempotent. */
@@ -624,7 +509,7 @@ export class FirecrackerService {
       await this.shutdownVM();
     }
     if (vmInfo != null) {
-      await this.releaseVmResources(vmInfo.info.ipBlockId);
+      await this.networkService.freeIpBlock(vmInfo.info.ipBlockId as IpBlockId);
     }
     await this.deleteVMDir();
   }

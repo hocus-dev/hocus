@@ -3,12 +3,12 @@ import { DefaultLogger } from "@temporalio/worker";
 import { AgentUtilService } from "./agent-util.service";
 import { BlockRegistryService } from "./block-registry/registry.service";
 import { BuildfsService } from "./buildfs.service";
-import { factoryFirecrackerService } from "./firecracker.service";
+import { factoryFirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import { AgentGitService } from "./git/git.service";
 import { PrebuildService } from "./prebuild.service";
 import { ProjectConfigService } from "./project-config/project-config.service";
-import { SSHGatewayService } from "./ssh-gateway.service";
-import { LowLevelStorageService, StorageService } from "./storage/storage.service";
+import { SSHGatewayService } from "./network/ssh-gateway.service";
+import { LowLevelStorageService, StorageService } from "./network/storage/storage.service";
 import { WorkspaceAgentService } from "./workspace-agent.service";
 
 import { config } from "~/config";
@@ -23,6 +23,7 @@ import { clientFactory } from "~/temporal/client-factory";
 import { TimeService } from "~/time.service";
 import { Token } from "~/token";
 import { WorkspaceService } from "~/workspace/workspace.service";
+import { WorkspaceNetworkService } from "./network/workspace-network.service";
 
 type Providers = typeof providers;
 type ProviderMap = GenericProviderMap<Providers>;
@@ -47,6 +48,7 @@ const providers = [
   { token: Token.BuildfsService, provide: { class: BuildfsService } },
   { token: Token.PrebuildService, provide: { class: PrebuildService } },
   { token: Token.SSHGatewayService, provide: { class: SSHGatewayService } },
+  { token: Token.WorkspaceNetworkService, provide: { class: WorkspaceNetworkService } },
   { token: Token.FirecrackerService, provide: { factory: factoryFirecrackerService } },
   { token: Token.WorkspaceAgentService, provide: { class: WorkspaceAgentService } },
   { token: Token.TemporalClient, provide: { factory: clientFactory } },

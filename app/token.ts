@@ -33,4 +33,5 @@ export const Token = {
   PerfService: "PerfServiceT",
   InitService: "InitServiceT",
   BlockRegistryService: "BlockRegistryServiceT",
+  WorkspaceNetworkService: "WorkspaceNetworkServiceT",
 } as const;

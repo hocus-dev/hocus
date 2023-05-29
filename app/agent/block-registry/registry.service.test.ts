@@ -176,7 +176,7 @@ const provideBlockRegistry = (
 async function ensureKernelDidNotBlowUp() {
   try {
     // Grep returns status 1 when no matches were found
-    await execCmd("bash", "-c", 'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption|RIP:"');
+    await execCmd("bash", "-c", 'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption| RIP:"');
     // eslint-disable-next-line no-console
     console.error((await execCmd("dmesg")).stdout);
     throw new Error("Looks like the kernel blew up, please reboot the CI machine...");

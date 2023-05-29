@@ -1,16 +1,12 @@
-import fs from "fs/promises";
-
 import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
-import { createAgentInjector } from "./agent-injector";
-import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
-import { execCmd, execSshCmd, sleep } from "./utils";
+import { createAgentInjector } from "../../agent-injector";
+import { execCmd, execSshCmd, sleep } from "../../utils";
 
 import { Scope } from "~/di/injector.server";
 import { printErrors } from "~/test-utils";
 import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
 
 const provideInjector = (
   testFn: (args: {
@@ -59,21 +55,6 @@ test.concurrent(
         process.kill(pid);
       }
     }
-  }),
-);
-
-test.concurrent(
-  "getIpsFromIpId",
-  provideInjector(async ({ injector }) => {
-    const fcService = injector.resolve(Token.FirecrackerService)("xd");
-    expect(fcService["getIpsFromIpId"](MINIMUM_IP_ID)).toMatchObject({
-      tapDeviceIp: "10.231.0.9",
-      vmIp: "10.231.0.10",
-    });
-    expect(fcService["getIpsFromIpId"](MAXIMUM_IP_ID)).toMatchObject({
-      tapDeviceIp: "10.231.255.253",
-      vmIp: "10.231.255.254",
-    });
   }),
 );
 
@@ -151,24 +132,5 @@ test.concurrent(
     expect(vmInfo3).toBeNull();
 
     await fcService.cleanup();
-  }),
-);
-
-test.concurrent(
-  "ipBlocks",
-  provideInjector(async ({ injector, runId }) => {
-    const fcService = injector.resolve(Token.FirecrackerService)(runId);
-    const storageService = injector.resolve(Token.StorageService);
-    const storageFileId = uuidv4();
-    const filePath = `/tmp/hocus-storage-test-${storageFileId}.yaml`;
-    storageService["lowLevelStorageService"].getPathToStorage = () => filePath;
-    try {
-      const ipBlockIds = await waitForPromises(
-        Array.from({ length: 15 }).map(() => fcService["getFreeIpBlockId"]()),
-      );
-      expect(new Set(ipBlockIds).size).toEqual(ipBlockIds.length);
-    } finally {
-      await fs.unlink(filePath);
-    }
   }),
 );

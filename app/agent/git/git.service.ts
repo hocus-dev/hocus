@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import type { AgentUtilService } from "../agent-util.service";
 import { HOST_PERSISTENT_DIR, PROJECT_DIR } from "../constants";
-import type { FirecrackerService } from "../firecracker.service";
+import type { FirecrackerService } from "../runtime/firecracker-legacy/firecracker.service";
 import { doesFileExist, execCmdWithOpts, execSshCmd, withFileLock } from "../utils";
 
 import { RemoteInfoTupleValidator } from "./validator";

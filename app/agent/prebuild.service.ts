@@ -23,7 +23,7 @@ import {
   SOLO_AGENT_INSTANCE_ID,
   WORKSPACE_ENV_SCRIPT_PATH,
 } from "./constants";
-import type { FirecrackerService } from "./firecracker.service";
+import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import {
   PREBUILD_DEV_DIR,
   PREBUILD_SCRIPTS_DIR,

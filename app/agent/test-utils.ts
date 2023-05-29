@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { createAgentInjector } from "./agent-injector";
 import type { AgentInjector } from "./agent-injector";
-import type { FirecrackerService } from "./firecracker.service";
+import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import { SSH_PROXY_IP } from "./test-constants";
 import { execCmd } from "./utils";
 

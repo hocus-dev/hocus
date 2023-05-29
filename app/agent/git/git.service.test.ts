@@ -4,7 +4,7 @@ import path from "path";
 import { SshKeyPairType } from "@prisma/client";
 
 import { PROJECT_DIR } from "../constants";
-import type { FirecrackerService } from "../firecracker.service";
+import type { FirecrackerService } from "../runtime/firecracker-legacy/firecracker.service";
 import { PERSISTENT_TEST_DIR } from "../test-constants";
 import { provideInjector, provideInjectorAndDb, withTestMount } from "../test-utils";
 import { execSshCmd } from "../utils";

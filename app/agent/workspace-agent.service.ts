@@ -18,14 +18,15 @@ import {
   WORKSPACE_REPOSITORY_DIR,
   WORKSPACE_SCRIPTS_DIR,
 } from "./constants";
-import type { FirecrackerService } from "./firecracker.service";
+import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import type { ProjectConfigService } from "./project-config/project-config.service";
-import type { SSHGatewayService } from "./ssh-gateway.service";
+import type { SSHGatewayService } from "./network/ssh-gateway.service";
 import { doesFileExist, execCmd, execSshCmd } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
+import { WorkspaceNetworkService } from "./network/workspace-network.service";
 
 export class InvalidWorkspaceStatusError extends Error {}
 
@@ -35,6 +36,7 @@ export class WorkspaceAgentService {
     Token.AgentUtilService,
     Token.SSHGatewayService,
     Token.ProjectConfigService,
+    Token.WorkspaceNetworkService,
     Token.FirecrackerService,
     Token.Config,
   ] as const;
@@ -45,6 +47,7 @@ export class WorkspaceAgentService {
     private readonly agentUtilService: AgentUtilService,
     private readonly sshGatewayService: SSHGatewayService,
     private readonly projectConfigService: ProjectConfigService,
+    private readonly networkService: WorkspaceNetworkService,
     private readonly fcServiceFactory: (id: string) => FirecrackerService,
     config: Config,
   ) {
@@ -372,7 +375,7 @@ export class WorkspaceAgentService {
         await this.writeUserGitConfig(ssh, args.userGitConfig);
         await this.checkoutToBranch(ssh, args.branchName);
         await Promise.all(args.tasks.map(taskFn));
-        await fcService.changeVMNetworkVisibility(ipBlockId, "public");
+        await this.networkService.changeInterfaceVisibility(ipBlockId, "public");
         await this.sshGatewayService.addPublicKeysToAuthorizedKeys(authorizedKeys);
         return {
           firecrackerProcessPid: firecrackerPid,
