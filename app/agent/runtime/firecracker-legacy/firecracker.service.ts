@@ -23,9 +23,8 @@ import {
   watchFileUntilLineMatches,
   withSsh,
 } from "../../utils";
-
-import type { VmInfo } from "./vm-info.validator";
-import { VmInfoValidator } from "./vm-info.validator";
+import type { VmInfo } from "../vm-info.validator";
+import { VmInfoValidator } from "../vm-info.validator";
 
 import type { IpBlockId, WorkspaceNetworkService } from "~/agent/network/workspace-network.service";
 import { VMS_NS_PATH } from "~/agent/network/workspace-network.service";
@@ -102,15 +101,15 @@ export class FirecrackerService {
     );
   }
 
-  getVMLogsPath(): string {
+  private getVMLogsPath(): string {
     return `/tmp/${this.instanceId}.log`;
   }
 
-  getStdinPath(): string {
+  private getStdinPath(): string {
     return `/tmp/${this.instanceId}.stdin`;
   }
 
-  async startFirecrackerInstance(): Promise<number> {
+  private async startFirecrackerInstance(): Promise<number> {
     this.logger.info(`starting firecracker instance with socket at ${this.pathToSocket}`);
 
     const stdinPath = this.getStdinPath();
@@ -211,7 +210,7 @@ export class FirecrackerService {
    * to the jailer's chroot directory and paths supplied to firecracker will be
    * properly modified.
    */
-  async createVM(cfg: {
+  private async createVM(cfg: {
     kernelPath: string;
     rootFsPath: string;
     vmIp: string;
@@ -314,7 +313,7 @@ export class FirecrackerService {
     return vmConfig;
   }
 
-  async writeVmInfoFile(args: { pid: number; ipBlockId: number }): Promise<void> {
+  private async writeVmInfoFile(args: { pid: number; ipBlockId: number }): Promise<void> {
     const vmInfo: VmInfo = {
       ...args,
       instanceId: this.instanceId,
@@ -322,7 +321,7 @@ export class FirecrackerService {
     await fs.writeFile(this.vmInfoFilePath, JSON.stringify(vmInfo));
   }
 
-  async readVmInfoFile(): Promise<VmInfo> {
+  private async readVmInfoFile(): Promise<VmInfo> {
     const contents = await fs.readFile(this.vmInfoFilePath);
     return VmInfoValidator.Parse(JSON.parse(contents.toString()));
   }
@@ -489,7 +488,7 @@ export class FirecrackerService {
    *
    * Waits for the VM to shutdown.
    */
-  async shutdownVM(): Promise<void> {
+  private async shutdownVM(): Promise<void> {
     await this.api.createSyncAction({
       info: {
         actionType: InstanceActionInfoActionTypeEnum.SendCtrlAltDel,
@@ -498,7 +497,7 @@ export class FirecrackerService {
     await watchFileUntilLineMatches(/reboot: Restarting system/, this.getVMLogsPath(), 30000);
   }
 
-  async deleteVMDir(): Promise<void> {
+  private async deleteVMDir(): Promise<void> {
     await fs.rm(this.instanceDir, { recursive: true, force: true });
   }
 

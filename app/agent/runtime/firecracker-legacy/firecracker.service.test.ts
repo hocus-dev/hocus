@@ -45,7 +45,7 @@ test.concurrent(
     let pid: number | null = null;
 
     try {
-      pid = await fcService.startFirecrackerInstance();
+      pid = await fcService["startFirecrackerInstance"]();
       // we wait for a bit to make sure the instance does not exit
       await sleep(250);
       // check that the process is still running
@@ -126,7 +126,7 @@ test.concurrent(
     expect(vmInfo2).not.toBeNull();
     expect(vmInfo2?.info).toEqual(vmInfo?.info);
 
-    await fcService.deleteVMDir();
+    await fcService["deleteVMDir"]();
 
     const vmInfo3 = await fcService.getVMInfo();
     expect(vmInfo3).toBeNull();
