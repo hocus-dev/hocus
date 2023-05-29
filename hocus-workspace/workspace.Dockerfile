@@ -53,6 +53,16 @@ USER hocus
 # Bash
 RUN echo '\nif [ -v SSH_CONNECTION ] || [ -v SSH_CLIENT ] || [ -v SSH_TTY ]; then\n  export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock;\nfi\n' >> ~/.bashrc
 
+FROM gcc:12.2.0 as prelockd-builder
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install fakeroot
+RUN git clone https://github.com/hakavlad/prelockd && \
+    cd prelockd && \
+    git checkout v0.9 && \
+    sed -i 's/systemctl daemon-reload//g' deb/DEBIAN/postinst && \
+    deb/build.sh
+
 FROM workspace-base as workspace
 
 USER root
@@ -73,6 +83,10 @@ RUN apt-get update \
     # Symlink docker-compose for compatibility
     && ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose \
     && yes | unminimize
+COPY --from=prelockd-builder /prelockd/deb/package.deb /prelockd.deb
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y /prelockd.deb && \
+    rm /prelockd.deb && \
+    systemctl enable prelockd.service
 RUN systemctl enable ssh docker && \
     usermod -aG docker hocus
 
