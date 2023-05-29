@@ -139,8 +139,9 @@ iptables -t nat -A POSTROUTING -j MASQUERADE
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 iptables -A FORWARD -i brbk0 -j ACCEPT
 
+KERNEL=./vmlinux-6.2-x86_64.bin
 #KERNEL=./resources/kernels/vmlinux-6.3-x86_64.bin
-KERNEL=./resources/kernels/vmlinux-6.2-x86_64.bin
+#KERNEL=./resources/kernels/vmlinux-6.2-x86_64.bin
 #KERNEL=./resources/kernels/vmlinux-5.10-x86_64.bin
 #KERNEL=./resources/kernels/vmlinux-alibaba-cloud-kernel-5.10-x86_64.bin
 
