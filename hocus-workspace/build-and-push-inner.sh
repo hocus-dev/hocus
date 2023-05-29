@@ -20,7 +20,7 @@ LABEL=$(date +"%d-%m-%Y")
 TAG="$NAME:$LABEL"
 TAG_LATEST="$NAME:latest"
 
-docker build --tag "$TAG" --target workspace --file workspace.Dockerfile resources
+docker build --tag "$TAG" --target "$TARGET" --file workspace.Dockerfile resources
 docker tag "$TAG" "$TAG_LATEST"
 docker push "$TAG"
 docker push "$TAG_LATEST"
