@@ -15,20 +15,25 @@ test.concurrent(
   "Run an alpine Qemu VM",
   provideBlockRegistry(async ({ injector, runId, brService }) => {
     const im1 = await brService.loadImageFromRemoteRepo(testImages.test3, "im1");
-    const b1 = await brService.expose(im1, EXPOSE_METHOD.BLOCK_DEV);
+    const c1 = await brService.createContainer(im1, "c1");
+    const b1 = await brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV);
     const qemuService = injector.resolve(Token.QemuService)(runId);
     await qemuService.withRuntime(
       {
         ssh: {
-          username: "hocus",
-          password: "hocus",
+          username: "root",
+          password: "root",
         },
-        vcpuCount: 1,
+        vcpuCount: 2,
         memSizeMib: 512,
         fs: { "/": b1 },
       },
-      ({ ssh }) => {
-        console.log("AAAAA");
+      async ({ ssh }) => {
+        console.log(await execSshCmd({ ssh }, ["ls"]));
+        console.log(await execSshCmd({ ssh }, ["mount"]));
+        //console.log(await execSshCmd({ ssh }, ["reboot"]));
+        console.log(runId);
+        console.log(await execSshCmd({ ssh }, ["poweroff", "-f"]));
       },
     );
   }),

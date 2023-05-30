@@ -23,12 +23,17 @@ import type { HocusRuntime } from "../hocus-runtime";
 import type { VmInfo } from "../vm-info.validator";
 import { VmInfoValidator } from "../vm-info.validator";
 
-import type { IpBlockId, WorkspaceNetworkService } from "~/agent/network/workspace-network.service";
+import {
+  IpBlockId,
+  NS_PREFIX,
+  WorkspaceNetworkService,
+} from "~/agent/network/workspace-network.service";
 import { VMS_NS_PATH } from "~/agent/network/workspace-network.service";
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
-import { displayError, unwrap, waitForPromises } from "~/utils.shared";
+import { displayError, sleep, unwrap, waitForPromises } from "~/utils.shared";
+import { Socket } from "net";
 
 const CHROOT_PATH_TO_SOCK = "/run/sock";
 // https://github.com/torvalds/linux/blob/8b817fded42d8fe3a0eb47b1149d907851a3c942/include/uapi/linux/virtio_blk.h#L58
@@ -53,7 +58,7 @@ factoryQemuService.inject = [
 ] as const;
 
 export class QemuService implements HocusRuntime {
-  private readonly pathToSocket: string;
+  private readonly qmpSocketPath: string;
   private readonly instanceDir: string;
   private readonly instanceDirRoot: string;
   private readonly vmInfoFilePath: string;
@@ -71,8 +76,8 @@ export class QemuService implements HocusRuntime {
     this.instanceDir = `/srv/jailer/qemu/${instanceId}`;
     this.instanceDirRoot = `${this.instanceDir}/root`;
     this.vmInfoFilePath = `${this.instanceDirRoot}/vm-info.json`;
-    this.pathToSocket = path.join(this.instanceDirRoot, CHROOT_PATH_TO_SOCK);
-    if (this.pathToSocket.length > MAX_UNIX_SOCKET_PATH_LENGTH) {
+    this.qmpSocketPath = path.join(this.instanceDirRoot, CHROOT_PATH_TO_SOCK);
+    if (this.qmpSocketPath.length > MAX_UNIX_SOCKET_PATH_LENGTH) {
       // https://blog.8-p.info/en/2020/06/11/unix-domain-socket-length/
       throw new Error(
         "Instance ID is too long. Length of the path to the socket exceeds the maximum on Linux.",
@@ -87,7 +92,7 @@ export class QemuService implements HocusRuntime {
   }
 
   private getVMLogsPath(): string {
-    return `/tmp/${this.instanceId}.log`;
+    return `/srv/jailer/qemu/logs/${this.instanceId}.log`;
   }
 
   private getStdinPath(): string {
@@ -178,146 +183,170 @@ export class QemuService implements HocusRuntime {
       ipBlockId: IpBlockId;
     }) => Promise<T>,
   ): Promise<T> {
+    const t1 = performance.now();
     const kernelPath = config.kernelPath ?? this.agentConfig.defaultKernel;
     const shouldPoweroff = config.shouldPoweroff ?? true;
+    let vmStarted = false;
     if (config.fs["/"] === void 0) {
       throw new Error("No root fs specified");
     }
     const diskPathToVirtioId: Record<string, string> = {};
     // This allows us to directly move the current code to cloud hypervisor
     await waitForPromises(
-      Object.values(config.fs).map(async (what) => {
+      Object.entries(config.fs).map(async ([path, what]) => {
         if ("device" in what) {
-          diskPathToVirtioId[what.device] = await this.getVirtioDeviceId(what.device);
+          diskPathToVirtioId[path] = await this.getVirtioDeviceId(what.device);
         }
       }),
     );
 
-    let vmStarted = false;
-    let ipBlockId: null | IpBlockId = null;
-    let fcPid: number;
+    const stdinPath = this.getStdinPath();
+    const logPath = this.getVMLogsPath();
+    for (const filePath of [stdinPath, logPath, this.qmpSocketPath]) {
+      if (path.dirname(filePath) !== "/tmp") {
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+      }
+      const pathExists = await doesFileExist(filePath);
+      if (pathExists) {
+        this.logger.info(`file already exists at ${filePath}, deleting`);
+        await fs.unlink(filePath);
+      }
+    }
+
+    const ipBlockId = await this.networkService.allocateIpBlock();
     try {
-      ipBlockId = await this.networkService.allocateIpBlock();
       const { tapIfCidr, tapIfIp, tapIfName, vmIp } = await this.networkService.setupInterfaces(
         ipBlockId,
       );
       const mask = new Netmask(`255.255.255.255/${tapIfCidr}`).mask;
-      const ipArg = `${vmIp}::${tapIfIp}:${mask}::eth0:off`;
+      const ipArg = `${vmIp}::${tapIfIp}:${mask}::eth0:off:8.8.8.8`;
 
+      this.logger.info("opening stdin");
+      await execCmd("mkfifo", stdinPath);
+      // The pipe is opened with O_RDWR even though the firecracker process only reads from it.
+      // This is because of how FIFOs work in linux - when the last writer closes the pipe,
+      // the reader gets an EOF. When the VM receives an EOF on the stdin, it detaches
+      // serial input and we can no longer interact with its console. If we opened this pipe
+      // as read only and later opened it again as a writer to run some commands, once we stopped
+      // writing to it, the VM would receive an EOF and detach the serial input, making it impossible
+      // to make any more writes. Since we open it as read/write here, there is always a writer and
+      // the VM never receives an EOF.
+      //
+      // Learned how to open a FIFO here: https://github.com/firecracker-microvm/firecracker-go-sdk/blob/9a0d3b28f7f7ae1ac96e970dec4d28a09f10c4a9/machine.go#L742
+      // Learned about read/write/EOF behaviour here: https://stackoverflow.com/a/40390938
+      const childStdin = await fs.open(stdinPath, FifoFlags.O_NONBLOCK | FifoFlags.O_RDWR, "0600");
+      const childStdout = await fs.open(logPath, "a");
+      const childStderr = await fs.open(logPath, "a");
       let diskCtr = 1;
-      const cp = spawn("qemu-system-x86_64", [
-        "-machine",
-        "q35,acpi=off",
-        "-m",
-        `${config.memSizeMib}M`,
-        ...Object.values(config.fs).flatMap((what) => {
-          if ("mountPoint" in what) {
-            throw new Error("virtiofs unsupported for now");
-          }
-          diskCtr += 1;
-          return [
-            "-blockdev",
-            `node-name=q${diskCtr},driver=raw,file.driver=host_device,file.filename=${
-              what.device
-            },discard=unmap,detect-zeroes=unmap,file.aio=io_uring${
-              what.readonly ? ",readonly=on" : ""
-            }`,
-            "-device",
-            `virtio-blk,drive=q${diskCtr},discard=on,serial=${diskPathToVirtioId[what.device]}`,
-          ];
-        }),
-        "--kernel",
-        kernelPath,
-        "--append",
-        `reboot=k noapic panic=1 nomodules random.trust_cpu=on root=/dev/disk/by-id/virtio-${
-          diskPathToVirtioId["/"]
-        } ${
-          config.fs["/"].readonly ? "ro" : "rw"
-        } rootflags=discard ip=${ipArg} console=ttyS0 damon_reclaim.enabled=Y damon_reclaim.min_age=30000000 damon_reclaim.wmarks_low=0 damon_reclaim.wmarks_high=1000 damon_reclaim.wmarks_mid=1000`,
-        "-cpu",
-        "host",
-        "-smp",
-        `${config.vcpuCount}`,
-        "-nographic",
-        "-enable-kvm",
-        "-no-reboot",
-        "-netdev",
-        `tap,ifname=${tapIfName},script=no,downscript=no,vhost=on,id=n1`,
-        "-device",
-        "virtio-net-pci,netdev=n1",
-        "-device",
-        "virtio-balloon,deflate-on-oom=on,free-page-reporting=on",
-      ]);
-
-      throw new Error("A");
-
-      await this.createVM({
-        kernelPath: kernelPath,
-        rootFsPath: config.rootFsPath,
-        vmIp,
-        tapIfIp,
-        tapIfName,
-        tapIfCidr,
-        copyRootFs: config.copyRootFs,
-        extraDrives: extraDrives.map(({ pathOnHost, copy }, idx) => ({
-          driveId: `drive${idx}`,
-          pathOnHost: pathOnHost,
-          copy,
-          isReadOnly: false,
-          isRootDevice: false,
-        })),
-        memSizeMib: config.memSizeMib,
-        vcpuCount: config.vcpuCount,
+      const cp = spawn(
+        NS_PREFIX[0],
+        [
+          ...NS_PREFIX.slice(1),
+          "qemu-system-x86_64",
+          "-initrd",
+          /* This tiny initrd allows us to mount all fs's at boot time and refer to disks by their serial number
+           * Here is the code:
+           * https://github.com/hocus-dev/tiny-initramfs/
+           */
+          "/srv/jailer/initrd.img",
+          "-qmp",
+          `unix:${this.qmpSocketPath},server,nowait`,
+          "-machine",
+          "q35,acpi=off",
+          "-m",
+          `${config.memSizeMib}M`,
+          ...Object.entries(config.fs).flatMap(([path, what]) => {
+            if ("mountPoint" in what) {
+              throw new Error("virtiofs unsupported for now");
+            }
+            diskCtr += 1;
+            return [
+              "-blockdev",
+              `node-name=q${diskCtr},driver=raw,file.driver=host_device,file.filename=${
+                what.device
+              },discard=unmap,detect-zeroes=unmap,file.aio=io_uring${
+                what.readonly ? ",read-only=on" : ""
+              }`,
+              "-device",
+              `virtio-blk,drive=q${diskCtr},discard=on,serial=${diskPathToVirtioId[path]}`,
+            ];
+          }),
+          "--kernel",
+          kernelPath,
+          "--append",
+          `reboot=k panic=-1 kernel.ctrlaltdel=0 nomodules random.trust_cpu=on i8042.noaux i8042.nomux i8042.nopnp i8042.dumbkbd ${
+            /* Custom boot parameters are handled by the custom initrd */
+            Object.entries(config.fs)
+              .map(
+                ([targetPath, what]) =>
+                  `mountdevice=SERIAL=${
+                    diskPathToVirtioId[targetPath]
+                  } mounttarget=${targetPath} mountflags=${
+                    what.readonly ? "ro" : "rw,discard"
+                  } mountfstype=ext4`,
+              )
+              .join(" ")
+          } ip=${ipArg} console=ttyS0 vm.compaction_proactiveness=100 vm.compact_unevictable_allowed=1 transparent_hugepage=never page_reporting.page_reporting_order=0 damon_reclaim.enabled=Y damon_reclaim.min_age=30000000 damon_reclaim.wmarks_low=0 damon_reclaim.wmarks_high=1000 damon_reclaim.wmarks_mid=999 damon_reclaim.quota_sz=1073741824 damon_reclaim.quota_reset_interval_ms=1000`,
+          "-cpu",
+          "host",
+          "-smp",
+          `${config.vcpuCount}`,
+          "-nographic",
+          "-enable-kvm",
+          "-no-reboot",
+          "-netdev",
+          `tap,ifname=${tapIfName},script=no,downscript=no,vhost=off,id=n1`,
+          "-device",
+          "virtio-net-pci,netdev=n1",
+          "-device",
+          "virtio-balloon,deflate-on-oom=on,free-page-reporting=on",
+        ],
+        { stdio: [childStdin.fd, childStdout.fd, childStderr.fd], detached: true },
+      );
+      cp.unref();
+      cp.on("error", (err) => {
+        // Without this block the error is handled by the nodejs process itself and makes it
+        // exit with code 1 crashing everything
+        this.logger.error(`qemu process errored: ${displayError(err)}`);
+      });
+      cp.on("close", (code) => {
+        void childStdin.close();
+        void childStdout.close();
+        void childStderr.close();
+        console.log(`qemu process with pid ${cp.pid} closed: ${code}`);
       });
 
+      if (cp.pid == null) {
+        throw new Error("Failed to start qemu");
+      }
+      const runtimePid = cp.pid;
       vmStarted = true;
-      const t3 = performance.now();
-      this.logger.info(
-        `Booting firecracker VM with pid ${fcPid} took: ${(t3 - t2).toFixed(2)} ms, TOTAL: ${(
-          t3 - t1
-        ).toFixed(2)} ms`,
-      );
-      await this.writeVmInfoFile({ pid: fcPid, ipBlockId });
+      this.logger.info(`Qemu process started with pid ${runtimePid}`);
+
       const sshConfig = { ...config.ssh, host: vmIp };
-      return await withSsh(sshConfig, async (ssh) => {
-        const useSudo = config.ssh.username !== "root";
-        const mountTasks: Promise<void>[] = [];
-        for (const drive of extraDrives) {
-          mountTasks.push(
-            this.agentUtilService.mountDriveAtPath(
-              ssh,
-              drive.pathOnHost,
-              drive.guestMountPath,
-              useSudo,
-            ),
-          );
-        }
-        await waitForPromises(mountTasks);
-        const r = await fn({
+      await withSsh(sshConfig, async (ssh) => {
+        const t2 = performance.now();
+        this.logger.info(`Booting qemu VM took: ${(t2 - t1).toFixed(2)} ms`);
+
+        return await fn({
           ssh,
           sshConfig,
-          firecrackerPid: fcPid,
+          runtimePid,
           vmIp,
           ipBlockId: unwrap(ipBlockId),
         });
-
-        this.perfService.log(fcPid, "withVM exit start");
-        // Ensure the page cache is flushed before proceeding
-        await execSshCmd({ ssh }, ["sync"]);
-
-        return r;
       });
     } finally {
       if (shouldPoweroff && vmStarted) {
         await this.shutdownVM();
       }
-      if (shouldPoweroff && ipBlockId !== null) {
-        await this.networkService.freeIpBlock(ipBlockId);
-      }
-      if (shouldPoweroff && config.removeVmDirAfterPoweroff !== false) {
+      if (shouldPoweroff && config.cleanupAfterStop !== false) {
         await this.deleteVMDir();
       }
-      this.perfService.log(fcPid, "withVM exit end");
+      // If we should poweroff or the vm was not started
+      if ((shouldPoweroff || !vmStarted) && ipBlockId !== null) {
+        await this.networkService.freeIpBlock(ipBlockId);
+      }
     }
   }
 
@@ -329,6 +358,33 @@ export class QemuService implements HocusRuntime {
    * Waits for the VM to shutdown.
    */
   async shutdownVM(): Promise<void> {
+    const sock = new Socket();
+    sock.setEncoding("utf-8");
+    sock.connect(this.qmpSocketPath);
+    sock.once("data", (c) => {
+      console.log(JSON.parse(c));
+      sock.write(JSON.stringify({ execute: "qmp_capabilities" }));
+      sock.once("data", (c) => {
+        console.log(JSON.parse(c));
+        /*sock.write(
+          JSON.stringify({
+            execute: "send-key",
+            arguments: {
+              keys: [
+                { type: "qcode", data: "ctrl" },
+                { type: "qcode", data: "alt" },
+                { type: "qcode", data: "delete" },
+              ],
+            },
+          }),
+        );*/
+        sock.on("data", (c) => {
+          console.log(c);
+          console.log(JSON.parse(c));
+        });
+      });
+    });
+    await sleep(10000);
     await this.api.createSyncAction({
       info: {
         actionType: InstanceActionInfoActionTypeEnum.SendCtrlAltDel,

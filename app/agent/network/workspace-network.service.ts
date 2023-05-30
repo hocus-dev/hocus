@@ -13,7 +13,7 @@ export type IpBlockId = A.Type<number, "ip-block-id">;
 
 const IP_PREFIX = "10.231.";
 export const VMS_NS_PATH = "/var/run/netns/vms";
-const NS_PREFIX = ["ip", "netns", "exec", "vms"] as const;
+export const NS_PREFIX = ["ip", "netns", "exec", "vms"] as const;
 const TAP_INTERFACE_NAME_PREFIX = "vm";
 const TAP_INTERFACE_CIDR = 30;
 
