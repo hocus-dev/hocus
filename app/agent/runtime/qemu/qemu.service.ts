@@ -313,7 +313,7 @@ export class QemuService implements HocusRuntime {
         void childStdin.close();
         void childStdout.close();
         void childStderr.close();
-        console.log(`qemu process with pid ${cp.pid} closed: ${code}`);
+        this.logger.info(`qemu process with pid ${cp.pid} closed: ${code}`);
       });
 
       if (cp.pid == null) {
@@ -324,7 +324,7 @@ export class QemuService implements HocusRuntime {
       this.logger.info(`Qemu process started with pid ${runtimePid}`);
 
       const sshConfig = { ...config.ssh, host: vmIp };
-      await withSsh(sshConfig, async (ssh) => {
+      return await withSsh(sshConfig, async (ssh) => {
         const t2 = performance.now();
         this.logger.info(`Booting qemu VM took: ${(t2 - t1).toFixed(2)} ms`);
 
@@ -350,6 +350,73 @@ export class QemuService implements HocusRuntime {
     }
   }
 
+  private async waitForQMPMessageWithTimeout(
+    sock: Socket,
+    timeoutMs = 500,
+  ): Promise<unknown | undefined> {
+    let timeout: NodeJS.Timeout | undefined;
+    let timeoutDone = false;
+    let timeoutResolve: ((value: unknown) => void) | undefined;
+    const timeoutP = new Promise((resolve) => {
+      timeoutResolve = resolve;
+      timeout = setTimeout(() => {
+        timeoutDone = true;
+        this.logger.debug(`[${this.instanceId}] Timeout waiting for QMP message`);
+        resolve(void 0);
+      }, timeoutMs);
+    });
+    let msgResolve: ((value: unknown) => void) | undefined;
+    const onceF = (c: Buffer) => {
+      const msg = c.toString("utf8");
+      if (msgResolve !== void 0) {
+        this.logger.debug(`[${this.instanceId}] Received QMP message ${msg}`);
+        msgResolve(JSON.parse(msg));
+      } else {
+        this.logger.error(`[${this.instanceId}] Logic error, missed QMP message ${msg}`);
+      }
+    };
+    const r = await Promise.race([
+      timeoutP,
+      new Promise((resolve) => {
+        msgResolve = resolve;
+        sock.once("data", onceF);
+      }),
+    ]);
+    // We hit the timeout first, we need to remove the listener to not leak memory .-.
+    if (timeoutDone) {
+      sock.removeListener("data", onceF);
+    }
+    // Cleanup the timeout promise if we got the message first
+    if (!timeoutDone && timeoutResolve !== void 0) {
+      clearTimeout(timeout);
+      timeoutResolve(void 0);
+      await timeoutP;
+    }
+    return r;
+  }
+
+  private async sendQMPMessage(sock: Socket, execute: string, args?: any) {
+    const msg = JSON.stringify({
+      execute,
+      arguments: args,
+    });
+    this.logger.debug(`[${this.instanceId}] Sent QMP message ${msg}`);
+    sock.write(msg);
+  }
+
+  private async qmpConnect(): Promise<Socket> {
+    const sock = new Socket();
+    sock.connect(this.qmpSocketPath);
+    if ((await this.waitForQMPMessageWithTimeout(sock)) === void 0) {
+      throw new Error("Failed to connect to QMP");
+    }
+    await this.sendQMPMessage(sock, "qmp_capabilities");
+    if ((await this.waitForQMPMessageWithTimeout(sock)) === void 0) {
+      throw new Error("Failed to get qmp capabilities");
+    }
+    return sock;
+  }
+
   /**
    * Only works if the VM kernel is compiled with support for
    * `CONFIG_SERIO_I8042` and `CONFIG_KEYBOARD_ATKBD` as per
@@ -357,43 +424,38 @@ export class QemuService implements HocusRuntime {
    *
    * Waits for the VM to shutdown.
    */
-  async shutdownVM(): Promise<void> {
-    const sock = new Socket();
-    sock.setEncoding("utf-8");
-    sock.connect(this.qmpSocketPath);
-    sock.once("data", (c) => {
-      console.log(JSON.parse(c));
-      sock.write(JSON.stringify({ execute: "qmp_capabilities" }));
-      sock.once("data", (c) => {
-        console.log(JSON.parse(c));
-        /*sock.write(
-          JSON.stringify({
-            execute: "send-key",
-            arguments: {
-              keys: [
-                { type: "qcode", data: "ctrl" },
-                { type: "qcode", data: "alt" },
-                { type: "qcode", data: "delete" },
-              ],
-            },
-          }),
-        );*/
-        sock.on("data", (c) => {
-          console.log(c);
-          console.log(JSON.parse(c));
-        });
-      });
+  private async shutdownVM(): Promise<void> {
+    const sock = await this.qmpConnect();
+    await this.sendQMPMessage(sock, "send-key", {
+      keys: [
+        { type: "qcode", data: "ctrl" },
+        { type: "qcode", data: "alt" },
+        { type: "qcode", data: "delete" },
+      ],
     });
-    await sleep(10000);
-    await this.api.createSyncAction({
-      info: {
-        actionType: InstanceActionInfoActionTypeEnum.SendCtrlAltDel,
-      },
-    });
-    await watchFileUntilLineMatches(/reboot: Restarting system/, this.getVMLogsPath(), 30000);
+    if ((await this.waitForQMPMessageWithTimeout(sock)) === void 0) {
+      throw new Error("Failed to press CTRL+ALT+DELETE");
+    }
+    // Now wait up to 5 seconds for a QMP event that the VM powered down
+    let cleanShutdownDone = false;
+    let t1 = performance.now();
+    while (!cleanShutdownDone && performance.now() - t1 < 5000) {
+      const m = await this.waitForQMPMessageWithTimeout(sock, 100);
+      if (m !== void 0 && (m as any).event === "SHUTDOWN") {
+        cleanShutdownDone = true;
+      }
+    }
+
+    if (!cleanShutdownDone) {
+      this.logger.error("Guest VM refused to terminate gracefully within 5s. Killing the VM");
+      // In case the VM does not cooperate ask qemu to exit forcefully
+      await this.sendQMPMessage(sock, "quit");
+      // We don't wait for a response cause we may get EOF in the middle of getting the response
+    }
+    sock.destroy();
   }
 
-  async deleteVMDir(): Promise<void> {
+  private async deleteVMDir(): Promise<void> {
     await fs.rm(this.instanceDir, { recursive: true, force: true });
   }
 
