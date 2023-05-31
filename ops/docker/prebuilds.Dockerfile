@@ -6,20 +6,20 @@ RUN apt-get update \
     && apt-get -t sid install -y sudo cmake zlib1g-dev libcurl4-openssl-dev libssl3 libssl-dev libaio-dev libnl-3-dev libnl-genl-3-dev libgflags-dev libzstd-dev libext2fs-dev
 RUN git clone https://github.com/hocus-dev/overlaybd.git && cd overlaybd && git checkout a52cabb627a5e3e50f3d364ac8a6a061b1bb6ff7
 RUN cd overlaybd && git submodule update --init
-RUN cd overlaybd && mkdir build && cd build && cmake .. && make && sudo make install
+RUN cd overlaybd && mkdir build && cd build && cmake .. && make -j8 && sudo make install
 
-FROM scratch as obd-prebuild
+FROM scratch as obd
 COPY --from=obd-builder /opt/overlaybd /opt/overlaybd
 COPY --from=obd-builder /etc/overlaybd /etc/overlaybd
 
 FROM golang:1.20.4-bullseye as obd-convertor-builder
 RUN git clone https://github.com/hocus-dev/accelerated-container-image.git && cd accelerated-container-image && git checkout 62f480a697ca68098ff2c91569aeaaf5e5b3463f
-RUN cd accelerated-container-image && make bin/convertor && cp ./bin/convertor /convertor
+RUN cd accelerated-container-image && make -j8 bin/convertor && cp ./bin/convertor /convertor
 
-FROM scratch as obd-convertor-prebuild
+FROM scratch as obd-convertor
 COPY --from=obd-convertor-builder /convertor /convertor
 
-FROM hocusdev/workspace as hocus-workspace-prebuild
+FROM hocusdev/workspace as hocus-workspace
 RUN { curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 -fsSL https://deb.nodesource.com/setup_18.x | sudo bash -; } \
     && DEBIAN_FRONTEND=noninteractive sudo apt-get install -y cmake nodejs qemu-system psmisc expect unzip skopeo jq \
     && sudo npm install --global yarn \
@@ -37,11 +37,11 @@ RUN cd ~/ \
     && rm -r ./go-dl \
     && fish -c "set -U fish_user_paths \$fish_user_paths /usr/local/go/bin/" && echo 'export PATH="/usr/local/go/bin/:$PATH"' >> ~/.bashrc
 # Install overlaybd
-COPY --from=obd-prebuild /opt/overlaybd /opt/overlaybd
-COPY --from=obd-prebuild /etc/overlaybd /etc/overlaybd
+COPY --from=obd /opt/overlaybd /opt/overlaybd
+COPY --from=obd /etc/overlaybd /etc/overlaybd
 RUN sudo chmod u+s /opt/overlaybd/bin/overlaybd-apply
 # Install the overlaybd conversion tool
-COPY --from=obd-convertor-prebuild /convertor /opt/overlaybd/bin/convertor
+COPY --from=obd-convertor /convertor /opt/overlaybd/bin/convertor
 # Buildkite CLI + agent for running the CI jobs locally ;)
 RUN sudo wget https://github.com/buildkite/cli/releases/download/v2.0.0/cli-linux-amd64 -O /usr/bin/bk && sudo chmod +x /usr/bin/bk
 RUN curl -sL https://raw.githubusercontent.com/buildkite/agent/main/install.sh | bash && fish -c "set -U fish_user_paths \$fish_user_paths ~/.buildkite-agent/bin" && echo 'export PATH="~/.buildkite-agent/bin:$PATH"' >> ~/.bashrc
@@ -58,7 +58,7 @@ RUN cd ~/ && mkdir ./yq-dl && wget https://github.com/mikefarah/yq/releases/down
 # Crane
 RUN VERSION=$(curl -s "https://api.github.com/repos/google/go-containerregistry/releases/latest" | jq -r '.tag_name') OSARCH=Linux_x86_64 bash -c 'wget -O - "https://github.com/google/go-containerregistry/releases/download/${VERSION}/go-containerregistry_${OSARCH}.tar.gz" | sudo tar -zxvf - -C /usr/local/bin/ crane'
 
-FROM node:18-bullseye AS agent-dev-prebuild
+FROM node:18-bullseye AS agent-dev
 
 RUN wget --continue --retry-connrefused --waitretry=1 --timeout=20 --tries=3 -q https://github.com/firecracker-microvm/firecracker/releases/download/v1.1.2/firecracker-v1.1.2-x86_64.tgz && \
     tar -xf firecracker-v1.1.2-x86_64.tgz && \
@@ -73,10 +73,10 @@ RUN apt-get update \
 RUN test -f /usr/sbin/nologin && useradd -ms /usr/sbin/nologin sshgateway
 COPY --chown=root:root --chmod=0644 sshd_config /etc/ssh/sshd_config
 # Install overlaybd
-COPY --from=obd-prebuild /opt/overlaybd /opt/overlaybd
-COPY --from=obd-prebuild /etc/overlaybd /etc/overlaybd
+COPY --from=obd /opt/overlaybd /opt/overlaybd
+COPY --from=obd /etc/overlaybd /etc/overlaybd
 RUN chmod u+s /opt/overlaybd/bin/overlaybd-apply
 # Install the overlaybd conversion tool
-COPY --from=obd-convertor-prebuild /convertor /opt/overlaybd/bin/convertor
+COPY --from=obd-convertor /convertor /opt/overlaybd/bin/convertor
 
 WORKDIR /app
