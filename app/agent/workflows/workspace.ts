@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import type { Workspace, WorkspaceInstance } from "@prisma/client";
 import {
   proxyActivities,
@@ -85,12 +86,13 @@ async function cleanUpAfterWorkspaceError(args: {
     retryWorkflow(fn, { maxRetries: 8, retryIntervalMs: 1000, isExponential: true });
   const latestError = parseWorkflowError(args.error);
   await withLock({ resourceId: `workspace-clean-up-${args.workspaceId}` }, async () => {
-    await retry(() =>
-      cleanUpWorkspaceInstanceLocal({
-        workspaceId: args.workspaceId,
-        vmInstanceId: args.vmInstanceId,
-      }),
-    );
+    // TODO: figure out a better retry policy for this
+    await cleanUpWorkspaceInstanceLocal({
+      workspaceId: args.workspaceId,
+      vmInstanceId: args.vmInstanceId,
+    }).catch((err) => {
+      console.error(`failed to run cleanUpWorkspaceInstanceLocal: ${parseWorkflowError(err)}`);
+    });
     await retry(() =>
       cleanUpWorkspaceInstanceDb({
         workspaceId: args.workspaceId,
