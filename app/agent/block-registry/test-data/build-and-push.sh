@@ -33,7 +33,9 @@ function build_and_push()
 }
 build_and_push "$SCRIPT_DIR"/test1.Dockerfile
 build_and_push "$SCRIPT_DIR"/test2.Dockerfile
+# Alpine images are 10Mb
 build_and_push "$SCRIPT_DIR"/testAlpine3_14.Dockerfile
+# Debian/Ubuntu images are 100Mb each, good enough to enable in CI for now
 # https://wiki.debian.org/DebianReleases
 build_and_push "$SCRIPT_DIR"/testDebianBookworm.Dockerfile
 build_and_push "$SCRIPT_DIR"/testDebianBuster.Dockerfile
@@ -43,5 +45,7 @@ build_and_push "$SCRIPT_DIR"/testUbuntuJammy.Dockerfile
 # BTW I use arch with self compiled zfs from git + zfsbootmenu
 # Skip untill lazy pulling is implemented, the image is 0.5GB
 # build_and_push "$SCRIPT_DIR"/testArchlinux.Dockerfile
+# For completion use nixos, also disabled for now as the image is 0.8GB
+# build_and_push "$SCRIPT_DIR"/testNixos.Dockerfile
 
 echo "{\"\": \"\"$RES}" | jq . > "$SCRIPT_DIR"/test_images.json

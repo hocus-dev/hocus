@@ -1,39 +1,27 @@
 import { spawn } from "child_process";
 import fs from "fs/promises";
+import { Socket } from "net";
 import path from "path";
 
 import type { DefaultLogger } from "@temporalio/worker";
 import { Netmask } from "netmask";
 import type { Config as SSHConfig, NodeSSH } from "node-ssh";
 import { match } from "ts-pattern";
-import { fetch, Agent } from "undici";
 
 import type { AgentUtilService } from "../../agent-util.service";
-import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "../../constants";
+import { MAX_UNIX_SOCKET_PATH_LENGTH } from "../../constants";
 import { FifoFlags } from "../../fifo-flags";
-import {
-  doesFileExist,
-  execCmd,
-  execSshCmd,
-  retry,
-  watchFileUntilLineMatches,
-  withSsh,
-} from "../../utils";
+import { doesFileExist, execCmd, withSsh } from "../../utils";
 import type { HocusRuntime } from "../hocus-runtime";
 import type { VmInfo } from "../vm-info.validator";
 import { VmInfoValidator } from "../vm-info.validator";
 
-import {
-  IpBlockId,
-  NS_PREFIX,
-  WorkspaceNetworkService,
-} from "~/agent/network/workspace-network.service";
-import { VMS_NS_PATH } from "~/agent/network/workspace-network.service";
+import type { IpBlockId, WorkspaceNetworkService } from "~/agent/network/workspace-network.service";
+import { NS_PREFIX } from "~/agent/network/workspace-network.service";
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
 import { displayError, sleep, unwrap, waitForPromises } from "~/utils.shared";
-import { Socket } from "net";
 
 const CHROOT_PATH_TO_SOCK = "/run/sock";
 // https://github.com/torvalds/linux/blob/8b817fded42d8fe3a0eb47b1149d907851a3c942/include/uapi/linux/virtio_blk.h#L58
@@ -126,20 +114,23 @@ export class QemuService implements HocusRuntime {
     if (info === null) {
       return null;
     }
-    const state = await this.api
-      .describeInstance()
-      .then((res) => res.state)
-      .catch((err) => {
-        if (err instanceof FetchError && (err.cause as any)?.cause?.code === "ECONNREFUSED") {
-          return null;
-        }
-        throw err;
-      });
+
+    const sock = await this.qmpConnect();
+    await this.sendQMPMessage(sock, "query-status");
+    const m = await this.waitForQMPMessageWithTimeout(sock);
+    if (m === void 0) {
+      return null;
+    }
+    sock.destroy();
     return {
-      status: match(state)
-        .with("Running", () => "on" as const)
-        .with("Paused", () => "paused" as const)
-        .with("Not started", () => "off" as const)
+      status: match((m as any).return.status)
+        .with("running", () => "on" as const)
+        .with("suspended", () => "paused" as const)
+        .with("paused", () => "paused" as const)
+        .with("postmigrate", () => "paused" as const)
+        .with("shutdown", () => "off" as const)
+        .with("internal-error", () => "off" as const)
+        .with("io-error", () => "off" as const)
         .with(null, () => "off" as const)
         .exhaustive(),
       info,
@@ -190,10 +181,21 @@ export class QemuService implements HocusRuntime {
     if (config.fs["/"] === void 0) {
       throw new Error("No root fs specified");
     }
+    for (const path of Object.keys(config.fs)) {
+      if (!path.startsWith("/")) {
+        throw new Error("Mount target does not start with /");
+      }
+      if (path.includes("//")) {
+        throw new Error("Mount target includes double /, please use a single one");
+      }
+    }
+    const mountOrder = Object.entries(config.fs).sort(
+      ([pathA, _a], [pathB, _b]) => pathA.split("/").length - pathB.split("/").length,
+    );
     const diskPathToVirtioId: Record<string, string> = {};
     // This allows us to directly move the current code to cloud hypervisor
     await waitForPromises(
-      Object.entries(config.fs).map(async ([path, what]) => {
+      mountOrder.map(async ([path, what]) => {
         if ("device" in what) {
           diskPathToVirtioId[path] = await this.getVirtioDeviceId(what.device);
         }
@@ -255,7 +257,7 @@ export class QemuService implements HocusRuntime {
           "q35,acpi=off",
           "-m",
           `${config.memSizeMib}M`,
-          ...Object.entries(config.fs).flatMap(([path, what]) => {
+          ...mountOrder.flatMap(([path, what]) => {
             if ("mountPoint" in what) {
               throw new Error("virtiofs unsupported for now");
             }
@@ -276,7 +278,7 @@ export class QemuService implements HocusRuntime {
           "--append",
           `reboot=k panic=-1 kernel.ctrlaltdel=0 nomodules random.trust_cpu=on i8042.noaux i8042.nomux i8042.nopnp i8042.dumbkbd ${
             /* Custom boot parameters are handled by the custom initrd */
-            Object.entries(config.fs)
+            mountOrder
               .map(
                 ([targetPath, what]) =>
                   `mountdevice=SERIAL=${
@@ -321,6 +323,7 @@ export class QemuService implements HocusRuntime {
       }
       const runtimePid = cp.pid;
       vmStarted = true;
+      await this.writeVmInfoFile({ pid: runtimePid, ipBlockId });
       this.logger.info(`Qemu process started with pid ${runtimePid}`);
 
       const sshConfig = { ...config.ssh, host: vmIp };
@@ -447,12 +450,28 @@ export class QemuService implements HocusRuntime {
     }
 
     if (!cleanShutdownDone) {
-      this.logger.error("Guest VM refused to terminate gracefully within 5s. Killing the VM");
+      this.logger.error("Guest OS refused to shutdown gracefully within 5s. Killing the VM");
       // In case the VM does not cooperate ask qemu to exit forcefully
       await this.sendQMPMessage(sock, "quit");
       // We don't wait for a response cause we may get EOF in the middle of getting the response
     }
     sock.destroy();
+
+    const vmInfo = await this.readVmInfoFile();
+    if (vmInfo === null) return;
+    // Give qemu 0.5s to terminate, if qemu failed to stop then send SIGKILL
+    let t2 = performance.now();
+    while (
+      (await doesFileExist(path.join("/proc", vmInfo.pid.toString()))) &&
+      performance.now() - t2 < 500
+    ) {
+      await sleep(100);
+    }
+
+    if (await doesFileExist(path.join("/proc", vmInfo.pid.toString()))) {
+      this.logger.info("Qemu refused to terminate gracefully for 0.5s. Killing Qemu");
+      await process.kill(vmInfo.pid, "SIGKILL");
+    }
   }
 
   private async deleteVMDir(): Promise<void> {
@@ -461,7 +480,7 @@ export class QemuService implements HocusRuntime {
 
   /** Stops the VM and cleans up its resources. Idempotent. */
   async cleanup(): Promise<void> {
-    const vmInfo = await this.getVMInfo();
+    const vmInfo = await this.getRuntimeInfo();
     if (vmInfo?.status === "on") {
       await this.shutdownVM();
     }
