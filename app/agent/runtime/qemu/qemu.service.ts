@@ -250,7 +250,7 @@ export class QemuService implements HocusRuntime {
            * Here is the code:
            * https://github.com/hocus-dev/tiny-initramfs/
            */
-          "/srv/jailer/initrd.img",
+          "/srv/jailer/resources/initrd.img",
           "-qmp",
           `unix:${this.qmpSocketPath},server,nowait`,
           "-machine",
