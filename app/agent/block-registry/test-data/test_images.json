@@ -1,10 +1,10 @@
 {
   "": "",
-  "test1": "quay.io/hocus/hocus-block-registry-tests@sha256:d196c21aabad77a4b7b27e9de4609570b106776efdf0eb48435f84a6ffca861f",
-  "test2": "quay.io/hocus/hocus-block-registry-tests@sha256:e49a037b5ac4275b12354c8b6c2865ddaa41feea04f560153ada7d618e745c19",
-  "testAlpine3_14": "quay.io/hocus/hocus-block-registry-tests@sha256:58467ad76a5f5f03f292b16fbc790d2784ea21a1f9440aff21c8eac1045d7bc1",
-  "testDebianBookworm": "quay.io/hocus/hocus-block-registry-tests@sha256:76a9bfc1990ccd88eb47c04fb41227dc0c0a7c4bb9bc15d2fd43c61e8a12073b",
-  "testDebianBuster": "quay.io/hocus/hocus-block-registry-tests@sha256:59578aecb01fda74cb178926d2fbb7d5a81b4dd471aee0d54a5474693c376e4f",
-  "testUbuntuFocal": "quay.io/hocus/hocus-block-registry-tests@sha256:436feb21493386ab24e302a1e981ff56a94d59581eafa5536cf09a6e4b991a3b",
-  "testUbuntuJammy": "quay.io/hocus/hocus-block-registry-tests@sha256:8f4a4ab931d40d319e15ca94c4354d84b0d59e8938788ab33159e116b33c3995"
+  "test1": "quay.io/hocus/hocus-block-registry-tests@sha256:dab1d9d583013f33cb97cceb67fc76e59a9f5ab8035a07d2953c8945c6069211",
+  "test2": "quay.io/hocus/hocus-block-registry-tests@sha256:2664cdc6aae1017cf9d2638608405da48f4edd5f1beb413f9686bea9e675107a",
+  "testAlpine3_14": "quay.io/hocus/hocus-block-registry-tests@sha256:d041198aed7bd8315e6e08c61585bb02037b0cda0c1382811fdc76afaac74278",
+  "testDebianBookworm": "quay.io/hocus/hocus-block-registry-tests@sha256:9a2b1b2e870e3743c0a5fefa2c696b7bd4f0d6918d8f5d3e8eb28a3c4e8c4767",
+  "testDebianBuster": "quay.io/hocus/hocus-block-registry-tests@sha256:deeba9043725f5c8d5cfb175c6ce9320f68682a064cb93887b54fdfb1cb1673d",
+  "testUbuntuFocal": "quay.io/hocus/hocus-block-registry-tests@sha256:6399dc837be7dc55ae485202c23e8371769ab97ac4eb6c02e2c46867eb41b360",
+  "testUbuntuJammy": "quay.io/hocus/hocus-block-registry-tests@sha256:969352e16f61b2292e982abb25440f0887791af76864afb72dd19b3116d7edfc"
 }
