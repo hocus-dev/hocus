@@ -15,7 +15,7 @@ const testCases = [
   ["Ubuntu Focal", testImages.testUbuntuFocal],
   ["Ubuntu Jammy", testImages.testUbuntuJammy],
 ];
-/*
+
 test.concurrent.each(testCases)(`Boots and connects to %s`, async (_name, remoteTag) =>
   provideBlockRegistry(async ({ injector, runId, brService }) => {
     const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
@@ -249,10 +249,10 @@ test.concurrent.each(testCases)(
       expect(sshCommandExitedWithin).toBeLessThan(5000);
     })(),
 );
-*/
 
+// Run those tests only on alpine, this test does not depend on the guest distro but on the guest kernel
 test.concurrent.each(
-  testCases.flatMap(([name, remoteTag]) => [
+  [testCases[0]].flatMap(([name, remoteTag]) => [
     [1, 128, name, remoteTag],
     [1, 256, name, remoteTag],
     [2, 128, name, remoteTag],
@@ -262,8 +262,6 @@ test.concurrent.each(
   `Creates vm with %d cores and %d MiB ram on %s`,
   async (vcpuCount, memSizeMib, _name, remoteTag) =>
     provideBlockRegistry(async ({ injector, runId, brService }) => {
-      console.log("BBB");
-
       const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
       const osCt = await brService.createContainer(osIm, "osCt");
       const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
@@ -281,8 +279,20 @@ test.concurrent.each(
           shouldPoweroff: true,
         },
         async ({ ssh }) => {
-          console.log("AAA");
-          console.log(await execSshCmd({ ssh }, ["ls"]));
+          const cpuInfo = (await execSshCmd({ ssh }, ["cat", "/proc/cpuinfo"])).stdout;
+          expect(cpuInfo).toMatch(new RegExp(`^cpu cores.*?${vcpuCount}$`, "gm"));
+          // Ram is more tricky and containers need a different test here
+          // Assert that the memory block size on the guest is 128MB
+          // block_size_bytes is in hex notation
+          await expect(
+            execSshCmd({ ssh }, ["cat", "/sys/devices/system/memory/block_size_bytes"]),
+          ).resolves.toHaveProperty("stdout", "8000000");
+          // Now check the amount of memory blocks on the system
+          expect(
+            (await execSshCmd({ ssh }, ["ls", "/sys/devices/system/memory/"])).stdout
+              .split("\n")
+              .filter((m) => m.startsWith("memory")),
+          ).toHaveLength(memSizeMib / 128);
         },
       );
     })(),
