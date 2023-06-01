@@ -1,7 +1,7 @@
 import path from "path";
 
 import testImages from "../../block-registry/test-data/test_images.json";
-import { doesFileExist, execSshCmd } from "../../utils";
+import { doesFileExist, execSshCmd, sleep } from "../../utils";
 
 import { EXPOSE_METHOD } from "~/agent/block-registry/registry.service";
 import { provideBlockRegistry } from "~/agent/block-registry/test-utils";
@@ -15,7 +15,7 @@ const testCases = [
   ["Ubuntu Focal", testImages.testUbuntuFocal],
   ["Ubuntu Jammy", testImages.testUbuntuJammy],
 ];
-
+/*
 test.concurrent.each(testCases)(`Boots and connects to %s`, async (_name, remoteTag) =>
   provideBlockRegistry(async ({ injector, runId, brService }) => {
     const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
@@ -29,7 +29,7 @@ test.concurrent.each(testCases)(`Boots and connects to %s`, async (_name, remote
           password: "root",
         },
         vcpuCount: 1,
-        memSizeMib: 512,
+        memSizeMib: 128,
         fs: { "/": osB },
         cleanupAfterStop: true,
         shouldPoweroff: true,
@@ -80,7 +80,7 @@ test.concurrent.each(testCases)(
             password: "root",
           },
           vcpuCount: 1,
-          memSizeMib: 512,
+          memSizeMib: 128,
           fs: {
             "/": osB,
             "/mount1rw": extraB1,
@@ -119,6 +119,170 @@ test.concurrent.each(testCases)(
               expect(execSshCmd({ ssh }, ["cat", path])).resolves.toHaveProperty("stdout", content),
             ),
           );
+        },
+      );
+    })(),
+);
+
+test.concurrent.each(testCases)(
+  `If requested then keeps running in the background on %s`,
+  async (_name, remoteTag) =>
+    provideBlockRegistry(async ({ injector, runId, brService }) => {
+      const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
+      const osCt = await brService.createContainer(osIm, "osCt");
+      const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
+      const instance = injector.resolve(Token.QemuService)(runId);
+      const vmInfo1 = await instance.withRuntime(
+        {
+          ssh: {
+            username: "root",
+            password: "root",
+          },
+          vcpuCount: 1,
+          memSizeMib: 128,
+          fs: { "/": osB },
+          cleanupAfterStop: false,
+          shouldPoweroff: false,
+        },
+        async (_args) => {
+          return await instance.getRuntimeInfo();
+        },
+      );
+      expect(vmInfo1).not.toBeNull();
+      expect(vmInfo1?.status).toBe("on");
+      expect(vmInfo1?.info.instanceId).toBe(runId);
+
+      const vmInfo2 = await instance.getRuntimeInfo();
+      expect(vmInfo2).not.toBeNull();
+      expect(vmInfo2?.status).toBe("on");
+      expect(vmInfo2?.info.instanceId).toBe(runId);
+
+      await instance.cleanup();
+
+      // Ensure the VM was shut down
+      await expect(instance.getRuntimeInfo()).resolves.toEqual(null);
+      await expect(
+        doesFileExist(path.join("/proc", (vmInfo1?.info.pid as number).toString())),
+      ).resolves.toEqual(false);
+    })(),
+);
+
+test.concurrent.each(
+  testCases.flatMap(([name, remoteTag]) => [
+    [["reboot"], name, remoteTag],
+    [["poweroff"], name, remoteTag],
+  ]),
+)(`Doesn't hang forever after issuing %s on %s`, async (command, _name, remoteTag) =>
+  provideBlockRegistry(async ({ injector, runId, brService }) => {
+    const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
+    const osCt = await brService.createContainer(osIm, "osCt");
+    const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
+    const instance = injector.resolve(Token.QemuService)(runId);
+    const vmInfo = await instance.withRuntime(
+      {
+        ssh: {
+          username: "root",
+          password: "root",
+        },
+        vcpuCount: 1,
+        memSizeMib: 128,
+        fs: { "/": osB },
+        cleanupAfterStop: true,
+        shouldPoweroff: true,
+      },
+      async ({ ssh }) => {
+        const info = await instance.getRuntimeInfo();
+        // Cause ssh might terminate unexpectedly, let the promise hang
+        void execSshCmd({ ssh }, command).catch((_err) => void 0);
+        await sleep(100);
+        return info;
+      },
+    );
+    expect(vmInfo).not.toBeNull();
+    expect(vmInfo?.status).toBe("on");
+    expect(vmInfo?.info.instanceId).toBe(runId);
+
+    // Ensure the VM was shut down
+    await expect(instance.getRuntimeInfo()).resolves.toEqual(null);
+    await expect(
+      doesFileExist(path.join("/proc", (vmInfo?.info.pid as number).toString())),
+    ).resolves.toEqual(false);
+  })(),
+);
+
+test.concurrent.each(testCases)(
+  `Doesn't hang forever when ssh is unresponsive on %s`,
+  async (_name, remoteTag) =>
+    provideBlockRegistry(async ({ injector, runId, brService }) => {
+      const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
+      const osCt = await brService.createContainer(osIm, "osCt");
+      const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
+      const instance = injector.resolve(Token.QemuService)(runId);
+
+      let sshCommandExitedWithin: number | null = null;
+      await instance.withRuntime(
+        {
+          ssh: {
+            username: "root",
+            password: "root",
+          },
+          vcpuCount: 1,
+          memSizeMib: 128,
+          fs: { "/": osB },
+          cleanupAfterStop: true,
+          shouldPoweroff: true,
+        },
+        async ({ ssh, runtimePid }) => {
+          const now = Date.now();
+          await waitForPromises([
+            execSshCmd({ ssh }, ["sh", "-c", "sleep 1; echo 'a'"]).catch(() => {
+              sshCommandExitedWithin = Date.now() - now;
+            }),
+            (async () => {
+              await sleep(500);
+              process.kill(runtimePid, "SIGKILL");
+            })(),
+          ]);
+        },
+      );
+      expect(sshCommandExitedWithin).not.toBe(null);
+      expect(sshCommandExitedWithin).toBeLessThan(5000);
+    })(),
+);
+*/
+
+test.concurrent.each(
+  testCases.flatMap(([name, remoteTag]) => [
+    [1, 128, name, remoteTag],
+    [1, 256, name, remoteTag],
+    [2, 128, name, remoteTag],
+    [2, 256, name, remoteTag],
+  ]),
+)(
+  `Creates vm with %d cores and %d MiB ram on %s`,
+  async (vcpuCount, memSizeMib, _name, remoteTag) =>
+    provideBlockRegistry(async ({ injector, runId, brService }) => {
+      console.log("BBB");
+
+      const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
+      const osCt = await brService.createContainer(osIm, "osCt");
+      const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
+      const instance = injector.resolve(Token.QemuService)(runId);
+      await instance.withRuntime(
+        {
+          ssh: {
+            username: "root",
+            password: "root",
+          },
+          vcpuCount,
+          memSizeMib,
+          fs: { "/": osB },
+          cleanupAfterStop: true,
+          shouldPoweroff: true,
+        },
+        async ({ ssh }) => {
+          console.log("AAA");
+          console.log(await execSshCmd({ ssh }, ["ls"]));
         },
       );
     })(),

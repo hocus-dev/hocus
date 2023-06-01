@@ -115,7 +115,18 @@ export class QemuService implements HocusRuntime {
       return null;
     }
 
-    const sock = await this.qmpConnect();
+    let sock: Socket;
+    try {
+      sock = await this.qmpConnect();
+    } catch (err: any) {
+      if (
+        (err instanceof Error && err?.message.includes("Failed to connect to QMP")) ||
+        err?.message.includes("ECONNREFUSED")
+      )
+        return null;
+      throw err;
+    }
+
     await this.sendQMPMessage(sock, "query-status");
     const m = await this.waitForQMPMessageWithTimeout(sock);
     if (m === void 0) {
@@ -327,7 +338,7 @@ export class QemuService implements HocusRuntime {
       this.logger.info(`Qemu process started with pid ${runtimePid}`);
 
       const sshConfig = { ...config.ssh, host: vmIp };
-      return await withSsh(sshConfig, async (ssh) => {
+      return await withSsh(sshConfig, this.logger, async (ssh) => {
         const t2 = performance.now();
         this.logger.info(`Booting qemu VM took: ${(t2 - t1).toFixed(2)} ms`);
 
@@ -343,7 +354,7 @@ export class QemuService implements HocusRuntime {
       if (shouldPoweroff && vmStarted) {
         await this.shutdownVM();
       }
-      if (shouldPoweroff && config.cleanupAfterStop !== false) {
+      if (shouldPoweroff && config.cleanupAfterStop) {
         await this.deleteVMDir();
       }
       // If we should poweroff or the vm was not started
@@ -409,7 +420,10 @@ export class QemuService implements HocusRuntime {
 
   private async qmpConnect(): Promise<Socket> {
     const sock = new Socket();
-    sock.connect(this.qmpSocketPath);
+    await new Promise((resolve, reject) => {
+      sock.on("error", (err) => reject(err));
+      sock.connect(this.qmpSocketPath, () => resolve(void 0));
+    });
     if ((await this.waitForQMPMessageWithTimeout(sock)) === void 0) {
       throw new Error("Failed to connect to QMP");
     }
@@ -428,7 +442,17 @@ export class QemuService implements HocusRuntime {
    * Waits for the VM to shutdown.
    */
   private async shutdownVM(): Promise<void> {
-    const sock = await this.qmpConnect();
+    let sock: Socket;
+    try {
+      sock = await this.qmpConnect();
+    } catch (err: any) {
+      if (
+        (err instanceof Error && err?.message.includes("Failed to connect to QMP")) ||
+        err?.message.includes("ECONNREFUSED")
+      )
+        return;
+      throw err;
+    }
     await this.sendQMPMessage(sock, "send-key", {
       keys: [
         { type: "qcode", data: "ctrl" },
@@ -469,8 +493,24 @@ export class QemuService implements HocusRuntime {
     }
 
     if (await doesFileExist(path.join("/proc", vmInfo.pid.toString()))) {
-      this.logger.info("Qemu refused to terminate gracefully for 0.5s. Killing Qemu");
+      this.logger.error("Qemu refused to terminate gracefully for 0.5s. Killing Qemu");
       await process.kill(vmInfo.pid, "SIGKILL");
+    }
+
+    // Give the kernel 0.5s to cleanup the process
+    let t3 = performance.now();
+    while (
+      (await doesFileExist(path.join("/proc", vmInfo.pid.toString()))) &&
+      performance.now() - t3 < 500
+    ) {
+      await sleep(100);
+    }
+
+    if (await doesFileExist(path.join("/proc", vmInfo.pid.toString()))) {
+      this.logger.error(
+        "Kernel failed to cleanup qemu for 0.5s after SIGKILL. Process probably hanged in kernel space!",
+      );
+      throw new Error(`[${this.instanceId}] Qemu hanged in kernel space`);
     }
   }
 

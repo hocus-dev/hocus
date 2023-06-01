@@ -32,7 +32,8 @@ export const provideRunId = <T>(
 export const printErrors = <T>(testFn: () => Promise<T>, runId?: string): (() => Promise<T>) => {
   return async () => {
     try {
-      return await testFn();
+      const a = await testFn();
+      return a;
     } catch (err) {
       /* eslint-disable no-console */
       if (err instanceof ResponseError) {

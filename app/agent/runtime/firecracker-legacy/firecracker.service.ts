@@ -439,7 +439,7 @@ export class FirecrackerService {
       );
       await this.writeVmInfoFile({ pid: fcPid, ipBlockId });
       const sshConfig = { ...config.ssh, host: vmIp };
-      return await withSsh(sshConfig, async (ssh) => {
+      return await withSsh(sshConfig, this.logger, async (ssh) => {
         const useSudo = config.ssh.username !== "root";
         const mountTasks: Promise<void>[] = [];
         for (const drive of extraDrives) {

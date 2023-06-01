@@ -7,6 +7,7 @@ import path from "path";
 
 import type { Log } from "@prisma/client";
 import { Context } from "@temporalio/activity";
+import type { DefaultLogger } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from "node-ssh";
 import { NodeSSH } from "node-ssh";
@@ -131,6 +132,7 @@ export const execSshCmd = async (
 
 export const withSsh = async <T>(
   connectionOptions: SSHConfig,
+  logger: DefaultLogger,
   fn: (ssh: NodeSSH) => Promise<T>,
 ): Promise<T> => {
   const ssh = await retry(
@@ -143,6 +145,10 @@ export const withSsh = async <T>(
     15,
     500,
   );
+
+  ssh.connection?.on("error", (err) => {
+    logger.info(err);
+  });
 
   const context = getActivityContext();
   let finish: () => void = () => {};
@@ -166,6 +172,7 @@ export const withSsh = async <T>(
     try {
       return await fn(ssh);
     } finally {
+      //ssh.connection?.destroy();
       ssh.dispose();
     }
   } finally {
