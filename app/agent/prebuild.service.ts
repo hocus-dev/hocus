@@ -23,7 +23,6 @@ import {
   SOLO_AGENT_INSTANCE_ID,
   WORKSPACE_ENV_SCRIPT_PATH,
 } from "./constants";
-import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import {
   PREBUILD_DEV_DIR,
   PREBUILD_SCRIPTS_DIR,
@@ -33,6 +32,7 @@ import {
 } from "./prebuild-constants";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
+import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import { doesFileExist, execCmd, execSshCmd, sha256, withFileLock } from "./utils";
 
 import type { Config } from "~/config";

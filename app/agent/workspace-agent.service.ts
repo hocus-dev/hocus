@@ -18,15 +18,15 @@ import {
   WORKSPACE_REPOSITORY_DIR,
   WORKSPACE_SCRIPTS_DIR,
 } from "./constants";
-import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
-import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { SSHGatewayService } from "./network/ssh-gateway.service";
+import type { WorkspaceNetworkService } from "./network/workspace-network.service";
+import type { ProjectConfigService } from "./project-config/project-config.service";
+import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import { doesFileExist, execCmd, execSshCmd } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
 import { unwrap, waitForPromises } from "~/utils.shared";
-import { WorkspaceNetworkService } from "./network/workspace-network.service";
 
 export class InvalidWorkspaceStatusError extends Error {}
 

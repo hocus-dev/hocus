@@ -6,4 +6,3 @@ RUN apk update \
     && touch /run/openrc/softlevel \
     && echo "root:root" | chpasswd \
     && rc-status
-    
