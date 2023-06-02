@@ -33,8 +33,9 @@ function build_and_push()
 }
 build_and_push "$SCRIPT_DIR"/test1.Dockerfile
 build_and_push "$SCRIPT_DIR"/test2.Dockerfile
-# Alpine images are 10Mb
+# Alpine images are 10Mb so they are preffered in tests
 build_and_push "$SCRIPT_DIR"/testAlpine3_14.Dockerfile
+build_and_push "$SCRIPT_DIR"/testAlpine3_14NoSSH.Dockerfile
 # Debian/Ubuntu images are 100Mb each, good enough to enable in CI for now
 # https://wiki.debian.org/DebianReleases
 build_and_push "$SCRIPT_DIR"/testDebianBookworm.Dockerfile

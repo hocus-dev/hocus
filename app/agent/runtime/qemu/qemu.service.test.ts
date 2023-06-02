@@ -220,31 +220,39 @@ test.concurrent.each(testCases)(
       const instance = injector.resolve(Token.QemuService)(runId);
 
       let sshCommandExitedWithin: number | null = null;
-      await instance.withRuntime(
-        {
-          ssh: {
-            username: "root",
-            password: "root",
+      let sshDone: (value: unknown) => void;
+      let sshDonePromise = new Promise((resolve) => {
+        sshDone = resolve;
+      });
+      await expect(
+        instance.withRuntime(
+          {
+            ssh: {
+              username: "root",
+              password: "root",
+            },
+            vcpuCount: 1,
+            memSizeMib: 128,
+            fs: { "/": osB },
+            cleanupAfterStop: true,
+            shouldPoweroff: true,
           },
-          vcpuCount: 1,
-          memSizeMib: 128,
-          fs: { "/": osB },
-          cleanupAfterStop: true,
-          shouldPoweroff: true,
-        },
-        async ({ ssh, runtimePid }) => {
-          const now = Date.now();
-          await waitForPromises([
-            execSshCmd({ ssh }, ["sh", "-c", "sleep 1; echo 'a'"]).catch(() => {
-              sshCommandExitedWithin = Date.now() - now;
-            }),
-            (async () => {
-              await sleep(500);
-              process.kill(runtimePid, "SIGKILL");
-            })(),
-          ]);
-        },
-      );
+          async ({ ssh, runtimePid }) => {
+            const now = Date.now();
+            await waitForPromises([
+              execSshCmd({ ssh }, ["sh", "-c", "sleep 1; echo 'a'"]).catch(() => {
+                sshCommandExitedWithin = Date.now() - now;
+                sshDone(void 0);
+              }),
+              (async () => {
+                await sleep(500);
+                process.kill(runtimePid, "SIGKILL");
+              })(),
+            ]);
+          },
+        ),
+      ).rejects.toThrow();
+      await sshDonePromise;
       expect(sshCommandExitedWithin).not.toBe(null);
       expect(sshCommandExitedWithin).toBeLessThan(5000);
     })(),
@@ -296,4 +304,84 @@ test.concurrent.each(
         },
       );
     })(),
+);
+
+test.concurrent(
+  `Doesn't hang forever if qemu fails to start`,
+  provideBlockRegistry(async ({ injector, runId, brService }) => {
+    const osCt = await brService.createContainer(void 0, "emptyCt", { mkfs: true, sizeInGB: 64 });
+    const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
+    const instance = injector.resolve(Token.QemuService)(runId);
+    await expect(
+      instance.withRuntime(
+        {
+          ssh: {
+            username: "root",
+            password: "root",
+          },
+          vcpuCount: 1,
+          memSizeMib: 128,
+          fs: { "/": osB },
+          cleanupAfterStop: true,
+          shouldPoweroff: true,
+          kernelPath: "/tmp/very-legit-kernel-image",
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("closed: 1");
+  }),
+);
+
+test.concurrent(
+  `Doesn't hang forever if booting vm without /init`,
+  provideBlockRegistry(async ({ injector, runId, brService }) => {
+    const osCt = await brService.createContainer(void 0, "emptyCt", { mkfs: true, sizeInGB: 64 });
+    const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
+    const instance = injector.resolve(Token.QemuService)(runId);
+    await expect(
+      instance.withRuntime(
+        {
+          ssh: {
+            username: "root",
+            password: "root",
+          },
+          vcpuCount: 1,
+          memSizeMib: 128,
+          fs: { "/": osB },
+          cleanupAfterStop: true,
+          shouldPoweroff: true,
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("closed: 0");
+  }),
+);
+
+test.concurrent(
+  `Doesn't hang forever if booting vm without ssh`,
+  provideBlockRegistry(async ({ injector, runId, brService }) => {
+    const osIm = await brService.loadImageFromRemoteRepo(testImages.testAlpine3_14NoSSH, "osIm");
+    const osCt = await brService.createContainer(osIm, "osCt");
+    const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
+    const instance = injector.resolve(Token.QemuService)(runId);
+    await expect(
+      instance.withRuntime(
+        {
+          ssh: {
+            username: "root",
+            password: "root",
+          },
+          vcpuCount: 1,
+          memSizeMib: 128,
+          fs: { "/": osB },
+          cleanupAfterStop: true,
+          shouldPoweroff: true,
+        },
+        async ({ ssh }) => {
+          await expect(execSshCmd({ ssh }, ["whoami"])).resolves.toHaveProperty("stdout", "root");
+          return await instance.getRuntimeInfo();
+        },
+      ),
+    ).rejects.toThrow("ECONNREFUSED");
+  }),
 );

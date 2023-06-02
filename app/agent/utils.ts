@@ -134,20 +134,31 @@ export const withSsh = async <T>(
   connectionOptions: SSHConfig,
   logger: DefaultLogger,
   fn: (ssh: NodeSSH) => Promise<T>,
+  abortController?: AbortController,
 ): Promise<T> => {
   const ssh = await retry(
-    async () =>
-      await new NodeSSH().connect({
-        keepaliveInterval: 250,
-        keepaliveCountMax: 4,
-        ...connectionOptions,
-      }),
+    async () => {
+      if (abortController === void 0 || !abortController.signal.aborted) {
+        return await new NodeSSH().connect({
+          keepaliveInterval: 250,
+          keepaliveCountMax: 4,
+          timeout: 200,
+          readyTimeout: 200,
+          ...connectionOptions,
+        });
+      }
+    },
     15,
     500,
   );
+  if (ssh === void 0) {
+    if (abortController !== void 0) abortController.signal.throwIfAborted();
+    throw new Error("Failed to establish ssh connection");
+  }
 
   ssh.connection?.on("error", (err) => {
-    logger.info(err);
+    logger.info(err.toString());
+    abortController?.abort(err);
   });
 
   const context = getActivityContext();

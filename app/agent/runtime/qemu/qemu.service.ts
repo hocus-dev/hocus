@@ -23,6 +23,8 @@ import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
 import { displayError, sleep, unwrap, waitForPromises } from "~/utils.shared";
 
+export class QmpConnectionFailedError extends Error {}
+
 const CHROOT_PATH_TO_SOCK = "/run/sock";
 // https://github.com/torvalds/linux/blob/8b817fded42d8fe3a0eb47b1149d907851a3c942/include/uapi/linux/virtio_blk.h#L58
 const VIRTIO_BLK_ID_BYTES = 20;
@@ -119,11 +121,7 @@ export class QemuService implements HocusRuntime {
     try {
       sock = await this.qmpConnect();
     } catch (err: any) {
-      if (
-        (err instanceof Error && err?.message.includes("Failed to connect to QMP")) ||
-        err?.message.includes("ECONNREFUSED")
-      )
-        return null;
+      if (err instanceof QmpConnectionFailedError) return null;
       throw err;
     }
 
@@ -251,6 +249,7 @@ export class QemuService implements HocusRuntime {
       const childStdout = await fs.open(logPath, "a");
       const childStderr = await fs.open(logPath, "a");
       let diskCtr = 1;
+      const qemuExited = new AbortController();
       const cp = spawn(
         NS_PREFIX[0],
         [
@@ -321,35 +320,50 @@ export class QemuService implements HocusRuntime {
         // Without this block the error is handled by the nodejs process itself and makes it
         // exit with code 1 crashing everything
         this.logger.error(`qemu process errored: ${displayError(err)}`);
+        qemuExited.abort(err);
       });
       cp.on("close", (code) => {
         void childStdin.close();
         void childStdout.close();
         void childStderr.close();
         this.logger.info(`qemu process with pid ${cp.pid} closed: ${code}`);
+        qemuExited.abort(new Error(`qemu process with pid ${cp.pid} closed: ${code}`));
       });
 
       if (cp.pid == null) {
-        throw new Error("Failed to start qemu");
+        throw new Error(`[${this.instanceId}] Failed to start qemu`);
       }
       const runtimePid = cp.pid;
       vmStarted = true;
       await this.writeVmInfoFile({ pid: runtimePid, ipBlockId });
-      this.logger.info(`Qemu process started with pid ${runtimePid}`);
+      this.logger.info(`[${this.instanceId}] Qemu process started with pid ${runtimePid}`);
 
       const sshConfig = { ...config.ssh, host: vmIp };
-      return await withSsh(sshConfig, this.logger, async (ssh) => {
-        const t2 = performance.now();
-        this.logger.info(`Booting qemu VM took: ${(t2 - t1).toFixed(2)} ms`);
-
-        return await fn({
-          ssh,
+      return await Promise.race([
+        new Promise<T>((_resolve, reject) => {
+          if (qemuExited.signal.aborted) reject(qemuExited.signal.reason);
+          qemuExited.signal.addEventListener("abort", () => reject(qemuExited.signal.reason), {
+            once: true,
+          });
+        }),
+        withSsh(
           sshConfig,
-          runtimePid,
-          vmIp,
-          ipBlockId: unwrap(ipBlockId),
-        });
-      });
+          this.logger,
+          async (ssh) => {
+            const t2 = performance.now();
+            this.logger.info(`Booting qemu VM took: ${(t2 - t1).toFixed(2)} ms`);
+
+            return await fn({
+              ssh,
+              sshConfig,
+              runtimePid,
+              vmIp,
+              ipBlockId: unwrap(ipBlockId),
+            });
+          },
+          qemuExited,
+        ),
+      ]);
     } finally {
       if (shouldPoweroff && vmStarted) {
         await this.shutdownVM();
@@ -421,15 +435,15 @@ export class QemuService implements HocusRuntime {
   private async qmpConnect(): Promise<Socket> {
     const sock = new Socket();
     await new Promise((resolve, reject) => {
-      sock.on("error", (err) => reject(err));
+      sock.on("error", (err) => reject(new QmpConnectionFailedError(err.message)));
       sock.connect(this.qmpSocketPath, () => resolve(void 0));
     });
     if ((await this.waitForQMPMessageWithTimeout(sock)) === void 0) {
-      throw new Error("Failed to connect to QMP");
+      throw new QmpConnectionFailedError("Failed to connect to QMP");
     }
     await this.sendQMPMessage(sock, "qmp_capabilities");
     if ((await this.waitForQMPMessageWithTimeout(sock)) === void 0) {
-      throw new Error("Failed to get qmp capabilities");
+      throw new QmpConnectionFailedError("Failed to get qmp capabilities");
     }
     return sock;
   }
@@ -446,11 +460,7 @@ export class QemuService implements HocusRuntime {
     try {
       sock = await this.qmpConnect();
     } catch (err: any) {
-      if (
-        (err instanceof Error && err?.message.includes("Failed to connect to QMP")) ||
-        err?.message.includes("ECONNREFUSED")
-      )
-        return;
+      if (err instanceof QmpConnectionFailedError) return;
       throw err;
     }
     await this.sendQMPMessage(sock, "send-key", {
