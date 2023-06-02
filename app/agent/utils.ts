@@ -183,7 +183,6 @@ export const withSsh = async <T>(
     try {
       return await fn(ssh);
     } finally {
-      //ssh.connection?.destroy();
       ssh.dispose();
     }
   } finally {
@@ -280,6 +279,10 @@ export const doesFileExist = async (filePath: string): Promise<boolean> => {
     }
     throw err;
   }
+};
+
+export const isProcessAlive = async (pid: number): Promise<boolean> => {
+  return await doesFileExist(path.join("/proc", pid.toString()));
 };
 
 export const sha256 = (str: Buffer | string): string => {

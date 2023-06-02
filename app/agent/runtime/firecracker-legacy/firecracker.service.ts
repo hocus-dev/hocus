@@ -71,7 +71,7 @@ export class FirecrackerService {
   constructor(
     private readonly agentUtilService: AgentUtilService,
     private readonly logger: DefaultLogger,
-    private readonly config: Config,
+    config: Config,
     private readonly perfService: PerfService,
     private readonly networkService: WorkspaceNetworkService,
     public readonly instanceId: string,

@@ -11,7 +11,7 @@ import { match } from "ts-pattern";
 import type { AgentUtilService } from "../../agent-util.service";
 import { MAX_UNIX_SOCKET_PATH_LENGTH } from "../../constants";
 import { FifoFlags } from "../../fifo-flags";
-import { doesFileExist, execCmd, withSsh } from "../../utils";
+import { doesFileExist, execCmd, isProcessAlive, withSsh } from "../../utils";
 import type { HocusRuntime } from "../hocus-runtime";
 import type { VmInfo } from "../vm-info.validator";
 import { VmInfoValidator } from "../vm-info.validator";
@@ -30,22 +30,13 @@ const CHROOT_PATH_TO_SOCK = "/run/sock";
 const VIRTIO_BLK_ID_BYTES = 20;
 
 export function factoryQemuService(
-  agentUtilService: AgentUtilService,
   logger: DefaultLogger,
   config: Config,
-  perfService: PerfService,
   networkService: WorkspaceNetworkService,
 ): (instanceId: string) => HocusRuntime {
-  return (instanceId: string) =>
-    new QemuService(agentUtilService, logger, config, perfService, networkService, instanceId);
+  return (instanceId: string) => new QemuService(logger, config, networkService, instanceId);
 }
-factoryQemuService.inject = [
-  Token.AgentUtilService,
-  Token.Logger,
-  Token.Config,
-  Token.PerfService,
-  Token.WorkspaceNetworkService,
-] as const;
+factoryQemuService.inject = [Token.Logger, Token.Config, Token.WorkspaceNetworkService] as const;
 
 export class QemuService implements HocusRuntime {
   private readonly qmpSocketPath: string;
@@ -55,10 +46,8 @@ export class QemuService implements HocusRuntime {
   private readonly agentConfig: ReturnType<Config["agent"]>;
 
   constructor(
-    private readonly agentUtilService: AgentUtilService,
     private readonly logger: DefaultLogger,
-    private readonly config: Config,
-    private readonly perfService: PerfService,
+    config: Config,
     private readonly networkService: WorkspaceNetworkService,
     public readonly instanceId: string,
   ) {
@@ -141,7 +130,9 @@ export class QemuService implements HocusRuntime {
         .with("internal-error", () => "off" as const)
         .with("io-error", () => "off" as const)
         .with(null, () => "off" as const)
-        .exhaustive(),
+        .otherwise((v) => {
+          throw new Error(`Unknown vm state: ${v}`);
+        }),
       info,
     };
   }
@@ -198,11 +189,16 @@ export class QemuService implements HocusRuntime {
         throw new Error("Mount target includes double /, please use a single one");
       }
     }
+    // We need to ensure that we mount devices from the top down,
+    // If /asf would be mounted before / then the /asf mount wouldn't be
+    // the parent of the / mount, breaking the system.
+    // We only care to sort the mount targets from top down
+    // This logic was omitted from the initrd cause it's easier to do it here
     const mountOrder = Object.entries(config.fs).sort(
       ([pathA, _a], [pathB, _b]) => pathA.split("/").length - pathB.split("/").length,
     );
     const diskPathToVirtioId: Record<string, string> = {};
-    // This allows us to directly move the current code to cloud hypervisor
+    // This allows us to directly move the current code to cloud hypervisor if we ever need it
     await waitForPromises(
       mountOrder.map(async ([path, what]) => {
         if ("device" in what) {
@@ -234,7 +230,7 @@ export class QemuService implements HocusRuntime {
 
       this.logger.info("opening stdin");
       await execCmd("mkfifo", stdinPath);
-      // The pipe is opened with O_RDWR even though the firecracker process only reads from it.
+      // The pipe is opened with O_RDWR even though the qemu process only reads from it.
       // This is because of how FIFOs work in linux - when the last writer closes the pipe,
       // the reader gets an EOF. When the VM receives an EOF on the stdin, it detaches
       // serial input and we can no longer interact with its console. If we opened this pipe
@@ -495,28 +491,22 @@ export class QemuService implements HocusRuntime {
     if (vmInfo === null) return;
     // Give qemu 0.5s to terminate, if qemu failed to stop then send SIGKILL
     let t2 = performance.now();
-    while (
-      (await doesFileExist(path.join("/proc", vmInfo.pid.toString()))) &&
-      performance.now() - t2 < 500
-    ) {
+    while ((await isProcessAlive(vmInfo.pid)) && performance.now() - t2 < 500) {
       await sleep(100);
     }
 
-    if (await doesFileExist(path.join("/proc", vmInfo.pid.toString()))) {
+    if (await isProcessAlive(vmInfo.pid)) {
       this.logger.error("Qemu refused to terminate gracefully for 0.5s. Killing Qemu");
-      await process.kill(vmInfo.pid, "SIGKILL");
+      process.kill(vmInfo.pid, "SIGKILL");
     }
 
     // Give the kernel 0.5s to cleanup the process
     let t3 = performance.now();
-    while (
-      (await doesFileExist(path.join("/proc", vmInfo.pid.toString()))) &&
-      performance.now() - t3 < 500
-    ) {
+    while ((await isProcessAlive(vmInfo.pid)) && performance.now() - t3 < 500) {
       await sleep(100);
     }
 
-    if (await doesFileExist(path.join("/proc", vmInfo.pid.toString()))) {
+    if (await isProcessAlive(vmInfo.pid)) {
       this.logger.error(
         "Kernel failed to cleanup qemu for 0.5s after SIGKILL. Process probably hanged in kernel space!",
       );

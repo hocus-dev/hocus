@@ -1,7 +1,7 @@
 import path from "path";
 
 import testImages from "../../block-registry/test-data/test_images.json";
-import { doesFileExist, execSshCmd, sleep } from "../../utils";
+import { doesFileExist, execSshCmd, isProcessAlive, sleep } from "../../utils";
 
 import { EXPOSE_METHOD } from "~/agent/block-registry/registry.service";
 import { provideBlockRegistry } from "~/agent/block-registry/test-utils";
@@ -45,9 +45,7 @@ test.concurrent.each(testCases)(`Boots and connects to %s`, async (_name, remote
 
     // Ensure the VM was shut down
     await expect(instance.getRuntimeInfo()).resolves.toEqual(null);
-    await expect(
-      doesFileExist(path.join("/proc", (vmInfo?.info.pid as number).toString())),
-    ).resolves.toEqual(false);
+    await expect(isProcessAlive(vmInfo?.info.pid as number)).resolves.toEqual(false);
   })(),
 );
 
@@ -161,9 +159,7 @@ test.concurrent.each(testCases)(
 
       // Ensure the VM was shut down
       await expect(instance.getRuntimeInfo()).resolves.toEqual(null);
-      await expect(
-        doesFileExist(path.join("/proc", (vmInfo1?.info.pid as number).toString())),
-      ).resolves.toEqual(false);
+      await expect(isProcessAlive(vmInfo1?.info.pid as number)).resolves.toEqual(false);
     })(),
 );
 
@@ -204,9 +200,7 @@ test.concurrent.each(
 
     // Ensure the VM was shut down
     await expect(instance.getRuntimeInfo()).resolves.toEqual(null);
-    await expect(
-      doesFileExist(path.join("/proc", (vmInfo?.info.pid as number).toString())),
-    ).resolves.toEqual(false);
+    await expect(isProcessAlive(vmInfo?.info.pid as number)).resolves.toEqual(false);
   })(),
 );
 

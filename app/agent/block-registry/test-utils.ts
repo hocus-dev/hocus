@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import { spawn } from "child_process";
 import fs from "fs/promises";
@@ -86,13 +87,9 @@ export const provideBlockRegistry = (
           cp.on("error", reject);
           cp.on("close", (code) => {
             if (!shouldTerminate) {
-              // eslint-disable-next-line no-console
               console.error(`[${runId}] overlaybd-tcmu exited prematurely with code ${code}`);
-              // eslint-disable-next-line no-console
               console.error(`[${runId}] overlaybd-tcmu STDOUT: ${tcmuStdout}`);
-              // eslint-disable-next-line no-console
               console.error(`[${runId}] overlaybd-tcmu STDERR: ${tcmuStderr}`);
-              // eslint-disable-next-line no-console
               console.error(`[${runId}] Please consult the artifacts for more details`);
               reject("overlaybd-tcmu exited");
             } else {
@@ -141,10 +138,8 @@ export const provideBlockRegistry = (
         } finally {
           await fs.unlink(archivePath);
         }
-        // eslint-disable-next-line no-console
         console.error(`Failed run id: ${runId}. Please consult the artifact ${runId}.tar.gz`);
       } else {
-        // eslint-disable-next-line no-console
         console.error(
           `Failed run id: ${runId}. Please investigate ../hocus-resources/tests/${runId}`,
         );
@@ -161,7 +156,6 @@ export const provideBlockRegistry = (
           await brService.getTCMUSubtype();
           await brService.hideEverything();
         } catch (err) {
-          // eslint-disable-next-line no-console
           console.error(`[${runId}] Failed to cleanup registry ${(err as Error).message}`);
         }
         if (!keepStorage) {
@@ -184,10 +178,9 @@ async function ensureKernelDidNotBlowUp() {
   try {
     // Grep returns status 1 when no matches were found
     await execCmd("bash", "-c", 'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption| RIP:"');
-    // eslint-disable-next-line no-console
     console.error((await execCmd("dmesg")).stdout);
     throw new Error("Looks like the kernel blew up, please reboot the CI machine...");
   } catch (err) {
-    if (err instanceof ExecCmdError && (err as ExecCmdError).status !== 1) throw err;
+    if (err instanceof ExecCmdError && err.status !== 1) throw err;
   }
 }
