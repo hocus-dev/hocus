@@ -28,7 +28,7 @@ export class QmpConnectionFailedError extends Error {}
 export class QMPSocket extends EventEmitter {
   private _sock: Socket;
   // If null then does not process any inflight request
-  private cmdResolve: ((v: any) => void) | null;
+  private cmdInflight: [(v: any) => void, (err: any) => void] | null;
   constructor(
     private readonly instanceId: string,
     private readonly logger: DefaultLogger,
@@ -36,7 +36,7 @@ export class QMPSocket extends EventEmitter {
   ) {
     super();
     this._sock = new Socket(opts);
-    this.cmdResolve = null;
+    this.cmdInflight = null;
   }
 
   async connect(qmpSocketPath: string): Promise<void> {
@@ -51,7 +51,15 @@ export class QMPSocket extends EventEmitter {
       });
     });
     // Ok we're connected, time to set up event handlers
-    this._sock.on("error", (err) => this.emit("error", err));
+    this._sock.on("error", (err) => {
+      if (this.cmdInflight) {
+        const reject = this.cmdInflight[1];
+        this.cmdInflight = null;
+        reject(err);
+      } else {
+        this.emit("error", err);
+      }
+    });
     this._sock.on("data", (c: Buffer) => {
       const msgs = c.toString("utf8");
       this.logger.debug(`[${this.instanceId}] Received QMP message ${msgs}`);
@@ -66,9 +74,9 @@ export class QMPSocket extends EventEmitter {
               this.logger.error(`[${this.instanceId}] No listeners for QMP event ${msg}`);
             }
           } else {
-            if (this.cmdResolve) {
-              const cb = this.cmdResolve;
-              this.cmdResolve = null;
+            if (this.cmdInflight) {
+              const cb = this.cmdInflight[0];
+              this.cmdInflight = null;
               cb(parsed);
             } else {
               this.logger.error(`[${this.instanceId}] Logic error, missed QMP response ${msg}`);
@@ -128,8 +136,8 @@ export class QMPSocket extends EventEmitter {
 
     const r = await Promise.race([
       timeoutP,
-      new Promise((resolve) => {
-        this.cmdResolve = resolve;
+      new Promise((resolve, reject) => {
+        this.cmdInflight = [resolve, reject];
       }),
     ]);
     // Cleanup the timeout promise if we got the message first
@@ -145,10 +153,10 @@ export class QMPSocket extends EventEmitter {
     this._sock.destroy();
     this._sock.removeAllListeners();
     this.removeAllListeners();
-    if (this.cmdResolve) {
-      const cb = this.cmdResolve;
-      this.cmdResolve = null;
-      cb(void 0);
+    if (this.cmdInflight) {
+      const reject = this.cmdInflight[1];
+      this.cmdInflight = null;
+      reject(new Error("Disconnected while waiting for qmp response"));
     }
   }
 }
@@ -546,6 +554,7 @@ export class QemuService implements HocusRuntime {
         if (!cleanShutdownDone) {
           this.logger.error("Guest OS refused to shutdown gracefully within 5s. Killing the VM");
           // In case the VM does not cooperate ask qemu to exit forcefully
+          qmpSock.on("error", () => void 0);
           await qmpSock.executeQMPCommandAndShutdown("quit");
         }
         break;
