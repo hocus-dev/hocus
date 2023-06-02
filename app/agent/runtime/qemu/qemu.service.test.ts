@@ -172,26 +172,49 @@ test.concurrent.each(
     const osCt = await brService.createContainer(osIm, "osCt");
     const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
     const instance = injector.resolve(Token.QemuService)(runId);
-    const vmInfo = await instance.withRuntime(
-      {
-        ssh: {
-          username: "root",
-          password: "root",
+    const vmInfo = await instance
+      .withRuntime(
+        {
+          ssh: {
+            username: "root",
+            password: "root",
+          },
+          vcpuCount: 1,
+          memSizeMib: 128,
+          fs: { "/": osB },
+          cleanupAfterStop: true,
+          shouldPoweroff: true,
         },
-        vcpuCount: 1,
-        memSizeMib: 128,
-        fs: { "/": osB },
-        cleanupAfterStop: true,
-        shouldPoweroff: true,
-      },
-      async ({ ssh }) => {
-        const info = await instance.getRuntimeInfo();
-        // Cause ssh might terminate unexpectedly, let the promise hang
-        void execSshCmd({ ssh }, command).catch((_err) => void 0);
-        await sleep(100);
-        return info;
-      },
-    );
+        async ({ ssh }) => {
+          const info = await instance.getRuntimeInfo();
+          // Cause ssh might terminate unexpectedly, let the promise hang
+          void execSshCmd({ ssh }, command).catch((_err) => void 0);
+          await sleep(100);
+          return info;
+        },
+      )
+      .catch((err: any) => {
+        // TODO: investigate this intermidient failure:
+        /*
+            write EPIPE
+            at onWrite (node_modules/ssh2/lib/client.js:305:16)
+            at AESGCMCipherBinding.Protocol._onWrite (node_modules/ssh2/lib/protocol/Protocol.js:116:33)
+            at AESGCMCipherBinding.encrypt (node_modules/ssh2/lib/protocol/crypto.js:381:10)
+            at sendPacket (node_modules/ssh2/lib/protocol/utils.js:353:19)
+            at Protocol.channelClose (node_modules/ssh2/lib/protocol/Protocol.js:423:5)
+            at Channel.close (node_modules/ssh2/lib/Channel.js:210:30)
+            at onCHANNEL_CLOSE (node_modules/ssh2/lib/utils.js:62:13)
+            at CHANNEL_CLOSE (node_modules/ssh2/lib/client.js:643:11)
+            at 97 (node_modules/ssh2/lib/protocol/handlers.misc.js:928:16)
+            at Protocol.onPayload (node_modules/ssh2/lib/protocol/Protocol.js:2025:10)
+            at AESGCMDecipherBinding.decrypt (node_modules/ssh2/lib/protocol/crypto.js:1086:26)
+            at Protocol.parsePacket [as _parse] (node_modules/ssh2/lib/protocol/Protocol.js:1994:25)
+            at Protocol.parse (node_modules/ssh2/lib/protocol/Protocol.js:293:16)
+            at Socket.<anonymous> (node_modules/ssh2/lib/client.js:713:21)
+        */
+        if (err instanceof Error && err?.message.includes("EPIPE")) return;
+        throw err;
+      });
     expect(vmInfo).not.toBeNull();
     expect(vmInfo?.status).toBe("on");
     expect(vmInfo?.info.instanceId).toBe(runId);

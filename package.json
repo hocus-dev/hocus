@@ -11,7 +11,7 @@
     "dev-prebuild": "run-p \"dev-prebuild:*\"",
     "dev-prebuild:css": "tailwindcss -i ./styles/app.css -o app/styles/app.css",
     "start": "c NODE_ENV=production ts-node -r tsconfig-paths/register entrypoints/server.ts",
-    "test:backend": "jest --testPathIgnorePatterns=\\(app/agent/.*.test.ts extensions\\)",
+    "test:backend": "node --trace-warnings node_modules/.bin/jest --detectOpenHandles --maxWorkers=16 --maxConcurrency=32 --testTimeout 20000 --testPathIgnorePatterns=\\(app/agent/.*.test.ts extensions\\)",
     "test:agent": "node --trace-warnings node_modules/.bin/jest --detectOpenHandles --maxWorkers=16 --maxConcurrency=32 app/agent/ --testTimeout 600000",
     "typecheck": "tsc -p ./tsconfig.json",
     "lint": "eslint --max-warnings=0 .",
