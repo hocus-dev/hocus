@@ -1,7 +1,5 @@
-import path from "path";
-
 import testImages from "../../block-registry/test-data/test_images.json";
-import { doesFileExist, execSshCmd, isProcessAlive, sleep } from "../../utils";
+import { execSshCmd, isProcessAlive, sleep } from "../../utils";
 
 import { EXPOSE_METHOD } from "~/agent/block-registry/registry.service";
 import { provideBlockRegistry } from "~/agent/block-registry/test-utils";

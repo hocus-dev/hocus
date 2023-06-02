@@ -8,7 +8,6 @@ import { Netmask } from "netmask";
 import type { Config as SSHConfig, NodeSSH } from "node-ssh";
 import { match } from "ts-pattern";
 
-import type { AgentUtilService } from "../../agent-util.service";
 import { MAX_UNIX_SOCKET_PATH_LENGTH } from "../../constants";
 import { FifoFlags } from "../../fifo-flags";
 import { doesFileExist, execCmd, isProcessAlive, withSsh } from "../../utils";
@@ -19,7 +18,6 @@ import { VmInfoValidator } from "../vm-info.validator";
 import type { IpBlockId, WorkspaceNetworkService } from "~/agent/network/workspace-network.service";
 import { NS_PREFIX } from "~/agent/network/workspace-network.service";
 import type { Config } from "~/config";
-import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
 import { displayError, sleep, unwrap, waitForPromises } from "~/utils.shared";
 
