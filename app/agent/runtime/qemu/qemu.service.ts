@@ -1,7 +1,9 @@
 import { spawn } from "child_process";
 import fs from "fs/promises";
+import type { SocketConstructorOpts } from "net";
 import { Socket } from "net";
 import path from "path";
+import { EventEmitter } from "stream";
 
 import type { DefaultLogger } from "@temporalio/worker";
 import { Netmask } from "netmask";
@@ -22,6 +24,134 @@ import { Token } from "~/token";
 import { displayError, sleep, unwrap, waitForPromises } from "~/utils.shared";
 
 export class QmpConnectionFailedError extends Error {}
+
+export class QMPSocket extends EventEmitter {
+  private _sock: Socket;
+  // If null then does not process any inflight request
+  private cmdResolve: ((v: any) => void) | null;
+  constructor(
+    private readonly instanceId: string,
+    private readonly logger: DefaultLogger,
+    opts?: SocketConstructorOpts,
+  ) {
+    super();
+    this._sock = new Socket(opts);
+    this.cmdResolve = null;
+  }
+
+  async connect(qmpSocketPath: string): Promise<void> {
+    this.logger.debug(`[${this.instanceId}] Connecting to qmp socket`);
+    await new Promise((resolve, reject) => {
+      const socketErrHandler = (err: any) => reject(new QmpConnectionFailedError(err.message));
+      this._sock.on("error", socketErrHandler);
+      this._sock.connect(qmpSocketPath, () => {
+        this.logger.debug(`[${this.instanceId}] Connected to qmp socket`);
+        this._sock.removeListener("error", socketErrHandler);
+        resolve(void 0);
+      });
+    });
+    // Ok we're connected, time to set up event handlers
+    this._sock.on("error", (err) => this.emit("error", err));
+    this._sock.on("data", (c: Buffer) => {
+      const msgs = c.toString("utf8");
+      this.logger.debug(`[${this.instanceId}] Received QMP message ${msgs}`);
+      for (const msg of msgs.split("\n")) {
+        if (msg.trim().length === 0) continue;
+        let parsed: any;
+        try {
+          parsed = JSON.parse(msg);
+          if ("event" in parsed) {
+            // Emit QMP events
+            if (!this.emit(parsed.event.toLowerCase(), parsed)) {
+              this.logger.error(`[${this.instanceId}] No listeners for QMP event ${msg}`);
+            }
+          } else {
+            if (this.cmdResolve) {
+              const cb = this.cmdResolve;
+              this.cmdResolve = null;
+              cb(parsed);
+            } else {
+              this.logger.error(`[${this.instanceId}] Logic error, missed QMP response ${msg}`);
+            }
+          }
+        } catch (e) {
+          this.logger.error(`[${this.instanceId}] Failed to parse QMP message: ${msg}`);
+          this.emit("error", e);
+        }
+      }
+    });
+
+    if ((await this.waitForQmpResponseWithTimeout()) === void 0) {
+      throw new QmpConnectionFailedError("Failed to connect to QMP");
+    }
+    if ((await this.executeQMPCommandWaitForResponse("qmp_capabilities")) === void 0) {
+      throw new QmpConnectionFailedError("Failed to get qmp capabilities");
+    }
+  }
+
+  async executeQMPCommandWaitForResponse(
+    execute: string,
+    args?: any,
+    timeoutMs = 500,
+  ): Promise<any> {
+    const msg = JSON.stringify({
+      execute,
+      arguments: args,
+    });
+    this.logger.debug(`[${this.instanceId}] Sent QMP command ${msg}`);
+    this._sock.write(msg);
+    return await this.waitForQmpResponseWithTimeout(timeoutMs);
+  }
+
+  async executeQMPCommandAndShutdown(execute: string, args?: any): Promise<void> {
+    const msg = JSON.stringify({
+      execute,
+      arguments: args,
+    });
+    this.logger.debug(`[${this.instanceId}] Sent QMP command ${msg}`);
+    this._sock.write(msg);
+    this.disconnect();
+  }
+
+  private async waitForQmpResponseWithTimeout(timeoutMs = 500): Promise<unknown | undefined> {
+    let timeout: NodeJS.Timeout | undefined;
+    let timeoutDone = false;
+    let timeoutResolve: ((value: unknown) => void) | undefined;
+    const timeoutP = new Promise((resolve) => {
+      timeoutResolve = resolve;
+      timeout = setTimeout(() => {
+        timeoutDone = true;
+        this.logger.debug(`[${this.instanceId}] Timeout waiting for QMP response`);
+        resolve(void 0);
+      }, timeoutMs);
+    });
+
+    const r = await Promise.race([
+      timeoutP,
+      new Promise((resolve) => {
+        this.cmdResolve = resolve;
+      }),
+    ]);
+    // Cleanup the timeout promise if we got the message first
+    if (!timeoutDone && timeoutResolve !== void 0) {
+      clearTimeout(timeout);
+      timeoutResolve(void 0);
+      await timeoutP;
+    }
+    return r;
+  }
+
+  disconnect(): void {
+    this._sock.destroy();
+    this._sock.removeAllListeners();
+    this.removeAllListeners();
+    if (this.cmdResolve) {
+      const cb = this.cmdResolve;
+      this.cmdResolve = null;
+      cb(void 0);
+    }
+  }
+}
 
 const CHROOT_PATH_TO_SOCK = "/run/sock";
 // https://github.com/torvalds/linux/blob/8b817fded42d8fe3a0eb47b1149d907851a3c942/include/uapi/linux/virtio_blk.h#L58
@@ -104,20 +234,19 @@ export class QemuService implements HocusRuntime {
       return null;
     }
 
-    let sock: Socket;
+    const qmpSock = new QMPSocket(this.instanceId, this.logger);
     try {
-      sock = await this.qmpConnect();
+      await qmpSock.connect(this.qmpSocketPath);
     } catch (err: any) {
       if (err instanceof QmpConnectionFailedError) return null;
       throw err;
     }
 
-    await this.sendQMPMessage(sock, "query-status");
-    const m = await this.waitForQMPMessageWithTimeout(sock);
+    const m = await qmpSock.executeQMPCommandWaitForResponse("query-status");
     if (m === void 0) {
       return null;
     }
-    sock.destroy();
+    qmpSock.disconnect();
     return {
       status: match((m as any).return.status)
         .with("running", () => "on" as const)
@@ -372,83 +501,6 @@ export class QemuService implements HocusRuntime {
     }
   }
 
-  private async waitForQMPMessageWithTimeout(
-    sock: Socket,
-    timeoutMs = 500,
-  ): Promise<unknown | undefined> {
-    let timeout: NodeJS.Timeout | undefined;
-    let timeoutDone = false;
-    let timeoutResolve: ((value: unknown) => void) | undefined;
-    const timeoutP = new Promise((resolve) => {
-      timeoutResolve = resolve;
-      timeout = setTimeout(() => {
-        timeoutDone = true;
-        this.logger.debug(`[${this.instanceId}] Timeout waiting for QMP message`);
-        resolve(void 0);
-      }, timeoutMs);
-    });
-    let msgResolve: ((value: unknown) => void) | undefined;
-    const onceF = (c: Buffer) => {
-      const msg = c.toString("utf8");
-      if (msgResolve !== void 0) {
-        this.logger.debug(`[${this.instanceId}] Received QMP message ${msg}`);
-        let parsed: any;
-        try {
-          parsed = JSON.parse(msg);
-        } catch (e) {
-          this.logger.error(`[${this.instanceId}] Failed to parse QMP message: ${msg}`);
-          throw e;
-        }
-        msgResolve(parsed);
-      } else {
-        this.logger.error(`[${this.instanceId}] Logic error, missed QMP message ${msg}`);
-      }
-    };
-    const r = await Promise.race([
-      timeoutP,
-      new Promise((resolve) => {
-        msgResolve = resolve;
-        sock.once("data", onceF);
-      }),
-    ]);
-    // We hit the timeout first, we need to remove the listener to not leak memory .-.
-    if (timeoutDone) {
-      sock.removeListener("data", onceF);
-    }
-    // Cleanup the timeout promise if we got the message first
-    if (!timeoutDone && timeoutResolve !== void 0) {
-      clearTimeout(timeout);
-      timeoutResolve(void 0);
-      await timeoutP;
-    }
-    return r;
-  }
-
-  private async sendQMPMessage(sock: Socket, execute: string, args?: any) {
-    const msg = JSON.stringify({
-      execute,
-      arguments: args,
-    });
-    this.logger.debug(`[${this.instanceId}] Sent QMP message ${msg}`);
-    sock.write(msg);
-  }
-
-  private async qmpConnect(): Promise<Socket> {
-    const sock = new Socket();
-    await new Promise((resolve, reject) => {
-      sock.on("error", (err) => reject(new QmpConnectionFailedError(err.message)));
-      sock.connect(this.qmpSocketPath, () => resolve(void 0));
-    });
-    if ((await this.waitForQMPMessageWithTimeout(sock)) === void 0) {
-      throw new QmpConnectionFailedError("Failed to connect to QMP");
-    }
-    await this.sendQMPMessage(sock, "qmp_capabilities");
-    if ((await this.waitForQMPMessageWithTimeout(sock)) === void 0) {
-      throw new QmpConnectionFailedError("Failed to get qmp capabilities");
-    }
-    return sock;
-  }
-
   /**
    * Only works if the VM kernel is compiled with support for
    * `CONFIG_SERIO_I8042` and `CONFIG_KEYBOARD_ATKBD` as per
@@ -457,40 +509,68 @@ export class QemuService implements HocusRuntime {
    * Waits for the VM to shutdown.
    */
   private async shutdownVM(): Promise<void> {
-    let sock: Socket;
-    try {
-      sock = await this.qmpConnect();
-    } catch (err: any) {
-      if (err instanceof QmpConnectionFailedError) return;
-      throw err;
-    }
-    await this.sendQMPMessage(sock, "send-key", {
-      keys: [
-        { type: "qcode", data: "ctrl" },
-        { type: "qcode", data: "alt" },
-        { type: "qcode", data: "delete" },
-      ],
-    });
-    if ((await this.waitForQMPMessageWithTimeout(sock)) === void 0) {
-      throw new Error("Failed to press CTRL+ALT+DELETE");
-    }
-    // Now wait up to 5 seconds for a QMP event that the VM powered down
-    let cleanShutdownDone = false;
-    let t1 = performance.now();
-    while (!cleanShutdownDone && performance.now() - t1 < 5000) {
-      const m = await this.waitForQMPMessageWithTimeout(sock, 100);
-      if (m !== void 0 && (m as any).event === "SHUTDOWN") {
-        cleanShutdownDone = true;
-      }
-    }
+    for (let retry = 0; retry < 2; retry += 1) {
+      const qmpSock = new QMPSocket(this.instanceId, this.logger);
+      try {
+        let cleanShutdownDone = false;
+        qmpSock.on("shutdown", () => {
+          cleanShutdownDone = true;
+        });
+        try {
+          await qmpSock.connect(this.qmpSocketPath);
+        } catch (err: any) {
+          if (err instanceof QmpConnectionFailedError) return;
+          throw err;
+        }
+        if (
+          (await qmpSock.executeQMPCommandWaitForResponse(
+            "send-key",
+            {
+              keys: [
+                { type: "qcode", data: "ctrl" },
+                { type: "qcode", data: "alt" },
+                { type: "qcode", data: "delete" },
+              ],
+            },
+            1000,
+          )) === void 0
+        ) {
+          throw new Error("Failed to press CTRL+ALT+DELETE");
+        }
+        // Now wait up to 5 seconds for a QMP event that the VM powered down
+        let t1 = performance.now();
+        while (!cleanShutdownDone && performance.now() - t1 < 5000) {
+          await sleep(100);
+        }
 
-    if (!cleanShutdownDone) {
-      this.logger.error("Guest OS refused to shutdown gracefully within 5s. Killing the VM");
-      // In case the VM does not cooperate ask qemu to exit forcefully
-      await this.sendQMPMessage(sock, "quit");
-      // We don't wait for a response cause we may get EOF in the middle of getting the response
+        if (!cleanShutdownDone) {
+          this.logger.error("Guest OS refused to shutdown gracefully within 5s. Killing the VM");
+          // In case the VM does not cooperate ask qemu to exit forcefully
+          await qmpSock.executeQMPCommandAndShutdown("quit");
+        }
+        break;
+      } catch (err: any) {
+        this.logger.error(
+          `[${
+            this.instanceId
+          }] Got error while trying to shutdown the VM gracefully: ${JSON.stringify(err)}`,
+        );
+        // In case qemu shuts down while interacting with the qmp socket
+        if (
+          !(
+            err instanceof Error &&
+            (err?.message.includes("EPIPE") ||
+              err?.message.includes("ECONNRESET") ||
+              err?.message.includes("Failed to press"))
+          )
+        ) {
+          throw err;
+        }
+      } finally {
+        qmpSock.disconnect();
+      }
+      this.logger.error(`${this.instanceId} Retrying shutdown logic`);
     }
-    sock.destroy();
 
     const vmInfo = await this.readVmInfoFile();
     if (vmInfo === null) return;

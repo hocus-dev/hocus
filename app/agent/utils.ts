@@ -183,6 +183,7 @@ export const withSsh = async <T>(
     try {
       return await fn(ssh);
     } finally {
+      ssh.connection?.destroy();
       ssh.dispose();
     }
   } finally {
