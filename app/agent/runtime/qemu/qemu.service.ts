@@ -392,7 +392,14 @@ export class QemuService implements HocusRuntime {
       const msg = c.toString("utf8");
       if (msgResolve !== void 0) {
         this.logger.debug(`[${this.instanceId}] Received QMP message ${msg}`);
-        msgResolve(JSON.parse(msg));
+        let parsed: any;
+        try {
+          parsed = JSON.parse(msg);
+        } catch (e) {
+          this.logger.error(`[${this.instanceId}] Failed to parse QMP message: ${msg}`);
+          throw e;
+        }
+        msgResolve(parsed);
       } else {
         this.logger.error(`[${this.instanceId}] Logic error, missed QMP message ${msg}`);
       }
