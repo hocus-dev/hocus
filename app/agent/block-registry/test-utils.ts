@@ -124,7 +124,16 @@ export const provideBlockRegistry = (
       if (process.env["BUILDKITE_AGENT_ACCESS_TOKEN"] !== void 0) {
         const archivePath = testRunDir + ".tar.gz";
         // TODO: Perhaps only upload the logs?
-        await execCmd("tar", "-zcf", archivePath, "-C", testsDir, runId);
+        await execCmd(
+          "tar",
+          "--hole-detection=seek",
+          "--sparse",
+          "-zcf",
+          archivePath,
+          "-C",
+          testsDir,
+          runId,
+        );
         try {
           await execCmdWithOpts(["buildkite-agent", "artifact", "upload", runId + ".tar.gz"], {
             cwd: testsDir,
