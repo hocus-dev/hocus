@@ -9,7 +9,6 @@ var config = {
     "^~/(.*)$": "<rootDir>/app/$1",
   },
   testEnvironment: "node",
-  workerThreads: true,
 };
 
 module.exports = config;
