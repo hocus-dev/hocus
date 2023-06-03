@@ -1,6 +1,6 @@
 # Image defined in ./ops/docker/prebuilds.Dockerfile
 # Please run ./ops/bin/dev/prebuild-push-update.sh to update
-FROM quay.io/hocus/hocus-prebuilds-agent-dev:37e79dd2ef074be36fcff7b8a2ece0c0b6884675a0884d3f1396305a88f5de9b
+FROM quay.io/hocus/hocus-prebuilds-agent-dev:cbde1cd5ee1432c05b1d7933cf3a8d4ded9b7469bf4f483698b6851eb296a4f7
 
 WORKDIR /app
 COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
