@@ -7,6 +7,7 @@ import path from "path";
 
 import type { Log } from "@prisma/client";
 import { Context } from "@temporalio/activity";
+import type { DefaultLogger } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from "node-ssh";
 import { NodeSSH } from "node-ssh";
@@ -131,18 +132,34 @@ export const execSshCmd = async (
 
 export const withSsh = async <T>(
   connectionOptions: SSHConfig,
+  logger: DefaultLogger,
   fn: (ssh: NodeSSH) => Promise<T>,
+  abortController?: AbortController,
 ): Promise<T> => {
   const ssh = await retry(
-    async () =>
-      await new NodeSSH().connect({
-        keepaliveInterval: 250,
-        keepaliveCountMax: 4,
-        ...connectionOptions,
-      }),
+    async () => {
+      if (abortController === void 0 || !abortController.signal.aborted) {
+        return await new NodeSSH().connect({
+          keepaliveInterval: 250,
+          keepaliveCountMax: 4,
+          timeout: 800,
+          readyTimeout: 800,
+          ...connectionOptions,
+        });
+      }
+    },
     15,
     500,
   );
+  if (ssh === void 0) {
+    if (abortController !== void 0) abortController.signal.throwIfAborted();
+    throw new Error("Failed to establish ssh connection");
+  }
+
+  ssh.connection?.on("error", (err) => {
+    logger.info(err.toString());
+    abortController?.abort(err);
+  });
 
   const context = getActivityContext();
   let finish: () => void = () => {};
@@ -166,6 +183,7 @@ export const withSsh = async <T>(
     try {
       return await fn(ssh);
     } finally {
+      ssh.connection?.destroy();
       ssh.dispose();
     }
   } finally {
@@ -262,6 +280,10 @@ export const doesFileExist = async (filePath: string): Promise<boolean> => {
     }
     throw err;
   }
+};
+
+export const isProcessAlive = async (pid: number): Promise<boolean> => {
+  return await doesFileExist(path.join("/proc", pid.toString()));
 };
 
 export const sha256 = (str: Buffer | string): string => {

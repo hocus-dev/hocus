@@ -462,7 +462,7 @@ test.concurrent(
       const firecrackerService2 = injector.resolve(Token.FirecrackerService)(
         workspaceInstance2.firecrackerInstanceId,
       );
-      await firecrackerService2.shutdownVM();
+      await firecrackerService2.cleanup();
       await stopWorkspace();
 
       const { workspaceInstance: workspaceInstance3 } = await startWorkspace();
@@ -471,8 +471,7 @@ test.concurrent(
       const firecrackerService3 = injector.resolve(Token.FirecrackerService)(
         workspaceInstance3.firecrackerInstanceId,
       );
-      await firecrackerService3.shutdownVM();
-      await firecrackerService3.deleteVMDir();
+      await firecrackerService3.cleanup();
       await stopWorkspace();
 
       const { workspaceInstance: workspaceInstance4 } = await startWorkspace();
@@ -480,7 +479,7 @@ test.concurrent(
       const firecrackerService4 = injector.resolve(Token.FirecrackerService)(
         workspaceInstance4.firecrackerInstanceId,
       );
-      await firecrackerService4.shutdownVM();
+      await firecrackerService4.cleanup();
       await sleep(1000);
       const waitForStatus = (statuses: WorkspaceStatus[]) =>
         retry(

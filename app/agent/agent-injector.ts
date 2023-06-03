@@ -3,12 +3,14 @@ import { DefaultLogger } from "@temporalio/worker";
 import { AgentUtilService } from "./agent-util.service";
 import { BlockRegistryService } from "./block-registry/registry.service";
 import { BuildfsService } from "./buildfs.service";
-import { factoryFirecrackerService } from "./firecracker.service";
 import { AgentGitService } from "./git/git.service";
+import { SSHGatewayService } from "./network/ssh-gateway.service";
+import { LowLevelStorageService, StorageService } from "./network/storage/storage.service";
+import { WorkspaceNetworkService } from "./network/workspace-network.service";
 import { PrebuildService } from "./prebuild.service";
 import { ProjectConfigService } from "./project-config/project-config.service";
-import { SSHGatewayService } from "./ssh-gateway.service";
-import { LowLevelStorageService, StorageService } from "./storage/storage.service";
+import { factoryFirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
+import { factoryQemuService } from "./runtime/qemu/qemu.service";
 import { WorkspaceAgentService } from "./workspace-agent.service";
 
 import { config } from "~/config";
@@ -47,7 +49,9 @@ const providers = [
   { token: Token.BuildfsService, provide: { class: BuildfsService } },
   { token: Token.PrebuildService, provide: { class: PrebuildService } },
   { token: Token.SSHGatewayService, provide: { class: SSHGatewayService } },
+  { token: Token.WorkspaceNetworkService, provide: { class: WorkspaceNetworkService } },
   { token: Token.FirecrackerService, provide: { factory: factoryFirecrackerService } },
+  { token: Token.QemuService, provide: { factory: factoryQemuService } },
   { token: Token.WorkspaceAgentService, provide: { class: WorkspaceAgentService } },
   { token: Token.TemporalClient, provide: { factory: clientFactory } },
   { token: Token.BlockRegistryService, provide: { class: BlockRegistryService } },

@@ -8,7 +8,7 @@ import type { NodeSSH } from "node-ssh";
 
 import type { AgentUtilService } from "./agent-util.service";
 import { HOST_PERSISTENT_DIR } from "./constants";
-import type { FirecrackerService } from "./firecracker.service";
+import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import { doesFileExist, execCmd, execSshCmd, withFileLock } from "./utils";
 
 import type { Config } from "~/config";

@@ -4,7 +4,7 @@ import path from "path";
 
 import yaml from "yaml";
 
-import { withFileLock } from "../utils";
+import { withFileLock } from "../../utils";
 
 import type { AgentStorage } from "./storage.validator";
 import { AgentStorageValidator } from "./storage.validator";

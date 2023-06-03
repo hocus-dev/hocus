@@ -14,6 +14,7 @@ export const Token = {
   TaskService: "TaskServiceT",
   SendGAEventTaskRunnerService: "SendGAEventTaskRunnerServiceT",
   FirecrackerService: "FirecrackerServiceT",
+  QemuService: "QemuServiceT",
   StorageService: "StorageServiceT",
   LowLevelStorageService: "LowLevelStorageServiceT",
   ProjectConfigService: "ProjectConfigServiceT",
@@ -33,4 +34,5 @@ export const Token = {
   PerfService: "PerfServiceT",
   InitService: "InitServiceT",
   BlockRegistryService: "BlockRegistryServiceT",
+  WorkspaceNetworkService: "WorkspaceNetworkServiceT",
 } as const;
