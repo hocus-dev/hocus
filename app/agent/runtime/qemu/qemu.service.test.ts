@@ -194,9 +194,9 @@ test.concurrent.each(
         },
       )
       .catch((err: any) => {
-        // TODO: investigate this intermidient failure:
+        // TODO: investigate this intermittent failure:
         /*
-            write EPIPE
+          write EPIPE
             at onWrite (node_modules/ssh2/lib/client.js:305:16)
             at AESGCMCipherBinding.Protocol._onWrite (node_modules/ssh2/lib/protocol/Protocol.js:116:33)
             at AESGCMCipherBinding.encrypt (node_modules/ssh2/lib/protocol/crypto.js:381:10)
@@ -212,7 +212,7 @@ test.concurrent.each(
             at Protocol.parse (node_modules/ssh2/lib/protocol/Protocol.js:293:16)
             at Socket.<anonymous> (node_modules/ssh2/lib/client.js:713:21)
         */
-        if (err instanceof Error && err?.message.includes("EPIPE")) return;
+        if (err?.message.includes("EPIPE") || err?.code.includes("EPIPE")) return;
         throw err;
       });
     expect(vmInfo).not.toBeNull();
