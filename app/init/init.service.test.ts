@@ -1,15 +1,14 @@
 import fs from "fs/promises";
 
 import { SshKeyPairType } from "@prisma/client";
-import { TestWorkflowEnvironment } from "@temporalio/testing";
 import { DefaultLogger, Runtime, Worker } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import { createActivities } from "~/agent/activities/list";
 import { createAgentInjector } from "~/agent/agent-injector";
-import { generateTemporalCodeBundle } from "~/temporal/bundle";
-import { provideAppInjector, provideAppInjectorAndDb } from "~/test-utils";
+import { createAppInjector } from "~/app-injector.server";
 import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
@@ -76,120 +75,108 @@ users:
         publicKey: pk_b7b83d63-a9b0-4871-92d0-07779f28cfa8
 `;
 
-let testEnv: TestWorkflowEnvironment;
-let workflowBundle: any;
-
 beforeAll(async () => {
   Runtime.install({
     logger: new DefaultLogger("WARN"),
   });
-  testEnv = await TestWorkflowEnvironment.createTimeSkipping({
-    client: {
-      dataConverter: {
-        payloadConverterPath: require.resolve("~/temporal/data-converter"),
-      },
-    },
-  });
-  workflowBundle = await generateTemporalCodeBundle();
-});
-
-afterAll(async () => {
-  await testEnv?.teardown();
 });
 
 test.concurrent(
   "getInitConfig",
-  provideAppInjectorAndDb(async ({ injector, db }) => {
-    const initService = injector.resolve(Token.InitService);
-    const sshKeyService = injector.resolve(Token.SshKeyService);
-    const gitService = injector.resolve(Token.GitService);
+  new TestEnvironmentBuilder(createAppInjector)
+    .withTestLogging()
+    .withTestDb()
+    .run(async ({ injector, db }) => {
+      const initService = injector.resolve(Token.InitService);
+      const sshKeyService = injector.resolve(Token.SshKeyService);
+      const gitService = injector.resolve(Token.GitService);
 
-    await waitForPromises(
-      [USER1_ID, USER2_ID].map((externalId) =>
-        db.user.create({
-          data: {
-            externalId,
-            active: true,
-            sshPublicKeys: {
-              create: {
-                name: "name_" + externalId,
-                publicKey: "pk_" + externalId,
+      await waitForPromises(
+        [USER1_ID, USER2_ID].map((externalId) =>
+          db.user.create({
+            data: {
+              externalId,
+              active: true,
+              sshPublicKeys: {
+                create: {
+                  name: "name_" + externalId,
+                  publicKey: "pk_" + externalId,
+                },
               },
-            },
-            gitConfig: {
-              create: {
-                gitEmail: "email_" + externalId,
-                gitUsername: "username_" + externalId,
-              },
-            },
-          },
-        }),
-      ),
-    );
-
-    const pair = await sshKeyService.createSshKeyPair(
-      db,
-      TESTS_PRIVATE_SSH_KEY,
-      SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
-    );
-    const repo = await db.$transaction((tdb) =>
-      gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
-    );
-    await db.project.create({
-      data: {
-        name: "test",
-        rootDirectoryPath: "/",
-        externalId: "6f5157ef-a51e-489e-890f-6637983a4b3c",
-        maxPrebuildRamMib: 1,
-        maxPrebuildVCPUCount: 2,
-        maxWorkspaceRamMib: 3,
-        maxWorkspaceVCPUCount: 4,
-        maxWorkspaceProjectDriveSizeMib: 5,
-        maxWorkspaceRootDriveSizeMib: 6,
-        maxPrebuildRootDriveSizeMib: 7,
-        gitRepository: {
-          connect: {
-            id: repo.id,
-          },
-        },
-        environmentVariableSet: {
-          create: {
-            environmentVariables: {
-              create: [
-                { name: "a", value: "3" },
-                { name: "b", value: "2" },
-                { name: "c", value: "1" },
-              ],
-            },
-          },
-        },
-        UserProjectEnvironmentVariableSet: {
-          create: [USER1_ID, USER2_ID].map((externalId, idx) => ({
-            user: { connect: { externalId } },
-            environmentSet: {
-              create: {
-                environmentVariables: {
-                  create: [
-                    { name: `a${idx}`, value: "1" },
-                    { name: `b${idx}`, value: "2" },
-                    { name: `c${idx}`, value: "3" },
-                  ],
+              gitConfig: {
+                create: {
+                  gitEmail: "email_" + externalId,
+                  gitUsername: "username_" + externalId,
                 },
               },
             },
-          })),
+          }),
+        ),
+      );
+
+      const pair = await sshKeyService.createSshKeyPair(
+        db,
+        TESTS_PRIVATE_SSH_KEY,
+        SshKeyPairType.SSH_KEY_PAIR_TYPE_SERVER_CONTROLLED,
+      );
+      const repo = await db.$transaction((tdb) =>
+        gitService.addGitRepository(tdb, TESTS_REPO_URL, pair.id),
+      );
+      await db.project.create({
+        data: {
+          name: "test",
+          rootDirectoryPath: "/",
+          externalId: "6f5157ef-a51e-489e-890f-6637983a4b3c",
+          maxPrebuildRamMib: 1,
+          maxPrebuildVCPUCount: 2,
+          maxWorkspaceRamMib: 3,
+          maxWorkspaceVCPUCount: 4,
+          maxWorkspaceProjectDriveSizeMib: 5,
+          maxWorkspaceRootDriveSizeMib: 6,
+          maxPrebuildRootDriveSizeMib: 7,
+          gitRepository: {
+            connect: {
+              id: repo.id,
+            },
+          },
+          environmentVariableSet: {
+            create: {
+              environmentVariables: {
+                create: [
+                  { name: "a", value: "3" },
+                  { name: "b", value: "2" },
+                  { name: "c", value: "1" },
+                ],
+              },
+            },
+          },
+          UserProjectEnvironmentVariableSet: {
+            create: [USER1_ID, USER2_ID].map((externalId, idx) => ({
+              user: { connect: { externalId } },
+              environmentSet: {
+                create: {
+                  environmentVariables: {
+                    create: [
+                      { name: `a${idx}`, value: "1" },
+                      { name: `b${idx}`, value: "2" },
+                      { name: `c${idx}`, value: "3" },
+                    ],
+                  },
+                },
+              },
+            })),
+          },
         },
-      },
-    });
-    const initConfig = await initService["getInitConfig"](db);
-    const initConfigStr = initService["stringifyInitConfig"](initConfig);
-    expect(initConfigStr).toEqual(EXPECTED_CONFIG);
-  }),
+      });
+      const initConfig = await initService["getInitConfig"](db);
+      const initConfigStr = initService["stringifyInitConfig"](initConfig);
+      expect(initConfigStr).toEqual(EXPECTED_CONFIG);
+    }),
 );
 
 test.concurrent(
   "dump and load",
-  provideAppInjector(async ({ injector }) => {
+  new TestEnvironmentBuilder(createAppInjector).withTestLogging().run(async ({ injector }) => {
     const initService = injector.resolve(Token.InitService);
     const initConfig = initService["parseInitConfig"](EXPECTED_CONFIG);
     const filePath = `/tmp/init-config-test-${uuidv4()}`;
@@ -203,45 +190,49 @@ test.concurrent(
 
 test.concurrent(
   "loadConfig",
-  provideAppInjectorAndDb(async ({ injector, db }) => {
-    const taskQueue = `test-${uuidv4()}`;
-    const initService = injector.resolve(Token.InitService);
-    initService["temporalQueue"] = taskQueue;
-    const initConfig = initService["parseInitConfig"](EXPECTED_CONFIG);
+  new TestEnvironmentBuilder(createAppInjector)
+    .withTestLogging()
+    .withTestDb()
+    .withTimeSkippingTemporal()
+    .run(async ({ injector, db, temporalTestEnv, workflowBundle }) => {
+      const taskQueue = `test-${uuidv4()}`;
+      const initService = injector.resolve(Token.InitService);
+      initService["temporalQueue"] = taskQueue;
+      const initConfig = initService["parseInitConfig"](EXPECTED_CONFIG);
 
-    const agentInjector = createAgentInjector();
-    const activities = await createActivities(agentInjector, db);
+      const agentInjector = createAgentInjector();
+      const activities = await createActivities(agentInjector, db);
 
-    const worker = await Worker.create({
-      connection: testEnv.nativeConnection,
-      taskQueue,
-      workflowsPath: require.resolve("~/agent/workflows"),
-      activities: {
-        ...activities,
-        updateGitBranchesAndObjects: async () => ({
-          newGitBranches: [],
-          updatedGitBranches: [],
-        }),
-      },
-      dataConverter: {
-        payloadConverterPath: require.resolve("~/temporal/data-converter"),
-      },
-      workflowBundle,
-    });
+      const worker = await Worker.create({
+        connection: temporalTestEnv.nativeConnection,
+        taskQueue,
+        workflowsPath: require.resolve("~/agent/workflows"),
+        activities: {
+          ...activities,
+          updateGitBranchesAndObjects: async () => ({
+            newGitBranches: [],
+            updatedGitBranches: [],
+          }),
+        },
+        dataConverter: {
+          payloadConverterPath: require.resolve("~/temporal/data-converter"),
+        },
+        workflowBundle,
+      });
 
-    const initialInitConfig = await initService["getInitConfig"](db);
-    expect(initialInitConfig).toEqual({
-      projects: [],
-      repos: [],
-      users: [],
-    });
+      const initialInitConfig = await initService["getInitConfig"](db);
+      expect(initialInitConfig).toEqual({
+        projects: [],
+        repos: [],
+        users: [],
+      });
 
-    await worker.runUntil(async () => {
-      for (const _ of [1, 2, 3]) {
-        await initService["loadConfig"](db, testEnv.client, initConfig);
-        const updatedInitConfig = await initService["getInitConfig"](db);
-        expect(updatedInitConfig).toEqual(initConfig);
-      }
-    });
-  }),
+      await worker.runUntil(async () => {
+        for (const _ of [1, 2, 3]) {
+          await initService["loadConfig"](db, temporalTestEnv.client, initConfig);
+          const updatedInitConfig = await initService["getInitConfig"](db);
+          expect(updatedInitConfig).toEqual(initConfig);
+        }
+      });
+    }),
 );

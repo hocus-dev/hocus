@@ -11,9 +11,14 @@ import { TestStateManagerRequestValidator, TEST_STATE_MANAGER_REQUEST_TAG } from
 
 import { waitForPromises } from "~/utils.shared";
 
-// TODO: Env variables
-const sockPath = "/tmp/test-state-manager.sock";
-const testDir = "/tmp/tests";
+const sockPath = process.env.TEST_STATE_MANAGER_SOCK;
+const testDir = process.env.TEST_STORAGE_DIR;
+
+if (sockPath === void 0 || testDir === void 0) {
+  throw new Error(`Please specify TEST_STATE_MANAGER_SOCK and TEST_STORAGE_DIR`);
+}
+
+console.log(`Will listen on ${sockPath} and manage ${testDir}`);
 
 const srv = new Server();
 // Each connection manages multiple tests
@@ -75,6 +80,11 @@ const cleanupServer = async () => {
 srv.listen(sockPath, async () => {
   // Allow anyone to connect to us :)
   await fs.mkdir(testDir, { recursive: true, mode: 0o777 });
+  try {
+    await fs.chmod(testDir, 0o777);
+  } catch (err) {
+    console.log("Failed to chmod test dir. Proceeding anyway");
+  }
   await fs.chmod(sockPath, 0o777);
   console.log(`Listening on Unix socket ${sockPath}`);
   // Disable the OOM reaper for us ;)
@@ -86,6 +96,8 @@ srv.listen(sockPath, async () => {
     console.log("Failed to disable OOM, please run as root");
   }
   srv.on("connection", (sock: Socket) => {
+    sock.setNoDelay(true);
+    sock.setKeepAlive(true, 100);
     const socketId = uuidv4();
     console.log(`Got connection with ID: ${socketId}`);
     const socketState: SocketStateT = { sock, tests: new Map() };
@@ -103,95 +115,115 @@ srv.listen(sockPath, async () => {
     });
     sock.on("data", async (buf: Buffer) => {
       const str = buf.toString("utf-8");
-      let parsed: unknown;
-      // First parse json
-      try {
-        parsed = JSON.parse(str);
-      } catch (err: any) {
-        sock.write(
-          JSON.stringify({
-            requestId: void 0,
-            error: err.toString(),
-          } as TestStateManagerResponse) + "\n",
-        );
-        // Nuke the connection cause the client is broken
-        sock.end();
-        return;
-      }
-      const sendErrResponse = (err: any) => {
-        sock.write(
-          JSON.stringify({
-            requestId: (parsed as any).requestId,
-            error: err.toString(),
-          } as TestStateManagerResponse) + "\n",
-        );
-      };
-      // Then validate the schema
-      let msg: TestStateManagerRequest;
-      try {
-        const parseResult = TestStateManagerRequestValidator.SafeParse(parsed);
-        if (!parseResult.success) throw parseResult.error;
-        msg = parseResult.value;
-      } catch (err: any) {
-        sendErrResponse(err);
-        return;
-      }
-      // Now handle the message
-      const sendOkResponse = <TagT extends TEST_STATE_MANAGER_REQUEST_TAG>(
-        requestTag: TagT,
-        response: Extract<TestStateManagerResponse, { requestTag: TagT }>["response"],
-      ) => {
-        sock.write(
-          JSON.stringify({
-            requestId: msg.requestId,
-            requestTag,
-            response,
-          } as TestStateManagerResponse) + "\n",
-        );
-      };
-      try {
-        switch (msg.requestTag) {
-          case TEST_STATE_MANAGER_REQUEST_TAG.TEST_START:
-            console.log(`Starting test with id ${msg.request.runId} on socket ${socketId}`);
-            socketState.tests.set(msg.request.runId, {
-              cleanupClosures: [],
-              socketId,
-              runId: msg.request.runId,
-            });
-            sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, {});
-            return;
-          case TEST_STATE_MANAGER_REQUEST_TAG.TEST_END:
-            {
-              console.log(`Ending test with id ${msg.request.runId} on socket ${socketId}`);
-              const testState = socketState.tests.get(msg.request.runId);
-              if (testState === void 0) {
-                throw new Error("Unable to find test state");
-              }
-              socketState.tests.delete(msg.request.runId);
-              await cleanupTestRun(testState, msg.request.testFailed);
-              sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_END, {});
-            }
-            return;
-          case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE:
-            {
-              console.log(
-                `Requesting logs file with id ${msg.request.runId} on socket ${socketId}`,
-              );
-              const testState = socketState.tests.get(msg.request.runId);
-              if (testState === void 0) {
-                throw new Error("Unable to find test state");
-              }
-              const testStateDir = join(testDir, msg.request.runId);
-              await fs.mkdir(testStateDir, { recursive: true, mode: 0o777 });
-              await fs.chmod(testStateDir, 0o777);
-              sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE, {
-                path: join(testStateDir, "logger.txt"),
-              });
-            }
-            return;
+      for (const chunk of str.split("\n")) {
+        if (chunk.trim().length === 0) continue;
+
+        let parsed: unknown;
+        // First parse json
+        try {
+          parsed = JSON.parse(chunk);
+        } catch (err: any) {
+          console.error(`${socketId} Sending err ${err}`);
+          if (
+            !sock.write(
+              JSON.stringify({
+                requestId: void 0,
+                error: err.toString(),
+              } as TestStateManagerResponse) + "\n",
+            )
+          ) {
+            console.error("Failed writing to socket");
+          }
+          // Nuke the connection cause the client is broken
+          sock.end();
+          return;
         }
-      } catch (err: any) {
-        sendErrResponse(err);
+        const sendErrResponse = (err: any) => {
+          console.error(`${socketId} Sending err ${err}`);
+          if (
+            !sock.write(
+              JSON.stringify({
+                requestId: (parsed as any).requestId,
+                error: err.toString(),
+              } as TestStateManagerResponse) + "\n",
+            )
+          ) {
+            console.error("Failed writing to socket");
+          }
+        };
+        // Then validate the schema
+        let msg: TestStateManagerRequest;
+        try {
+          const parseResult = TestStateManagerRequestValidator.SafeParse(parsed);
+          if (!parseResult.success) throw parseResult.error;
+          msg = parseResult.value;
+        } catch (err: any) {
+          console.error(`${socketId} Sending err ${err}`);
+          sendErrResponse(err);
+          return;
+        }
+        // Now handle the message
+        const sendOkResponse = <TagT extends TEST_STATE_MANAGER_REQUEST_TAG>(
+          requestTag: TagT,
+          response: Extract<TestStateManagerResponse, { requestTag: TagT }>["response"],
+        ) => {
+          if (
+            !sock.write(
+              JSON.stringify({
+                requestId: msg.requestId,
+                requestTag,
+                response,
+              } as TestStateManagerResponse) + "\n",
+            )
+          ) {
+            console.error("Failed writing to socket");
+          }
+        };
+        try {
+          switch (msg.requestTag) {
+            case TEST_STATE_MANAGER_REQUEST_TAG.TEST_START:
+              console.log(`Starting test with id ${msg.request.runId} on socket ${socketId}`);
+              socketState.tests.set(msg.request.runId, {
+                cleanupClosures: [],
+                socketId,
+                runId: msg.request.runId,
+              });
+              sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, {});
+              return;
+            case TEST_STATE_MANAGER_REQUEST_TAG.TEST_END:
+              {
+                console.log(`Ending test with id ${msg.request.runId} on socket ${socketId}`);
+                const testState = socketState.tests.get(msg.request.runId);
+                if (testState === void 0) {
+                  throw new Error("Unable to find test state");
+                }
+                socketState.tests.delete(msg.request.runId);
+                await cleanupTestRun(testState, msg.request.testFailed);
+                sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_END, {});
+              }
+              return;
+            case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE:
+              {
+                console.log(
+                  `Requesting logs file with id ${msg.request.runId} on socket ${socketId}`,
+                );
+                const testState = socketState.tests.get(msg.request.runId);
+                if (testState === void 0) {
+                  throw new Error("Unable to find test state");
+                }
+                const testStateDir = join(testDir, msg.request.runId);
+                await fs.mkdir(testStateDir, { recursive: true, mode: 0o777 });
+                await fs.chmod(testStateDir, 0o777);
+                sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE, {
+                  path: join(testStateDir, "logger.txt"),
+                });
+              }
+              return;
+          }
+        } catch (err: any) {
+          console.error(`${socketId} Sending err ${err}`);
+          sendErrResponse(err);
+        }
       }
     });
   });

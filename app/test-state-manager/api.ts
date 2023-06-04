@@ -1,6 +1,6 @@
 import type { Static, TSchema } from "@sinclair/typebox";
 import { Type as t } from "@sinclair/typebox";
-import { Any, T } from "ts-toolbelt";
+import type { Any } from "ts-toolbelt";
 
 import { compileSchema } from "~/schema/utils.server";
 import { UuidSchema } from "~/schema/uuid.schema.server";

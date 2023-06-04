@@ -18,6 +18,7 @@ export class TestStateManager extends EventEmitter {
     }
   >;
   private _sock: Socket;
+  private closing = false;
   constructor(private readonly sockPath: string) {
     super();
     this._sock = new Socket();
@@ -27,6 +28,17 @@ export class TestStateManager extends EventEmitter {
   async connect(): Promise<void> {
     await new Promise((resolve) => {
       this._sock.connect(this.sockPath, () => resolve(void 0));
+    });
+    this._sock.setNoDelay(true);
+    this._sock.setKeepAlive(true, 100);
+
+    this._sock.on("error", async (err: Error) => {
+      this.emit("error", err);
+    });
+    this._sock.on("close", async (err: Error) => {
+      if (!this.closing) {
+        this.emit("close", err);
+      }
     });
     this._sock.on("data", async (buf: Buffer) => {
       const str = buf.toString("utf-8");
@@ -76,11 +88,18 @@ export class TestStateManager extends EventEmitter {
   async mkRequest<T extends TEST_STATE_MANAGER_REQUEST_TAG>(
     requestTag: T,
     request: Any.Compute<Extract<TestStateManagerRequest, { requestTag: T }>["request"]>,
+    timeoutMs = 5000,
   ): Promise<Extract<TestStateManagerResponse, { requestTag: T }>["response"]> {
+    let timeout: NodeJS.Timeout | null = null;
+    const timeoutPromise = new Promise((resolve) => {
+      timeout = setTimeout(() => {
+        timeout = null;
+        resolve(void 0);
+      }, timeoutMs);
+    });
     const requestId = uuidv4();
-    this._sock.write(
-      JSON.stringify({ request, requestTag, requestId } as TestStateManagerRequest) + "\n",
-    );
+    const req =
+      JSON.stringify({ request, requestTag, requestId } as TestStateManagerRequest) + "\n";
     const requestPromise = new Promise<
       Extract<TestStateManagerResponse, { requestTag: T }>["response"]
     >((resolve, reject) => {
@@ -89,11 +108,20 @@ export class TestStateManager extends EventEmitter {
         reject,
         resolve,
       });
+      if (!this._sock.write(req)) {
+        reject(new Error("Socket write failed"));
+      }
     });
-    return (await requestPromise) as any;
+    const res = (await Promise.race([requestPromise, timeoutPromise])) as any;
+    if (timeout) clearTimeout(timeout);
+    else {
+      throw new Error(`Request ${req} timed out`);
+    }
+    return res;
   }
 
   async close() {
+    this.closing = true;
     this._sock.end();
   }
 }
