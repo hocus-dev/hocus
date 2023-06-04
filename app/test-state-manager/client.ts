@@ -5,7 +5,7 @@ import type { Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
 import type { TestStateManagerRequest, TestStateManagerResponse } from "./api";
-import { TEST_STATE_MANAGER_REQUEST_TAG } from "./api";
+import type { TEST_STATE_MANAGER_REQUEST_TAG } from "./api";
 import { TestStateManagerResponseValidator } from "./api";
 
 export class TestStateManager extends EventEmitter {
@@ -76,13 +76,13 @@ export class TestStateManager extends EventEmitter {
   async mkRequest<T extends TEST_STATE_MANAGER_REQUEST_TAG>(
     requestTag: T,
     request: Any.Compute<Extract<TestStateManagerRequest, { requestTag: T }>["request"]>,
-  ): Promise<Any.Compute<Extract<TestStateManagerResponse, { requestTag: T }>>> {
+  ): Promise<Extract<TestStateManagerResponse, { requestTag: T }>["response"]> {
     const requestId = uuidv4();
     this._sock.write(
       JSON.stringify({ request, requestTag, requestId } as TestStateManagerRequest) + "\n",
     );
     const requestPromise = new Promise<
-      Any.Compute<Extract<TestStateManagerResponse, { requestTag: T }>>
+      Extract<TestStateManagerResponse, { requestTag: T }>["response"]
     >((resolve, reject) => {
       this.inFlightRequests.set(requestId, {
         requestId,
@@ -90,22 +90,10 @@ export class TestStateManager extends EventEmitter {
         resolve,
       });
     });
-    return await requestPromise;
+    return (await requestPromise) as any;
   }
 
   async close() {
     this._sock.end();
   }
 }
-
-const main = async () => {
-  const sockPath = "/tmp/test-state-manager.sock";
-  const test = new TestStateManager(sockPath);
-  await test.connect();
-  const runId = uuidv4();
-  await test.mkRequest(TEST_STATE_MANAGER_REQUEST_TAG.START_TEST, { runId });
-  await test.mkRequest(TEST_STATE_MANAGER_REQUEST_TAG.END_TEST, { runId, testFailed: false });
-  await test.close();
-};
-
-void main();
