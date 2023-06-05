@@ -19,6 +19,7 @@ export const clientFactory = (
       return await fn(client);
     } finally {
       await connection.close();
+      connection.callContextStorage.disable();
     }
   };
 };
