@@ -1,3 +1,5 @@
+/* eslint-disable import/first */
+process.env.UV_THREADPOOL_SIZE = "64";
 /* eslint-disable no-console */
 import fs from "fs/promises";
 import type { Socket } from "node:net";
@@ -20,7 +22,7 @@ if (sockPath === void 0 || testDir === void 0) {
 
 console.log(`Will listen on ${sockPath} and manage ${testDir}`);
 
-const srv = new Server();
+const srv = new Server({ noDelay: true, keepAlive: true, pauseOnConnect: true });
 // Each connection manages multiple tests
 // Each test has a stack of cleanup closures
 // socketId => runId => TestRunStateT
@@ -226,6 +228,7 @@ srv.listen(sockPath, async () => {
         }
       }
     });
+    sock.resume();
   });
 });
 

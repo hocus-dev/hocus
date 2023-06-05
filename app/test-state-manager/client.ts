@@ -27,7 +27,8 @@ export class TestStateManager extends EventEmitter {
 
   async connect(): Promise<void> {
     await new Promise((resolve) => {
-      this._sock.connect(this.sockPath, () => resolve(void 0));
+      this._sock.connect(this.sockPath);
+      this._sock.once("ready", () => resolve(void 0));
     });
     this._sock.setNoDelay(true);
     this._sock.setKeepAlive(true, 100);
