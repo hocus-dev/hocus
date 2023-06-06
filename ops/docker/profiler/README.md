@@ -1,6 +1,6 @@
-Run with
+# NodeJS Profiler and Debugger
 
-On the host in separate terminals:
+Run on the host in separate terminals:
 
 ```bash
 docker exec -it agent bash
