@@ -158,7 +158,7 @@ steps:
       echo "Tests ended with status \$R";
       kill \$P;
       echo "Waiting for helper";
-      wait \$P;
+      wait \$P || true;
       exit \$R
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
@@ -183,7 +183,7 @@ steps:
       echo "Tests ended with status \$R";
       kill \$P;
       echo "Waiting for helper";
-      wait \$P;
+      wait \$P || true;
       exit \$R
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
