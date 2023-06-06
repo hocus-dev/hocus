@@ -11,6 +11,8 @@ export const TEST_STATE_MANAGER_REQUEST_TAG = {
   TEST_END: "TEST_STATE_MANAGER_REQUEST_TAG_TEST_END",
   REQUEST_LOGS_FILE: "TEST_STATE_MANAGER_REQUEST_LOGS_FILE",
   REQUEST_DATABASE: "TEST_STATE_MANAGER_REQUEST_DATABASE",
+  REQUEST_TEST_STATE_DIR: "TEST_STATE_MANAGER_REQUEST_TEST_STATE_DIR",
+  REQUEST_BLOCK_REGISTRY_WATCH: "TEST_STATE_MANAGER_BLOCK_REGISTRY_WATCH",
 } as const;
 export type TEST_STATE_MANAGER_REQUEST_TAG = valueof<typeof TEST_STATE_MANAGER_REQUEST_TAG>;
 
@@ -40,6 +42,7 @@ const RequestSchema = t.Union([
     TEST_STATE_MANAGER_REQUEST_TAG.TEST_START,
     t.Object({
       runId: UuidSchema,
+      testsDirMountPath: t.String(),
     }),
   ),
   mkRequestSchema(
@@ -62,6 +65,20 @@ const RequestSchema = t.Union([
       prismaSchemaPath: t.String(),
     }),
   ),
+  mkRequestSchema(
+    TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_TEST_STATE_DIR,
+    t.Object({
+      runId: UuidSchema,
+    }),
+  ),
+  mkRequestSchema(
+    TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH,
+    t.Object({
+      runId: UuidSchema,
+      tcmuSubtype: t.String(),
+      blockRegistryDir: t.String(),
+    }),
+  ),
 ]);
 
 const OkResponseSchema = t.Union([
@@ -78,6 +95,11 @@ const OkResponseSchema = t.Union([
     TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE,
     t.Object({ dbUrl: t.String() }),
   ),
+  mkResponseSchema(
+    TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_TEST_STATE_DIR,
+    t.Object({ dirPath: t.String() }),
+  ),
+  mkResponseSchema(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH, t.Object({})),
 ]);
 
 const ErrorResponseSchema = t.Object({

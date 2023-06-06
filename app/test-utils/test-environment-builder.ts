@@ -12,28 +12,17 @@ import { DefaultLogger } from "@temporalio/worker";
 import type { Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
+import type { BlockRegistryService } from "~/agent/block-registry/registry.service";
+import { Config, config as defaultConfig } from "~/config";
 import type { Injector, ProvidersOverrides } from "~/di/injector.server";
 import { Scope } from "~/di/injector.server";
 import { generateTemporalCodeBundle } from "~/temporal/bundle";
 import { TEST_STATE_MANAGER_REQUEST_TAG } from "~/test-state-manager/api";
 import type { TestStateManager } from "~/test-state-manager/client";
 import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
-
-const DB_HOST = process.env.DB_HOST ?? "localhost";
-
-const changeSequenceNumbers = async (db: Prisma.NonTransactionClient): Promise<void> => {
-  const modelNames = Object.values(Prisma.ModelName).sort((a, b) => a.localeCompare(b));
-  await waitForPromises(
-    modelNames.map((name, idx) =>
-      // When you pass model ids around, it's easy to accidentally pass an id representing one model
-      // to a function that expects an id representing another model. By changing the sequence numbers
-      // so that every model has its own range of ids, we can easily detect this kind of error
-      // during testing.
-      db.$executeRawUnsafe(`ALTER SEQUENCE "${name}_id_seq" RESTART WITH ${(idx + 1) * 1000000}`),
-    ),
-  );
-};
+import { sleep, waitForPromises } from "~/utils.shared";
+import { dirname, join } from "path";
+import { spawn } from "child_process";
 
 // Early init functions operate before the dependency injector was created
 // and are meant to asynchronously create non trivial dependencies
@@ -94,7 +83,10 @@ export class TestEnvironmentBuilder<
         void 0;
       };
       let runId = uuidv4();
-      await this.#getStateManager().mkRequest(TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, { runId });
+      await this.#getStateManager().mkRequest(TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, {
+        runId,
+        testsDirMountPath: this.#getStateManager().testStorageDir,
+      });
       let testFailed = true;
       try {
         const earlyInitPromises: {
@@ -201,7 +193,7 @@ export class TestEnvironmentBuilder<
   ): TestEnvironmentBuilder<
     InjectorT,
     OverridesT,
-    EarlyInitT,
+    EarlyInitT & { logger: EarlyInitFunction },
     LateInitT & { logger: LateInitFunction<InjectorT, Logger> }
   > {
     return new TestEnvironmentBuilder(
@@ -303,5 +295,103 @@ export class TestEnvironmentBuilder<
       },
       ...this.lateInit,
     });
+  }
+
+  withBlockRegistry(): TestEnvironmentBuilder<
+    InjectorT,
+    OverridesT,
+    EarlyInitT & { brService: EarlyInitFunction },
+    LateInitT & { brService: LateInitFunction<InjectorT, BlockRegistryService> }
+  > {
+    return new TestEnvironmentBuilder(
+      this.injectorCtor,
+      this.injectorOverrides,
+      {
+        brService: async ({ runId }) => {
+          const rsp = await this.#getStateManager().mkRequest(
+            TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_TEST_STATE_DIR,
+            { runId },
+          );
+          const blockRegistryRoot = join(rsp.dirPath, "block-registry");
+          return {
+            [Token.Config]: {
+              provide: {
+                value: {
+                  ...defaultConfig,
+                  agent: () => ({ ...defaultConfig.agent(), blockRegistryRoot }),
+                },
+              },
+            },
+          };
+        },
+        ...this.earlyInit,
+      },
+      {
+        brService: async ({ injector, runId, addTeardownFunction }) => {
+          const obdLogRsp = await this.#getStateManager().mkRequest(
+            TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE,
+            { runId },
+          );
+          const obdLogFile = await fs.open(obdLogRsp.path, "a");
+
+          const brService: BlockRegistryService = injector.resolve(Token.BlockRegistryService);
+          const config: Config = injector.resolve(Token.Config);
+          const blockRegistryRoot: string = config.agent().blockRegistryRoot;
+          await brService.initializeRegistry();
+          const cp = spawn(
+            "/opt/overlaybd/bin/overlaybd-tcmu",
+            [join(blockRegistryRoot, "overlaybd.json")],
+            { stdio: ["ignore", obdLogFile.fd, obdLogFile.fd] },
+          );
+          const cpWait = new Promise<void>((resolve, reject) => {
+            cp.on("error", reject);
+            cp.on("close", () => {
+              void obdLogFile.close();
+              resolve(void 0);
+            });
+          });
+          // Wait for tcmu to overlaybd to fully initialize
+          for (let i = 0; i < 100; i += 1) {
+            try {
+              await fs.readFile(join(blockRegistryRoot, "logs", "overlaybd.log"), "utf-8");
+              break;
+            } catch (err) {
+              await sleep(5);
+            }
+            if (i == 99) {
+              throw new Error("TCMU failed to initialize");
+            }
+          }
+
+          await this.#getStateManager().mkRequest(
+            TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH,
+            {
+              runId,
+              blockRegistryDir: blockRegistryRoot,
+              tcmuSubtype: await brService.getTCMUSubtype(),
+            },
+          );
+
+          addTeardownFunction(async () => {
+            await brService.hideEverything();
+            cp.kill("SIGINT");
+            let timeout: NodeJS.Timeout | undefined;
+            await Promise.race([
+              cpWait,
+              new Promise((resolve) => {
+                timeout = setTimeout(() => {
+                  cp.kill("SIGKILL");
+                  resolve(void 0);
+                }, 1000);
+              }),
+            ]);
+            clearTimeout(timeout);
+          });
+
+          return brService;
+        },
+        ...this.lateInit,
+      },
+    );
   }
 }

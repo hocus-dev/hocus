@@ -3,52 +3,56 @@ import path from "path";
 
 import { v4 as uuidv4 } from "uuid";
 
+import { createAgentInjector } from "../agent-injector";
 import { execCmd } from "../utils";
 
 import type { ContainerId, ImageId } from "./registry.service";
 import { EXPOSE_METHOD } from "./registry.service";
 import testImages from "./test-data/test_images.json";
-import { provideBlockRegistry } from "./test-utils";
 
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
+import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
+
+const noSetupEnv = new TestEnvironmentBuilder(createAgentInjector).withLateInits({
+  brService: async ({ injector }) => injector.resolve(Token.BlockRegistryService),
+});
+
+const testEnv = new TestEnvironmentBuilder(createAgentInjector)
+  .withTestLogging()
+  .withBlockRegistry();
 
 test.concurrent(
   "Stability of tcmuStorageObjectId => lunId mapping",
-  provideBlockRegistry(
-    async ({ brService }) => {
-      // Stability test - the id doesn't change between releases
-      expect(brService.tcmuIdToLUN("random-string")).toEqual("13322996231709573508");
-      expect(brService.tcmuIdToLUN("raccoons")).toEqual("12634500512917172457");
-      expect(brService.tcmuIdToLUN("18446744073709551615")).toEqual("7702772950068300006");
-    },
-    { skipInit: true },
-  ),
+  noSetupEnv.run(async ({ brService }) => {
+    // Stability test - the id doesn't change between releases
+    expect(brService.tcmuIdToLUN("random-string")).toEqual("13322996231709573508");
+    expect(brService.tcmuIdToLUN("raccoons")).toEqual("12634500512917172457");
+    expect(brService.tcmuIdToLUN("18446744073709551615")).toEqual("7702772950068300006");
+  }),
 );
 
 test.concurrent(
   "Stability of W-LUN detection",
-  provideBlockRegistry(
-    async ({ brService }) => {
-      // Well known LUNs
-      expect(brService.isWLun("4334325174361833876")).toEqual(true);
-      expect(brService.isWLun("3018598453422375403")).toEqual(true);
-      expect(brService.isWLun("632590477590774088")).toEqual(true);
-      expect(brService.isWLun("4675257587543884155")).toEqual(true);
-      expect(brService.isWLun("16486746511334031826")).toEqual(true);
-      // Normal LUNs
-      expect(brService.isWLun("3519114781173106877")).toEqual(false);
-      expect(brService.isWLun("7541570494835722524")).toEqual(false);
-      expect(brService.isWLun("4855227540551039743")).toEqual(false);
-      expect(brService.isWLun("448555180398852958")).toEqual(false);
-      expect(brService.isWLun("11234747867045710393")).toEqual(false);
-    },
-    { skipInit: true },
-  ),
+  noSetupEnv.run(async ({ brService }) => {
+    // Well known LUNs
+    expect(brService.isWLun("4334325174361833876")).toEqual(true);
+    expect(brService.isWLun("3018598453422375403")).toEqual(true);
+    expect(brService.isWLun("632590477590774088")).toEqual(true);
+    expect(brService.isWLun("4675257587543884155")).toEqual(true);
+    expect(brService.isWLun("16486746511334031826")).toEqual(true);
+    // Normal LUNs
+    expect(brService.isWLun("3519114781173106877")).toEqual(false);
+    expect(brService.isWLun("7541570494835722524")).toEqual(false);
+    expect(brService.isWLun("4855227540551039743")).toEqual(false);
+    expect(brService.isWLun("448555180398852958")).toEqual(false);
+    expect(brService.isWLun("11234747867045710393")).toEqual(false);
+  }),
 );
 
 test.concurrent(
   "Test create/expose/hide/commit",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const testFile1 = "hello-world";
     const testContent1 = "Hello World!";
     const testFile2 = "hello-world-2";
@@ -91,7 +95,7 @@ test.concurrent(
 
 test.concurrent(
   "Test loadImageFromRemoteRepo",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const im1 = await brService.loadImageFromRemoteRepo(testImages.test1, "im1");
     const im2 = await brService.loadImageFromRemoteRepo(testImages.test2, "im2");
     const im1Mount = await brService.expose(im1, EXPOSE_METHOD.HOST_MOUNT);
@@ -123,7 +127,7 @@ test.concurrent(
 
 test.concurrent(
   "Test loadImageFromDisk",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const loadF = async (tag: string, id: string) => {
       const p = path.join(brService["paths"].root, "../", id);
       await execCmd(
@@ -169,7 +173,7 @@ test.concurrent(
 
 test.concurrent(
   "Concurrency and idempotence of loadImageFromRemoteRepo",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const tasks: Promise<ImageId>[][] = [[], []];
     // Low concurrency because skopeo is slow
     for (let i = 0; i < 3; i++) {
@@ -223,7 +227,7 @@ test.concurrent(
 
 test.concurrent(
   "Concurrency and idempotence of loadImageFromDisk",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const loadF = async (tag: string, id: string) => {
       const p = path.join(brService["paths"].root, "../", id);
       await execCmd(
@@ -295,7 +299,7 @@ test.concurrent(
 
 test.concurrent(
   "Concurrency and idempotence of createContainer",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const tasks: Promise<any>[][] = [[], []];
     const N = 5;
     for (let i = 0; i < N; i++) {
@@ -314,7 +318,7 @@ test.concurrent(
 
 test.concurrent(
   "Concurrency and idempotence of commitContainer",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
     const tasks: Promise<any>[][] = [[], []];
@@ -336,7 +340,7 @@ test.concurrent(
 
 test.concurrent(
   "Concurrency and idempotence of expose",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
     // Do 5 runs to ensure we don't have races
@@ -365,7 +369,7 @@ test.concurrent(
 
 test.concurrent(
   "Concurrency and idempotence of hide",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
     for (let run = 0; run < 5; run++) {
@@ -386,7 +390,7 @@ test.concurrent(
 
 test.concurrent(
   "LUN placement - Handles LUN collisions",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
     // So multiple concurrent test runs of the same test don't collide with each other
@@ -433,7 +437,7 @@ test.concurrent(
 
 test.concurrent(
   "LUN placement - Never uses Well Known LUNs",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     // So multiple concurrent test runs of the same test don't collide with each other
     let randLun = brService.tcmuIdToLUN(uuidv4());
@@ -479,7 +483,7 @@ test.concurrent(
 
 test.concurrent(
   "LUN placement - Throws when fixed point + hash collision in hash function",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
     // So multiple concurrent test runs of the same test don't collide with each other
@@ -515,7 +519,7 @@ test.concurrent(
 
 test.concurrent(
   "LUN placement - Throws when loop + hash collision in hash function",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     // 4 containers will be placed, but not the fifth
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
@@ -585,7 +589,7 @@ test.concurrent(
 
 test.concurrent(
   "LUN placement - Cleans up double assignments",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     // So multiple concurrent test runs of the same test don't collide with each other
     let randLun1 = brService.tcmuIdToLUN(uuidv4());
@@ -661,7 +665,7 @@ test.concurrent(
 //    * Kaniko builds invalid OCI images which cause segfaults during conversion into overlaybd format
 test.concurrent.skip(
   "256 layers is max",
-  provideBlockRegistry(async ({ brService }) => {
+  testEnv.run(async ({ brService }) => {
     let parentImgId: ImageId | undefined = void 0;
     for (let i = 0; i < 512; i += 1) {
       let mkfs = parentImgId === void 0;

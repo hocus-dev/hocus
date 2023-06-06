@@ -1,12 +1,12 @@
 import { TestStateManager } from "~/test-state-manager/client";
 
 export default async (_globalConfig: any, _projectConfig: any) => {
-  let socketPath = process.env.TEST_STATE_MANAGER_SOCK;
-  if (socketPath === void 0) {
+  let testStorageDir = process.env.TEST_STORAGE_DIR;
+  if (testStorageDir === void 0) {
     // eslint-disable-next-line no-console
-    throw new Error("Please provide TEST_STATE_MANAGER_SOCK");
+    throw new Error("Please provide TEST_STORAGE_DIR");
   }
-  const stateManager = new TestStateManager(socketPath);
+  const stateManager = new TestStateManager(testStorageDir);
   await stateManager.connect();
   stateManager.on("error", (err: Error) => {
     // eslint-disable-next-line no-console

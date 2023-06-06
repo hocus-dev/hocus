@@ -6,23 +6,28 @@ import type { Socket } from "node:net";
 import { Server } from "node:net";
 import { basename, dirname, join } from "path";
 
+import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import type { TestStateManagerRequest, TestStateManagerResponse } from "./api";
 import { TestStateManagerRequestValidator, TEST_STATE_MANAGER_REQUEST_TAG } from "./api";
 import { onServerExit as dbOnServerExit, setupTestDatabase } from "./db";
 
-import { waitForPromises } from "~/utils.shared";
+import { BlockRegistryService } from "~/agent/block-registry/registry.service";
 import { execCmd, execCmdWithOpts } from "~/agent/utils";
+import { waitForPromises } from "~/utils.shared";
 
-const sockPath = process.env.TEST_STATE_MANAGER_SOCK;
-const testDir = process.env.TEST_STORAGE_DIR;
-
-if (sockPath === void 0 || testDir === void 0) {
-  throw new Error(`Please specify TEST_STATE_MANAGER_SOCK and TEST_STORAGE_DIR`);
+const testsDir = process.env.TEST_STORAGE_DIR;
+if (testsDir === void 0) {
+  throw new Error(`Please specify TEST_STORAGE_DIR`);
 }
+const sockPath = join(testsDir, "state_manager.sock");
 
-console.log(`Will listen on ${sockPath} and manage ${testDir}`);
+console.log(`Will listen on ${sockPath} and manage ${testsDir}`);
+
+const pathRemap = (from: string, to: string, path: string): string => {
+  return path.replace(from, to);
+};
 
 const srv = new Server({ noDelay: true, keepAlive: true, pauseOnConnect: true });
 // Each connection manages multiple tests
@@ -32,7 +37,10 @@ type TestRunStateT = {
   socketId: string;
   runId: string;
   // In case of failure this directory will be uploaded
+  // This is the path accessible from where the server is running and not necessarily accessible for the test
   getTestStateDir: () => Promise<string>;
+  // Path where testsDir is mounted in the test container
+  testsDirMountPath: string;
   cleanupClosures: ((debugDumpDir: string | null) => Promise<void>)[];
 };
 type SocketStateT = { sock: Socket; tests: Map<string, TestRunStateT> };
@@ -155,10 +163,11 @@ const processRequest = async (
         cleanupClosures: [],
         socketId,
         runId: msg.request.runId,
+        testsDirMountPath: msg.request.testsDirMountPath,
         getTestStateDir: async (): Promise<string> => {
           if (testStateDirSetup === null) {
             testStateDirSetup = (async () => {
-              const testStateDir = join(testDir, msg.request.runId);
+              const testStateDir = join(testsDir, msg.request.runId);
               await fs.mkdir(testStateDir, { recursive: true, mode: 0o777 });
               await fs.chmod(testStateDir, 0o777);
               return testStateDir;
@@ -191,7 +200,11 @@ const processRequest = async (
         // No advanced cleanup required
         const testStateDir = await testState.getTestStateDir();
         sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE, {
-          path: join(testStateDir, `logger-${uuidv4()}.log`),
+          path: pathRemap(
+            testsDir,
+            testState.testsDirMountPath,
+            join(testStateDir, `logger-${uuidv4()}.log`),
+          ),
         });
       }
       return;
@@ -209,14 +222,51 @@ const processRequest = async (
         });
       }
       return;
+    case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_TEST_STATE_DIR:
+      {
+        const testState = socketState.tests.get(msg.request.runId);
+        if (testState === void 0) {
+          throw new Error("Unable to find test state");
+        }
+        sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_TEST_STATE_DIR, {
+          dirPath: pathRemap(
+            testsDir,
+            testState.testsDirMountPath,
+            await testState.getTestStateDir(),
+          ),
+        });
+      }
+      return;
+    case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH:
+      {
+        const testState = socketState.tests.get(msg.request.runId);
+        if (testState === void 0) {
+          throw new Error("Unable to find test state");
+        }
+        testState.cleanupClosures.push(async () => {
+          const brService = new BlockRegistryService(new DefaultLogger("ERROR"), {
+            agent: () => ({
+              blockRegistryRoot: pathRemap(
+                testState.testsDirMountPath,
+                testsDir,
+                msg.request.blockRegistryDir,
+              ),
+              blockRegistryConfigFsPath: "/sys/kernel/config",
+            }),
+          } as any);
+          await brService.hideEverything();
+        });
+        sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH, {});
+      }
+      return;
   }
 };
 
 srv.listen(sockPath, async () => {
   // Allow anyone to connect to us :)
-  await fs.mkdir(testDir, { recursive: true, mode: 0o777 });
+  await fs.mkdir(testsDir, { recursive: true, mode: 0o777 });
   try {
-    await fs.chmod(testDir, 0o777);
+    await fs.chmod(testsDir, 0o777);
   } catch (err) {
     console.log("Failed to chmod test dir. Proceeding anyway");
   }

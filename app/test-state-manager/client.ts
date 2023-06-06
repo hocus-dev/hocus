@@ -1,4 +1,5 @@
 import { Socket } from "net";
+import { join } from "path";
 import { EventEmitter } from "stream";
 
 import type { Any } from "ts-toolbelt";
@@ -19,7 +20,7 @@ export class TestStateManager extends EventEmitter {
   >;
   private _sock: Socket;
   private closing = false;
-  constructor(private readonly sockPath: string) {
+  constructor(public readonly testStorageDir: string) {
     super();
     this._sock = new Socket();
     this.inFlightRequests = new Map();
@@ -27,7 +28,7 @@ export class TestStateManager extends EventEmitter {
 
   async connect(): Promise<void> {
     await new Promise((resolve) => {
-      this._sock.connect(this.sockPath);
+      this._sock.connect(join(this.testStorageDir, "state_manager.sock"));
       this._sock.once("ready", () => resolve(void 0));
     });
     this._sock.setNoDelay(true);
