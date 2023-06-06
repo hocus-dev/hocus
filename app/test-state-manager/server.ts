@@ -1,5 +1,3 @@
-/* eslint-disable import/first */
-process.env.UV_THREADPOOL_SIZE = "64";
 /* eslint-disable no-console */
 import fs from "fs/promises";
 import type { Socket } from "node:net";
