@@ -151,7 +151,7 @@ steps:
     command: |
       mkdir /tmp/tests;
       TEST_STORAGE_DIR=/tmp/tests yarn run test:startTestManager > /dev/null &
-      export P=$! ;
+      export P=$\! ;
       sleep 0.5;
       TEST_STORAGE_DIR=/tmp/tests yarn test:backend;
       kill -s SIGINT $P;
@@ -173,7 +173,7 @@ steps:
       ops/docker/resources/setup-network.sh;
       mkdir /srv/jailer/tests;
       TEST_STORAGE_DIR=/srv/jailer/tests yarn run test:startTestManager > /dev/null &
-      export P=$! ;
+      export P=$\! ;
       sleep 0.5;
       TEST_STORAGE_DIR=/srv/jailer/tests yarn test:agent;
       kill -s SIGINT $P;
