@@ -20,6 +20,7 @@ import { TEST_STATE_MANAGER_REQUEST_TAG } from "~/test-state-manager/api";
 import type { TestStateManager } from "~/test-state-manager/client";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
+import { Any } from "ts-toolbelt";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
 
@@ -80,9 +81,12 @@ export class TestEnvironmentBuilder<
 
   run(
     testFn: (
-      context: { injector: InjectorT; runId: string } & {
-        [K in keyof LateInitT]: Awaited<ReturnType<LateInitT[K]>>;
-      },
+      context: Any.Compute<
+        { injector: InjectorT; runId: string } & Record<string, never> & {
+            [K in keyof LateInitT]: Awaited<ReturnType<LateInitT[K]>>;
+          },
+        "flat"
+      >,
     ) => Promise<void>,
   ): () => Promise<void> {
     return async () => {
