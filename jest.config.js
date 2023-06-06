@@ -13,7 +13,7 @@ var config = {
     "^~/(.*)$": "<rootDir>/app/$1",
   },
   testEnvironment: "node",
-  workerThreads: true,
+  //workerThreads: true,
   setupFilesAfterEnv: ["<rootDir>/app/jest/test-setup.ts"],
 };
 
