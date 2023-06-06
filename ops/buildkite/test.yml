@@ -154,7 +154,7 @@ steps:
       export P=\$! ;
       sleep 0.5;
       TEST_STORAGE_DIR=/tmp/tests yarn test:backend;
-      kill -s SIGINT \$P;
+      kill \$P;
       echo "Waiting for helper";
       wait \$P;
     env:
@@ -176,7 +176,7 @@ steps:
       export P=\$! ;
       sleep 0.5;
       TEST_STORAGE_DIR=/srv/jailer/tests yarn test:agent;
-      kill -s SIGINT \$P;
+      kill \$P;
       echo "Waiting for helper";
       wait \$P;
     env:
