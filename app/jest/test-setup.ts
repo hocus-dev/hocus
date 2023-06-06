@@ -1,4 +1,9 @@
+// eslint-disable-next-line n/prefer-global/console
+import console from "console";
+
 import { TestStateManager } from "~/test-state-manager/client";
+// https://github.com/jestjs/jest/issues/10322#issuecomment-1304375267
+global.console = console;
 
 beforeAll(async () => {
   let testStorageDir = process.env.TEST_STORAGE_DIR;

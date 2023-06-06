@@ -15,7 +15,6 @@ var config = {
   testEnvironment: "node",
   workerThreads: true,
   setupFilesAfterEnv: ["<rootDir>/app/jest/test-setup.ts"],
-  noStackTrace: true,
 };
 
 module.exports = config;
