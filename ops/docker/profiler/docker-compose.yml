@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  node:
+    build:
+      context: .
+      dockerfile: profiler.Dockerfile
+    command: bash
+    stdin_open: true
+    tty: true
+    network_mode: host
+    pid: host
+    privileged: true
+    volumes:
+      - ./shared:/shared
