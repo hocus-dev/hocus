@@ -232,7 +232,7 @@ test.concurrent.each(
 test.concurrent.each(testCases)(
   `Doesn't hang forever when ssh is unresponsive on %s`,
   async (_name, remoteTag) =>
-    testEnv.run(async ({ instance, runId, brService }) => {
+    testEnv.run(async ({ instance, brService }) => {
       const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
       const osCt = await brService.createContainer(osIm, "osCt");
       const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
