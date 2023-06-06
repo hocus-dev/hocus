@@ -15,6 +15,10 @@ docker-compose run --rm node
 export IP_ADDRESS="SETME"
 export AGENT_PROCESS_PID="SETME"
 diat heapprofile -p=$AGENT_PROCESS_PID -a "$IP_ADDRESS:4848"
+
+# If you don't want to use diat you may send SIGUSR1 manually to the NodeJs process
+# kill -s SIGUSR1 $AGENT_PROCESS_PID
+# this will open the profiler on port 9229
 ```
 
 Then in VSCode, go to the Ports tab and forward `$IP_ADDRESS:4848` to localhost:4848. Go to chrome://inspect in your browser, click "Configure" and add localhost:4848. A new remote target should show up. Then click "inspect" on it.
