@@ -155,6 +155,7 @@ steps:
       sleep 0.5;
       TEST_STORAGE_DIR=/tmp/tests yarn test:backend;
       export R=\$?
+      echo "Tests ended with status \$R";
       kill \$P;
       echo "Waiting for helper";
       wait \$P;
@@ -179,6 +180,7 @@ steps:
       sleep 0.5;
       TEST_STORAGE_DIR=/srv/jailer/tests yarn test:agent;
       export R=\$?
+      echo "Tests ended with status \$R";
       kill \$P;
       echo "Waiting for helper";
       wait \$P;
