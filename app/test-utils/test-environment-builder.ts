@@ -42,7 +42,7 @@ type EarlyInitFunction = (ctx: {
 type EarlyInitMap = Record<string, EarlyInitFunction>;
 
 // Late Init functions operate on an already existing injector and are meant to either:
-// - Augument the test context with extra values
+// - Augment the test context with extra values
 // - Run non trivial initialization on some service
 // - Register some state with the state manager server
 type LateInitFunction<InjectorT, T> = (ctx: {
