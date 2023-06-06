@@ -4,14 +4,16 @@ process.env.UV_THREADPOOL_SIZE = "64";
 import fs from "fs/promises";
 import type { Socket } from "node:net";
 import { Server } from "node:net";
-import { join } from "path";
+import { basename, dirname, join } from "path";
 
 import { v4 as uuidv4 } from "uuid";
 
 import type { TestStateManagerRequest, TestStateManagerResponse } from "./api";
 import { TestStateManagerRequestValidator, TEST_STATE_MANAGER_REQUEST_TAG } from "./api";
+import { onServerExit as dbOnServerExit, setupTestDatabase } from "./db";
 
 import { waitForPromises } from "~/utils.shared";
+import { execCmd, execCmdWithOpts } from "~/agent/utils";
 
 const sockPath = process.env.TEST_STATE_MANAGER_SOCK;
 const testDir = process.env.TEST_STORAGE_DIR;
@@ -29,20 +31,62 @@ const srv = new Server({ noDelay: true, keepAlive: true, pauseOnConnect: true })
 type TestRunStateT = {
   socketId: string;
   runId: string;
-  cleanupClosures: ((failed: boolean) => Promise<void>)[];
+  // In case of failure this directory will be uploaded
+  getTestStateDir: () => Promise<string>;
+  cleanupClosures: ((debugDumpDir: string | null) => Promise<void>)[];
 };
 type SocketStateT = { sock: Socket; tests: Map<string, TestRunStateT> };
 const srvState = new Map<string, SocketStateT>();
 
-const cleanupTestRun = async (testState: TestRunStateT, testFailed: boolean) => {
-  // TODO: fork the process here to ensure a rouge cleanup function won't bring the manager down
+const cleanupTestRun = async (
+  testState: TestRunStateT,
+  testFailed: boolean,
+): Promise<string | undefined> => {
   console.log(`Cleaning up test ${testState.runId} on socket ${testState.socketId}`);
   for (const closure of testState.cleanupClosures.reverse()) {
     try {
-      await closure(testFailed);
+      // If test failed then request a debug dump
+      await closure(testFailed ? await testState.getTestStateDir() : null);
     } catch (err) {
       console.error(testState.socketId, testState.runId, err);
     }
+    const redFG = "\x1b[31m";
+    const resetFG = "\x1b[0m";
+    let keepStorage = false;
+    let artifactsMsg: string | undefined = void 0;
+    if (testFailed) {
+      if (process.env["BUILDKITE_AGENT_ACCESS_TOKEN"] !== void 0) {
+        const testRunDir = await testState.getTestStateDir();
+        const archivePath = testRunDir + ".tar.gz";
+        await execCmd(
+          "tar",
+          "--hole-detection=seek",
+          "--sparse",
+          "-zcf",
+          archivePath,
+          "-C",
+          dirname(archivePath),
+          basename(testRunDir),
+        );
+        try {
+          await execCmdWithOpts(["buildkite-agent", "artifact", "upload", basename(archivePath)], {
+            cwd: dirname(archivePath),
+          });
+        } finally {
+          await fs.unlink(archivePath);
+        }
+        artifactsMsg = `${redFG}Failed run id: ${testState.runId}. Please consult the artifact ${testState.runId}.tar.gz${resetFG}`;
+      } else {
+        const testRunDir = await testState.getTestStateDir();
+        artifactsMsg = `${redFG}Failed run id: ${testState.runId}. Please investigate ${testRunDir}${resetFG}`;
+        keepStorage = true;
+      }
+    }
+    if (artifactsMsg) console.error(artifactsMsg);
+    if (!keepStorage) {
+      await fs.rm(await testState.getTestStateDir(), { recursive: true, force: true });
+    }
+    return artifactsMsg;
   }
 };
 
@@ -75,8 +119,97 @@ const cleanupServer = async () => {
     }),
   );
 
+  await dbOnServerExit();
+
   console.log("Waiting for server to terminate");
   await serverClose;
+};
+
+const processRequest = async (
+  msg: TestStateManagerRequest,
+  socketId: string,
+  socketState: SocketStateT,
+) => {
+  const sendOkResponse = <TagT extends TEST_STATE_MANAGER_REQUEST_TAG>(
+    requestTag: TagT,
+    response: Extract<TestStateManagerResponse, { requestTag: TagT }>["response"],
+  ) => {
+    if (
+      !socketState.sock.write(
+        JSON.stringify({
+          requestId: msg.requestId,
+          requestTag,
+          response,
+        } as TestStateManagerResponse) + "\n",
+      )
+    ) {
+      console.error("Failed writing to socket");
+    }
+  };
+
+  switch (msg.requestTag) {
+    case TEST_STATE_MANAGER_REQUEST_TAG.TEST_START:
+      console.log(`Starting test with id ${msg.request.runId} on socket ${socketId}`);
+      let testStateDirSetup: Promise<string> | null = null;
+      socketState.tests.set(msg.request.runId, {
+        cleanupClosures: [],
+        socketId,
+        runId: msg.request.runId,
+        getTestStateDir: async (): Promise<string> => {
+          if (testStateDirSetup === null) {
+            testStateDirSetup = (async () => {
+              const testStateDir = join(testDir, msg.request.runId);
+              await fs.mkdir(testStateDir, { recursive: true, mode: 0o777 });
+              await fs.chmod(testStateDir, 0o777);
+              return testStateDir;
+            })();
+          }
+          return await testStateDirSetup;
+        },
+      });
+      sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, {});
+      return;
+    case TEST_STATE_MANAGER_REQUEST_TAG.TEST_END:
+      {
+        console.log(`Ending test with id ${msg.request.runId} on socket ${socketId}`);
+        const testState = socketState.tests.get(msg.request.runId);
+        if (testState === void 0) {
+          throw new Error("Unable to find test state");
+        }
+        socketState.tests.delete(msg.request.runId);
+        const artifactsMsg = await cleanupTestRun(testState, msg.request.testFailed);
+        sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_END, { artifactsMsg });
+      }
+      return;
+    case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE:
+      {
+        console.log(`Requesting logs file with id ${msg.request.runId} on socket ${socketId}`);
+        const testState = socketState.tests.get(msg.request.runId);
+        if (testState === void 0) {
+          throw new Error("Unable to find test state");
+        }
+        // No advanced cleanup required
+        const testStateDir = await testState.getTestStateDir();
+        sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE, {
+          path: join(testStateDir, `logger-${uuidv4()}.log`),
+        });
+      }
+      return;
+    case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE:
+      {
+        console.log(
+          `Requesting new database from ${msg.request.prismaSchemaPath} on test ${msg.request.runId} on socket ${socketId}`,
+        );
+        const testState = socketState.tests.get(msg.request.runId);
+        if (testState === void 0) {
+          throw new Error("Unable to find test state");
+        }
+        sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE, {
+          dbUrl: await setupTestDatabase(msg.request.prismaSchemaPath, testState.cleanupClosures),
+        });
+      }
+      return;
+  }
 };
 
 srv.listen(sockPath, async () => {
@@ -117,6 +250,7 @@ srv.listen(sockPath, async () => {
     });
     sock.on("data", async (buf: Buffer) => {
       const str = buf.toString("utf-8");
+      const tasks = [];
       for (const chunk of str.split("\n")) {
         if (chunk.trim().length === 0) continue;
 
@@ -138,6 +272,7 @@ srv.listen(sockPath, async () => {
           }
           // Nuke the connection cause the client is broken
           sock.end();
+          // We nuked the connection so we don't care about the remaining messages
           return;
         }
         const sendErrResponse = (err: any) => {
@@ -162,71 +297,20 @@ srv.listen(sockPath, async () => {
         } catch (err: any) {
           console.error(`${socketId} Sending err ${err}`);
           sendErrResponse(err);
-          return;
+          continue;
         }
+        console.log(`Got request ${msg.requestId} on socket ${socketId}`);
         // Now handle the message
-        const sendOkResponse = <TagT extends TEST_STATE_MANAGER_REQUEST_TAG>(
-          requestTag: TagT,
-          response: Extract<TestStateManagerResponse, { requestTag: TagT }>["response"],
-        ) => {
-          if (
-            !sock.write(
-              JSON.stringify({
-                requestId: msg.requestId,
-                requestTag,
-                response,
-              } as TestStateManagerResponse) + "\n",
-            )
-          ) {
-            console.error("Failed writing to socket");
+        tasks.push(async () => {
+          try {
+            await processRequest(msg, socketId, socketState);
+          } catch (err: any) {
+            console.error(`${socketId} Sending err ${err}`);
+            sendErrResponse(err);
           }
-        };
-        try {
-          switch (msg.requestTag) {
-            case TEST_STATE_MANAGER_REQUEST_TAG.TEST_START:
-              console.log(`Starting test with id ${msg.request.runId} on socket ${socketId}`);
-              socketState.tests.set(msg.request.runId, {
-                cleanupClosures: [],
-                socketId,
-                runId: msg.request.runId,
-              });
-              sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, {});
-              return;
-            case TEST_STATE_MANAGER_REQUEST_TAG.TEST_END:
-              {
-                console.log(`Ending test with id ${msg.request.runId} on socket ${socketId}`);
-                const testState = socketState.tests.get(msg.request.runId);
-                if (testState === void 0) {
-                  throw new Error("Unable to find test state");
-                }
-                socketState.tests.delete(msg.request.runId);
-                await cleanupTestRun(testState, msg.request.testFailed);
-                sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_END, {});
-              }
-              return;
-            case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE:
-              {
-                console.log(
-                  `Requesting logs file with id ${msg.request.runId} on socket ${socketId}`,
-                );
-                const testState = socketState.tests.get(msg.request.runId);
-                if (testState === void 0) {
-                  throw new Error("Unable to find test state");
-                }
-                const testStateDir = join(testDir, msg.request.runId);
-                await fs.mkdir(testStateDir, { recursive: true, mode: 0o777 });
-                await fs.chmod(testStateDir, 0o777);
-                sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE, {
-                  path: join(testStateDir, "logger.txt"),
-                });
-              }
-              return;
-          }
-        } catch (err: any) {
-          console.error(`${socketId} Sending err ${err}`);
-          sendErrResponse(err);
-        }
+        });
       }
+      await waitForPromises(tasks.map((task) => task()));
     });
     sock.resume();
   });

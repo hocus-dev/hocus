@@ -91,6 +91,8 @@ export class TestStateManager extends EventEmitter {
     request: Any.Compute<Extract<TestStateManagerRequest, { requestTag: T }>["request"]>,
     timeoutMs = 5000,
   ): Promise<Extract<TestStateManagerResponse, { requestTag: T }>["response"]> {
+    if (!this._sock.writable) throw new Error("Socket not writable");
+    if (this._sock.connecting) throw new Error("Socket not connected");
     let timeout: NodeJS.Timeout | null = null;
     const timeoutPromise = new Promise((resolve) => {
       timeout = setTimeout(() => {

@@ -9,8 +9,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
 import type { Logger, LogLevel } from "@temporalio/worker";
 import { DefaultLogger } from "@temporalio/worker";
-import { Client as PgClient } from "pg";
-import * as build from "prisma/build";
+import type { Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
 import type { Injector, ProvidersOverrides } from "~/di/injector.server";
@@ -20,7 +19,6 @@ import { TEST_STATE_MANAGER_REQUEST_TAG } from "~/test-state-manager/api";
 import type { TestStateManager } from "~/test-state-manager/client";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
-import { Any } from "ts-toolbelt";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
 
@@ -138,18 +136,25 @@ export class TestEnvironmentBuilder<
           const res = await promise;
           extraCtx[key as keyof LateInitT] = res;
         }
-        const res = await testFn({ injector, runId, ...extraCtx });
+        const res = await testFn({ injector, runId, ...(extraCtx as any) });
         testFailed = false;
         return res;
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error("Failed test run", runId, JSON.stringify(err));
+        console.error("Failed test run", runId, err, JSON.stringify(err));
         throw err;
       } finally {
-        await this.#getStateManager().mkRequest(TEST_STATE_MANAGER_REQUEST_TAG.TEST_END, {
-          runId,
-          testFailed,
-        });
+        const rsp = await this.#getStateManager().mkRequest(
+          TEST_STATE_MANAGER_REQUEST_TAG.TEST_END,
+          {
+            runId,
+            testFailed,
+          },
+        );
+        if (rsp.artifactsMsg) {
+          // eslint-disable-next-line no-console
+          console.error(rsp.artifactsMsg);
+        }
         await waitForPromises(teardownTasks.map((teardownFn) => teardownFn()));
       }
     };
@@ -249,45 +254,18 @@ export class TestEnvironmentBuilder<
   > {
     return new TestEnvironmentBuilder(this.injectorCtor, this.injectorOverrides, this.earlyInit, {
       db: async ({ runId, addTeardownFunction }) => {
-        const dbName = runId;
-        const dbUrl = `postgresql://postgres:pass@${DB_HOST}:5432/${dbName}`;
+        const rsp = await this.#getStateManager().mkRequest(
+          TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE,
+          { runId, prismaSchemaPath: "prisma/schema.prisma" },
+        );
         const db = new PrismaClient({
           datasources: {
-            db: { url: dbUrl },
+            db: { url: rsp.dbUrl },
           },
         });
-        const schemaPath = `prisma/tmp-${dbName}.prisma`;
-        const schemaContents = (await fs.readFile("prisma/schema.prisma", "utf-8")).replace(
-          `env("PRISMA_DATABASE_URL")`,
-          `"${dbUrl}"`,
-        );
-        await fs.writeFile(schemaPath, schemaContents);
-
-        await build.ensureDatabaseExists("apply", true, schemaPath);
-        const migrate = new build.Migrate(schemaPath);
-
-        // eslint-disable-next-line no-console
-        console.info = () => {};
-        await migrate.applyMigrations();
-        await fs.unlink(schemaPath);
-
-        migrate.stop();
-
-        await changeSequenceNumbers(db);
 
         addTeardownFunction(async () => {
           await db.$disconnect();
-
-          const pgClient = new PgClient({
-            user: "postgres",
-            password: "pass",
-            host: DB_HOST,
-            port: 5432,
-          });
-          const query = `DROP DATABASE "${dbName}";`;
-          await pgClient.connect();
-          await pgClient.query(query);
-          await pgClient.end();
         });
 
         return db;

@@ -175,12 +175,12 @@ export const provideBlockRegistry = (
 
 // I have never suspected that I legitimately need to worry about this case
 async function ensureKernelDidNotBlowUp() {
-  /*try {
+  try {
     // Grep returns status 1 when no matches were found
     await execCmd("bash", "-c", 'dmesg | grep -i -E "Kernel BUG|invalid opcode|corruption| RIP:"');
     console.error((await execCmd("dmesg")).stdout);
     throw new Error("Looks like the kernel blew up, please reboot the CI machine...");
   } catch (err) {
     if (err instanceof ExecCmdError && err.status !== 1) throw err;
-  }*/
+  }
 }

@@ -10,6 +10,7 @@ export const TEST_STATE_MANAGER_REQUEST_TAG = {
   TEST_START: "TEST_STATE_MANAGER_REQUEST_TAG_TEST_START",
   TEST_END: "TEST_STATE_MANAGER_REQUEST_TAG_TEST_END",
   REQUEST_LOGS_FILE: "TEST_STATE_MANAGER_REQUEST_LOGS_FILE",
+  REQUEST_DATABASE: "TEST_STATE_MANAGER_REQUEST_DATABASE",
 } as const;
 export type TEST_STATE_MANAGER_REQUEST_TAG = valueof<typeof TEST_STATE_MANAGER_REQUEST_TAG>;
 
@@ -54,14 +55,28 @@ const RequestSchema = t.Union([
       runId: UuidSchema,
     }),
   ),
+  mkRequestSchema(
+    TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE,
+    t.Object({
+      runId: UuidSchema,
+      prismaSchemaPath: t.String(),
+    }),
+  ),
 ]);
 
 const OkResponseSchema = t.Union([
   mkResponseSchema(TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, t.Object({})),
-  mkResponseSchema(TEST_STATE_MANAGER_REQUEST_TAG.TEST_END, t.Object({})),
+  mkResponseSchema(
+    TEST_STATE_MANAGER_REQUEST_TAG.TEST_END,
+    t.Object({ artifactsMsg: t.Optional(t.String()) }),
+  ),
   mkResponseSchema(
     TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE,
     t.Object({ path: t.String() }),
+  ),
+  mkResponseSchema(
+    TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE,
+    t.Object({ dbUrl: t.String() }),
   ),
 ]);
 
