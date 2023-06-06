@@ -14,8 +14,7 @@ var config = {
   },
   testEnvironment: "node",
   workerThreads: true,
-  globalSetup: "<rootDir>/app/jest/global-setup.ts",
-  globalTeardown: "<rootDir>/app/jest/global-teardown.ts",
+  setupFilesAfterEnv: ["<rootDir>/app/jest/test-setup.ts"],
 };
 
 module.exports = config;

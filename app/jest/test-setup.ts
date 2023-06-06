@@ -1,6 +1,6 @@
 import { TestStateManager } from "~/test-state-manager/client";
 
-export default async (_globalConfig: any, _projectConfig: any) => {
+beforeAll(async () => {
   let testStorageDir = process.env.TEST_STORAGE_DIR;
   if (testStorageDir === void 0) {
     // eslint-disable-next-line no-console
@@ -19,4 +19,8 @@ export default async (_globalConfig: any, _projectConfig: any) => {
     process.kill(process.pid, "SIGINT");
   });
   (globalThis as any).stateManager = stateManager;
-};
+});
+
+afterAll(async () => {
+  await (globalThis as any).stateManager.close();
+});
