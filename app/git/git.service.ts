@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { GitRepository } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
@@ -162,5 +164,27 @@ export class GitService {
       return { status: "disconnected" };
     }
     return { status: "connected", lastConnectedAt };
+  }
+
+  computeGitRepositoryImageTag(args: {
+    gitRepositoryUrl: string;
+    extras?: {
+      lastFetchAt: Date;
+      randomId: string;
+    };
+  }): string {
+    const sha256 = createHash("sha256");
+    sha256.update(args.gitRepositoryUrl);
+    const hash = sha256.digest("hex");
+
+    let tag = hash;
+    if (args.extras != null) {
+      tag += `-${Math.floor(args.extras.lastFetchAt.getTime() / 1000)}`;
+      tag += `-${args.extras.randomId}`;
+    }
+    if (tag.length > 128) {
+      throw new Error(`Computed tag is too long: ${tag}`);
+    }
+    return tag;
   }
 }
