@@ -154,9 +154,11 @@ steps:
       export P=\$! ;
       sleep 0.5;
       TEST_STORAGE_DIR=/tmp/tests yarn test:backend;
+      export R=\$?
       kill \$P;
       echo "Waiting for helper";
       wait \$P;
+      exit \$R
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
       NO_EXPOSE_PORTS: ""
@@ -176,9 +178,11 @@ steps:
       export P=\$! ;
       sleep 0.5;
       TEST_STORAGE_DIR=/srv/jailer/tests yarn test:agent;
+      export R=\$?
       kill \$P;
       echo "Waiting for helper";
       wait \$P;
+      exit \$R
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
       NO_EXPOSE_PORTS: ""
