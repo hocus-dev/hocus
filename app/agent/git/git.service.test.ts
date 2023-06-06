@@ -3,21 +3,25 @@ import path from "path";
 
 import { SshKeyPairType } from "@prisma/client";
 
+import { createAgentInjector } from "../agent-injector";
 import { PROJECT_DIR } from "../constants";
 import type { FirecrackerService } from "../runtime/firecracker-legacy/firecracker.service";
 import { PERSISTENT_TEST_DIR } from "../test-constants";
-import { provideInjector, provideInjectorAndDb, withTestMount } from "../test-utils";
+import { withTestMount } from "../test-utils";
 import { execSshCmd } from "../utils";
 
 import type { GitRemoteInfo } from "./git.service";
 
 import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
+const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging();
+
 test.concurrent(
   "getRemotes",
-  provideInjector(async ({ injector }) => {
+  testEnv.run(async ({ injector }) => {
     const gitService = injector.resolve(Token.AgentGitService);
     const remotesLinux = await gitService.getRemotes(
       "git@github.com:torvalds/linux.git",
@@ -46,7 +50,7 @@ test.concurrent(
 
 test.concurrent(
   "findRemoteUpdates",
-  provideInjector(async ({ injector }) => {
+  testEnv.run(async ({ injector }) => {
     const gitService = injector.resolve(Token.AgentGitService);
     const remotes = [
       {
@@ -91,7 +95,7 @@ test.concurrent(
 
 test.concurrent(
   "updateBranches",
-  provideInjectorAndDb(async ({ injector, db }) => {
+  testEnv.withTestDb().run(async ({ injector, db }) => {
     const appGitService = injector.resolve(Token.GitService);
     const gitService = injector.resolve(Token.AgentGitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);
@@ -147,7 +151,7 @@ test.concurrent(
 
 test.concurrent(
   "fetchRepository",
-  provideInjector(async ({ injector, runId }) => {
+  testEnv.run(async ({ injector, runId }) => {
     const gitService = injector.resolve(Token.AgentGitService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const agentConfig = injector.resolve(Token.Config).agent();
@@ -196,7 +200,7 @@ test.concurrent(
 
 test.concurrent(
   "getOrCreateGitRepositoryFile",
-  provideInjectorAndDb(async ({ injector, db }) => {
+  testEnv.withTestDb().run(async ({ injector, db }) => {
     const appGitService = injector.resolve(Token.GitService);
     const gitService = injector.resolve(Token.AgentGitService);
     const sshKeyService = injector.resolve(Token.SshKeyService);

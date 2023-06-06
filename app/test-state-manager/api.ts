@@ -93,7 +93,7 @@ const OkResponseSchema = t.Union([
   ),
   mkResponseSchema(
     TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE,
-    t.Object({ dbUrl: t.String() }),
+    t.Object({ dbName: t.String() }),
   ),
   mkResponseSchema(
     TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_TEST_STATE_DIR,

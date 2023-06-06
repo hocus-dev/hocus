@@ -5,10 +5,13 @@ import fs from "fs";
 const filepath = "node_modules/prisma/build/index.js";
 const extraExports = `module.exports = {Migrate, ensureDatabaseExists};`;
 const contents = fs.readFileSync(filepath).toString();
+const stat = fs.statSync(filepath);
 if (!contents.endsWith(extraExports)) {
   const newContents = contents + `\n${extraExports}`;
   // As multiple processes might do this at the same time use move
   const rand = Math.floor(Math.random() * 10 ** 10).toString();
-  fs.writeFileSync(filepath + rand, newContents);
-  fs.renameSync(filepath + rand, filepath);
+  const dstPath = filepath + rand;
+  fs.writeFileSync(dstPath, newContents, { mode: stat.mode });
+  fs.chownSync(dstPath, stat.uid, stat.gid);
+  fs.renameSync(dstPath, filepath);
 }

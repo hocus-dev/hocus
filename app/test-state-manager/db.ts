@@ -143,7 +143,7 @@ export async function setupTestDatabase(
     await adminConn.query(`DROP DATABASE "${testDbName}" WITH (FORCE);`);
   });
 
-  return testDbUrl;
+  return testDbName;
 }
 
 export async function onServerExit(): Promise<void> {

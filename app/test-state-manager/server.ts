@@ -26,6 +26,8 @@ const sockPath = join(testsDir, "state_manager.sock");
 console.log(`Will listen on ${sockPath} and manage ${testsDir}`);
 
 const pathRemap = (from: string, to: string, path: string): string => {
+  if (!from.endsWith("/")) from = from + "/";
+  if (!to.endsWith("/")) to = to + "/";
   return path.replace(from, to);
 };
 
@@ -58,44 +60,44 @@ const cleanupTestRun = async (
     } catch (err) {
       console.error(testState.socketId, testState.runId, err);
     }
-    const redFG = "\x1b[31m";
-    const resetFG = "\x1b[0m";
-    let keepStorage = false;
-    let artifactsMsg: string | undefined = void 0;
-    if (testFailed) {
-      if (process.env["BUILDKITE_AGENT_ACCESS_TOKEN"] !== void 0) {
-        const testRunDir = await testState.getTestStateDir();
-        const archivePath = testRunDir + ".tar.gz";
-        await execCmd(
-          "tar",
-          "--hole-detection=seek",
-          "--sparse",
-          "-zcf",
-          archivePath,
-          "-C",
-          dirname(archivePath),
-          basename(testRunDir),
-        );
-        try {
-          await execCmdWithOpts(["buildkite-agent", "artifact", "upload", basename(archivePath)], {
-            cwd: dirname(archivePath),
-          });
-        } finally {
-          await fs.unlink(archivePath);
-        }
-        artifactsMsg = `${redFG}Failed run id: ${testState.runId}. Please consult the artifact ${testState.runId}.tar.gz${resetFG}`;
-      } else {
-        const testRunDir = await testState.getTestStateDir();
-        artifactsMsg = `${redFG}Failed run id: ${testState.runId}. Please investigate ${testRunDir}${resetFG}`;
-        keepStorage = true;
-      }
-    }
-    if (artifactsMsg) console.error(artifactsMsg);
-    if (!keepStorage) {
-      await fs.rm(await testState.getTestStateDir(), { recursive: true, force: true });
-    }
-    return artifactsMsg;
   }
+  const redFG = "\x1b[31m";
+  const resetFG = "\x1b[0m";
+  let keepStorage = false;
+  let artifactsMsg: string | undefined = void 0;
+  if (testFailed) {
+    if (process.env["BUILDKITE_AGENT_ACCESS_TOKEN"] !== void 0) {
+      const testRunDir = await testState.getTestStateDir();
+      const archivePath = testRunDir + ".tar.gz";
+      await execCmd(
+        "tar",
+        "--hole-detection=seek",
+        "--sparse",
+        "-zcf",
+        archivePath,
+        "-C",
+        dirname(archivePath),
+        basename(testRunDir),
+      );
+      try {
+        await execCmdWithOpts(["buildkite-agent", "artifact", "upload", basename(archivePath)], {
+          cwd: dirname(archivePath),
+        });
+      } finally {
+        await fs.unlink(archivePath);
+      }
+      artifactsMsg = `${redFG}Failed run id: ${testState.runId}. Please consult the artifact ${testState.runId}.tar.gz${resetFG}`;
+    } else {
+      const testRunDir = await testState.getTestStateDir();
+      artifactsMsg = `${redFG}Failed run id: ${testState.runId}. Please investigate ${testRunDir}${resetFG}`;
+      keepStorage = true;
+    }
+  }
+  if (artifactsMsg) console.error(artifactsMsg);
+  if (!keepStorage) {
+    await fs.rm(await testState.getTestStateDir(), { recursive: true, force: true });
+  }
+  return artifactsMsg;
 };
 
 const cleanupConnection = async (socketState: SocketStateT) => {
@@ -218,7 +220,7 @@ const processRequest = async (
           throw new Error("Unable to find test state");
         }
         sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE, {
-          dbUrl: await setupTestDatabase(msg.request.prismaSchemaPath, testState.cleanupClosures),
+          dbName: await setupTestDatabase(msg.request.prismaSchemaPath, testState.cleanupClosures),
         });
       }
       return;

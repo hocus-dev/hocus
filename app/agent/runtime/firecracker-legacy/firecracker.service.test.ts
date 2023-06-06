@@ -1,46 +1,16 @@
-import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import { createAgentInjector } from "../../agent-injector";
 import { execCmd, execSshCmd, sleep } from "../../utils";
 
-import { Scope } from "~/di/injector.server";
-import { printErrors } from "~/test-utils";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 
-const provideInjector = (
-  testFn: (args: {
-    injector: ReturnType<typeof createAgentInjector>;
-    runId: string;
-  }) => Promise<void>,
-): (() => Promise<void>) => {
-  const injector = createAgentInjector({
-    [Token.Logger]: {
-      provide: {
-        factory: function () {
-          return new DefaultLogger("ERROR");
-        },
-      },
-      scope: Scope.Transient,
-    },
-  });
-  const runId = uuidv4();
-  return printErrors(async () => {
-    try {
-      await testFn({ injector, runId });
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(`Failed run id: ${runId}`);
-      throw err;
-    } finally {
-      await injector.dispose();
-    }
-  });
-};
+const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging();
 
 test.concurrent(
   "startFirecrackerInstance",
-  provideInjector(async ({ injector, runId }) => {
+  testEnv.run(async ({ injector, runId }) => {
     const fcService = injector.resolve(Token.FirecrackerService)(runId);
     let pid: number | null = null;
 
@@ -61,7 +31,7 @@ test.concurrent(
 // tests that when a firecracker process exits, withVM throws in a reasonable amount of time
 test.concurrent(
   "withVM - unresponsive ssh",
-  provideInjector(async ({ injector }) => {
+  testEnv.run(async ({ injector }) => {
     const instanceId = uuidv4();
     const fcService = injector.resolve(Token.FirecrackerService)(instanceId);
     const agentConfig = injector.resolve(Token.Config).agent();
@@ -96,7 +66,7 @@ test.concurrent(
 
 test.concurrent(
   "getVMInfo",
-  provideInjector(async ({ injector }) => {
+  testEnv.run(async ({ injector }) => {
     const instanceId = uuidv4();
     const fcService = injector.resolve(Token.FirecrackerService)(instanceId);
     const agentConfig = injector.resolve(Token.Config).agent();

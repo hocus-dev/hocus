@@ -38,6 +38,7 @@ tasks:
       sleep 0.01
     workspaceShell: fish
     workspace: |
+      sudo mkdir -p /home/hocus/dev/hocus-resources/tests
       sudo TEST_STORAGE_DIR=/home/hocus/dev/hocus-resources/tests yarn run test:startTestManager
   - name: Terminal
     prebuild: sleep 0.01

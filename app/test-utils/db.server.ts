@@ -27,6 +27,9 @@ const changeSequenceNumbers = async (db: Prisma.NonTransactionClient): Promise<v
   );
 };
 
+/**
+ @deprecated Please use TestEnvironmentBuilder
+*/
 export const provideDb = (
   testFn: (db: Prisma.NonTransactionClient) => Promise<void>,
 ): (() => Promise<void>) => {

@@ -149,7 +149,10 @@ steps:
 
   - label: ":jest: Backend tests"
     command: |
-      yarn test:backend
+      mkdir /tmp/tests;
+      TEST_STORAGE_DIR=/tmp/tests yarn run test:startTestManager > /dev/null &;
+      sleep 0.5;
+      TEST_STORAGE_DIR=/tmp/tests yarn test:backend;
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
       NO_EXPOSE_PORTS: ""
@@ -164,7 +167,10 @@ steps:
       export DB_HOST="db";
       export AGENT_DATABASE_URL="postgres://postgres:pass@db:5432/rooms";
       ops/docker/resources/setup-network.sh;
-      yarn test:agent;
+      mkdir /srv/jailer/tests;
+      TEST_STORAGE_DIR=/srv/jailer/tests yarn run test:startTestManager > /dev/null &;
+      sleep 0.5;
+      TEST_STORAGE_DIR=/srv/jailer/tests yarn test:agent;
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
       NO_EXPOSE_PORTS: ""

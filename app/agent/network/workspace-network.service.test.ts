@@ -1,51 +1,19 @@
 import fs from "fs/promises";
 
-import { DefaultLogger } from "@temporalio/worker";
-import { v4 as uuidv4 } from "uuid";
-
 import { createAgentInjector } from "../agent-injector";
 
 import { MAXIMUM_IP_ID, MINIMUM_IP_ID } from "./storage/constants";
 import type { IpBlockId } from "./workspace-network.service";
 
-import { Scope } from "~/di/injector.server";
-import { printErrors } from "~/test-utils";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
-const provideInjector = (
-  testFn: (args: {
-    injector: ReturnType<typeof createAgentInjector>;
-    runId: string;
-  }) => Promise<void>,
-): (() => Promise<void>) => {
-  const injector = createAgentInjector({
-    [Token.Logger]: {
-      provide: {
-        factory: function () {
-          return new DefaultLogger("ERROR");
-        },
-      },
-      scope: Scope.Transient,
-    },
-  });
-  const runId = uuidv4();
-  return printErrors(async () => {
-    try {
-      await testFn({ injector, runId });
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(`Failed run id: ${runId}`);
-      throw err;
-    } finally {
-      await injector.dispose();
-    }
-  });
-};
+const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging();
 
 test.concurrent(
   "getIpsFromIpBlockId",
-  provideInjector(async ({ injector }) => {
+  testEnv.run(async ({ injector }) => {
     const networkService = injector.resolve(Token.WorkspaceNetworkService);
     expect(networkService["getIpsFromIpBlockId"](MINIMUM_IP_ID as IpBlockId)).toMatchObject({
       tapIfIp: "10.231.0.9",
@@ -60,7 +28,7 @@ test.concurrent(
 
 test.concurrent(
   "allocateIpBlock",
-  provideInjector(async ({ injector, runId }) => {
+  testEnv.run(async ({ injector, runId }) => {
     const networkService = injector.resolve(Token.WorkspaceNetworkService);
     const storageService = injector.resolve(Token.StorageService);
     const filePath = `/tmp/hocus-network-storage-test-${runId}.yaml`;

@@ -1,11 +1,14 @@
 // must be the first import
 import "./prisma-export-patch.server";
 
+import { spawn } from "child_process";
 import fs from "fs/promises";
+import { join } from "path";
 import { formatWithOptions } from "util";
 
+import type { Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
 import type { Logger, LogLevel } from "@temporalio/worker";
 import { DefaultLogger } from "@temporalio/worker";
@@ -13,7 +16,8 @@ import type { Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
 import type { BlockRegistryService } from "~/agent/block-registry/registry.service";
-import { Config, config as defaultConfig } from "~/config";
+import type { Config } from "~/config";
+import { config as defaultConfig } from "~/config";
 import type { Injector, ProvidersOverrides } from "~/di/injector.server";
 import { Scope } from "~/di/injector.server";
 import { generateTemporalCodeBundle } from "~/temporal/bundle";
@@ -21,8 +25,8 @@ import { TEST_STATE_MANAGER_REQUEST_TAG } from "~/test-state-manager/api";
 import type { TestStateManager } from "~/test-state-manager/client";
 import { Token } from "~/token";
 import { sleep, waitForPromises } from "~/utils.shared";
-import { dirname, join } from "path";
-import { spawn } from "child_process";
+
+const DB_HOST = process.env.DB_HOST ?? "localhost";
 
 // Early init functions operate before the dependency injector was created
 // and are meant to asynchronously create non trivial dependencies
@@ -206,7 +210,9 @@ export class TestEnvironmentBuilder<
             { runId },
           );
           const logsFile = await fs.open(rsp.path, "a");
+          let logsEnded = false;
           addTeardownFunction(async () => {
+            logsEnded = true;
             await logsFile.close();
           });
           return {
@@ -219,9 +225,17 @@ export class TestEnvironmentBuilder<
                     entry.meta["runId"] = runId;
                     const { level, timestampNanos, message, meta } = entry;
                     const date = new Date(Number(timestampNanos / 1000000n));
-                    await logsFile.write(
-                      `${format(date)} [${level}] [${format(meta)}] ${message} \n`,
-                    );
+                    if (!logsEnded) {
+                      await logsFile.write(
+                        `${format(date)} [${level}] [${format(meta)}] ${message} \n`,
+                      );
+                    } else {
+                      // eslint-disable-next-line no-console
+                      console.error(
+                        "Attempted to log after test ended",
+                        `${format(date)} [${level}] [${format(meta)}] ${message} \n`,
+                      );
+                    }
                   });
                 },
               },
@@ -250,9 +264,11 @@ export class TestEnvironmentBuilder<
           TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE,
           { runId, prismaSchemaPath: "prisma/schema.prisma" },
         );
+        const dbUrl = `postgresql://postgres:pass@${DB_HOST}:5432/${rsp.dbName}`;
+
         const db = new PrismaClient({
           datasources: {
-            db: { url: rsp.dbUrl },
+            db: { url: dbUrl },
           },
         });
 
