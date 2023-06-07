@@ -339,7 +339,7 @@ srv.listen(sockPath, async () => {
           }
           // Nuke the connection cause the client is broken
           sock.end();
-          // We nuked the connection so we don't care about the remaining messages
+          // We nuked the connection, so we don't care about the remaining messages
           return;
         }
         const sendErrResponse = (err: any) => {

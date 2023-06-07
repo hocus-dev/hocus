@@ -29,8 +29,8 @@ import { sleep, waitForPromises } from "~/utils.shared";
 const DB_HOST = process.env.DB_HOST ?? "localhost";
 
 // Early init functions operate before the dependency injector was created
-// and are meant to asynchronously create non trivial dependencies
-// The current DI framework doesn't allow to resolve async dependencies
+// and are meant to asynchronously create nontrivial dependencies
+// The current DI framework doesn't allow resolving async dependencies
 type EarlyInitFunction = (ctx: {
   // The test run id
   runId: string;
@@ -43,7 +43,7 @@ type EarlyInitMap = Record<string, EarlyInitFunction>;
 
 // Late Init functions operate on an already existing injector and are meant to either:
 // - Augment the test context with extra values
-// - Run non trivial initialization on some service
+// - Run nontrivial initialization on some service
 // - Register some state with the state manager server
 type LateInitFunction<InjectorT, T> = (ctx: {
   // The requested injector

@@ -1,0 +1,2 @@
+{"rule":"LC_AFTER_PERIOD","sentence":"^\\QAs of time of writing there is no reliable way to always trigger cleanup in existing JS testing frameworks: | Cleans up on | JEST | Mocha | Ava | | ------------- | ---- | ----- | --- | | Test Timeout | ✅ | ✅ | ❌ | | Test Failures | ✅ | ✅ | ✅ | | Uncaught exception | ✅ | ✅ | ❌ | | Unhandled error | ✅ | ✅ | ❌ | | process.exit | ❌ | ❌ | ❌ | | SIGINT/SIGTERM | ❌ | ❌ | ❌ | | Test OOM | ❌ | ❌ | ❌ | | Force exit | ❌ | ❌ | ❌ |\\E$"}
+{"rule":"SENTENCE_WHITESPACE","sentence":"^\\QConfig}\\E$"}
