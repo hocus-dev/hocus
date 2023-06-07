@@ -66,3 +66,4 @@ vscode:
     - timonwong.shellcheck
     # Prose linter
     - ChrisChinchilla.vale-vscode
+    - valentjn.vscode-ltex

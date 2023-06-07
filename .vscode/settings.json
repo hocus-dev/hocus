@@ -58,5 +58,15 @@
     ]
   },
   "excalidraw.theme": "dark",
-  "typescript.tsdk": "./node_modules/typescript/lib"
+  "typescript.tsdk": "./node_modules/typescript/lib",
+  "ltex.enabled": [
+    "bash",
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact",
+    "html",
+    "markdown",
+    "restructuredtext",
+  ]
 }
