@@ -4,11 +4,11 @@ import path from "path";
 import { SshKeyPairType } from "@prisma/client";
 
 import { createAgentInjector } from "../agent-injector";
+import { EXPOSE_METHOD } from "../block-registry/registry.service";
+import { withExposedImage } from "../block-registry/utils";
 import { PROJECT_DIR } from "../constants";
-import type { FirecrackerService } from "../runtime/firecracker-legacy/firecracker.service";
-import { PERSISTENT_TEST_DIR } from "../test-constants";
-import { withTestMount } from "../test-utils";
-import { execSshCmd } from "../utils";
+import type { HocusRuntime } from "../runtime/hocus-runtime";
+import { execCmdWithOpts } from "../utils";
 
 import type { GitRemoteInfo } from "./git.service";
 
@@ -151,50 +151,49 @@ test.concurrent(
 
 test.concurrent(
   "fetchRepository",
-  testEnv.run(async ({ injector, runId }) => {
+  testEnv.withBlockRegistry().run(async ({ injector, runId, brService }) => {
     const gitService = injector.resolve(Token.AgentGitService);
-    const agentUtilService = injector.resolve(Token.AgentUtilService);
-    const agentConfig = injector.resolve(Token.Config).agent();
-    await fs.mkdir(PERSISTENT_TEST_DIR, { recursive: true });
-    const pathOnHost = path.join(PERSISTENT_TEST_DIR, `fetch-repository-test-${runId}`);
-    await fs.unlink(pathOnHost).catch(() => {});
+    const imageTag = runId;
 
-    const fetchRepo = (fcService: FirecrackerService) =>
-      gitService.fetchRepository(
-        fcService,
-        {
-          pathOnHost,
-          maxSizeMiB: 100,
-        },
-        {
-          credentials: { privateSshKey: TESTS_PRIVATE_SSH_KEY },
-          url: TESTS_REPO_URL,
-        },
-      );
+    const fetchRepo = (runtimeService: HocusRuntime) =>
+      gitService.fetchRepository(runtimeService, imageTag, {
+        credentials: { privateSshKey: TESTS_PRIVATE_SSH_KEY },
+        url: TESTS_REPO_URL,
+      });
     let fcId = 0;
-    const getFc = () => {
+    const getRuntime = () => {
       fcId += 1;
-      return injector.resolve(Token.FirecrackerService)(`fetch-repository-test-${runId}-${fcId}`);
+      return injector.resolve(Token.QemuService)(`${runId}-${fcId}`);
     };
 
-    await fetchRepo(getFc());
+    await fetchRepo(getRuntime());
 
     const txtFilePath = "test.txt";
     const txtFileContent = "test";
-    await withTestMount(getFc(), pathOnHost, agentConfig, async (ssh, mountPath) => {
-      const out = await execSshCmd({ ssh, opts: { cwd: path.join(mountPath, PROJECT_DIR) } }, [
-        "ls",
-        "-lah",
-      ]);
-      expect(out.stdout).toContain(".git");
-      await agentUtilService.writeFile(ssh, path.join(mountPath, txtFilePath), txtFileContent);
-    });
-    await fetchRepo(getFc());
-    await withTestMount(getFc(), pathOnHost, agentConfig, async (ssh, mountPath) => {
-      expect(
-        (await agentUtilService.readFile(ssh, path.join(mountPath, txtFilePath))).toString(),
-      ).toEqual(txtFileContent);
-    });
+    const containerId = brService.genContainerId(imageTag);
+    await withExposedImage(
+      brService,
+      containerId,
+      EXPOSE_METHOD.HOST_MOUNT,
+      async ({ mountPoint }) => {
+        const out = await execCmdWithOpts(["ls", "-lah"], {
+          cwd: path.join(mountPoint, PROJECT_DIR),
+        });
+        expect(out.stdout).toContain(".git");
+        await fs.writeFile(path.join(mountPoint, txtFilePath), txtFileContent);
+      },
+    );
+    await fetchRepo(getRuntime());
+    await withExposedImage(
+      brService,
+      containerId,
+      EXPOSE_METHOD.HOST_MOUNT,
+      async ({ mountPoint }) => {
+        expect((await fs.readFile(path.join(mountPoint, txtFilePath))).toString()).toEqual(
+          txtFileContent,
+        );
+      },
+    );
   }),
 );
 
