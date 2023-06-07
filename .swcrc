@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/swcrc",
+  "jsc": {
+    "parser": {
+      "syntax": "typescript"
+    },
+    "target": "es2020"
+  },
+  // https://github.com/swc-project/jest/issues/25
+  "sourceMaps": "inline",
+  "inlineSourcesContent": true,
+  "minify": false
+}
