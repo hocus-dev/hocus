@@ -15,7 +15,8 @@ QUAY_REPO=hocus/hocus-block-registry-tests
 RES=""
 function build_and_push()
 {
-  local TEST_NAME=$(basename "$1" | sed 's/\.Dockerfile//')
+  local TEST_NAME
+  TEST_NAME=$(basename "$1" | sed 's/\.Dockerfile//')
   docker build -f "$1" "$SCRIPT_DIR"/resources -t "$TMP_NAME:$TEST_NAME"
   skopeo copy --dest-decompress --dest-oci-accept-uncompressed-layers docker-daemon:"$TMP_NAME:$TEST_NAME" oci:"/tmp/$TEST_NAME"
   /opt/overlaybd/bin/convertor --oci -r local-directory -i "/tmp/$TEST_NAME" -o "/tmp/$TEST_NAME-obd"
