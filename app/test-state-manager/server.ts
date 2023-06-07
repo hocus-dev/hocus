@@ -46,6 +46,7 @@ type TestRunStateT = {
 type SocketStateT = { sock: Socket; tests: Map<string, TestRunStateT> };
 const srvState = new Map<string, SocketStateT>();
 
+const artifactsUploadPromises: Map<string, Promise<void>> = new Map();
 const cleanupTestRun = async (
   testState: TestRunStateT,
   testFailed: boolean,
@@ -67,23 +68,35 @@ const cleanupTestRun = async (
     if (process.env["BUILDKITE_AGENT_ACCESS_TOKEN"] !== void 0) {
       const testRunDir = await testState.getTestStateDir();
       const archivePath = testRunDir + ".tar.gz";
-      await execCmd(
-        "tar",
-        "--hole-detection=seek",
-        "--sparse",
-        "-zcf",
-        archivePath,
-        "-C",
-        dirname(archivePath),
-        basename(testRunDir),
+      // Don't block the response for the client
+      // Do the upload in the background
+      const taskKey = uuidv4();
+      artifactsUploadPromises.set(
+        taskKey,
+        (async () => {
+          await execCmd(
+            "tar",
+            "--hole-detection=seek",
+            "--sparse",
+            "-zcf",
+            archivePath,
+            "-C",
+            dirname(archivePath),
+            basename(testRunDir),
+          );
+          try {
+            await execCmdWithOpts(
+              ["buildkite-agent", "artifact", "upload", basename(archivePath)],
+              {
+                cwd: dirname(archivePath),
+              },
+            );
+          } finally {
+            await fs.unlink(archivePath);
+          }
+          artifactsUploadPromises.delete(taskKey);
+        })(),
       );
-      try {
-        await execCmdWithOpts(["buildkite-agent", "artifact", "upload", basename(archivePath)], {
-          cwd: dirname(archivePath),
-        });
-      } finally {
-        await fs.unlink(archivePath);
-      }
       artifactsMsg = `${redFG}Failed run id: ${testState.runId}. Please consult the artifact ${testState.runId}.tar.gz${resetFG}`;
     } else {
       const testRunDir = await testState.getTestStateDir();
@@ -126,6 +139,8 @@ const cleanupServer = async () => {
       await cleanupConnection(socketState);
     }),
   );
+
+  await waitForPromises(artifactsUploadPromises.values());
 
   await dbOnServerExit();
 

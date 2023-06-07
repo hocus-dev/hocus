@@ -142,8 +142,8 @@ export const withSsh = async <T>(
         return await new NodeSSH().connect({
           keepaliveInterval: 250,
           keepaliveCountMax: 4,
-          timeout: 800,
-          readyTimeout: 800,
+          timeout: 2000,
+          readyTimeout: 2000,
           ...connectionOptions,
         });
       }
