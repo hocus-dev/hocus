@@ -1,8 +1,9 @@
 import testImages from "../../block-registry/test-data/test_images.json";
 import { execSshCmd, isProcessAlive, sleep } from "../../utils";
 
+import { createAgentInjector } from "~/agent/agent-injector";
 import { EXPOSE_METHOD } from "~/agent/block-registry/registry.service";
-import { provideBlockRegistry } from "~/agent/block-registry/test-utils";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
@@ -14,12 +15,18 @@ const testCases = [
   ["Ubuntu Jammy", testImages.testUbuntuJammy],
 ];
 
+const testEnv = new TestEnvironmentBuilder(createAgentInjector)
+  .withTestLogging()
+  .withBlockRegistry()
+  .withLateInits({
+    instance: async ({ injector, runId }) => injector.resolve(Token.QemuService)(runId),
+  });
+
 test.concurrent.each(testCases)(`Boots and connects to %s`, async (_name, remoteTag) =>
-  provideBlockRegistry(async ({ injector, runId, brService }) => {
+  testEnv.run(async ({ runId, brService, instance }) => {
     const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
     const osCt = await brService.createContainer(osIm, "osCt");
     const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
-    const instance = injector.resolve(Token.QemuService)(runId);
     const vmInfo = await instance.withRuntime(
       {
         ssh: {
@@ -50,7 +57,7 @@ test.concurrent.each(testCases)(`Boots and connects to %s`, async (_name, remote
 test.concurrent.each(testCases)(
   `Properly handles multiple mounts on %s`,
   async (_name, remoteTag) =>
-    provideBlockRegistry(async ({ injector, runId, brService }) => {
+    testEnv.run(async ({ brService, instance }) => {
       const [osIm, extraIm1, extraIm2] = await waitForPromises([
         brService.loadImageFromRemoteRepo(remoteTag, "osIm"),
         brService.loadImageFromRemoteRepo(testImages.test1, "extraIm1"),
@@ -68,7 +75,6 @@ test.concurrent.each(testCases)(
           brService.expose(what, EXPOSE_METHOD.BLOCK_DEV),
         ),
       );
-      const instance = injector.resolve(Token.QemuService)(runId);
       await instance.withRuntime(
         {
           ssh: {
@@ -123,11 +129,10 @@ test.concurrent.each(testCases)(
 test.concurrent.each(testCases)(
   `If requested then keeps running in the background on %s`,
   async (_name, remoteTag) =>
-    provideBlockRegistry(async ({ injector, runId, brService }) => {
+    testEnv.run(async ({ instance, runId, brService }) => {
       const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
       const osCt = await brService.createContainer(osIm, "osCt");
       const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
-      const instance = injector.resolve(Token.QemuService)(runId);
       const vmInfo1 = await instance.withRuntime(
         {
           ssh: {
@@ -167,11 +172,10 @@ test.concurrent.each(
     [["poweroff"], name, remoteTag],
   ]),
 )(`Doesn't hang forever after issuing %s on %s`, async (command, _name, remoteTag) =>
-  provideBlockRegistry(async ({ injector, runId, brService }) => {
+  testEnv.run(async ({ instance, runId, brService }) => {
     const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
     const osCt = await brService.createContainer(osIm, "osCt");
     const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
-    const instance = injector.resolve(Token.QemuService)(runId);
     const vmInfo = await instance
       .withRuntime(
         {
@@ -228,11 +232,10 @@ test.concurrent.each(
 test.concurrent.each(testCases)(
   `Doesn't hang forever when ssh is unresponsive on %s`,
   async (_name, remoteTag) =>
-    provideBlockRegistry(async ({ injector, runId, brService }) => {
+    testEnv.run(async ({ instance, brService }) => {
       const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
       const osCt = await brService.createContainer(osIm, "osCt");
       const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
-      const instance = injector.resolve(Token.QemuService)(runId);
 
       let sshCommandExitedWithin: number | null = null;
       let sshDone: (value: unknown) => void;
@@ -284,11 +287,10 @@ test.concurrent.each(
 )(
   `Creates vm with %d cores and %d MiB ram on %s`,
   async (vcpuCount, memSizeMib, _name, remoteTag) =>
-    provideBlockRegistry(async ({ injector, runId, brService }) => {
+    testEnv.run(async ({ instance, brService }) => {
       const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
       const osCt = await brService.createContainer(osIm, "osCt");
       const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
-      const instance = injector.resolve(Token.QemuService)(runId);
       await instance.withRuntime(
         {
           ssh: {
@@ -305,7 +307,7 @@ test.concurrent.each(
           const cpuInfo = (await execSshCmd({ ssh }, ["cat", "/proc/cpuinfo"])).stdout;
           expect(cpuInfo).toMatch(new RegExp(`^cpu cores.*?${vcpuCount}$`, "gm"));
           // Ram is more tricky and containers need a different test here
-          // Assert that the memory block size on the guest is 128MB
+          // Assert that the memory block size on the guest is 128 MB
           // block_size_bytes is in hex notation
           await expect(
             execSshCmd({ ssh }, ["cat", "/sys/devices/system/memory/block_size_bytes"]),
@@ -323,10 +325,9 @@ test.concurrent.each(
 
 test.concurrent(
   `Doesn't hang forever if qemu fails to start`,
-  provideBlockRegistry(async ({ injector, runId, brService }) => {
+  testEnv.run(async ({ instance, brService }) => {
     const osCt = await brService.createContainer(void 0, "emptyCt", { mkfs: true, sizeInGB: 64 });
     const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
-    const instance = injector.resolve(Token.QemuService)(runId);
     await expect(
       instance.withRuntime(
         {
@@ -349,10 +350,9 @@ test.concurrent(
 
 test.concurrent(
   `Doesn't hang forever if booting vm without /init`,
-  provideBlockRegistry(async ({ injector, runId, brService }) => {
+  testEnv.run(async ({ instance, brService }) => {
     const osCt = await brService.createContainer(void 0, "emptyCt", { mkfs: true, sizeInGB: 64 });
     const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
-    const instance = injector.resolve(Token.QemuService)(runId);
     await expect(
       instance.withRuntime(
         {
@@ -374,11 +374,10 @@ test.concurrent(
 
 test.concurrent(
   `Doesn't hang forever if booting vm without ssh`,
-  provideBlockRegistry(async ({ injector, runId, brService }) => {
+  testEnv.run(async ({ instance, brService }) => {
     const osIm = await brService.loadImageFromRemoteRepo(testImages.testAlpine3_14NoSSH, "osIm");
     const osCt = await brService.createContainer(osIm, "osCt");
     const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
-    const instance = injector.resolve(Token.QemuService)(runId);
     await expect(
       instance.withRuntime(
         {

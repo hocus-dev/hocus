@@ -33,6 +33,13 @@ tasks:
     workspaceShell: fish
     workspace: |
       PORT=1337 npx ts-node -r tsconfig-paths/register entrypoints/codec-server.ts
+  - name: Test state manager
+    prebuild: |
+      sleep 0.01
+    workspaceShell: fish
+    workspace: |
+      sudo mkdir -p /home/hocus/dev/hocus-resources/tests
+      sudo TEST_STORAGE_DIR=/home/hocus/dev/hocus-resources/tests yarn run test:startTestManager
   - name: Terminal
     prebuild: sleep 0.01
     workspaceShell: fish
@@ -57,5 +64,4 @@ vscode:
     - exiasr.hadolint
     # Shell script linter
     - timonwong.shellcheck
-    # Prose linter
-    - ChrisChinchilla.vale-vscode
+    - valentjn.vscode-ltex

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/swcrc",
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "decorators": false,
+      "dynamicImport": true
+    }
+  },
+  // https://github.com/swc-project/jest/issues/25
+  "sourceMaps": "inline",
+  "module": { "type": "commonjs" }
+}

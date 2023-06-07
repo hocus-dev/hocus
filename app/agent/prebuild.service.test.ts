@@ -3,17 +3,20 @@ import { LogGroupType, VmTaskStatus } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 
+import { createAgentInjector } from "./agent-injector";
 import { SUCCESSFUL_PREBUILD_STATES } from "./prebuild-constants";
-import { provideInjectorAndDb } from "./test-utils";
 
 import { createExampleRepositoryAndProject } from "~/test-utils/project";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { createTestUser } from "~/user/test-utils";
 import { numericSort, waitForPromises } from "~/utils.shared";
 
+const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging().withTestDb();
+
 test.concurrent(
   "getArchivablePrebuildEvents, getRemovablePrebuildEvents",
-  provideInjectorAndDb(async ({ injector, db }) => {
+  testEnv.run(async ({ injector, db }) => {
     const sortedIds = (prebuildEvents: PrebuildEvent[]) =>
       prebuildEvents.map((p) => p.id).sort(numericSort);
     const prebuildService = injector.resolve(Token.PrebuildService);
@@ -174,7 +177,7 @@ test.concurrent(
 
 test(
   "cleanupDbAfterPrebuildError",
-  provideInjectorAndDb(async ({ injector, db }) => {
+  testEnv.run(async ({ injector, db }) => {
     const prebuildService = injector.resolve(Token.PrebuildService);
     const project = await db.$transaction((tdb) =>
       createExampleRepositoryAndProject({ tdb, injector }),

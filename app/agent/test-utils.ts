@@ -1,21 +1,13 @@
 import fs from "fs/promises";
 
-import type { Prisma } from "@prisma/client";
-import { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH } from "node-ssh";
 import { v4 as uuidv4 } from "uuid";
 
-import { createAgentInjector } from "./agent-injector";
-import type { AgentInjector } from "./agent-injector";
 import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import { SSH_PROXY_IP } from "./test-constants";
 import { execCmd } from "./utils";
 
 import type { Config } from "~/config";
-import { Scope } from "~/di/injector.server";
-import { printErrors, provideRunId } from "~/test-utils";
-import { provideDb } from "~/test-utils/db.server";
-import { Token } from "~/token";
 
 export const withTestMount = async <T>(
   fcService: FirecrackerService,
@@ -45,28 +37,6 @@ export const withTestMount = async <T>(
       return await fn(ssh, mountPath);
     },
   );
-};
-
-export const provideInjector = (
-  testFn: (args: { injector: AgentInjector; runId: string }) => Promise<void>,
-): (() => Promise<void>) => {
-  const injector = createAgentInjector({
-    [Token.Logger]: {
-      provide: {
-        factory: function () {
-          return new DefaultLogger("ERROR");
-        },
-      },
-      scope: Scope.Transient,
-    },
-  });
-  return printErrors(provideRunId(async ({ runId }) => await testFn({ injector, runId })));
-};
-
-export const provideInjectorAndDb = (
-  testFn: (args: { injector: AgentInjector; db: Prisma.NonTransactionClient }) => Promise<void>,
-): (() => Promise<void>) => {
-  return provideInjector(({ injector }) => provideDb((db) => testFn({ injector, db }))());
 };
 
 export const execSshCmdThroughProxy = async (args: {

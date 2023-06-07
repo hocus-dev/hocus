@@ -13,25 +13,16 @@ import:
   - "@cspell/dict-lorem-ipsum/cspell-ext.json"
   - "@cspell/dict-npm/cspell-ext.json"
 ignoreRegExpList:
-  # GH Advisories
   - GHSA-[-\w]+
-  # SSH keys
   - (["''`])ssh-ed25519.*?\1
-  # PGP keys
-  - /-----BEGIN OPENSSH PRIVATE KEY-----[\w\W]+?-----END OPENSSH PRIVATE KEY-----/m
-  # Posthog tokens
+  - /-----BEGIN OPENSSH PRIVATE KEY-----[\w\W]+?-----END OPENSSH PRIVATE
+    KEY-----/m
   - (['"`])phc_\w+?\1
-  # flaky Imports
   - ts-toolbelt
-  # Vscode extension id's in yamls
   - \- [\w-]+.[\w-]+
-  # JWT's
   - \"([a-zA-Z0-9_=]+)\.([a-zA-Z0-9_=]+)\.([a-zA-Z0-9_\\-\\+/=]*)\"
-  # Container names
   - ([A-Za-z0-9\-]+)/[A-Za-z0-9\-]+:[A-Za-z0-9\-]+
-  # Networking
   - \w+-hocusvm
-  # Command options
   - --retry-connrefused
   - --waitretry
   - --dbname
@@ -66,103 +57,124 @@ ignorePaths:
   - .linting
   - .env
   - .vscode
-  # External stuff which better to not modify
   - deps/firecracker-client
   - buildkite-agent.cfg.example
   - ops/bin/kvm-ok
 words:
-  - typebox
-  - tailwindcss
-  - flowbite
-  - excalidraw
-  - posthog
+  - acpi
+  - AESGCM
+  - Alua
+  - archivable
+  - archlinux
+  - autoincrement
+  - automerge
+  - blkid
+  - bson
+  - buildfs
+  - camelcase
+  - cbor
+  - Codespaces
+  - datasource
+  - datasources
+  - dbgenerated
+  - devicon
+  - distroless
+  - dnat
+  - dnssetup
+  - dockerfiles
+  - dport
+  - dprint
+  - dtach
+  - dynamicconfig
+  - ejson
+  - entrypoints
   - envlist
+  - EOSQL
+  - esbuild
+  - excalidraw
+  - fetchrepo
+  - flowbite
+  - Gerrit
+  - Gitea
+  - gorbak
+  - hadolint
+  - hardlinked
+  - hocusdev
+  - iputils
+  - isready
+  - jdbc
+  - kaniko
+  - keychain
+  - keycloak
+  - localtime
+  - lowerdir
+  - mapenum
+  - mkfifo
+  - mountinfo
+  - nameserver
+  - Nanos
+  - netdev
+  - netns
+  - nologin
+  - NOPASSWD
+  - nowait
+  - nproc
+  - oidc
+  - overlaybd
+  - Overlayfs
+  - ovsx
+  - pacman
+  - passwordless
+  - permissioning
+  - PGDATA
+  - pgtmpfs
+  - posthog
+  - postmigrate
+  - POSTROUTING
+  - poweroff
+  - preauthkey
   - prebuild
   - prebuilds
-  - dnssetup
-  - usermod
-  - iputils
-  - resolv
-  - nameserver
-  - urandom
-  - buildfs
-  - netns
-  - veth
-  - vpeer
-  - keycloak
-  - esbuild
-  - socat
-  - mkfifo
-  - blkid
-  - hadolint
-  - dockerfiles
-  - oidc
-  - kaniko
-  - virt
-  - localtime
-  - Gitea
-  - Codespaces
-  - Gerrit
-  - Roadmap
-  - tmpfs
-  - pgtmpfs
-  - PGDATA
-  - isready
-  - NOPASSWD
-  - hocusdev
-  - vcpu
-  - entrypoints
-  - quickstart
-  - rootfs
-  - autoincrement
-  - Timestamptz
-  - dbgenerated
-  - permissioning
-  - archivable
-  - datasource
-  - temporalio
-  - EOSQL
-  - psql
-  - sshgateway
-  - pacman
-  - tailscale
-  - qcow
-  - vmlinux
-  - virtio
-  - netdev
-  - stty
-  - rootca
-  - dtach
-  - gorbak
-  - uuidv
-  - retriable
-  - bson
-  - distroless
-  - dynamicconfig
-  - tclt
-  - nologin
-  - psmisc
-  - POSTROUTING
   - PREROUTING
-  - dnat
-  - dport
-  - keychain
-  - mapenum
-  - jdbc
+  - psmisc
+  - psql
+  - qcow
+  - quickstart
+  - resolv
+  - retriable
+  - Roadmap
+  - rootca
+  - rootfs
   - sideloading
-  - archlinux
-  - ejson
-  - cbor
+  - SIGHUP
+  - SIGINT
+  - SIGKILL
+  - SIGTERM
+  - skopeo
+  - socat
+  - sshgateway
   - sshpk
-  - camelcase
-  - poweroff
+  - stty
+  - tailscale
   - tailscaled
-  - preauthkey
-  - fetchrepo
-  - passwordless
+  - tailwindcss
+  - tclt
+  - tcmu
   - tctl
-  - ovsx
+  - temporalio
+  - Timestamptz
+  - tmpfs
+  - typebox
+  - typecheck
+  - unmap
   - upperdir
-  - lowerdir
-  - nproc
-  - automerge
+  - urandom
+  - usermod
+  - uuidv
+  - vcpu
+  - veth
+  - virt
+  - virtio
+  - virtiofs
+  - vmlinux
+  - vpeer

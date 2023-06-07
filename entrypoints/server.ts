@@ -79,7 +79,6 @@ app.all("*", async (req, res, next) => {
       build:
         process.env.NODE_ENV === "production"
           ? // Workaround for this bug: https://github.com/remix-run/remix/issues/3032
-            // @ts-expect-error
             await import("@remix-run/dev/server-build")
           : require(BUILD_DIR),
       mode: process.env.NODE_ENV,
@@ -98,7 +97,6 @@ app.all("*", async (req, res, next) => {
         build:
           process.env.NODE_ENV === "production"
             ? // Workaround for this bug: https://github.com/remix-run/remix/issues/3032
-              // @ts-expect-error
               await import("@remix-run/dev/server-build")
             : require(BUILD_DIR),
         mode: process.env.NODE_ENV,

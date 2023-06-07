@@ -1,6 +1,8 @@
+// cSpell:words httphey heyo
+import { createAgentInjector } from "./agent-injector";
 import { execSshCmd, sha256 } from "./utils";
 
-import { provideInjector } from "~/agent/test-utils";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
@@ -21,9 +23,11 @@ ADD git@git.example.com:foo/bar.git /bar
 ADD --chown=1 https://github.com/hocus-dev/hocus.git heyo /hocus
 RUN git clone xd`;
 
+const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging();
+
 test.concurrent(
   "isUrl",
-  provideInjector(async ({ injector }) => {
+  testEnv.run(async ({ injector }) => {
     const buildfsService = injector.resolve(Token.BuildfsService);
     const cases: [string, boolean][] = [
       ["https://github.com", true],
@@ -48,7 +52,7 @@ test.concurrent(
 
 test.concurrent(
   "getExternalFilePathsFromDockerfile",
-  provideInjector(async ({ injector }) => {
+  testEnv.run(async ({ injector }) => {
     const buildfsService = injector.resolve(Token.BuildfsService);
     const parse = (dockerfile: string) =>
       buildfsService.getExternalFilePathsFromDockerfile(dockerfile).sort();
@@ -66,7 +70,7 @@ test.concurrent(
 
 test.concurrent(
   "getSha256FromFiles",
-  provideInjector(async ({ injector, runId }) => {
+  testEnv.run(async ({ injector, runId }) => {
     const buildfsService = injector.resolve(Token.BuildfsService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const agentConfig = injector.resolve(Token.Config).agent();
