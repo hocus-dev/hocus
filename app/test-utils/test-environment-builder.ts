@@ -28,9 +28,10 @@ import { sleep, waitForPromises } from "~/utils.shared";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
 
-// Early init functions operate before the dependency injector is created
-// and are meant to asynchronously create nontrivial dependencies
-// The current DI framework doesn't allow resolving async dependencies
+// Early init functions run before the dependency injector is created,
+// and their results are used to override the default providers.
+// They are used to asynchronously create nontrivial dependencies because
+// the current DI framework doesn't allow resolving async dependencies.
 type EarlyInitFunction = (ctx: {
   // The test run id
   runId: string;
