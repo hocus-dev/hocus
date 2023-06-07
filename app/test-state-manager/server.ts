@@ -65,6 +65,8 @@ const cleanupTestRun = async (
   let keepStorage = false;
   let artifactsMsg: string | undefined = void 0;
   if (testFailed) {
+    // Keep storage until we make a tarball
+    keepStorage = true;
     if (process.env["BUILDKITE_AGENT_ACCESS_TOKEN"] !== void 0) {
       const testRunDir = await testState.getTestStateDir();
       const archivePath = testRunDir + ".tar.gz";
@@ -84,6 +86,7 @@ const cleanupTestRun = async (
             dirname(archivePath),
             basename(testRunDir),
           );
+          await fs.rm(testRunDir, { recursive: true, force: true });
           try {
             await execCmdWithOpts(
               ["buildkite-agent", "artifact", "upload", basename(archivePath)],
@@ -101,7 +104,6 @@ const cleanupTestRun = async (
     } else {
       const testRunDir = await testState.getTestStateDir();
       artifactsMsg = `${redFG}Failed run id: ${testState.runId}. Please investigate ${testRunDir}${resetFG}`;
-      keepStorage = true;
     }
   }
   if (artifactsMsg) console.error(artifactsMsg);
