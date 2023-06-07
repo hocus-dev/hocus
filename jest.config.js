@@ -7,7 +7,14 @@ require("tsconfig-paths").register();
 /** @type {import('jest').Config} */
 var config = {
   transform: {
-    "^.+\\.(t|j)sx?$": ["@swc/jest"],
+    "^.+\\.(t|j)sx?$": [
+      "@swc-node/jest",
+      {
+        target: "ES2020",
+        module: "commonjs",
+        sourcemap: "inline",
+      },
+    ],
   },
   moduleNameMapper: {
     "^~/(.*)$": "<rootDir>/app/$1",

@@ -68,9 +68,9 @@
   "devDependencies": {
     "@remix-run/dev": "^1.16.1",
     "@remix-run/eslint-config": "^1.16.1",
+    "@swc-node/jest": "^1.6.5",
     "@swc/core": "^1.2.241",
     "@swc/helpers": "^0.4.7",
-    "@swc/jest": "^0.2.22",
     "@temporalio/testing": "^1.7.4",
     "@types/cookie": "^0.5.1",
     "@types/cookie-parser": "^1.4.3",
