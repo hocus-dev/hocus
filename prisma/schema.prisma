@@ -227,25 +227,25 @@ model GitRepository {
   lastBranchUpdateAt            DateTime                        @default(now()) @db.Timestamptz(3)
   createdAt                     DateTime                        @default(now()) @db.Timestamptz(3)
   Project                       Project[]
-  gitRepositoryFiles            GitRepositoryFile[]
   GitRepositoryConnectionStatus GitRepositoryConnectionStatus[]
+  GitRepositoryImage            GitRepositoryImage[]
 }
 
-model GitRepositoryFile {
+model GitRepositoryImage {
   id              BigInt        @id @default(autoincrement())
   gitRepository   GitRepository @relation(fields: [gitRepositoryId], references: [id])
   gitRepositoryId BigInt
-  file            File          @relation(fields: [fileId], references: [id])
-  fileId          BigInt
+  localOciImage   LocalOciImage @relation(fields: [localOciImageId], references: [id])
+  localOciImageId BigInt
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
 
-  /// Enforce that agentInstanceId and file.agentInstanceId are the same.
-  fileAgentMatch File @relation("git_repository_file_agent_match", fields: [fileId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and localOciImage.agentInstanceId are the same.
+  imageAgentMatch LocalOciImage @relation("git_repository_image_agent_match", fields: [localOciImageId, agentInstanceId], references: [id, agentInstanceId])
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-  @@unique([gitRepositoryId, fileId])
+  @@unique([gitRepositoryId, localOciImageId])
   @@unique([gitRepositoryId, agentInstanceId])
 }
 
@@ -336,12 +336,28 @@ model AgentInstance {
   id                 BigInt               @id @default(autoincrement())
   externalId         String               @unique
   files              File[]
-  gitRepositoryFiles GitRepositoryFile[]
   buildfsEventFiles  BuildfsEventFiles[]
   prebuildEventFiles PrebuildEventFiles[]
   workspaces         Workspace[]
 
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  localOciImages     LocalOciImage[]
+  GitRepositoryImage GitRepositoryImage[]
+}
+
+model LocalOciImage {
+  id              BigInt        @id @default(autoincrement())
+  externalId      String        @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tag             String
+  readonly        Boolean
+  agentInstanceId BigInt
+  agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
+
+  gitRepositoryImages      GitRepositoryImage[]
+  gitRepositoryMatchImages GitRepositoryImage[] @relation("git_repository_image_agent_match")
+
+  @@unique([agentInstanceId, id])
+  @@unique([agentInstanceId, tag])
 }
 
 model File {
@@ -350,8 +366,6 @@ model File {
   agentInstanceId                     BigInt
   /// Should be absolute.
   path                                String
-  gitRepositoryFiles                  GitRepositoryFile[]
-  gitRepositoryFileAgentMatch         GitRepositoryFile[]  @relation("git_repository_file_agent_match")
   buildfsEventProjectFiles            BuildfsEventFiles[]  @relation("buildfs_event_project_file")
   buildfsEventOutputFiles             BuildfsEventFiles[]  @relation("buildfs_event_output_file")
   buildfsEventProjectFileAgentMatch   BuildfsEventFiles[]  @relation("buildfs_event_project_file_agent_match")

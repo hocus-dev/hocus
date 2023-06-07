@@ -37,6 +37,7 @@ const providers = [
   { token: Token.TimeService, provide: { class: TimeService } },
   { token: Token.Logger, provide: { class: DefaultLogger }, scope: Scope.Transient },
   { token: Token.PerfService, provide: { class: PerfService } },
+  { token: Token.BlockRegistryService, provide: { class: BlockRegistryService } },
   { token: Token.LowLevelStorageService, provide: { class: LowLevelStorageService } },
   { token: Token.StorageService, provide: { class: StorageService } },
   { token: Token.AgentUtilService, provide: { class: AgentUtilService } },
@@ -54,7 +55,6 @@ const providers = [
   { token: Token.QemuService, provide: { factory: factoryQemuService } },
   { token: Token.WorkspaceAgentService, provide: { class: WorkspaceAgentService } },
   { token: Token.TemporalClient, provide: { factory: clientFactory } },
-  { token: Token.BlockRegistryService, provide: { class: BlockRegistryService } },
 ] as const;
 
 export const createAgentInjector = (overrides?: ProviderOverrides): AgentInjector => {

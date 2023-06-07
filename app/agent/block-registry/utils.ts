@@ -58,3 +58,5 @@ export const withExposedImages = async <
 ): Promise<R> => {
   return withExposedImagesInner(service, 0, exposeArgs as any, [], innerFn as any);
 };
+
+export const getTagLockFile = (id: string) => `/tmp/tag-${id}.lock`;

@@ -35,12 +35,6 @@ export const config = makeConfig()({
     license: process.env.HOCUS_LICENSE ?? void 0,
     licensePublicKey: HOCUS_LICENSE_PUBLIC_KEY,
   }),
-  shared: () => ({
-    maxRepositoryDriveSizeMib: parseIntWithMin(
-      process.env.SHARED_MAX_REPOSITORY_DRIVE_SIZE_MIB ?? "5000",
-      10,
-    ),
-  }),
   agent: () => ({
     temporalAddress: get("AGENT_TEMPORAL_ADDRESS", "localhost:7233"),
     databaseUrl: get("AGENT_DATABASE_URL", "postgres://postgres:pass@localhost:5432/rooms"),
