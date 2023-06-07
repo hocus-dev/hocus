@@ -12,9 +12,9 @@ fi
 
 set -o nounset
 
-DOCKERFILE_PATH="$(realpath ${1})"
-OUTPUT_PATH="$(realpath ${2})"
-CONTEXT_DIR="$(realpath ${3})"
+DOCKERFILE_PATH="$(realpath "${1}")"
+OUTPUT_PATH="$(realpath "${2}")"
+CONTEXT_DIR="$(realpath "${3}")"
 
 IMAGE_TAG=$(basename "$DOCKERFILE_PATH" | sed 's/\.Dockerfile//')
 IMAGE_NAME="buildfs:${IMAGE_TAG}"
