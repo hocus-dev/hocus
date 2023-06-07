@@ -81,6 +81,10 @@ export class TestEnvironmentBuilder<
     ) => Promise<void>,
   ): () => Promise<void> {
     return async () => {
+      let testName = "";
+      try {
+        testName = expect.getState().currentTestName ?? "";
+      } catch (_err) {}
       let teardownTasks: (() => Promise<void>)[] = [];
       const addTeardownFunction = (task: () => Promise<void>): void => {
         teardownTasks.push(task);
@@ -137,7 +141,7 @@ export class TestEnvironmentBuilder<
         return res;
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error("Failed test run", runId, err, JSON.stringify(err));
+        console.error(`[${testName}] Failed test run`, runId, err, JSON.stringify(err));
         throw err;
       } finally {
         const rsp = await this.#getStateManager().mkRequest(
@@ -149,7 +153,7 @@ export class TestEnvironmentBuilder<
         );
         if (rsp.artifactsMsg) {
           // eslint-disable-next-line no-console
-          console.error(rsp.artifactsMsg);
+          console.error(`[${testName}] ${rsp.artifactsMsg}`);
         }
         await waitForPromises(teardownTasks.map((teardownFn) => teardownFn()));
       }
