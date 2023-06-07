@@ -5,6 +5,7 @@ import { Server } from "node:net";
 import { basename, dirname, join } from "path";
 
 import { DefaultLogger } from "@temporalio/worker";
+import { match, P } from "ts-pattern";
 import { v4 as uuidv4 } from "uuid";
 
 import type { TestStateManagerRequest, TestStateManagerResponse } from "./api";
@@ -158,7 +159,7 @@ const processRequest = async (
   const sendOkResponse = <TagT extends TEST_STATE_MANAGER_REQUEST_TAG>(
     requestTag: TagT,
     response: Extract<TestStateManagerResponse, { requestTag: TagT }>["response"],
-  ) => {
+  ): void => {
     if (
       !socketState.sock.write(
         JSON.stringify({
@@ -172,45 +173,50 @@ const processRequest = async (
     }
   };
 
-  switch (msg.requestTag) {
-    case TEST_STATE_MANAGER_REQUEST_TAG.TEST_START:
-      console.log(`Starting test with id ${msg.request.runId} on socket ${socketId}`);
-      let testStateDirSetup: Promise<string> | null = null;
-      socketState.tests.set(msg.request.runId, {
-        cleanupClosures: [],
-        socketId,
-        runId: msg.request.runId,
-        testsDirMountPath: msg.request.testsDirMountPath,
-        getTestStateDir: async (): Promise<string> => {
-          if (testStateDirSetup === null) {
-            testStateDirSetup = (async () => {
-              const testStateDir = join(testsDir, msg.request.runId);
-              await fs.mkdir(testStateDir, { recursive: true, mode: 0o777 });
-              await fs.chmod(testStateDir, 0o777);
-              return testStateDir;
-            })();
-          }
-          return await testStateDirSetup;
-        },
-      });
-      sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, {});
-      return;
-    case TEST_STATE_MANAGER_REQUEST_TAG.TEST_END:
-      {
-        console.log(`Ending test with id ${msg.request.runId} on socket ${socketId}`);
-        const testState = socketState.tests.get(msg.request.runId);
+  await match(msg)
+    .with(
+      { requestTag: TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, request: P.select() },
+      async ({ runId, testsDirMountPath }) => {
+        console.log(`Starting test with id ${runId} on socket ${socketId}`);
+        let testStateDirSetup: Promise<string> | null = null;
+        socketState.tests.set(runId, {
+          cleanupClosures: [],
+          socketId,
+          runId,
+          testsDirMountPath: testsDirMountPath,
+          getTestStateDir: async (): Promise<string> => {
+            if (testStateDirSetup === null) {
+              testStateDirSetup = (async () => {
+                const testStateDir = join(testsDir, runId);
+                await fs.mkdir(testStateDir, { recursive: true, mode: 0o777 });
+                await fs.chmod(testStateDir, 0o777);
+                return testStateDir;
+              })();
+            }
+            return await testStateDirSetup;
+          },
+        });
+        sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_START, {});
+      },
+    )
+    .with(
+      { requestTag: TEST_STATE_MANAGER_REQUEST_TAG.TEST_END, request: P.select() },
+      async ({ testFailed, runId }) => {
+        console.log(`Ending test with id ${runId} on socket ${socketId}`);
+        const testState = socketState.tests.get(runId);
         if (testState === void 0) {
           throw new Error("Unable to find test state");
         }
-        socketState.tests.delete(msg.request.runId);
-        const artifactsMsg = await cleanupTestRun(testState, msg.request.testFailed);
+        socketState.tests.delete(runId);
+        const artifactsMsg = await cleanupTestRun(testState, testFailed);
         sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.TEST_END, { artifactsMsg });
-      }
-      return;
-    case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE:
-      {
-        console.log(`Requesting logs file with id ${msg.request.runId} on socket ${socketId}`);
-        const testState = socketState.tests.get(msg.request.runId);
+      },
+    )
+    .with(
+      { requestTag: TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE, request: P.select() },
+      async ({ runId }) => {
+        console.log(`Requesting logs file with id ${runId} on socket ${socketId}`);
+        const testState = socketState.tests.get(runId);
         if (testState === void 0) {
           throw new Error("Unable to find test state");
         }
@@ -223,25 +229,27 @@ const processRequest = async (
             join(testStateDir, `logger-${uuidv4()}.log`),
           ),
         });
-      }
-      return;
-    case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE:
-      {
+      },
+    )
+    .with(
+      { requestTag: TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE, request: P.select() },
+      async ({ runId, prismaSchemaPath }) => {
         console.log(
-          `Requesting new database from ${msg.request.prismaSchemaPath} on test ${msg.request.runId} on socket ${socketId}`,
+          `Requesting new database from ${prismaSchemaPath} on test ${runId} on socket ${socketId}`,
         );
-        const testState = socketState.tests.get(msg.request.runId);
+        const testState = socketState.tests.get(runId);
         if (testState === void 0) {
           throw new Error("Unable to find test state");
         }
         sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_DATABASE, {
-          dbName: await setupTestDatabase(msg.request.prismaSchemaPath, testState.cleanupClosures),
+          dbName: await setupTestDatabase(prismaSchemaPath, testState.cleanupClosures),
         });
-      }
-      return;
-    case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_TEST_STATE_DIR:
-      {
-        const testState = socketState.tests.get(msg.request.runId);
+      },
+    )
+    .with(
+      { requestTag: TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_TEST_STATE_DIR, request: P.select() },
+      async ({ runId }) => {
+        const testState = socketState.tests.get(runId);
         if (testState === void 0) {
           throw new Error("Unable to find test state");
         }
@@ -252,31 +260,31 @@ const processRequest = async (
             await testState.getTestStateDir(),
           ),
         });
-      }
-      return;
-    case TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH:
+      },
+    )
+    .with(
       {
-        const testState = socketState.tests.get(msg.request.runId);
+        requestTag: TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH,
+        request: P.select(),
+      },
+      async ({ runId, blockRegistryDir }) => {
+        const testState = socketState.tests.get(runId);
         if (testState === void 0) {
           throw new Error("Unable to find test state");
         }
         testState.cleanupClosures.push(async () => {
           const brService = new BlockRegistryService(new DefaultLogger("ERROR"), {
             agent: () => ({
-              blockRegistryRoot: pathRemap(
-                testState.testsDirMountPath,
-                testsDir,
-                msg.request.blockRegistryDir,
-              ),
+              blockRegistryRoot: pathRemap(testState.testsDirMountPath, testsDir, blockRegistryDir),
               blockRegistryConfigFsPath: "/sys/kernel/config",
             }),
           } as any);
           await brService.hideEverything();
         });
         sendOkResponse(TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH, {});
-      }
-      return;
-  }
+      },
+    )
+    .exhaustive();
 };
 
 srv.listen(sockPath, async () => {
