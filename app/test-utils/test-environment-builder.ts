@@ -286,7 +286,7 @@ export class TestEnvironmentBuilder<
     });
   }
 
-  // TODO: Create an withWorker helper ;)
+  // TODO: Create a withWorker helper ;)
   withTimeSkippingTemporal(): TestEnvironmentBuilder<
     InjectorT,
     OverridesT,
