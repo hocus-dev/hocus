@@ -153,6 +153,7 @@ steps:
       TEST_STORAGE_DIR=/tmp/tests yarn run test:startTestManager > /dev/null &
       export P=\$! ;
       sleep 0.5;
+      set +e;
       TEST_STORAGE_DIR=/tmp/tests yarn test:backend;
       export R=\$?
       echo "Tests ended with status \$R";
@@ -178,6 +179,7 @@ steps:
       TEST_STORAGE_DIR=/srv/jailer/tests yarn run test:startTestManager > /dev/null &
       export P=\$! ;
       sleep 0.5;
+      set +e;
       TEST_STORAGE_DIR=/srv/jailer/tests yarn test:agent;
       export R=\$?
       echo "Tests ended with status \$R";
