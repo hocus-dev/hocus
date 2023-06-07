@@ -19,6 +19,8 @@ import { sleep, waitForPromises } from "~/utils.shared";
 
 jest.setTimeout(30000);
 
+jest.setTimeout(30000);
+
 const noSetupEnv = new TestEnvironmentBuilder(createAgentInjector).withLateInits({
   brService: async ({ injector }) => injector.resolve(Token.BlockRegistryService),
 });
