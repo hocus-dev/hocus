@@ -310,7 +310,7 @@ test.concurrent(
     const c1 = res[0][0];
     const c2 = res[1][0];
     expect(res).toEqual([Array(N).fill(c1), Array(N).fill(c2)]);
-    // Sanity check the container works
+    // Sanity check that the container works
     await brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV);
     await brService.expose(c2, EXPOSE_METHOD.BLOCK_DEV);
   }),
@@ -332,7 +332,7 @@ test.concurrent(
     const im1 = res[0][0];
     const im2 = res[1][0];
     expect(res).toEqual([Array(N).fill(im1), Array(N).fill(im2)]);
-    // Sanity check the image works
+    // Sanity check that the image works
     await brService.expose(im1, EXPOSE_METHOD.BLOCK_DEV);
     await brService.expose(im2, EXPOSE_METHOD.BLOCK_DEV);
   }),
@@ -344,7 +344,7 @@ test.concurrent(
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const c2 = await brService.createContainer(void 0, "c2", { mkfs: true, sizeInGB: 64 });
     // Do 5 runs to ensure we don't have races
-    // Especially when i first wrote this test the kernel literally blew up...
+    // Especially when I first wrote this test the kernel literally blew up...
     // https://lore.kernel.org/lkml/5f637569-36af-a8d0-e378-b27a63f08501@gmail.com/
     for (let run = 0; run < 5; run++) {
       const tasks: Promise<any>[][] = [[], [], [], []];
@@ -631,7 +631,7 @@ test.concurrent(
           `${tcmuSubtype}_${c1}`,
         ),
       );
-      // Oh no...
+      // Oh, no...
       await expect(brService["getTCMUAluaMembers"](`${tcmuSubtype}_${c1}`)).resolves.toEqual([
         randLun1,
         randLun2,
@@ -643,7 +643,7 @@ test.concurrent(
     await expect(brService["getTCMUAluaMembers"](`${tcmuSubtype}_${c1}`)).resolves.toEqual([
       randLun1,
     ]);
-    // Let's do it again but this time hide the block device
+    // Let's do it again, but this time hide the block device
     await simulateRaceF();
     await expect(fs.stat(path.join(brService["paths"].tcmLoopTarget, "lun", `lun_${randLun2}`)))
       .resolves;
