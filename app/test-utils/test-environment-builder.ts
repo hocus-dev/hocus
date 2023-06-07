@@ -35,7 +35,10 @@ const DB_HOST = process.env.DB_HOST ?? "localhost";
 type EarlyInitFunction = (ctx: {
   // The test run id
   runId: string;
-  // All startup tasks. If, for example, a startup task requires a db connection then the task may wait for it
+  // All EarlyInitFunctions are executed concurrently during init
+  // Here is a map of all the init promises in case you want to wait
+  // for some other init task to complete. For ex. if your init task
+  // has a dependency on the logger you may wait for it here
   earlyInitPromises: Record<string, Promise<any>>;
   // For closing open handles. Don't use this to guarantee some operation will be executed
   addTeardownFunction: (task: () => Promise<void>) => void;
@@ -51,7 +54,10 @@ type LateInitFunction<InjectorT, T> = (ctx: {
   injector: InjectorT;
   // The test run id
   runId: string;
-  // All startup tasks so if for ex a startup task requires a db connection then the task may wait for it
+  // All LateInitFunctions are executed concurrently during init
+  // Here is a map of all the init promises in case you want to wait
+  // for some other init task to complete. For ex. if your init task
+  // has a dependency on the logger you may wait for it here
   lateInitPromises: Record<string, Promise<any>>;
   // For closing open handles, don't use this to guarantee some operation will be executed
   addTeardownFunction: (task: () => Promise<void>) => void;
