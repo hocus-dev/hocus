@@ -64,6 +64,4 @@ vscode:
     - exiasr.hadolint
     # Shell script linter
     - timonwong.shellcheck
-    # Prose linter
-    - ChrisChinchilla.vale-vscode
     - valentjn.vscode-ltex
