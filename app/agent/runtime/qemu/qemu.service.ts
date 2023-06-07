@@ -1,3 +1,4 @@
+// cSpell: words nomodules mountdevice proactiveness noaux nomux nopnp dumbkbd unevictable ifname downscript hugepage mounttarget mountflags mountfstype wmarks SERIO ATKBD qcode blockdev ctrlaltdel
 import { spawn } from "child_process";
 import fs from "fs/promises";
 import type { SocketConstructorOpts } from "net";
@@ -328,7 +329,7 @@ export class QemuService implements HocusRuntime {
     // If /asf would be mounted before / then the /asf mount wouldn't be
     // the parent of the / mount, breaking the system.
     // We only care to sort the mount targets from top down
-    // This logic was omitted from the initrd cause it's easier to do it here
+    // This logic was omitted from the initrd because it's easier to do it here
     const mountOrder = Object.entries(config.fs).sort(
       ([pathA, _a], [pathB, _b]) => pathA.split("/").length - pathB.split("/").length,
     );
@@ -368,14 +369,14 @@ export class QemuService implements HocusRuntime {
       // The pipe is opened with O_RDWR even though the qemu process only reads from it.
       // This is because of how FIFOs work in linux - when the last writer closes the pipe,
       // the reader gets an EOF. When the VM receives an EOF on the stdin, it detaches
-      // serial input and we can no longer interact with its console. If we opened this pipe
+      // serial input, and we can no longer interact with its console. If we opened this pipe
       // as read only and later opened it again as a writer to run some commands, once we stopped
       // writing to it, the VM would receive an EOF and detach the serial input, making it impossible
       // to make any more writes. Since we open it as read/write here, there is always a writer and
       // the VM never receives an EOF.
       //
       // Learned how to open a FIFO here: https://github.com/firecracker-microvm/firecracker-go-sdk/blob/9a0d3b28f7f7ae1ac96e970dec4d28a09f10c4a9/machine.go#L742
-      // Learned about read/write/EOF behaviour here: https://stackoverflow.com/a/40390938
+      // Learned about read/write/EOF behavior here: https://stackoverflow.com/a/40390938
       const childStdin = await fs.open(stdinPath, FifoFlags.O_NONBLOCK | FifoFlags.O_RDWR, "0600");
       const childStdout = await fs.open(logPath, "a");
       const childStderr = await fs.open(logPath, "a");
@@ -514,7 +515,7 @@ export class QemuService implements HocusRuntime {
    * `CONFIG_SERIO_I8042` and `CONFIG_KEYBOARD_ATKBD` as per
    * https://github.com/firecracker-microvm/firecracker/blob/2b8ad83629af511f918d616aa1c0d441e52c397a/docs/api_requests/actions.md#intel-and-amd-only-sendctrlaltdel
    *
-   * Waits for the VM to shutdown.
+   * Waits for the VM to shut down.
    */
   private async shutdownVM(): Promise<void> {
     for (let retry = 0; retry < 2; retry += 1) {
@@ -595,7 +596,7 @@ export class QemuService implements HocusRuntime {
       process.kill(vmInfo.pid, "SIGKILL");
     }
 
-    // Give the kernel 0.5s to cleanup the process
+    // Give the kernel 0.5s to clean up the process
     let t3 = performance.now();
     while ((await isProcessAlive(vmInfo.pid)) && performance.now() - t3 < 500) {
       await sleep(100);

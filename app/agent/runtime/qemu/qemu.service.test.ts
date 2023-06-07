@@ -307,7 +307,7 @@ test.concurrent.each(
           const cpuInfo = (await execSshCmd({ ssh }, ["cat", "/proc/cpuinfo"])).stdout;
           expect(cpuInfo).toMatch(new RegExp(`^cpu cores.*?${vcpuCount}$`, "gm"));
           // Ram is more tricky and containers need a different test here
-          // Assert that the memory block size on the guest is 128MB
+          // Assert that the memory block size on the guest is 128 MB
           // block_size_bytes is in hex notation
           await expect(
             execSshCmd({ ssh }, ["cat", "/sys/devices/system/memory/block_size_bytes"]),

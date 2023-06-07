@@ -60,7 +60,7 @@
   "excalidraw.theme": "dark",
   "typescript.tsdk": "./node_modules/typescript/lib",
   "ltex.enabled": [
-    "bash",
+    "shellscript",
     "javascript",
     "javascriptreact",
     "typescript",

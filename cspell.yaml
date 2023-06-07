@@ -61,6 +61,7 @@ ignorePaths:
   - buildkite-agent.cfg.example
   - ops/bin/kvm-ok
 words:
+  - acpi
   - AESGCM
   - Alua
   - archivable
@@ -116,6 +117,7 @@ words:
   - netns
   - nologin
   - NOPASSWD
+  - nowait
   - nproc
   - oidc
   - overlaybd
@@ -127,6 +129,7 @@ words:
   - PGDATA
   - pgtmpfs
   - posthog
+  - postmigrate
   - POSTROUTING
   - poweroff
   - preauthkey
@@ -163,6 +166,7 @@ words:
   - tmpfs
   - typebox
   - typecheck
+  - unmap
   - upperdir
   - urandom
   - usermod
@@ -171,5 +175,6 @@ words:
   - veth
   - virt
   - virtio
+  - virtiofs
   - vmlinux
   - vpeer
