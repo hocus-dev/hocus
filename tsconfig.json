@@ -2,6 +2,7 @@
   "include": ["remix.env.d.ts", "**/*.ts", "**/*.tsx"],
   "exclude": ["extensions", "hocus-workspace"],
   "compilerOptions": {
+    "module": "commonjs",
     "lib": ["DOM", "DOM.Iterable", "ES2020"],
     "isolatedModules": true,
     "esModuleInterop": true,
