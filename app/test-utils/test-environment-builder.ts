@@ -28,15 +28,15 @@ import { sleep, waitForPromises } from "~/utils.shared";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
 
-// Early init functions operate before the dependency injector was created
+// Early init functions operate before the dependency injector is created
 // and are meant to asynchronously create nontrivial dependencies
 // The current DI framework doesn't allow resolving async dependencies
 type EarlyInitFunction = (ctx: {
   // The test run id
   runId: string;
-  // All startup tasks so if for ex a startup task requires a db connection then the task may wait for it
+  // All startup tasks. If, for example, a startup task requires a db connection then the task may wait for it
   earlyInitPromises: Record<string, Promise<any>>;
-  // For closing open handles, don't use this to guarantee some operation will be executed
+  // For closing open handles. Don't use this to guarantee some operation will be executed
   addTeardownFunction: (task: () => Promise<void>) => void;
 }) => Promise<ProvidersOverrides<any>>;
 type EarlyInitMap = Record<string, EarlyInitFunction>;
