@@ -1,13 +1,12 @@
 import type { SpawnOptionsWithoutStdio } from "child_process";
 import { spawn } from "child_process";
 import { createHash } from "crypto";
-import type { WriteStream } from "fs";
-import fs, { type FileHandle } from "fs/promises";
+import fs from "fs/promises";
 import path from "path";
 
 import type { Log } from "@prisma/client";
 import { Context } from "@temporalio/activity";
-import type { DefaultLogger } from "@temporalio/worker";
+import type { DefaultLogger, Logger } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from "node-ssh";
 import { NodeSSH } from "node-ssh";
@@ -84,50 +83,30 @@ export const execSshCmd = async (
     ssh: NodeSSH;
     opts?: SSHExecOptions;
     allowNonZeroExitCode?: boolean;
-    logFilePath?: string;
   },
   args: string[],
 ): Promise<SSHExecCommandResponse> => {
-  const { ssh, opts, logFilePath, allowNonZeroExitCode } = options;
-  let logFile: FileHandle | undefined = void 0;
-  let writeStream: WriteStream | undefined = void 0;
-  const writeF = (chunk: Buffer) => {
-    if (!unwrap(writeStream).write(chunk)) {
-      unwrap(writeStream).once("drain", () => {
-        writeF(chunk);
-      });
-    }
-  };
-  try {
-    if (logFilePath != null) {
-      logFile = await fs.open(logFilePath, "w");
-      writeStream = logFile.createWriteStream();
-    }
-    const output = await ssh.exec(args[0], args.slice(1), {
-      ...opts,
-      stream: "both",
-      ...(logFile != null
-        ? {
-            onStdout: writeF,
-            onStderr: writeF,
-          }
-        : {}),
-    });
-    if (!allowNonZeroExitCode && output.code !== 0) {
-      throw new Error(
-        `Command "${args.join(" ")}" failed with code ${output.code}, stdout:\n${
-          output.stdout
-        }\n\nstderr:\n${output.stderr}`,
-      );
-    }
-    return output;
-  } finally {
-    if (logFile != null) {
-      writeStream?.end();
-      writeStream?.close();
-      await logFile.close();
-    }
+  const { ssh, opts, allowNonZeroExitCode } = options;
+  const logger = (ssh as any)["_hocus_logger"] as Logger;
+
+  if (logger) {
+    logger.debug(`Executing command ${args} via SSH`);
+  } else {
+    // eslint-disable-next-line no-console
+    console.error(`No logger found. Executing command ${args} via SSH`);
   }
+  const output = await ssh.exec(args[0], args.slice(1), {
+    ...opts,
+    stream: "both",
+  });
+  if (!allowNonZeroExitCode && output.code !== 0) {
+    throw new Error(
+      `Command "${args.join(" ")}" failed with code ${output.code}, stdout:\n${
+        output.stdout
+      }\n\nstderr:\n${output.stderr}`,
+    );
+  }
+  return output;
 };
 
 export const withSsh = async <T>(
@@ -139,6 +118,7 @@ export const withSsh = async <T>(
   const ssh = await retry(
     async () => {
       if (abortController === void 0 || !abortController.signal.aborted) {
+        logger.debug("Trying to connect to VM via SSH");
         return await new NodeSSH().connect({
           keepaliveInterval: 250,
           keepaliveCountMax: 4,
@@ -155,6 +135,9 @@ export const withSsh = async <T>(
     if (abortController !== void 0) abortController.signal.throwIfAborted();
     throw new Error("Failed to establish ssh connection");
   }
+
+  logger.debug("Connected to VM via SSH");
+  (ssh as any)["_hocus_logger"] = logger;
 
   ssh.connection?.on("error", (err) => {
     logger.info(err.toString());

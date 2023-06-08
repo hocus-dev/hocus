@@ -162,7 +162,6 @@ export class QMPSocket extends EventEmitter {
   }
 }
 
-const CHROOT_PATH_TO_SOCK = "/run/sock";
 // https://github.com/torvalds/linux/blob/8b817fded42d8fe3a0eb47b1149d907851a3c942/include/uapi/linux/virtio_blk.h#L58
 const VIRTIO_BLK_ID_BYTES = 20;
 
@@ -176,10 +175,13 @@ export function factoryQemuService(
 factoryQemuService.inject = [Token.Logger, Token.Config, Token.WorkspaceNetworkService] as const;
 
 export class QemuService implements HocusRuntime {
+  private readonly storageRoot: string;
   private readonly qmpSocketPath: string;
-  private readonly instanceDir: string;
-  private readonly instanceDirRoot: string;
+  private readonly instanceStateDir: string;
   private readonly vmInfoFilePath: string;
+  private readonly consoleStdinFilePath: string;
+  private readonly consoleLogFilePath: string;
+
   private readonly agentConfig: ReturnType<Config["agent"]>;
 
   constructor(
@@ -189,10 +191,12 @@ export class QemuService implements HocusRuntime {
     public readonly instanceId: string,
   ) {
     this.agentConfig = config.agent();
-    this.instanceDir = `/srv/jailer/qemu/${instanceId}`;
-    this.instanceDirRoot = `${this.instanceDir}/root`;
-    this.vmInfoFilePath = `${this.instanceDirRoot}/vm-info.json`;
-    this.qmpSocketPath = path.join(this.instanceDirRoot, CHROOT_PATH_TO_SOCK);
+    this.storageRoot = this.agentConfig.runtimeStateRoot;
+    this.instanceStateDir = path.join(this.storageRoot, "qemu", "state", instanceId);
+    this.vmInfoFilePath = path.join(this.instanceStateDir, "/vm-info.json");
+    this.consoleLogFilePath = path.join(this.storageRoot, "qemu", "logs", `${instanceId}.log`);
+    this.consoleStdinFilePath = path.join("/tmp", instanceId, "/console.in");
+    this.qmpSocketPath = path.join("/tmp", instanceId, "/qmp-sock");
     if (this.qmpSocketPath.length > MAX_UNIX_SOCKET_PATH_LENGTH) {
       // https://blog.8-p.info/en/2020/06/11/unix-domain-socket-length/
       throw new Error(
@@ -205,14 +209,6 @@ export class QemuService implements HocusRuntime {
     // https://github.com/cloud-hypervisor/cloud-hypervisor/blob/6acceaa87cfd6327d99d212e3854cabf72c608cc/block_util/src/lib.rs#L82
     const st = await fs.stat(path);
     return `${st.dev}${st.rdev}${st.ino}`.substring(0, VIRTIO_BLK_ID_BYTES);
-  }
-
-  private getVMLogsPath(): string {
-    return `/srv/jailer/qemu/logs/${this.instanceId}.log`;
-  }
-
-  private getStdinPath(): string {
-    return `/tmp/${this.instanceId}.stdin`;
   }
 
   private async writeVmInfoFile(args: { pid: number; ipBlockId: number }): Promise<void> {
@@ -343,9 +339,13 @@ export class QemuService implements HocusRuntime {
       }),
     );
 
-    const stdinPath = this.getStdinPath();
-    const logPath = this.getVMLogsPath();
-    for (const filePath of [stdinPath, logPath, this.qmpSocketPath]) {
+    // TODO: abort if vmInfoFilePath exists
+    for (const filePath of [
+      this.vmInfoFilePath,
+      this.consoleStdinFilePath,
+      this.consoleLogFilePath,
+      this.qmpSocketPath,
+    ]) {
       if (path.dirname(filePath) !== "/tmp") {
         await fs.mkdir(path.dirname(filePath), { recursive: true });
       }
@@ -365,7 +365,7 @@ export class QemuService implements HocusRuntime {
       const ipArg = `${vmIp}::${tapIfIp}:${mask}::eth0:off:8.8.8.8`;
 
       this.logger.info("opening stdin");
-      await execCmd("mkfifo", stdinPath);
+      await execCmd("mkfifo", this.consoleStdinFilePath);
       // The pipe is opened with O_RDWR even though the qemu process only reads from it.
       // This is because of how FIFOs work in linux - when the last writer closes the pipe,
       // the reader gets an EOF. When the VM receives an EOF on the stdin, it detaches
@@ -377,9 +377,13 @@ export class QemuService implements HocusRuntime {
       //
       // Learned how to open a FIFO here: https://github.com/firecracker-microvm/firecracker-go-sdk/blob/9a0d3b28f7f7ae1ac96e970dec4d28a09f10c4a9/machine.go#L742
       // Learned about read/write/EOF behavior here: https://stackoverflow.com/a/40390938
-      const childStdin = await fs.open(stdinPath, FifoFlags.O_NONBLOCK | FifoFlags.O_RDWR, "0600");
-      const childStdout = await fs.open(logPath, "a");
-      const childStderr = await fs.open(logPath, "a");
+      const childStdin = await fs.open(
+        this.consoleStdinFilePath,
+        FifoFlags.O_NONBLOCK | FifoFlags.O_RDWR,
+        "0600",
+      );
+      const childStdout = await fs.open(this.consoleLogFilePath, "a");
+      const childStderr = await fs.open(this.consoleLogFilePath, "a");
       let diskCtr = 1;
       const qemuExited = new AbortController();
       const cp = spawn(
@@ -611,7 +615,7 @@ export class QemuService implements HocusRuntime {
   }
 
   private async deleteVMDir(): Promise<void> {
-    await fs.rm(this.instanceDir, { recursive: true, force: true });
+    await fs.rm(this.instanceStateDir, { recursive: true, force: true });
   }
 
   /** Stops the VM and cleans up its resources. Idempotent. */

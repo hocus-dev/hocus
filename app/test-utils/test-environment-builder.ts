@@ -340,12 +340,13 @@ export class TestEnvironmentBuilder<
             { runId },
           );
           const blockRegistryRoot = join(rsp.dirPath, "block-registry");
+          const runtimeStateRoot = join(rsp.dirPath, "runtime");
           return {
             [Token.Config]: {
               provide: {
                 value: {
                   ...defaultConfig,
-                  agent: () => ({ ...defaultConfig.agent(), blockRegistryRoot }),
+                  agent: () => ({ ...defaultConfig.agent(), blockRegistryRoot, runtimeStateRoot }),
                 },
               },
             },
