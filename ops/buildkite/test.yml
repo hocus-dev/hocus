@@ -124,15 +124,6 @@ steps:
               command: ["."]
               image: "imunew/typos-cli:latest"
 
-      - label: ":man_in_lotus_position::skin-tone-6: vale"
-        plugins:
-          - docker#v5.6.0:
-              command: ["/workdir/"]
-              image: "jdkato/vale:latest"
-        # TODO: This will be fixed in a separate PR xd
-        soft_fail:
-          - exit_status: 1
-
   - label: ":smoking: Deploy smoke test"
     command: "ls"
     env:
