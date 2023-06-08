@@ -119,7 +119,7 @@ export class AgentUtilService {
             },
           },
         },
-        ["bash", "-c", `echo -n "$FILE_CONTENT" > ${path}`],
+        ["sh", "-c", `echo -n "$FILE_CONTENT" > ${path}`],
       );
     } catch (err) {
       throw new Error(`Failed to write file "${path}": ${(err as any)?.message}`);
