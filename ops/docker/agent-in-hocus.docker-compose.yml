@@ -10,6 +10,8 @@ services:
     image: worker-dev
     restart: "no"
     privileged: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${NO_EXPOSE_PORTS-8822:}22"
     volumes:

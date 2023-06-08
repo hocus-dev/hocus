@@ -40,6 +40,12 @@ tasks:
     workspace: |
       sudo mkdir -p /home/hocus/dev/hocus-resources/tests
       sudo TEST_STORAGE_DIR=/home/hocus/dev/hocus-resources/tests yarn run test:startTestManager
+  - name: Zot
+    prebuild: |
+      sleep 0.01
+    workspaceShell: fish
+    workspace: |
+      zot serve ops/docker/zot/config-workspace.json
   - name: Terminal
     prebuild: sleep 0.01
     workspaceShell: fish
