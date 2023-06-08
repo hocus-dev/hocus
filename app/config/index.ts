@@ -70,6 +70,7 @@ export const config = makeConfig()({
     createDevelopmentProjects:
       (process.env.AGENT_DEV_CREATE_DEVELOPMENT_PROJECTS ?? "false") === "true",
     blockRegistryRoot: "/srv/jailer/block-registry/",
+    runtimeStateRoot: "/srv/jailer/runtime/",
     blockRegistryConfigFsPath: "/sys/kernel/config",
   }),
   hocusRepoAccess: () => ({
