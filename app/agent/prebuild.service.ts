@@ -33,13 +33,13 @@ import {
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
 import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
-import { doesFileExist, execCmd, execSshCmd, withFileLock } from "./utils";
+import { execCmd, execSshCmd, withFileLock } from "./utils";
 
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
 import { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
-import { sha256 } from "~/utils.shared";
+import { doesFileExist, sha256 } from "~/utils.server";
 import { displayError, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
 export class PrebuildService {

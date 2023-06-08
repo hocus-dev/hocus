@@ -4,7 +4,7 @@ import { execSshCmd } from "./utils";
 
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
-import { sha256 } from "~/utils.shared";
+import { sha256 } from "~/utils.server";
 import { waitForPromises } from "~/utils.shared";
 
 const DOCKERFILE_1 = `FROM ubuntu:latest

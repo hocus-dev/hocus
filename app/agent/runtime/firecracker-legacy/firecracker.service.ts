@@ -15,14 +15,7 @@ import { fetch, Agent } from "undici";
 import type { AgentUtilService } from "../../agent-util.service";
 import { JAILER_GROUP_ID, JAILER_USER_ID, MAX_UNIX_SOCKET_PATH_LENGTH } from "../../constants";
 import { FifoFlags } from "../../fifo-flags";
-import {
-  doesFileExist,
-  execCmd,
-  execSshCmd,
-  retry,
-  watchFileUntilLineMatches,
-  withSsh,
-} from "../../utils";
+import { execCmd, execSshCmd, retry, watchFileUntilLineMatches, withSsh } from "../../utils";
 import type { VmInfo } from "../vm-info.validator";
 import { VmInfoValidator } from "../vm-info.validator";
 
@@ -31,6 +24,7 @@ import { VMS_NS_PATH } from "~/agent/network/workspace-network.service";
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
 import { Token } from "~/token";
+import { doesFileExist } from "~/utils.server";
 import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
 const CHROOT_PATH_TO_SOCK = "/run/sock";

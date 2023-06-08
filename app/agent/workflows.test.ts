@@ -13,7 +13,7 @@ import type { AgentInjector } from "./agent-injector";
 import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { execSshCmdThroughProxy } from "./test-utils";
-import { doesFileExist, retry, sleep } from "./utils";
+import { retry, sleep } from "./utils";
 import {
   runBuildfsAndPrebuilds,
   runAddProjectAndRepository,
@@ -35,6 +35,7 @@ import { provideDb } from "~/test-utils/db.server";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
+import { doesFileExist } from "~/utils.server";
 import { unwrap, waitForPromises, formatBranchName, numericSort } from "~/utils.shared";
 
 const provideActivities = (

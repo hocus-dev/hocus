@@ -13,6 +13,7 @@ import lockfile from "proper-lockfile";
 import { Tail } from "tail";
 import type { Object } from "ts-toolbelt";
 
+import { doesFileExist } from "~/utils.server";
 import { unwrap } from "~/utils.shared";
 
 export const execCmd = async (...args: string[]): Promise<{ stdout: string; stderr: string }> => {
@@ -250,18 +251,6 @@ export const retry = async <T>(
     }
   }
   throw lastError;
-};
-
-export const doesFileExist = async (filePath: string): Promise<boolean> => {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch (err: any) {
-    if (err?.code === "ENOENT") {
-      return false;
-    }
-    throw err;
-  }
 };
 
 export const isProcessAlive = async (pid: number): Promise<boolean> => {

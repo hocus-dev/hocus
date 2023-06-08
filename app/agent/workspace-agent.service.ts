@@ -22,10 +22,11 @@ import type { SSHGatewayService } from "./network/ssh-gateway.service";
 import type { WorkspaceNetworkService } from "./network/workspace-network.service";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
-import { doesFileExist, execCmd, execSshCmd } from "./utils";
+import { execCmd, execSshCmd } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
+import { doesFileExist } from "~/utils.server";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 export class InvalidWorkspaceStatusError extends Error {}

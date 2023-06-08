@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import type { GitRepository } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { SshKeyPairType } from "@prisma/client";
@@ -10,6 +8,7 @@ import type { GitRepoConnectionStatus } from "./types.shared";
 import type { SshKeyService } from "~/ssh-key/ssh-key.service";
 import type { TimeService } from "~/time.service";
 import { Token } from "~/token";
+import { sha256 } from "~/utils.server";
 
 export class GitService {
   static inject = [Token.SshKeyService, Token.TimeService] as const;
@@ -173,11 +172,7 @@ export class GitService {
       randomId: string;
     };
   }): string {
-    const sha256 = createHash("sha256");
-    sha256.update(args.gitRepositoryUrl);
-    const hash = sha256.digest("hex");
-
-    let tag = hash;
+    let tag = sha256(args.gitRepositoryUrl);
     if (args.extras != null) {
       tag += `-${Math.floor(args.extras.lastFetchAt.getTime() / 1000)}`;
       tag += `-${args.extras.randomId}`;
