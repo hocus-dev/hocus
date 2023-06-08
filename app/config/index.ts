@@ -43,8 +43,13 @@ export const config = makeConfig()({
     buildfsRootFs: get("AGENT_BUILDFS_ROOTFS", "/srv/jailer/resources/buildfs.ext4"),
     // `get` is not used here because users usually will not want to set these manually
     // in production. `get` would throw an error if the env var was not set.
-    fetchRepositoryRootFs:
-      process.env.AGENT_FETCH_REPOSITORY_ROOTFS_PATH ?? "/srv/jailer/resources/fetchrepo.ext4",
+    fetchRepoImageTag:
+      process.env.AGENT_FETCH_REPO_IMAGE_TAG ?? "quay.io/hocus/fetchrepo:07-06-2023",
+    // has no effect currently because the overlaybd convertor enforces a max size of 64 GB
+    fetchRepoRepoFsMaxSizeGb: parseIntWithMin(
+      process.env.AGENT_FETCH_REPO_REPO_FS_MAX_SIZE_GB ?? "512",
+      1,
+    ),
     checkoutAndInspectRootFs:
       process.env.AGENT_CHECKOUT_AND_INSPECT_ROOTFS_PATH ??
       "/srv/jailer/resources/checkout-and-inspect.ext4",

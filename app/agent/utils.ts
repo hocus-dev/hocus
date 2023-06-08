@@ -1,6 +1,5 @@
 import type { SpawnOptionsWithoutStdio } from "child_process";
 import { spawn } from "child_process";
-import { createHash } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 
@@ -267,10 +266,6 @@ export const doesFileExist = async (filePath: string): Promise<boolean> => {
 
 export const isProcessAlive = async (pid: number): Promise<boolean> => {
   return await doesFileExist(path.join("/proc", pid.toString()));
-};
-
-export const sha256 = (str: Buffer | string): string => {
-  return createHash("sha256").update(str).digest("hex");
 };
 
 const lockedFilePaths = new Map<string, { mutex: Mutex; numLocks: number }>();

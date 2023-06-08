@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { GitBranch, GitObject, GitRepositoryFile, File } from "@prisma/client";
+import type { GitBranch, GitObject, File } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { AgentUtilService } from "../agent-util.service";
 import type { BlockRegistryService } from "../block-registry/registry.service";
 import { EXPOSE_METHOD } from "../block-registry/registry.service";
-import { getTagLockFile, withExposedImage } from "../block-registry/utils";
+import { getTagLockFile, withExposedImages } from "../block-registry/utils";
 import { HOST_PERSISTENT_DIR, PROJECT_DIR } from "../constants";
 import type { HocusRuntime } from "../runtime/hocus-runtime";
 import { execCmdWithOpts, execSshCmd, withFileLockCreateIfNotExists } from "../utils";
@@ -19,7 +19,7 @@ import { RemoteInfoTupleValidator } from "./validator";
 import type { Config } from "~/config";
 import type { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
-import { displayError, unwrap, waitForPromises } from "~/utils.shared";
+import { displayError, sha256, unwrap, waitForPromises } from "~/utils.shared";
 
 export interface GitRemoteInfo {
   /** The name of the remote, e.g. `refs/heads/master` */
@@ -295,14 +295,32 @@ export class AgentGitService {
     },
   ): Promise<void> {
     const lockFile = getTagLockFile(imageTag);
+    const localRootFsImageTag = sha256(this.agentConfig.fetchRepoImageTag);
+    const rootFsImageId = this.blockRegistryService.genImageId(localRootFsImageTag);
+    if (!(await this.blockRegistryService.hasImage(rootFsImageId))) {
+      await this.blockRegistryService.loadImageFromRemoteRepo(
+        this.agentConfig.fetchRepoImageTag,
+        localRootFsImageTag,
+      );
+    }
+    const rootFsContainerId = await this.blockRegistryService.createContainer(
+      rootFsImageId,
+      localRootFsImageTag,
+    );
+
     return await withFileLockCreateIfNotExists(lockFile, async () => {
-      const containerId = await this.blockRegistryService.createContainer(void 0, imageTag);
-      const outputDir = "/tmp/output";
-      await withExposedImage(
+      const containerId = await this.blockRegistryService.createContainer(void 0, imageTag, {
+        mkfs: true,
+        sizeInGB: this.agentConfig.fetchRepoRepoFsMaxSizeGb,
+      });
+      const outputDir = "/fr";
+      await withExposedImages(
         this.blockRegistryService,
-        containerId,
-        EXPOSE_METHOD.BLOCK_DEV,
-        async (exposedImage) => {
+        [
+          [rootFsContainerId, EXPOSE_METHOD.BLOCK_DEV],
+          [containerId, EXPOSE_METHOD.BLOCK_DEV],
+        ] as const,
+        async ([exposedRootFsContainer, exposedRepoContainer]) => {
           await runtime.withRuntime(
             {
               ssh: {
@@ -311,7 +329,8 @@ export class AgentGitService {
               },
               kernelPath: this.agentConfig.defaultKernel,
               fs: {
-                [outputDir]: exposedImage,
+                "/": exposedRootFsContainer,
+                [outputDir]: exposedRepoContainer,
               },
               memSizeMib: 4096,
               vcpuCount: 2,

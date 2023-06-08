@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+
 import { GroupError } from "./group-error";
 
 export const unwrap = <T>(value: T | undefined | null): T => {
@@ -118,4 +120,8 @@ export const max = (a: number, b: number): number => {
 
 export const formatBranchName = (name: string): string => {
   return name.replace(/^refs\/heads\//, "");
+};
+
+export const sha256 = (str: Buffer | string): string => {
+  return createHash("sha256").update(str).digest("hex");
 };

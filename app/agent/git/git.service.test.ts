@@ -17,6 +17,8 @@ import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
+jest.setTimeout(30000);
+
 const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging();
 
 test.concurrent(
