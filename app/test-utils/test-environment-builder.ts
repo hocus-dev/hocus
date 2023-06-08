@@ -28,6 +28,26 @@ import { sleep, waitForPromises } from "~/utils.shared";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
 
+// WARNING: Only use this in tests in you know what you're doing
+export function discoverCaller(): string {
+  let caller = "[UNKNOWN]";
+  // Play some 4D chess
+  const o = Error.prepareStackTrace;
+  try {
+    if (o) {
+      Error.prepareStackTrace = (err, stackTraces) => {
+        // We need to use the original formatter for source maps to apply properly
+        caller = o(err, [stackTraces[2]]).match(/.*?\((.*)\)/)[1];
+      };
+      const a = new Error();
+      void a.stack;
+    }
+  } finally {
+    Error.prepareStackTrace = o;
+  }
+  return caller;
+}
+
 // Early init functions run before the dependency injector is created,
 // and their results are used to override the default providers.
 // They are used to asynchronously create nontrivial dependencies because
@@ -87,11 +107,8 @@ export class TestEnvironmentBuilder<
       >,
     ) => Promise<void>,
   ): () => Promise<void> {
+    const testLocation = discoverCaller();
     return async () => {
-      let testName = "";
-      try {
-        testName = expect.getState().currentTestName ?? "";
-      } catch (_err) {}
       let teardownTasks: (() => Promise<void>)[] = [];
       const addTeardownFunction = (task: () => Promise<void>): void => {
         teardownTasks.push(task);
@@ -148,7 +165,7 @@ export class TestEnvironmentBuilder<
         return res;
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error(`[${testName}] Failed test run`, runId, err, JSON.stringify(err));
+        console.error(`[${testLocation}]\nFailed test run`, runId, err, JSON.stringify(err));
         throw err;
       } finally {
         const rsp = await this.#getStateManager().mkRequest(
@@ -160,7 +177,7 @@ export class TestEnvironmentBuilder<
         );
         if (rsp.artifactsMsg) {
           // eslint-disable-next-line no-console
-          console.error(`[${testName}] ${rsp.artifactsMsg}`);
+          console.error(`[${testLocation}]\n${rsp.artifactsMsg}`);
         }
         await waitForPromises(teardownTasks.map((teardownFn) => teardownFn()));
       }
