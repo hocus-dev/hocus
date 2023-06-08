@@ -418,7 +418,7 @@ export class QemuService implements HocusRuntime {
           "--kernel",
           kernelPath,
           "--append",
-          `reboot=k panic=-1 kernel.ctrlaltdel=0 nomodules random.trust_cpu=on i8042.noaux i8042.nomux i8042.nopnp i8042.dumbkbd ${
+          `systemd.firstboot=off reboot=k panic=-1 kernel.ctrlaltdel=0 nomodules random.trust_cpu=on i8042.noaux i8042.nomux i8042.nopnp i8042.dumbkbd ${
             /* Custom boot parameters are handled by the custom initrd */
             mountOrder
               .map(

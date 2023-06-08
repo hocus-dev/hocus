@@ -335,6 +335,7 @@ export class BlockRegistryService {
       await execCmd(
         "skopeo",
         "copy",
+        ...(process.env.OCI_PROXY ? ["--src-tls-verify=false"] : []),
         "--multi-arch",
         "system",
         "--dest-oci-accept-uncompressed-layers",

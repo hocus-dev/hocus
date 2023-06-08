@@ -1,4 +1,4 @@
-import testImages from "../../block-registry/test-data/test_images.json";
+import { testImages } from "../../block-registry/test-data/test-images.const";
 import { execSshCmd, isProcessAlive, sleep } from "../../utils";
 
 import { createAgentInjector } from "~/agent/agent-injector";
@@ -13,6 +13,11 @@ const testCases = [
   ["Debian Buster", testImages.testDebianBuster],
   ["Ubuntu Focal", testImages.testUbuntuFocal],
   ["Ubuntu Jammy", testImages.testUbuntuJammy],
+  // TODO: Enable when the oci proxy is deployed in CI
+  //       I've tested that those images work locally
+  //       and they even found one bug :3
+  //["Archlinux", testImages.testArchlinux],
+  //["NixOS", testImages.testNixos],
 ];
 
 const testEnv = new TestEnvironmentBuilder(createAgentInjector)
