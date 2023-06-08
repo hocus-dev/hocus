@@ -200,7 +200,7 @@ test.concurrent(
 );
 
 test.concurrent(
-  "getOrCreateGitRepositoryFile",
+  "getOrCreateGitRepoImage",
   testEnv.withTestDb().run(async ({ injector, db }) => {
     const appGitService = injector.resolve(Token.GitService);
     const gitService = injector.resolve(Token.AgentGitService);
@@ -218,13 +218,13 @@ test.concurrent(
     const agentInstance = await db.$transaction((tdb) =>
       agentUtilService.getOrCreateSoloAgentInstance(tdb),
     );
-    const files = await waitForPromises(
+    const images = await waitForPromises(
       Array.from({ length: 10 }).map(() =>
         db.$transaction((tdb) =>
-          gitService.getOrCreateGitRepositoryFile(tdb, agentInstance.id, repo.id),
+          gitService.getOrCreateGitRepoImage(tdb, agentInstance.id, repo.id),
         ),
       ),
     );
-    expect(files.every((f) => f.id === files[0].id)).toBe(true);
+    expect(images.every((f) => f.id === images[0].id)).toBe(true);
   }),
 );

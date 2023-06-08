@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { GitBranch, GitObject, File } from "@prisma/client";
+import type { GitBranch, GitObject, GitRepositoryImage, LocalOciImage } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
@@ -10,7 +10,7 @@ import type { AgentUtilService } from "../agent-util.service";
 import type { BlockRegistryService } from "../block-registry/registry.service";
 import { EXPOSE_METHOD } from "../block-registry/registry.service";
 import { getTagLockFile, withExposedImages } from "../block-registry/utils";
-import { HOST_PERSISTENT_DIR, PROJECT_DIR } from "../constants";
+import { PROJECT_DIR } from "../constants";
 import type { HocusRuntime } from "../runtime/hocus-runtime";
 import { execCmdWithOpts, execSshCmd, withFileLockCreateIfNotExists } from "../utils";
 
@@ -19,7 +19,8 @@ import { RemoteInfoTupleValidator } from "./validator";
 import type { Config } from "~/config";
 import type { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
-import { displayError, sha256, unwrap, waitForPromises } from "~/utils.shared";
+import { sha256 } from "~/utils.server";
+import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
 export interface GitRemoteInfo {
   /** The name of the remote, e.g. `refs/heads/master` */
@@ -408,51 +409,72 @@ export class AgentGitService {
     });
   }
 
-  async getOrCreateGitRepositoryFile(
+  async getOrCreateGitRepoImage(
     db: Prisma.TransactionClient,
     agentInstanceId: bigint,
     gitRepositoryId: bigint,
   ): Promise<
-    GitRepositoryFile & {
-      file: File;
+    GitRepositoryImage & {
+      localOciImage: LocalOciImage;
     }
   > {
-    let gitRepositoryFile = await db.gitRepositoryFile.findUnique({
+    let gitRepoImage = await db.gitRepositoryImage.findUnique({
       // eslint-disable-next-line camelcase
       where: { gitRepositoryId_agentInstanceId: { gitRepositoryId, agentInstanceId } },
-      include: { file: true },
+      include: { localOciImage: true },
     });
-    if (gitRepositoryFile != null) {
-      return gitRepositoryFile;
+    if (gitRepoImage != null) {
+      return gitRepoImage;
     }
 
     await db.$executeRawUnsafe(
-      `LOCK TABLE "${Prisma.ModelName.GitRepositoryFile}" IN SHARE UPDATE EXCLUSIVE MODE`,
+      `LOCK TABLE "${Prisma.ModelName.GitRepositoryImage}" IN SHARE UPDATE EXCLUSIVE MODE`,
     );
 
-    gitRepositoryFile = await db.gitRepositoryFile.findUnique({
+    gitRepoImage = await db.gitRepositoryImage.findUnique({
       // eslint-disable-next-line camelcase
       where: { gitRepositoryId_agentInstanceId: { gitRepositoryId, agentInstanceId } },
-      include: { file: true },
+      include: { localOciImage: true },
     });
-    if (gitRepositoryFile != null) {
-      return gitRepositoryFile;
+    if (gitRepoImage != null) {
+      return gitRepoImage;
     }
-
-    const file = await db.file.create({
-      data: {
-        agentInstanceId,
-        path: path.join(HOST_PERSISTENT_DIR, "repositories", `${uuidv4()}.ext4`),
+    const repo = await db.gitRepository.findUniqueOrThrow({
+      where: {
+        id: gitRepositoryId,
+      },
+      select: {
+        url: true,
       },
     });
-    return await db.gitRepositoryFile.create({
+    const imageTag = sha256(repo.url);
+    return await db.gitRepositoryImage.create({
       data: {
-        gitRepositoryId,
-        fileId: file.id,
-        agentInstanceId,
+        gitRepository: {
+          connect: {
+            id: gitRepositoryId,
+          },
+        },
+        agentInstance: {
+          connect: {
+            id: agentInstanceId,
+          },
+        },
+        imageAgentMatch: {},
+        localOciImage: {
+          create: {
+            tag: imageTag,
+            readonly: false,
+            agentInstance: {
+              connect: {
+                id: agentInstanceId,
+              },
+            },
+          },
+        },
       },
       include: {
-        file: true,
+        localOciImage: true,
       },
     });
   }
