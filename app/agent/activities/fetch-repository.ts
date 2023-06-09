@@ -10,13 +10,10 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
   ({ injector, db }) =>
   async (gitRepositoryId) => {
     const instanceId = `fetchrepo-${uuidv4()}`;
-    const firecrackerService = injector.resolve(Token.FirecrackerService)(instanceId);
+    const runtimeService = injector.resolve(Token.QemuService)(instanceId);
     const gitService = injector.resolve(Token.AgentGitService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const perfService = injector.resolve(Token.PerfService);
-    const maxRepositoryDriveSizeMib = injector
-      .resolve(Token.Config)
-      .shared().maxRepositoryDriveSizeMib;
     perfService.log("fetchRepository", "start", gitRepositoryId);
     await runActivityHeartbeat({ intervalMs: 5000 }, async () => {
       const repo = await db.gitRepository.findUniqueOrThrow({
@@ -25,23 +22,16 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
           sshKeyPair: true,
         },
       });
-      const repoFile = await db.$transaction(async (tdb) => {
+      const repoImage = await db.$transaction(async (tdb) => {
         const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(tdb);
-        return await gitService.getOrCreateGitRepositoryFile(tdb, agentInstance.id, repo.id);
+        return await gitService.getOrCreateGitRepoImage(tdb, agentInstance.id, repo.id);
       });
-      await gitService.fetchRepository(
-        firecrackerService,
-        {
-          pathOnHost: repoFile.file.path,
-          maxSizeMiB: maxRepositoryDriveSizeMib,
+      await gitService.fetchRepository(runtimeService, repoImage.localOciImage.tag, {
+        url: repo.url,
+        credentials: {
+          privateSshKey: repo.sshKeyPair.privateKey,
         },
-        {
-          url: repo.url,
-          credentials: {
-            privateSshKey: repo.sshKeyPair.privateKey,
-          },
-        },
-      );
+      });
     });
     perfService.log("fetchRepository", "end", gitRepositoryId);
   };
