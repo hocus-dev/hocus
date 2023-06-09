@@ -17,6 +17,9 @@ import { P, match } from "ts-pattern";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { VMTaskOutput } from "./agent-util.types";
+import type { BlockRegistryService } from "./block-registry/registry.service";
+import { EXPOSE_METHOD } from "./block-registry/registry.service";
+import { getTagLockFile, withExposedImages } from "./block-registry/utils";
 import type { BuildfsService } from "./buildfs.service";
 import {
   HOST_PERSISTENT_DIR,
@@ -33,13 +36,14 @@ import {
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
 import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
-import { execCmd, execSshCmd, withFileLock } from "./utils";
+import type { HocusRuntime } from "./runtime/hocus-runtime";
+import { execCmd, execSshCmd, withFileLockCreateIfNotExists } from "./utils";
 
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
 import { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
-import { doesFileExist, sha256 } from "~/utils.server";
+import { sha256 } from "~/utils.server";
 import { displayError, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
 
 export class PrebuildService {
@@ -49,6 +53,7 @@ export class PrebuildService {
     Token.ProjectConfigService,
     Token.BuildfsService,
     Token.PerfService,
+    Token.BlockRegistryService,
     Token.Config,
   ] as const;
   private readonly agentConfig: ReturnType<Config["agent"]>;
@@ -59,6 +64,7 @@ export class PrebuildService {
     private readonly projectConfigService: ProjectConfigService,
     private readonly buildfsService: BuildfsService,
     private readonly perfService: PerfService,
+    private readonly brService: BlockRegistryService,
     config: Config,
   ) {
     this.agentConfig = config.agent();
@@ -296,104 +302,118 @@ export class PrebuildService {
    * `null` is returned.
    */
   async checkoutAndInspect(args: {
-    fcService: FirecrackerService;
-    /** Should point to the output of `fetchRepository` on host */
-    repositoryDrivePath: string;
+    runtime: HocusRuntime;
+    /** The tag of the image with the git repository */
+    repoImageTag: string;
     /** The repository will be checked out to this branch. */
     targetBranch: string;
-    /** A new drive will be created at this path on host. */
-    outputDrivePath: string;
+    /** A new image will be created with this output id. */
+    outputId: string;
     /** Relative paths to directories where `hocus.yml` files are located in the repository. */
     projectConfigPaths: string[];
   }): Promise<
     ({ projectConfig: ProjectConfig; imageFileHash: string | null } | null | ValidationError)[]
   > {
-    if (await doesFileExist(args.outputDrivePath)) {
-      this.logger.warn(
-        `output drive already exists at "${args.outputDrivePath}", it will be overwritten`,
+    const repoImageId = await this.brService.genContainerId(args.repoImageTag);
+    const outputImageId = await withFileLockCreateIfNotExists(
+      getTagLockFile(args.repoImageTag),
+      async () => {
+        return this.brService.commitContainer(repoImageId, args.outputId, {
+          removeContainer: false,
+        });
+      },
+    );
+    const outputContainerId = await this.brService.createContainer(outputImageId, args.outputId);
+
+    const localRootFsImageTag = sha256(this.agentConfig.checkoutAndInspectImageTag);
+    const rootFsImageId = this.brService.genImageId(localRootFsImageTag);
+    if (!(await this.brService.hasImage(rootFsImageId))) {
+      await this.brService.loadImageFromRemoteRepo(
+        this.agentConfig.checkoutAndInspectImageTag,
+        localRootFsImageTag,
       );
     }
-    await fs.mkdir(path.dirname(args.outputDrivePath), { recursive: true });
-    await withFileLock(args.repositoryDrivePath, async () => {
-      await execCmd("cp", "--sparse=always", args.repositoryDrivePath, args.outputDrivePath);
-    });
-    const workdir = "/tmp/workdir";
-    try {
-      return await args.fcService.withVM(
-        {
-          ssh: {
-            username: "hocus",
-            privateKey: this.agentConfig.prebuildSshPrivateKey,
-          },
-          kernelPath: this.agentConfig.defaultKernel,
-          rootFsPath: this.agentConfig.checkoutAndInspectRootFs,
-          copyRootFs: true,
-          extraDrives: [{ pathOnHost: args.outputDrivePath, guestMountPath: workdir }],
-          memSizeMib: 4096,
-          vcpuCount: 2,
-        },
-        async ({ ssh }) => {
-          const repoPath = `${workdir}/project`;
-
-          await execSshCmd({ ssh, opts: { cwd: repoPath } }, [
-            "git",
-            "checkout",
-            args.targetBranch,
-          ]);
-          const configs: (ProjectConfig | null | ValidationError)[] = mapOverNull(
-            await waitForPromises(
-              args.projectConfigPaths.map((p) =>
-                this.projectConfigService.getConfig(ssh, repoPath, p),
-              ),
-            ),
-            (c) => {
-              if (c instanceof ValidationError || c == null) {
-                return c;
-              }
-              return c[0];
+    // TODO: remove the output image once the block registry supports garbage collection
+    const workdir = "/workdir";
+    return await withExposedImages(
+      this.brService,
+      [
+        [rootFsImageId, EXPOSE_METHOD.BLOCK_DEV],
+        [outputContainerId, EXPOSE_METHOD.BLOCK_DEV],
+      ] as const,
+      async ([rootFsSpec, workdirFsSpec]) =>
+        args.runtime.withRuntime(
+          {
+            ssh: {
+              username: "hocus",
+              password: "hocus",
             },
-          );
-          return await waitForPromises(
-            configs.map(async (config, idx) => {
-              if (config == null || config instanceof ValidationError) {
-                return config;
-              }
-              const pathToImageFile = path.join(
-                repoPath,
-                args.projectConfigPaths[idx],
-                config.image.file,
-              );
-              const imageFile = await this.agentUtilService.readFile(ssh, pathToImageFile);
-              let externalFilesHash: null | string = null;
-              try {
-                const externalFilesPaths =
-                  this.buildfsService.getExternalFilePathsFromDockerfile(imageFile);
-                const absoluteFilePaths = externalFilesPaths.map((p) =>
-                  path.join(repoPath, args.projectConfigPaths[idx], config.image.buildContext, p),
-                );
-                externalFilesHash = await this.buildfsService.getSha256FromFiles(
-                  ssh,
-                  repoPath,
-                  absoluteFilePaths,
-                );
-              } catch (err) {
-                this.logger.error(displayError(err));
-              }
-              const imageFileHash = sha256(imageFile);
+            fs: {
+              "/": rootFsSpec,
+              [workdir]: workdirFsSpec,
+            },
+            memSizeMib: 4096,
+            vcpuCount: 2,
+          },
+          async ({ ssh }) => {
+            const repoPath = `${workdir}/project`;
 
-              return {
-                projectConfig: config,
-                imageFileHash:
-                  externalFilesHash === null ? null : imageFileHash + externalFilesHash,
-              };
-            }),
-          );
-        },
-      );
-    } catch (err) {
-      await fs.unlink(args.outputDrivePath);
-      throw err;
-    }
+            await execSshCmd({ ssh, opts: { cwd: repoPath } }, [
+              "git",
+              "checkout",
+              args.targetBranch,
+            ]);
+            const configs: (ProjectConfig | null | ValidationError)[] = mapOverNull(
+              await waitForPromises(
+                args.projectConfigPaths.map((p) =>
+                  this.projectConfigService.getConfig(ssh, repoPath, p),
+                ),
+              ),
+              (c) => {
+                if (c instanceof ValidationError || c == null) {
+                  return c;
+                }
+                return c[0];
+              },
+            );
+            return await waitForPromises(
+              configs.map(async (config, idx) => {
+                if (config == null || config instanceof ValidationError) {
+                  return config;
+                }
+                const pathToImageFile = path.join(
+                  repoPath,
+                  args.projectConfigPaths[idx],
+                  config.image.file,
+                );
+                const imageFile = await this.agentUtilService.readFile(ssh, pathToImageFile);
+                let externalFilesHash: null | string = null;
+                try {
+                  const externalFilesPaths =
+                    this.buildfsService.getExternalFilePathsFromDockerfile(imageFile);
+                  const absoluteFilePaths = externalFilesPaths.map((p) =>
+                    path.join(repoPath, args.projectConfigPaths[idx], config.image.buildContext, p),
+                  );
+                  externalFilesHash = await this.buildfsService.getSha256FromFiles(
+                    ssh,
+                    repoPath,
+                    absoluteFilePaths,
+                  );
+                } catch (err) {
+                  this.logger.error(displayError(err));
+                }
+                const imageFileHash = sha256(imageFile);
+
+                return {
+                  projectConfig: config,
+                  imageFileHash:
+                    externalFilesHash === null ? null : imageFileHash + externalFilesHash,
+                };
+              }),
+            );
+          },
+        ),
+    );
   }
 
   async changePrebuildEventStatus(

@@ -50,9 +50,8 @@ export const config = makeConfig()({
       process.env.AGENT_FETCH_REPO_REPO_FS_MAX_SIZE_GB ?? "512",
       1,
     ),
-    checkoutAndInspectRootFs:
-      process.env.AGENT_CHECKOUT_AND_INSPECT_ROOTFS_PATH ??
-      "/srv/jailer/resources/checkout-and-inspect.ext4",
+    checkoutAndInspectImageTag:
+      process.env.AGENT_CHECKOUT_AND_INSPECT_IMAGE_TAG ?? "quay.io/hocus/fetchrepo:08-06-2023",
     defaultWorkspaceRootFs:
       process.env.DEFAULT_WORKSPACE_ROOTFS_PATH ?? "/srv/jailer/resources/default-workspace.ext4",
     prebuildSshPublicKey:
