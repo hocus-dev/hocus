@@ -1,0 +1,32 @@
+{
+  "distSpecVersion": "1.1.0-dev",
+  "storage": {
+    "rootDirectory": "/home/hocus/zot"
+  },
+  "http": {
+    "address": "0.0.0.0",
+    "port": "9999"
+  },
+  "log": {
+    "level": "info"
+  },
+  "extensions": {
+    "sync": {
+      "enable": true,
+      "registries": [
+        {
+          "urls": ["https://quay.io"],
+          "onDemand": true,
+          "tlsVerify": false,
+          "maxRetries": 3,
+          "retryDelay": "10s",
+          "content": [
+            {
+              "prefix": "/hocus/hocus-block-registry-tests"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -8,7 +8,7 @@ import { execCmd } from "../utils";
 
 import type { ContainerId, ImageId } from "./registry.service";
 import { EXPOSE_METHOD } from "./registry.service";
-import testImages from "./test-data/test_images.json";
+import { testImages } from "./test-data/test-images.const";
 
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
@@ -133,6 +133,7 @@ test.concurrent(
       await execCmd(
         "skopeo",
         "copy",
+        ...(process.env.OCI_PROXY ? ["--src-tls-verify=false"] : []),
         "--multi-arch",
         "system",
         "--dest-oci-accept-uncompressed-layers",
@@ -233,6 +234,7 @@ test.concurrent(
       await execCmd(
         "skopeo",
         "copy",
+        ...(process.env.OCI_PROXY ? ["--src-tls-verify=false"] : []),
         "--multi-arch",
         "system",
         "--dest-oci-accept-uncompressed-layers",
