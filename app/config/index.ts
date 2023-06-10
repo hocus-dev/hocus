@@ -45,11 +45,6 @@ export const config = makeConfig()({
     // in production. `get` would throw an error if the env var was not set.
     fetchRepoImageTag:
       process.env.AGENT_FETCH_REPO_IMAGE_TAG ?? "quay.io/hocus/fetchrepo:08-06-2023",
-    // has no effect currently because the overlaybd convertor enforces a max size of 64 GB
-    fetchRepoRepoFsMaxSizeGb: parseIntWithMin(
-      process.env.AGENT_FETCH_REPO_REPO_FS_MAX_SIZE_GB ?? "512",
-      1,
-    ),
     checkoutAndInspectImageTag:
       process.env.AGENT_CHECKOUT_AND_INSPECT_IMAGE_TAG ?? "quay.io/hocus/fetchrepo:08-06-2023",
     defaultWorkspaceRootFs:

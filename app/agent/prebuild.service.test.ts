@@ -1,4 +1,3 @@
-import fs from "fs/promises";
 import path from "path";
 
 import type { PrebuildEvent } from "@prisma/client";
@@ -14,6 +13,7 @@ import { createExampleRepositoryAndProject } from "~/test-utils/project";
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { createTestUser } from "~/user/test-utils";
+import { doesFileExist } from "~/utils.server";
 import { numericSort, waitForPromises } from "~/utils.shared";
 
 const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging().withTestDb();
@@ -294,36 +294,37 @@ test.concurrent(
 
 test.concurrent(
   "checkoutAndInspect",
-  testEnv.withBlockRegistry().run(async ({ injector, runId }) => {
-    const prebuildService = injector.resolve(Token.PrebuildService);
-    const brService = injector.resolve(Token.BlockRegistryService);
+  testEnv
+    .withBlockRegistry()
+    .withImagePush((timestamp) => [
+      {
+        tag: `quay.io/hocus/hocus-tests:checkout-and-inspect-${timestamp}`,
+        imageId: BlockRegistryService.genContainerId("output"),
+      },
+    ])
+    .run(async ({ injector, runId }) => {
+      const prebuildService = injector.resolve(Token.PrebuildService);
+      const brService = injector.resolve(Token.BlockRegistryService);
 
-    const repoImageTag = "im1";
-    const repoImageId = await brService.loadImageFromRemoteRepo(
-      "quay.io/hocus/hocus-tests:fetchrepo-06-10-2023-18-18-47",
-      repoImageTag,
-    );
-    const repoContainerId = await brService.createContainer(repoImageId, "fetchrepo");
-    const runtime = injector.resolve(Token.QemuService)(runId);
-    const outputId = "output";
+      const repoImageTag = "im1";
+      const repoImageId = await brService.loadImageFromRemoteRepo(
+        "quay.io/hocus/hocus-tests:fetchrepo-06-10-2023-22-29-27",
+        repoImageTag,
+      );
+      const repoContainerId = await brService.createContainer(repoImageId, "fetchrepo");
+      const runtime = injector.resolve(Token.QemuService)(runId);
+      const outputId = "output";
 
-    // For some reason, this fails. Kernel logs:
-    // [    1.259303] EXT4-fs (vda): mounted filesystem 3d8b79fe-5d5f-40ce-a25b-45f392bdf32b with ordered data mode. Quota mode: disabled.
-    // [    1.264972] EXT4-fs (vdb): bad geometry: block count 134217728 exceeds size of device (16777216 blocks)
-    // [    1.266533] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
-    // initramfs: Failed to mount filesystem from SERIAL=52064425 into /target/workdir: Invalid argument
-    // initramfs: Causing kernel panic
-    // [    1.270203] Kernel Offset: disabled
-    await prebuildService.checkoutAndInspect({
-      runtime,
-      repoContainerId,
-      targetBranch: "main",
-      outputId,
-      projectConfigPaths: ["/"],
-    });
+      await prebuildService.checkoutAndInspect({
+        runtime,
+        repoContainerId,
+        targetBranch: "main",
+        outputId,
+        projectConfigPaths: ["/"],
+      });
 
-    const ctId = await BlockRegistryService.genContainerId(outputId);
-    const { mountPoint } = await brService.expose(ctId, EXPOSE_METHOD.HOST_MOUNT);
-    console.log(await fs.readFile(path.join(mountPoint, "hocus.yml")));
-  }),
+      const ctId = await BlockRegistryService.genContainerId(outputId);
+      const { mountPoint } = await brService.expose(ctId, EXPOSE_METHOD.HOST_MOUNT);
+      expect(await doesFileExist(path.join(mountPoint, "project", "hocus.yml"))).toBe(true);
+    }),
 );

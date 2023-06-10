@@ -312,7 +312,7 @@ export class AgentGitService {
     return await withLocalLock(LocalLockNamespace.CONTAINER, containerId, async () => {
       await this.blockRegistryService.createContainer(void 0, outputId, {
         mkfs: true,
-        sizeInGB: this.agentConfig.fetchRepoRepoFsMaxSizeGb,
+        sizeInGB: 64,
       });
       const outputDir = "/fr";
       await withExposedImages(
