@@ -204,6 +204,14 @@ test.concurrent(
           );
         },
       );
+
+      const committedImageId = await brService.commitContainer(containerId, "committed", {
+        removeContainer: false,
+      });
+      const newContainerId = await brService.createContainer(committedImageId, "new");
+      // This fails for some reason. The error is:
+      // Command "mount --read-write -o discard /dev/hocus/sda /srv/jailer/tests/3e2e0cfc-7f76-4f16-a9cd-07adce243b48/block-registry/mounts/ct_new" failed with status 32, stdout: "", stderr: mount: /srv/jailer/tests/3e2e0cfc-7f76-4f16-a9cd-07adce243b48/block-registry/mounts/ct_new: wrong fs type, bad option, bad superblock on /dev/hocus/sda, missing codepage or helper program, or other error.
+      await brService.expose(newContainerId, EXPOSE_METHOD.HOST_MOUNT);
     }),
 );
 

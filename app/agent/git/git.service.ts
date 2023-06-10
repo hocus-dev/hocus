@@ -9,10 +9,10 @@ import { v4 as uuidv4 } from "uuid";
 import type { AgentUtilService } from "../agent-util.service";
 import { BlockRegistryService } from "../block-registry/registry.service";
 import { EXPOSE_METHOD } from "../block-registry/registry.service";
-import { getTagLockFile, withExposedImages } from "../block-registry/utils";
+import { withExposedImages } from "../block-registry/utils";
 import { PROJECT_DIR } from "../constants";
 import type { HocusRuntime } from "../runtime/hocus-runtime";
-import { execCmdWithOpts, execSshCmd, withFileLockCreateIfNotExists } from "../utils";
+import { LocalLockNamespace, execCmdWithOpts, execSshCmd, withLocalLock } from "../utils";
 
 import { RemoteInfoTupleValidator } from "./validator";
 
@@ -277,7 +277,8 @@ export class AgentGitService {
 
   async fetchRepository(
     runtime: HocusRuntime,
-    imageTag: string,
+    /** A container with the fetched repository will be created from this */
+    outputId: string,
     repository: {
       url: string;
       credentials: {
@@ -295,7 +296,6 @@ export class AgentGitService {
       };
     },
   ): Promise<void> {
-    const lockFile = getTagLockFile(imageTag);
     const localRootFsImageTag = sha256(this.agentConfig.fetchRepoImageTag);
     const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
     if (!(await this.blockRegistryService.hasImage(rootFsImageId))) {
@@ -308,9 +308,9 @@ export class AgentGitService {
       rootFsImageId,
       localRootFsImageTag,
     );
-
-    return await withFileLockCreateIfNotExists(lockFile, async () => {
-      const containerId = await this.blockRegistryService.createContainer(void 0, imageTag, {
+    const containerId = BlockRegistryService.genContainerId(outputId);
+    return await withLocalLock(LocalLockNamespace.CONTAINER, containerId, async () => {
+      await this.blockRegistryService.createContainer(void 0, outputId, {
         mkfs: true,
         sizeInGB: this.agentConfig.fetchRepoRepoFsMaxSizeGb,
       });

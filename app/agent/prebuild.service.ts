@@ -14,12 +14,14 @@ import { VmTaskStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import { P, match } from "ts-pattern";
+import { v4 as uuidv4 } from "uuid";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { VMTaskOutput } from "./agent-util.types";
+import type { ContainerId } from "./block-registry/registry.service";
 import { BlockRegistryService } from "./block-registry/registry.service";
 import { EXPOSE_METHOD } from "./block-registry/registry.service";
-import { getTagLockFile, withExposedImages } from "./block-registry/utils";
+import { withExposedImages } from "./block-registry/utils";
 import type { BuildfsService } from "./buildfs.service";
 import {
   HOST_PERSISTENT_DIR,
@@ -37,7 +39,7 @@ import type { ProjectConfigService } from "./project-config/project-config.servi
 import type { ProjectConfig } from "./project-config/validator";
 import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import type { HocusRuntime } from "./runtime/hocus-runtime";
-import { execCmd, execSshCmd, withFileLockCreateIfNotExists } from "./utils";
+import { LocalLockNamespace, execCmd, execSshCmd, withLocalLock } from "./utils";
 
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
@@ -294,8 +296,9 @@ export class PrebuildService {
   }
 
   /**
-   * Copies the contents of `repositoryDrivePath` into `outputDrivePath`, and checks
-   * out the given branch there.
+   * Creates a new image based on the `repoImageTag` image with an id created from `outputId`,
+   * checks out the repository to the `targetBranch` branch, and returns the `hocus.yml` files
+   * in the `projectConfigPaths`
    *
    * Returns an array of `ProjectConfig`s, `null`s, or validation errors corresponding to the
    * `projectConfigPaths` argument. If a hocus config file is not present in a directory,
@@ -303,22 +306,22 @@ export class PrebuildService {
    */
   async checkoutAndInspect(args: {
     runtime: HocusRuntime;
-    /** The tag of the image with the git repository */
-    repoImageTag: string;
+    /** The id of the container with the git repository */
+    repoContainerId: ContainerId;
     /** The repository will be checked out to this branch. */
     targetBranch: string;
-    /** A new image will be created with this output id. */
+    /** A new container will be created with this output id. */
     outputId: string;
     /** Relative paths to directories where `hocus.yml` files are located in the repository. */
     projectConfigPaths: string[];
   }): Promise<
     ({ projectConfig: ProjectConfig; imageFileHash: string | null } | null | ValidationError)[]
   > {
-    const repoImageId = await BlockRegistryService.genContainerId(args.repoImageTag);
-    const outputImageId = await withFileLockCreateIfNotExists(
-      getTagLockFile(args.repoImageTag),
+    const outputImageId = await withLocalLock(
+      LocalLockNamespace.CONTAINER,
+      args.repoContainerId,
       async () => {
-        return this.brService.commitContainer(repoImageId, args.outputId, {
+        return this.brService.commitContainer(args.repoContainerId, args.outputId, {
           removeContainer: false,
         });
       },
@@ -333,12 +336,17 @@ export class PrebuildService {
         localRootFsImageTag,
       );
     }
-    // TODO: remove the output image once the block registry supports garbage collection
+    const rootFsContainerTag = uuidv4();
+    // TODO: delete this container once the block registry allows it
+    const rootFsContainerId = await this.brService.createContainer(
+      rootFsImageId,
+      rootFsContainerTag,
+    );
     const workdir = "/workdir";
     return await withExposedImages(
       this.brService,
       [
-        [rootFsImageId, EXPOSE_METHOD.BLOCK_DEV],
+        [rootFsContainerId, EXPOSE_METHOD.BLOCK_DEV],
         [outputContainerId, EXPOSE_METHOD.BLOCK_DEV],
       ] as const,
       async ([rootFsSpec, workdirFsSpec]) =>

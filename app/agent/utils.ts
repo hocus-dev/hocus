@@ -1,6 +1,7 @@
 import type { SpawnOptionsWithoutStdio } from "child_process";
 import { spawn } from "child_process";
 import fs from "fs/promises";
+import os from "os";
 import path from "path";
 
 import type { Log } from "@prisma/client";
@@ -13,7 +14,8 @@ import lockfile from "proper-lockfile";
 import { Tail } from "tail";
 import type { Object } from "ts-toolbelt";
 
-import { doesFileExist } from "~/utils.server";
+import type { valueof } from "~/types/utils";
+import { doesFileExist, sha256 } from "~/utils.server";
 import { unwrap } from "~/utils.shared";
 
 export const execCmd = async (...args: string[]): Promise<{ stdout: string; stderr: string }> => {
@@ -328,6 +330,20 @@ export const withManyFileLocks = async <T>(
     fnComposite = () => withFileLock(lockFilePath, innerFnCopy);
   }
   return await fnComposite();
+};
+
+export type LocalLockNamespace = valueof<typeof LocalLockNamespace>;
+export const LocalLockNamespace = {
+  CONTAINER: "container",
+} as const;
+
+export const withLocalLock = async <T>(
+  ns: LocalLockNamespace,
+  lockId: string,
+  fn: () => Promise<T>,
+): Promise<T> => {
+  const lockFilePath = path.join(os.tmpdir(), `local-lock-${ns}-${sha256(lockId)}`);
+  return await withFileLockCreateIfNotExists(lockFilePath, fn);
 };
 
 export const logErrors = <T extends (...args: any[]) => Promise<any>>(fn: T): T => {
