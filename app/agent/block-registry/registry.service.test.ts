@@ -914,7 +914,11 @@ test.concurrent(
       outputId: string,
       contents: string,
     ): Promise<ImageId> => {
+<<<<<<< HEAD
       const ctId = await BlockRegistryService.genContainerId(outputId);
+=======
+      const ctId = await brService.genContainerId(outputId);
+>>>>>>> 7a67008 (test multiple layers for pushImage)
       const ct: ContainerId = await brService.createContainer(imageId, ctId, {
         mkfs: imageId === void 0,
         sizeInGB: 64,
