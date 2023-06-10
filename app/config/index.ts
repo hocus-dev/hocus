@@ -103,4 +103,8 @@ export const config = makeConfig()({
       1,
     ),
   }),
+  tests: () => ({
+    testOutputOciRegistryUsername: process.env.TEST_OUTPUT_OCI_REGISTRY_USERNAME,
+    testOutputOciRegistryPassword: process.env.TEST_OUTPUT_OCI_REGISTRY_PASSWORD,
+  }),
 });

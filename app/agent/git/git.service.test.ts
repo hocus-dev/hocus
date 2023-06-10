@@ -4,7 +4,7 @@ import path from "path";
 import { SshKeyPairType } from "@prisma/client";
 
 import { createAgentInjector } from "../agent-injector";
-import { EXPOSE_METHOD } from "../block-registry/registry.service";
+import { BlockRegistryService, EXPOSE_METHOD } from "../block-registry/registry.service";
 import { withExposedImage } from "../block-registry/utils";
 import { PROJECT_DIR } from "../constants";
 import type { HocusRuntime } from "../runtime/hocus-runtime";
@@ -17,7 +17,7 @@ import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
 
-jest.setTimeout(30000);
+jest.setTimeout(45000);
 
 const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging();
 
@@ -153,50 +153,58 @@ test.concurrent(
 
 test.concurrent(
   "fetchRepository",
-  testEnv.withBlockRegistry().run(async ({ injector, runId, brService }) => {
-    const gitService = injector.resolve(Token.AgentGitService);
-    const imageTag = runId;
+  testEnv
+    .withBlockRegistry()
+    .withImagePush((timestamp) => [
+      {
+        tag: `quay.io/hocus/hocus-tests:fetchrepo-${timestamp}`,
+        imageId: BlockRegistryService.genContainerId("fetchrepo"),
+      },
+    ])
+    .run(async ({ injector, runId, brService }) => {
+      const gitService = injector.resolve(Token.AgentGitService);
+      const imageTag = "fetchrepo";
 
-    const fetchRepo = (runtimeService: HocusRuntime) =>
-      gitService.fetchRepository(runtimeService, imageTag, {
-        credentials: { privateSshKey: TESTS_PRIVATE_SSH_KEY },
-        url: TESTS_REPO_URL,
-      });
-    let fcId = 0;
-    const getRuntime = () => {
-      fcId += 1;
-      return injector.resolve(Token.QemuService)(`${runId}-${fcId}`);
-    };
-
-    await fetchRepo(getRuntime());
-
-    const txtFilePath = "test.txt";
-    const txtFileContent = "test";
-    const containerId = brService.genContainerId(imageTag);
-    await withExposedImage(
-      brService,
-      containerId,
-      EXPOSE_METHOD.HOST_MOUNT,
-      async ({ mountPoint }) => {
-        const out = await execCmdWithOpts(["ls", "-lah"], {
-          cwd: path.join(mountPoint, PROJECT_DIR),
+      const fetchRepo = (runtimeService: HocusRuntime) =>
+        gitService.fetchRepository(runtimeService, imageTag, {
+          credentials: { privateSshKey: TESTS_PRIVATE_SSH_KEY },
+          url: TESTS_REPO_URL,
         });
-        expect(out.stdout).toContain(".git");
-        await fs.writeFile(path.join(mountPoint, txtFilePath), txtFileContent);
-      },
-    );
-    await fetchRepo(getRuntime());
-    await withExposedImage(
-      brService,
-      containerId,
-      EXPOSE_METHOD.HOST_MOUNT,
-      async ({ mountPoint }) => {
-        expect((await fs.readFile(path.join(mountPoint, txtFilePath))).toString()).toEqual(
-          txtFileContent,
-        );
-      },
-    );
-  }),
+      let ctr = 0;
+      const getRuntime = () => {
+        ctr += 1;
+        return injector.resolve(Token.QemuService)(`${runId}-${ctr}`);
+      };
+
+      await fetchRepo(getRuntime());
+
+      const txtFilePath = "test.txt";
+      const txtFileContent = "test";
+      const containerId = BlockRegistryService.genContainerId(imageTag);
+      await withExposedImage(
+        brService,
+        containerId,
+        EXPOSE_METHOD.HOST_MOUNT,
+        async ({ mountPoint }) => {
+          const out = await execCmdWithOpts(["ls", "-lah"], {
+            cwd: path.join(mountPoint, PROJECT_DIR),
+          });
+          expect(out.stdout).toContain(".git");
+          await fs.writeFile(path.join(mountPoint, txtFilePath), txtFileContent);
+        },
+      );
+      await fetchRepo(getRuntime());
+      await withExposedImage(
+        brService,
+        containerId,
+        EXPOSE_METHOD.HOST_MOUNT,
+        async ({ mountPoint }) => {
+          expect((await fs.readFile(path.join(mountPoint, txtFilePath))).toString()).toEqual(
+            txtFileContent,
+          );
+        },
+      );
+    }),
 );
 
 test.concurrent(

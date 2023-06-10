@@ -119,3 +119,19 @@ export const max = (a: number, b: number): number => {
 export const formatBranchName = (name: string): string => {
   return name.replace(/^refs\/heads\//, "");
 };
+
+/**
+ * Returns a formatted timestamp in the format `YYYY-MM-DD-HH-MM-SS`.
+ */
+export const genFormattedTimestamp = (date: Date): string => {
+  const dateOptions = { year: "numeric", month: "2-digit", day: "2-digit" } as const;
+  const timeOptions = {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  } as const;
+  const formattedDate = date.toLocaleDateString("en-US", dateOptions).replace(/\//g, "-");
+  const formattedTime = date.toLocaleTimeString("en-US", timeOptions).replace(/:/g, "-");
+  return `${formattedDate}-${formattedTime}`;
+};

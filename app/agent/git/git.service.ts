@@ -7,7 +7,7 @@ import type { Logger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import type { AgentUtilService } from "../agent-util.service";
-import type { BlockRegistryService } from "../block-registry/registry.service";
+import { BlockRegistryService } from "../block-registry/registry.service";
 import { EXPOSE_METHOD } from "../block-registry/registry.service";
 import { getTagLockFile, withExposedImages } from "../block-registry/utils";
 import { PROJECT_DIR } from "../constants";
@@ -297,7 +297,7 @@ export class AgentGitService {
   ): Promise<void> {
     const lockFile = getTagLockFile(imageTag);
     const localRootFsImageTag = sha256(this.agentConfig.fetchRepoImageTag);
-    const rootFsImageId = this.blockRegistryService.genImageId(localRootFsImageTag);
+    const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
     if (!(await this.blockRegistryService.hasImage(rootFsImageId))) {
       await this.blockRegistryService.loadImageFromRemoteRepo(
         this.agentConfig.fetchRepoImageTag,

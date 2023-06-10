@@ -17,7 +17,7 @@ import { P, match } from "ts-pattern";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { VMTaskOutput } from "./agent-util.types";
-import type { BlockRegistryService } from "./block-registry/registry.service";
+import { BlockRegistryService } from "./block-registry/registry.service";
 import { EXPOSE_METHOD } from "./block-registry/registry.service";
 import { getTagLockFile, withExposedImages } from "./block-registry/utils";
 import type { BuildfsService } from "./buildfs.service";
@@ -314,7 +314,7 @@ export class PrebuildService {
   }): Promise<
     ({ projectConfig: ProjectConfig; imageFileHash: string | null } | null | ValidationError)[]
   > {
-    const repoImageId = await this.brService.genContainerId(args.repoImageTag);
+    const repoImageId = await BlockRegistryService.genContainerId(args.repoImageTag);
     const outputImageId = await withFileLockCreateIfNotExists(
       getTagLockFile(args.repoImageTag),
       async () => {
@@ -326,7 +326,7 @@ export class PrebuildService {
     const outputContainerId = await this.brService.createContainer(outputImageId, args.outputId);
 
     const localRootFsImageTag = sha256(this.agentConfig.checkoutAndInspectImageTag);
-    const rootFsImageId = this.brService.genImageId(localRootFsImageTag);
+    const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
     if (!(await this.brService.hasImage(rootFsImageId))) {
       await this.brService.loadImageFromRemoteRepo(
         this.agentConfig.checkoutAndInspectImageTag,
