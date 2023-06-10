@@ -32,7 +32,7 @@ export const execCmdWithOpts = async (
     SpawnOptionsWithoutStdio,
     { env?: Record<string, string | undefined>; cwd?: string | undefined }
   >,
-): Promise<{ stdout: string; stderr: string }> => {
+): Promise<{ stdout: string; stderr: string; pid?: number }> => {
   return await new Promise((resolve, reject) => {
     const cp = spawn(args[0], args.slice(1), options as SpawnOptionsWithoutStdio);
     let stdout = "";
