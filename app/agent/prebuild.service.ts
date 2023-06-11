@@ -703,10 +703,13 @@ export class PrebuildService {
       vcpuCount,
     } = args;
     this.perfService.log("prebuild", "start", outputRootFsId);
-    const rootFsContainerId = await this.brService.createContainer(rootFsImageId, outputRootFsId);
-    const projectContainerId = await this.brService.createContainer(
-      projectImageId,
-      outputProjectId,
+    const [rootFsContainerId, projectContainerId] = await waitForPromises(
+      (
+        [
+          [rootFsImageId, outputRootFsId + "xd"],
+          [projectImageId, outputProjectId + "xd"],
+        ] as const
+      ).map(([imageId, outputId]) => this.brService.createContainer(imageId, outputId)),
     );
     const result = await withExposedImages(
       this.brService,
@@ -752,6 +755,14 @@ export class PrebuildService {
             );
           },
         ),
+    );
+    await waitForPromises(
+      (
+        [
+          [rootFsContainerId, outputRootFsId],
+          [projectContainerId, outputProjectId],
+        ] as const
+      ).map(([containerId, outputId]) => this.brService.commitContainer(containerId, outputId)),
     );
     this.perfService.log("prebuild", "end", outputRootFsId);
     return result;
