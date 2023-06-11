@@ -15,3 +15,4 @@ hocus.yml.schema.json
 .clinic
 agent-build
 prisma/tmp*.prisma
+out

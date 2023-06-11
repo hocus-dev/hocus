@@ -1,4 +1,4 @@
-FROM alpine:3.18
+FROM alpine:3.18 AS fetchrepo
 
 RUN apk add \
     curl \
@@ -25,3 +25,9 @@ RUN adduser -s /bin/sh -h /home/hocus -D hocus && \
     chown -R hocus:hocus /home/hocus && \
     echo 'hocus:hocus' | chpasswd
 RUN git lfs install
+
+FROM fetchrepo AS buildfs
+
+RUN apk add findutils docker && \
+    rc-update add docker
+RUN echo 'root:root' | chpasswd

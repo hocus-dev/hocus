@@ -1,4 +1,5 @@
 import type { CheckoutAndInspectResult } from "../activities-types";
+import { BlockRegistryService } from "../block-registry/registry.service";
 import { SOLO_AGENT_INSTANCE_ID } from "../constants";
 import { randomString } from "../utils";
 
@@ -34,7 +35,7 @@ export type CheckoutAndInspectActivity = (args: {
 export const checkoutAndInspect: CreateActivity<CheckoutAndInspectActivity> = ({ injector, db }) =>
   withActivityHeartbeat({ intervalMs: 5000 }, async (args) => {
     const instanceId = `checkout-and-inspect-${randomString(8)}`;
-    const fcService = injector.resolve(Token.FirecrackerService)(instanceId);
+    const runtime = injector.resolve(Token.QemuService)(instanceId);
     const prebuildService = injector.resolve(Token.PrebuildService);
     const perfService = injector.resolve(Token.PerfService);
     perfService.log("checkoutAndInspect", "start", args.gitRepositoryId, args.targetBranch);
@@ -43,20 +44,20 @@ export const checkoutAndInspect: CreateActivity<CheckoutAndInspectActivity> = ({
       where: { id: args.gitRepositoryId },
       include: {
         GitRepositoryImage: {
-          include: { agentInstance: true },
+          include: { agentInstance: true, localOciImage: true },
         },
       },
     });
-    const repoImage = unwrap(
+    const localOciImage = unwrap(
       gitRepository.GitRepositoryImage.find(
         (f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
       ),
-    );
+    ).localOciImage;
     const result = await prebuildService.checkoutAndInspect({
-      fcService,
-      repositoryDrivePath: repoFile.file.path,
+      runtime,
+      repoContainerId: BlockRegistryService.genContainerId(localOciImage.tag),
       targetBranch: args.targetBranch,
-      outputDrivePath: args.outputDrivePath,
+      outputId: args.outputId,
       projectConfigPaths: args.projectConfigPaths,
     });
 

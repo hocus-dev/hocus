@@ -1,11 +1,15 @@
 // cSpell:words httphey heyo
 import { createAgentInjector } from "./agent-injector";
+import { EXPOSE_METHOD } from "./block-registry/registry.service";
+import { withExposedImages } from "./block-registry/utils";
 import { execSshCmd } from "./utils";
 
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { sha256 } from "~/utils.server";
 import { waitForPromises } from "~/utils.shared";
+
+jest.setTimeout(30000);
 
 const DOCKERFILE_1 = `FROM ubuntu:latest
 COPY ./foo /foo`;
@@ -71,11 +75,12 @@ test.concurrent(
 
 test.concurrent(
   "getSha256FromFiles",
-  testEnv.run(async ({ injector, runId }) => {
+  testEnv.withBlockRegistry().run(async ({ injector, runId }) => {
     const buildfsService = injector.resolve(Token.BuildfsService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const brService = injector.resolve(Token.BlockRegistryService);
     const agentConfig = injector.resolve(Token.Config).agent();
-    const fcService = injector.resolve(Token.FirecrackerService)(runId);
+    const runtime = injector.resolve(Token.QemuService)(runId);
 
     const files = [
       { path: "/tmp/foo/foo", content: "foo" },
@@ -91,27 +96,70 @@ test.concurrent(
         .join("\n") + "\n",
     );
 
-    await fcService.withVM(
-      {
-        ssh: {
-          username: "hocus",
-          privateKey: agentConfig.prebuildSshPrivateKey,
-        },
-        kernelPath: agentConfig.defaultKernel,
-        rootFsPath: agentConfig.checkoutAndInspectRootFs,
-        copyRootFs: true,
-        memSizeMib: 1024,
-        vcpuCount: 1,
-      },
-      async ({ ssh }) => {
-        await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/foo"]);
-        await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/bar"]);
-        await waitForPromises(
-          files.map(({ path, content }) => agentUtilService.writeFile(ssh, path, content)),
-        );
-        const hash = await buildfsService.getSha256FromFiles(ssh, "/tmp", ["foo", "bar/hugo"]);
-        expect(hash).toBe(expectedHash);
-      },
+    const imageId = await brService.loadImageFromRemoteRepo(agentConfig.buildfsImageTag, "im1");
+    const containerId = await brService.createContainer(imageId, "c1");
+    await withExposedImages(
+      brService,
+      [[containerId, EXPOSE_METHOD.BLOCK_DEV]] as const,
+      ([fsSpec]) =>
+        runtime.withRuntime(
+          {
+            ssh: {
+              username: "hocus",
+              password: "hocus",
+            },
+            fs: {
+              "/": fsSpec,
+            },
+            memSizeMib: 1024,
+            vcpuCount: 1,
+          },
+          async ({ ssh }) => {
+            await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/foo"]);
+            await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/bar"]);
+            await waitForPromises(
+              files.map(({ path, content }) => agentUtilService.writeFile(ssh, path, content)),
+            );
+            const hash = await buildfsService.getSha256FromFiles(ssh, "/tmp", ["foo", "bar/hugo"]);
+            expect(hash).toBe(expectedHash);
+          },
+        ),
     );
   }),
+);
+
+test.concurrent(
+  "buildfs",
+  testEnv
+    .withTestDb()
+    .withBlockRegistry()
+    .run(async ({ injector, runId, db }) => {
+      const buildfsService = injector.resolve(Token.BuildfsService);
+      const brService = injector.resolve(Token.BlockRegistryService);
+      const runtime = injector.resolve(Token.QemuService)(runId);
+
+      const vmTask = await db.$transaction((tdb) =>
+        buildfsService.createBuildfsVmTask(tdb, {
+          relativeProjectRootDirPath: "/",
+          contextPath: "/",
+          dockerfilePath: "hocus.Dockerfile",
+        }),
+      );
+
+      const repoImageId = await brService.loadImageFromRemoteRepo(
+        "quay.io/hocus/hocus-tests:checkout-and-inspect-06-10-2023-22-41-53",
+        "repo-image",
+      );
+      const outputId = "output";
+
+      await buildfsService.buildfs({
+        db,
+        runtime,
+        vmTaskId: vmTask.id,
+        memSizeMib: 1024,
+        vcpuCount: 1,
+        repoImageId,
+        outputId,
+      });
+    }),
 );
