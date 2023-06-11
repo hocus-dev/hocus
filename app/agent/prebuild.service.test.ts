@@ -308,7 +308,7 @@ test.concurrent(
 
       const repoImageTag = "im1";
       const repoImageId = await brService.loadImageFromRemoteRepo(
-        "quay.io/hocus/hocus-tests:fetchrepo-06-10-2023-22-29-27",
+        "quay.io/hocus/hocus-tests:fetchrepo-06-11-2023-18-13-34",
         repoImageTag,
       );
       const repoContainerId = await brService.createContainer(repoImageId, "fetchrepo");
@@ -318,7 +318,7 @@ test.concurrent(
       await prebuildService.checkoutAndInspect({
         runtime,
         repoContainerId,
-        targetBranch: "main",
+        targetBranch: "checkout-and-inspect-test-1",
         outputId,
         projectConfigPaths: ["/"],
       });

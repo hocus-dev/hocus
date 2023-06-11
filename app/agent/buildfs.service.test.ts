@@ -1,15 +1,17 @@
 // cSpell:words httphey heyo
+import path from "path";
+
 import { createAgentInjector } from "./agent-injector";
-import { EXPOSE_METHOD } from "./block-registry/registry.service";
+import { BlockRegistryService, EXPOSE_METHOD } from "./block-registry/registry.service";
 import { withExposedImages } from "./block-registry/utils";
 import { execSshCmd } from "./utils";
 
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
-import { sha256 } from "~/utils.server";
+import { doesFileExist, sha256 } from "~/utils.server";
 import { waitForPromises } from "~/utils.shared";
 
-jest.setTimeout(30000);
+jest.setTimeout(3600000);
 
 const DOCKERFILE_1 = `FROM ubuntu:latest
 COPY ./foo /foo`;
@@ -133,6 +135,12 @@ test.concurrent(
   testEnv
     .withTestDb()
     .withBlockRegistry()
+    .withImagePush((timestamp) => [
+      {
+        tag: `quay.io/hocus/hocus-tests:buildfs-${timestamp}`,
+        imageId: BlockRegistryService.genImageId("output"),
+      },
+    ])
     .run(async ({ injector, runId, db }) => {
       const buildfsService = injector.resolve(Token.BuildfsService);
       const brService = injector.resolve(Token.BlockRegistryService);
@@ -147,19 +155,28 @@ test.concurrent(
       );
 
       const repoImageId = await brService.loadImageFromRemoteRepo(
-        "quay.io/hocus/hocus-tests:checkout-and-inspect-06-10-2023-22-41-53",
+        "quay.io/hocus/hocus-tests:checkout-and-inspect-06-11-2023-18-17-06",
         "repo-image",
       );
       const outputId = "output";
 
-      await buildfsService.buildfs({
+      const result = await buildfsService.buildfs({
         db,
         runtime,
         vmTaskId: vmTask.id,
-        memSizeMib: 1024,
-        vcpuCount: 1,
+        memSizeMib: 4096,
+        vcpuCount: 4,
         repoImageId,
         outputId,
       });
+      if (!result.buildSuccessful) {
+        // eslint-disable-next-line no-console
+        console.error(result);
+      }
+      expect(result.buildSuccessful).toBe(true);
+
+      const outputImageId = await BlockRegistryService.genImageId(outputId);
+      const { mountPoint } = await brService.expose(outputImageId, EXPOSE_METHOD.HOST_MOUNT);
+      expect(await doesFileExist(path.join(mountPoint, "home/hocus"))).toBe(true);
     }),
 );

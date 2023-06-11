@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import path from "path";
 
 import type { BuildfsEvent, BuildfsEventFiles, Prisma, VmTask } from "@prisma/client";
@@ -245,6 +246,18 @@ export class BuildfsService {
     return { event, status: "created" };
   }
 
+  async transferBuildfsScript(ssh: NodeSSH): Promise<void> {
+    const scriptPathOnHost = path.join(
+      this.agentConfig.hostBuildfsResourcesDir,
+      "bin",
+      "buildfs.sh",
+    );
+    const script = (await fs.readFile(scriptPathOnHost)).toString();
+    await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(this.buildfsScriptPath)]);
+    await this.agentUtilService.writeFile(ssh, this.buildfsScriptPath, script);
+    await execSshCmd({ ssh }, ["chmod", "+x", this.buildfsScriptPath]);
+  }
+
   async buildfs(args: {
     db: Prisma.NonTransactionClient;
     runtime: HocusRuntime;
@@ -292,12 +305,10 @@ export class BuildfsService {
               vcpuCount: args.vcpuCount,
             },
             async ({ ssh, sshConfig }) => {
-              const workdir = "/tmp/workdir";
-              const buildfsScriptPath = `${workdir}/bin/buildfs.sh`;
+              const workdir = this.workdir;
               await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
               await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
-              await ssh.putDirectory(this.agentConfig.hostBuildfsResourcesDir, workdir);
-              await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
+              await this.transferBuildfsScript(ssh);
 
               const taskResults = await this.agentUtilService.execVmTasks(sshConfig, args.db, [
                 { vmTaskId: args.vmTaskId },

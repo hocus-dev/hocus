@@ -31,3 +31,4 @@ FROM fetchrepo AS buildfs
 RUN apk add findutils docker && \
     rc-update add docker
 RUN echo 'root:root' | chpasswd
+RUN apk add bash
