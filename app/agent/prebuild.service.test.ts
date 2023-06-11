@@ -13,7 +13,7 @@ import { createExampleRepositoryAndProject } from "~/test-utils/project";
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { createTestUser } from "~/user/test-utils";
-import { doesFileExist } from "~/utils.server";
+import { doesFileExist, sha256 } from "~/utils.server";
 import { numericSort, waitForPromises } from "~/utils.shared";
 
 const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging().withTestDb();
@@ -327,4 +327,55 @@ test.concurrent(
       const { mountPoint } = await brService.expose(imId, EXPOSE_METHOD.HOST_MOUNT);
       expect(await doesFileExist(path.join(mountPoint, "project", "hocus.yml"))).toBe(true);
     }),
+);
+
+test.concurrent(
+  "prebuild",
+  testEnv.withBlockRegistry().run(async ({ injector, runId, db }) => {
+    const prebuildService = injector.resolve(Token.PrebuildService);
+    const brService = injector.resolve(Token.BlockRegistryService);
+
+    const [rootFsImageId, projectImageId] = await waitForPromises(
+      [
+        "quay.io/hocus/hocus-tests:buildfs-06-11-2023-18-32-43",
+        "quay.io/hocus/hocus-tests:checkout-and-inspect-06-11-2023-18-17-06",
+      ].map((ref) => brService.loadImageFromRemoteRepo(ref, sha256(ref))),
+    );
+    const cwd = "/home/hocus/dev/project";
+    const tasks = [
+      { command: "echo 1", cwd },
+      { command: `echo "$ENV_VAR_1" > hey.txt`, cwd },
+    ];
+    const vmTasks = await db.$transaction((tdb) =>
+      prebuildService.createPrebuildVmTasks(tdb, tasks),
+    );
+    const runtime = injector.resolve(Token.QemuService)(runId);
+    const outputRootFsId = "output-rootfs";
+    const outputProjectId = "output-project";
+
+    const result = await prebuildService.prebuild({
+      db,
+      runtime,
+      envVariables: [
+        {
+          name: "ENV_VAR_1",
+          value: "value1",
+        },
+      ],
+      tasks: tasks.map((t, idx) => ({
+        idx,
+        vmTaskId: vmTasks[idx].id,
+        originalCommand: t.command,
+      })),
+      rootFsImageId,
+      projectImageId,
+      outputRootFsId,
+      outputProjectId,
+      memSizeMib: 1024,
+      vcpuCount: 1,
+    });
+    expect(result.length).toBe(2);
+    expect(result[0].status).toBe(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
+    expect(result[1].status).toBe(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
+  }),
 );

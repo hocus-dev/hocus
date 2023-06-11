@@ -18,16 +18,12 @@ import { v4 as uuidv4 } from "uuid";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { VMTaskOutput } from "./agent-util.types";
-import type { ContainerId } from "./block-registry/registry.service";
+import type { ContainerId, ImageId } from "./block-registry/registry.service";
 import { BlockRegistryService } from "./block-registry/registry.service";
 import { EXPOSE_METHOD } from "./block-registry/registry.service";
 import { withExposedImages } from "./block-registry/utils";
 import type { BuildfsService } from "./buildfs.service";
-import {
-  HOST_PERSISTENT_DIR,
-  SOLO_AGENT_INSTANCE_ID,
-  WORKSPACE_ENV_SCRIPT_PATH,
-} from "./constants";
+import { HOST_PERSISTENT_DIR, WORKSPACE_ENV_SCRIPT_PATH } from "./constants";
 import {
   PREBUILD_DEV_DIR,
   PREBUILD_SCRIPTS_DIR,
@@ -37,7 +33,6 @@ import {
 } from "./prebuild-constants";
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
-import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import type { HocusRuntime } from "./runtime/hocus-runtime";
 import { LocalLockNamespace, execCmd, execSshCmd, withLocalLock } from "./utils";
 
@@ -112,22 +107,16 @@ export class PrebuildService {
     return await db.prebuildEvent.create({ data, include: { project: true } });
   }
 
-  async initPrebuildEvent(
+  async createPrebuildVmTasks(
     db: Prisma.TransactionClient,
-    args: {
-      prebuildEventId: bigint;
-      buildfsEventId: bigint | null;
-      workspaceTasks: { command: string; commandShell: string }[];
-      tasks: {
-        command: string;
-        cwd: string;
-      }[];
-    },
-  ): Promise<PrebuildEvent> {
-    await Promise.all(
-      args.tasks.map(async ({ command, cwd }, idx) => {
+    tasks: {
+      cwd: string;
+    }[],
+  ): Promise<VmTask[]> {
+    return waitForPromises(
+      tasks.map(async ({ cwd }, idx) => {
         const paths = this.getPrebuildTaskPaths(idx);
-        const vmTask = await this.agentUtilService.createVmTask(db, {
+        return this.agentUtilService.createVmTask(db, {
           command: [
             "bash",
             "-o",
@@ -141,15 +130,34 @@ export class PrebuildService {
           ],
           cwd,
         });
-        await db.prebuildEventTask.create({
+      }),
+    );
+  }
+
+  async initPrebuildEvent(
+    db: Prisma.TransactionClient,
+    args: {
+      prebuildEventId: bigint;
+      buildfsEventId: bigint | null;
+      workspaceTasks: { command: string; commandShell: string }[];
+      tasks: {
+        command: string;
+        cwd: string;
+      }[];
+    },
+  ): Promise<PrebuildEvent> {
+    const vmTasks = await this.createPrebuildVmTasks(db, args.tasks);
+    await waitForPromises(
+      args.tasks.map(({ command }, idx) =>
+        db.prebuildEventTask.create({
           data: {
             prebuildEventId: args.prebuildEventId,
-            vmTaskId: vmTask.id,
+            vmTaskId: vmTasks[idx].id,
             idx,
             originalCommand: command,
           },
-        });
-      }),
+        }),
+      ),
     );
     return await db.prebuildEvent.update({
       where: { id: args.prebuildEventId },
@@ -668,80 +676,84 @@ export class PrebuildService {
    * and the corresponding public key to the private key used to connect to the VM
    * (`agentConfig.prebuildSshPrivateKey`) is already present in the `hocus` user's authorized_keys.
    */
-  async prebuild(
-    db: Prisma.NonTransactionClient,
-    firecrackerService: FirecrackerService,
-    prebuildEventId: bigint,
-  ): Promise<VMTaskOutput[]> {
-    this.perfService.log("prebuild", "start", prebuildEventId);
-    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
-      where: { id: prebuildEventId },
-      include: {
-        tasks: { include: { vmTask: true } },
-        prebuildEventFiles: { include: { agentInstance: true, fsFile: true, projectFile: true } },
-        project: {
-          include: {
-            environmentVariableSet: {
-              include: {
-                environmentVariables: true,
-              },
-            },
-          },
-        },
-      },
-    });
-    const prebuildEventFiles = unwrap(
-      prebuildEvent.prebuildEventFiles.find(
-        (f) => f.agentInstance.externalId === SOLO_AGENT_INSTANCE_ID,
-      ),
+  async prebuild(args: {
+    db: Prisma.NonTransactionClient;
+    runtime: HocusRuntime;
+    envVariables: { name: string; value: string }[];
+    tasks: { idx: number; originalCommand: string; vmTaskId: bigint }[];
+    rootFsImageId: ImageId;
+    projectImageId: ImageId;
+    /** A new image will be created from this output id */
+    outputRootFsId: string;
+    /** A new image will be created from this output id */
+    outputProjectId: string;
+    memSizeMib: number;
+    vcpuCount: number;
+  }): Promise<VMTaskOutput[]> {
+    const {
+      db,
+      runtime,
+      envVariables,
+      tasks,
+      rootFsImageId,
+      projectImageId,
+      outputRootFsId,
+      outputProjectId,
+      memSizeMib,
+      vcpuCount,
+    } = args;
+    this.perfService.log("prebuild", "start", outputRootFsId);
+    const rootFsContainerId = await this.brService.createContainer(rootFsImageId, outputRootFsId);
+    const projectContainerId = await this.brService.createContainer(
+      projectImageId,
+      outputProjectId,
     );
-    const envVariables = prebuildEvent.project.environmentVariableSet.environmentVariables.map(
-      (v) => ({
-        name: v.name,
-        value: v.value,
-      }),
-    );
-    const tasks = prebuildEvent.tasks;
-    const result = await firecrackerService.withVM(
-      {
-        ssh: {
-          username: "hocus",
-          privateKey: this.agentConfig.prebuildSshPrivateKey,
-        },
-        kernelPath: this.agentConfig.defaultKernel,
-        rootFsPath: prebuildEventFiles.fsFile.path,
-        extraDrives: [
+    const result = await withExposedImages(
+      this.brService,
+      [
+        [rootFsContainerId, EXPOSE_METHOD.BLOCK_DEV],
+        [projectContainerId, EXPOSE_METHOD.BLOCK_DEV],
+      ] as const,
+      ([rootFsSpec, projectFsSpec]) =>
+        runtime.withRuntime(
           {
-            pathOnHost: prebuildEventFiles.projectFile.path,
-            guestMountPath: this.devDir,
+            ssh: {
+              username: "hocus",
+              privateKey: this.agentConfig.prebuildSshPrivateKey,
+            },
+            fs: {
+              "/": rootFsSpec,
+              [this.devDir]: projectFsSpec,
+            },
+            memSizeMib,
+            vcpuCount,
           },
-        ],
-        memSizeMib: prebuildEvent.project.maxPrebuildRamMib,
-        vcpuCount: prebuildEvent.project.maxPrebuildVCPUCount,
-      },
-      async ({ ssh, sshConfig }) => {
-        const envScript = this.agentUtilService.generateEnvVarsScript(envVariables);
-        await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
-        await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
-        await Promise.all(
-          tasks.map(async (task) => {
-            const script = this.agentUtilService.generatePrebuildTaskScript(task.originalCommand);
-            const paths = this.getPrebuildTaskPaths(task.idx);
-            await execSshCmd({ ssh }, ["mkdir", "-p", this.prebuildScriptsDir]);
-            await this.agentUtilService.writeFile(ssh, paths.scriptPath, script);
-          }),
-        );
+          async ({ ssh, sshConfig }) => {
+            const envScript = this.agentUtilService.generateEnvVarsScript(envVariables);
+            await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
+            await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
+            await waitForPromises(
+              tasks.map(async (task) => {
+                const script = this.agentUtilService.generatePrebuildTaskScript(
+                  task.originalCommand,
+                );
+                const paths = this.getPrebuildTaskPaths(task.idx);
+                await execSshCmd({ ssh }, ["mkdir", "-p", this.prebuildScriptsDir]);
+                await this.agentUtilService.writeFile(ssh, paths.scriptPath, script);
+              }),
+            );
 
-        return await this.agentUtilService.execVmTasks(
-          sshConfig,
-          db,
-          tasks.map((t) => ({
-            vmTaskId: t.vmTask.id,
-          })),
-        );
-      },
+            return await this.agentUtilService.execVmTasks(
+              sshConfig,
+              db,
+              tasks.map((t) => ({
+                vmTaskId: t.vmTaskId,
+              })),
+            );
+          },
+        ),
     );
-    this.perfService.log("prebuild", "end", prebuildEventId);
+    this.perfService.log("prebuild", "end", outputRootFsId);
     return result;
   }
 }
