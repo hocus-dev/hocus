@@ -299,7 +299,7 @@ test.concurrent(
     .withImagePush((timestamp) => [
       {
         tag: `quay.io/hocus/hocus-tests:checkout-and-inspect-${timestamp}`,
-        imageId: BlockRegistryService.genContainerId("output"),
+        imageId: BlockRegistryService.genImageId("output"),
       },
     ])
     .run(async ({ injector, runId }) => {
@@ -323,8 +323,8 @@ test.concurrent(
         projectConfigPaths: ["/"],
       });
 
-      const ctId = await BlockRegistryService.genContainerId(outputId);
-      const { mountPoint } = await brService.expose(ctId, EXPOSE_METHOD.HOST_MOUNT);
+      const imId = await BlockRegistryService.genImageId(outputId);
+      const { mountPoint } = await brService.expose(imId, EXPOSE_METHOD.HOST_MOUNT);
       expect(await doesFileExist(path.join(mountPoint, "project", "hocus.yml"))).toBe(true);
     }),
 );

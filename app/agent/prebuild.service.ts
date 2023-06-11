@@ -310,23 +310,25 @@ export class PrebuildService {
     repoContainerId: ContainerId;
     /** The repository will be checked out to this branch. */
     targetBranch: string;
-    /** A new container will be created with this output id. */
+    /** A new image will be created from this output id. */
     outputId: string;
     /** Relative paths to directories where `hocus.yml` files are located in the repository. */
     projectConfigPaths: string[];
   }): Promise<
     ({ projectConfig: ProjectConfig; imageFileHash: string | null } | null | ValidationError)[]
   > {
-    const outputImageId = await withLocalLock(
+    const tmpOutputId = `tmp-${sha256(args.outputId)}`;
+    const tmpOutputImageId = await withLocalLock(
       LocalLockNamespace.CONTAINER,
       args.repoContainerId,
       async () => {
-        return this.brService.commitContainer(args.repoContainerId, args.outputId, {
+        return this.brService.commitContainer(args.repoContainerId, tmpOutputId, {
           removeContainer: false,
         });
       },
     );
-    const outputContainerId = await this.brService.createContainer(outputImageId, args.outputId);
+    const outputContainerId = await this.brService.createContainer(tmpOutputImageId, args.outputId);
+    // TODO: remove the tmpOutputImage once the block registry allows it
 
     const localRootFsImageTag = sha256(this.agentConfig.checkoutAndInspectImageTag);
     const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
@@ -343,7 +345,7 @@ export class PrebuildService {
       rootFsContainerTag,
     );
     const workdir = "/workdir";
-    return await withExposedImages(
+    const result = await withExposedImages(
       this.brService,
       [
         [rootFsContainerId, EXPOSE_METHOD.BLOCK_DEV],
@@ -422,6 +424,8 @@ export class PrebuildService {
           },
         ),
     );
+    await this.brService.commitContainer(outputContainerId, args.outputId);
+    return result;
   }
 
   async changePrebuildEventStatus(
