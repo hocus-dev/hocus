@@ -86,7 +86,7 @@ model PrebuildEvent {
 
   archiveAfter             DateTime                   @default(now()) @db.Timestamptz(3)
   createdAt                DateTime                   @default(now()) @db.Timestamptz(3)
-  prebuildEventFiles       PrebuildEventFiles[]
+  prebuildEventImages      PrebuildEventImages[]
   workspaces               Workspace[]
   reservations             PrebuildEventReservation[]
   /// Set if the prebuild failed because an error occurred within the application itself.
@@ -102,21 +102,21 @@ model PrebuildEventSystemError {
   occurredAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
-model PrebuildEventFiles {
+model PrebuildEventImages {
   id              BigInt        @id @default(autoincrement())
   prebuildEvent   PrebuildEvent @relation(fields: [prebuildEventId], references: [id])
   prebuildEventId BigInt
-  fsFile          File          @relation("prebuild_event_fs_file", fields: [fsFileId], references: [id])
-  fsFileId        BigInt
-  projectFile     File          @relation("prebuild_event_project_file", fields: [projectFileId], references: [id])
-  projectFileId   BigInt
+  fsImage         LocalOciImage @relation("prebuild_event_fs_image", fields: [fsImageId], references: [id])
+  fsImageId       BigInt
+  projectImage    LocalOciImage @relation("prebuild_event_project_image", fields: [projectImageId], references: [id])
+  projectImageId  BigInt
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
 
-  /// Enforce that agentInstanceId and fsFile.agentInstanceId are the same.
-  fsFileAgentMatch      File @relation("prebuild_event_fs_file_agent_match", fields: [fsFileId, agentInstanceId], references: [id, agentInstanceId])
-  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same.
-  projectFileAgentMatch File @relation("prebuild_event_project_file_agent_match", fields: [projectFileId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and fsImage.agentInstanceId are the same.
+  fsImageAgentMatch      LocalOciImage @relation("prebuild_event_fs_image_agent_match", fields: [fsImageId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and projectImage.agentInstanceId are the same.
+  projectImageAgentMatch LocalOciImage @relation("prebuild_event_project_image_agent_match", fields: [projectImageId, agentInstanceId], references: [id, agentInstanceId])
 
   @@unique([prebuildEventId, agentInstanceId])
 }
@@ -167,37 +167,37 @@ model VmTask {
 }
 
 model BuildfsEvent {
-  id                BigInt              @id @default(autoincrement())
-  vmTask            VmTask              @relation(fields: [vmTaskId], references: [id])
-  vmTaskId          BigInt
+  id                 BigInt               @id @default(autoincrement())
+  vmTask             VmTask               @relation(fields: [vmTaskId], references: [id])
+  vmTaskId           BigInt
   /// Relative path to the Dockerfile in the `project` directory of the input drive.
-  dockerfilePath    String
+  dockerfilePath     String
   /// Relative path to the build context in the `project` directory of the input drive.
-  contextPath       String
-  cacheHash         String
-  projectId         BigInt
-  project           Project             @relation(fields: [projectId], references: [id])
-  buildfsEventFiles BuildfsEventFiles[]
-  prebuildEvents    PrebuildEvent[]
+  contextPath        String
+  cacheHash          String
+  projectId          BigInt
+  project            Project              @relation(fields: [projectId], references: [id])
+  buildfsEventImages BuildfsEventImages[]
+  prebuildEvents     PrebuildEvent[]
 
   @@index([cacheHash])
 }
 
-model BuildfsEventFiles {
+model BuildfsEventImages {
   id              BigInt        @id @default(autoincrement())
   buildfsEvent    BuildfsEvent  @relation(fields: [buildfsEventId], references: [id])
   buildfsEventId  BigInt
-  projectFile     File          @relation("buildfs_event_project_file", fields: [projectFileId], references: [id])
-  projectFileId   BigInt
-  outputFile      File          @relation("buildfs_event_output_file", fields: [outputFileId], references: [id])
-  outputFileId    BigInt
+  projectImage    LocalOciImage @relation("buildfs_event_project_image", fields: [projectImageId], references: [id])
+  projectImageId  BigInt
+  outputImage     LocalOciImage @relation("buildfs_event_output_image", fields: [outputImageId], references: [id])
+  outputImageId   BigInt
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
 
-  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same.
-  projectFileAgentMatch File @relation("buildfs_event_project_file_agent_match", fields: [projectFileId, agentInstanceId], references: [id, agentInstanceId])
-  /// Enforce that agentInstanceId and outputFile.agentInstanceId are the same.
-  outputFileAgentMatch  File @relation("buildfs_event_output_file_agent_match", fields: [outputFileId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and projectImage.agentInstanceId are the same.
+  projectImageAgentMatch LocalOciImage @relation("buildfs_event_project_image_agent_match", fields: [projectImageId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and outputImage.agentInstanceId are the same.
+  outputImageAgentMatch  LocalOciImage @relation("buildfs_event_output_image_agent_match", fields: [outputImageId, agentInstanceId], references: [id, agentInstanceId])
 
   @@unique([buildfsEventId, agentInstanceId])
 }
@@ -333,16 +333,15 @@ model Project {
 }
 
 model AgentInstance {
-  id                 BigInt               @id @default(autoincrement())
-  externalId         String               @unique
-  files              File[]
-  buildfsEventFiles  BuildfsEventFiles[]
-  prebuildEventFiles PrebuildEventFiles[]
-  workspaces         Workspace[]
+  id         BigInt      @id @default(autoincrement())
+  externalId String      @unique
+  workspaces Workspace[]
 
-  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
-  localOciImages     LocalOciImage[]
-  GitRepositoryImage GitRepositoryImage[]
+  createdAt           DateTime              @default(now()) @db.Timestamptz(3)
+  localOciImages      LocalOciImage[]
+  buildfsEventImages  BuildfsEventImages[]
+  GitRepositoryImage  GitRepositoryImage[]
+  PrebuildEventImages PrebuildEventImages[]
 }
 
 model LocalOciImage {
@@ -353,36 +352,23 @@ model LocalOciImage {
   agentInstanceId BigInt
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
 
-  gitRepositoryImages      GitRepositoryImage[]
-  gitRepositoryMatchImages GitRepositoryImage[] @relation("git_repository_image_agent_match")
+  gitRepositoryImages                  GitRepositoryImage[]
+  gitRepositoryMatchImages             GitRepositoryImage[]  @relation("git_repository_image_agent_match")
+  prebuildEventFsImages                PrebuildEventImages[] @relation("prebuild_event_fs_image")
+  prebuildEventProjectImages           PrebuildEventImages[] @relation("prebuild_event_project_image")
+  prebuildEventFsAgentMatchImages      PrebuildEventImages[] @relation("prebuild_event_fs_image_agent_match")
+  prebuildEventProjectAgentMatchImages PrebuildEventImages[] @relation("prebuild_event_project_image_agent_match")
+  buildfsEventProjectImages            BuildfsEventImages[]  @relation("buildfs_event_project_image")
+  buildfsEventOutputImages             BuildfsEventImages[]  @relation("buildfs_event_output_image")
+  buildfsEventProjectImageAgentMatch   BuildfsEventImages[]  @relation("buildfs_event_project_image_agent_match")
+  buildfsEventOutputImageAgentMatch    BuildfsEventImages[]  @relation("buildfs_event_output_image_agent_match")
+  workspacesRootFs                     Workspace[]           @relation("workspace_project_image")
+  workspacesProject                    Workspace[]           @relation("workspace_root_fs_image")
+  workspaceRootfsImageAgentMatch       Workspace[]           @relation("workspace_root_fs_image_agent_match")
+  workspaceProjectImageAgentMatch      Workspace[]           @relation("workspace_project_image_agent_match")
 
   @@unique([agentInstanceId, id])
   @@unique([agentInstanceId, tag])
-}
-
-model File {
-  id                                  BigInt               @id @default(autoincrement())
-  agentInstance                       AgentInstance        @relation(fields: [agentInstanceId], references: [id])
-  agentInstanceId                     BigInt
-  /// Should be absolute.
-  path                                String
-  buildfsEventProjectFiles            BuildfsEventFiles[]  @relation("buildfs_event_project_file")
-  buildfsEventOutputFiles             BuildfsEventFiles[]  @relation("buildfs_event_output_file")
-  buildfsEventProjectFileAgentMatch   BuildfsEventFiles[]  @relation("buildfs_event_project_file_agent_match")
-  buildfsEventOutputFileAgentMatch    BuildfsEventFiles[]  @relation("buildfs_event_output_file_agent_match")
-  prebuildEventFsFiles                PrebuildEventFiles[] @relation("prebuild_event_fs_file")
-  prebuildEventProjectFiles           PrebuildEventFiles[] @relation("prebuild_event_project_file")
-  prebuildEventFsFilesAgentMatch      PrebuildEventFiles[] @relation("prebuild_event_fs_file_agent_match")
-  prebuildEventProjectFilesAgentMatch PrebuildEventFiles[] @relation("prebuild_event_project_file_agent_match")
-  workspacesRootFs                    Workspace[]          @relation("workspace_project_file")
-  workspacesProject                   Workspace[]          @relation("workspace_root_fs_file")
-  workspaceRootfsFileAgentMatch       Workspace[]          @relation("workspace_root_fs_file_agent_match")
-  workspaceProjectFileAgentMatch      Workspace[]          @relation("workspace_project_file_agent_match")
-
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-
-  @@unique([id, agentInstanceId])
-  @@unique([agentInstanceId, path])
 }
 
 model EnvironmentVariable {
@@ -426,10 +412,10 @@ model Workspace {
   prebuildEvent    PrebuildEvent      @relation(fields: [prebuildEventId], references: [id])
   gitBranchId      BigInt
   gitBranch        GitBranch          @relation(fields: [gitBranchId], references: [id])
-  rootFsFileId     BigInt
-  rootFsFile       File               @relation("workspace_root_fs_file", fields: [rootFsFileId], references: [id])
-  projectFileId    BigInt
-  projectFile      File               @relation("workspace_project_file", fields: [projectFileId], references: [id])
+  rootFsImageId    BigInt
+  rootFsImage      LocalOciImage      @relation("workspace_root_fs_image", fields: [rootFsImageId], references: [id])
+  projectImageId   BigInt
+  projectImage     LocalOciImage      @relation("workspace_project_image", fields: [projectImageId], references: [id])
   agentInstanceId  BigInt
   agentInstance    AgentInstance      @relation(fields: [agentInstanceId], references: [id])
   status           WorkspaceStatus
@@ -437,10 +423,10 @@ model Workspace {
   activeInstance   WorkspaceInstance? @relation(fields: [activeInstanceId], references: [id])
   latestError      String?
 
-  /// Enforce that agentInstanceId and rootFsFile.agentInstanceId are the same.
-  rootFsFileAgentMatch  File @relation("workspace_root_fs_file_agent_match", fields: [rootFsFileId, agentInstanceId], references: [id, agentInstanceId])
-  /// Enforce that agentInstanceId and projectFile.agentInstanceId are the same.
-  projectFileAgentMatch File @relation("workspace_project_file_agent_match", fields: [projectFileId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and rootFsImage.agentInstanceId are the same.
+  rootFsImageAgentMatch  LocalOciImage @relation("workspace_root_fs_image_agent_match", fields: [rootFsImageId, agentInstanceId], references: [id, agentInstanceId])
+  /// Enforce that agentInstanceId and projectImage.agentInstanceId are the same.
+  projectImageAgentMatch LocalOciImage @relation("workspace_project_image_agent_match", fields: [projectImageId, agentInstanceId], references: [id, agentInstanceId])
 
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   lastOpenedAt DateTime @default(now()) @db.Timestamptz(3)
