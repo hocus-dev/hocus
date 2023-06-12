@@ -347,9 +347,6 @@ export class BlockRegistryService {
     },
   ): Promise<ImageId> {
     const imageId = BlockRegistryService.genImageId(outputId);
-    if (await this.hasImage(imageId)) {
-      return imageId;
-    }
     const imageIndexDir = path.join(this.paths.run, "ingest-" + this.genRandId());
     const skipVerifyTls = process.env.OCI_PROXY != null || opts?.skipVerifyTls === true;
     try {
