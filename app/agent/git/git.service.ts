@@ -338,7 +338,6 @@ export class AgentGitService {
             },
             async ({ ssh }) => {
               const repositoryDir = path.join(outputDir, PROJECT_DIR);
-              const logFilePath = "/tmp/ssh-fetchrepo.log";
               const outputDirOwner = await execSshCmd({ ssh }, [
                 "sudo",
                 "stat",
@@ -379,7 +378,7 @@ export class AgentGitService {
                   ])
                 ).code === 0;
               if (repositoryExists) {
-                await execSshCmd({ ssh, logFilePath, opts: { ...sshOpts, cwd: repositoryDir } }, [
+                await execSshCmd({ ssh, opts: { ...sshOpts, cwd: repositoryDir } }, [
                   "git",
                   "fetch",
                   "--all",
@@ -388,7 +387,6 @@ export class AgentGitService {
                 await execSshCmd(
                   {
                     ssh,
-                    logFilePath,
                     opts: sshOpts,
                   },
                   ["git", "clone", "--no-checkout", repository.url, repositoryDir],
@@ -396,7 +394,7 @@ export class AgentGitService {
               }
 
               // TODO: This is a PITA as LFS might span TB's of data .-. we need to revisit this in the future
-              await execSshCmd({ ssh, logFilePath, opts: { ...sshOpts, cwd: repositoryDir } }, [
+              await execSshCmd({ ssh, opts: { ...sshOpts, cwd: repositoryDir } }, [
                 "git",
                 "lfs",
                 "fetch",
