@@ -1,18 +1,22 @@
 import fs from "fs/promises";
 import path from "path";
 
+import portfinder from "portfinder";
 import { v4 as uuidv4 } from "uuid";
 
 import { createAgentInjector } from "../agent-injector";
-import { execCmd } from "../utils";
+import { execCmd, execCmdWithOpts } from "../utils";
 
 import type { ContainerId, ImageId } from "./registry.service";
+import { BlockRegistryService } from "./registry.service";
 import { EXPOSE_METHOD } from "./registry.service";
 import { testImages } from "./test-data/test-images.const";
 
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
-import { waitForPromises } from "~/utils.shared";
+import { sleep, waitForPromises } from "~/utils.shared";
+
+jest.setTimeout(30000);
 
 const noSetupEnv = new TestEnvironmentBuilder(createAgentInjector).withLateInits({
   brService: async ({ injector }) => injector.resolve(Token.BlockRegistryService),
@@ -337,6 +341,16 @@ test.concurrent(
     // Sanity check that the image works
     await brService.expose(im1, EXPOSE_METHOD.BLOCK_DEV);
     await brService.expose(im2, EXPOSE_METHOD.BLOCK_DEV);
+  }),
+);
+
+test.concurrent(
+  "commitContainer without removing the container",
+  testEnv.run(async ({ brService }) => {
+    const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
+    const im1 = await brService.commitContainer(c1, "im1", { removeContainer: false });
+    await brService.expose(c1, EXPOSE_METHOD.BLOCK_DEV);
+    await brService.expose(im1, EXPOSE_METHOD.BLOCK_DEV);
   }),
 );
 
@@ -691,6 +705,65 @@ test.concurrent.skip(
       const cMount = await brService.expose(ct, EXPOSE_METHOD.HOST_MOUNT);
       await fs.writeFile(path.join(cMount.mountPoint, `layer_${i}`), `Hello from layer ${i}`);
       parentImgId = await brService.commitContainer(ct, `im${i}`);
+    }
+  }),
+);
+
+test.concurrent(
+  "pushImage",
+  testEnv.run(async ({ brService }) => {
+    const writeToNewImage = async (
+      imageId: ImageId | undefined,
+      outputId: string,
+      contents: string,
+    ): Promise<ImageId> => {
+      const ctId = await BlockRegistryService.genContainerId(outputId);
+      const ct: ContainerId = await brService.createContainer(imageId, ctId, {
+        mkfs: imageId === void 0,
+        sizeInGB: 64,
+      });
+      const cMount = await brService.expose(ct, EXPOSE_METHOD.HOST_MOUNT);
+      await fs.writeFile(path.join(cMount.mountPoint, "test"), contents);
+      return brService.commitContainer(ct, outputId);
+    };
+    const im1 = await writeToNewImage(void 0, "im1", "test");
+    const im2 = await writeToNewImage(im1, "im2", "roast");
+    const im3 = await writeToNewImage(im2, "im3", "brother");
+
+    const ac = new AbortController();
+    const [registryPromise, port] = await portfinder.getPortPromise().then(async (port) => {
+      const promise = execCmdWithOpts(["crane", "registry", "serve"], {
+        env: { PORT: port.toString() },
+        signal: ac.signal,
+      });
+      // give the registry some time to start or error out
+      await Promise.race([sleep(250), promise]);
+      return [promise, port] as const;
+    });
+    try {
+      const tag = `localhost:${port}/hocus/push-test:tag-1`;
+      await brService.pushImage(im3, {
+        tag,
+        username: "username",
+        password: "password",
+      });
+      const im4 = await brService.loadImageFromRemoteRepo(tag, "im4", { skipVerifyTls: true });
+      const { mountPoint: mountPoint2 } = await brService.expose(im4, EXPOSE_METHOD.HOST_MOUNT);
+      await expect(fs.readFile(path.join(mountPoint2, "test"), "utf-8")).resolves.toEqual(
+        "brother",
+      );
+      await brService.hide(im4);
+      const ct1Id = await brService.createContainer(im4, "ct1");
+      const { mountPoint: mountPoint3 } = await brService.expose(ct1Id, EXPOSE_METHOD.HOST_MOUNT);
+      const writeData = "hello";
+      await fs.writeFile(path.join(mountPoint3, "test2"), writeData);
+      const readData = await fs.readFile(path.join(mountPoint3, "test2")).then((b) => b.toString());
+      expect(readData).toEqual(writeData);
+    } finally {
+      // the registry child process will be killed even if this code does not
+      // run in case of a sigkill, because it will die along with its parent - jest
+      ac.abort();
+      await registryPromise.catch(() => {});
     }
   }),
 );

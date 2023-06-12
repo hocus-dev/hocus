@@ -92,13 +92,16 @@ words:
   - EOSQL
   - esbuild
   - excalidraw
+  - fastoci
   - fetchrepo
   - flowbite
   - Gerrit
   - Gitea
   - gorbak
   - hadolint
+  - Hardlink
   - hardlinked
+  - hardlinks
   - hocusdev
   - iputils
   - isready
@@ -111,9 +114,11 @@ words:
   - mapenum
   - mkfifo
   - mountinfo
+  - mountpoint
   - nameserver
   - Nanos
   - netdev
+  - netlink
   - netns
   - nologin
   - NOPASSWD
@@ -128,6 +133,7 @@ words:
   - permissioning
   - PGDATA
   - pgtmpfs
+  - portfinder
   - posthog
   - postmigrate
   - POSTROUTING
@@ -154,6 +160,7 @@ words:
   - socat
   - sshgateway
   - sshpk
+  - starcraft
   - stty
   - tailscale
   - tailscaled

@@ -4,6 +4,8 @@ import type { IpBlockId } from "../network/workspace-network.service";
 
 import type { VmInfo } from "./vm-info.validator";
 
+type FsSpec = { device: string; readonly: boolean } | { mountPoint: string; readonly: boolean };
+
 export interface HocusRuntime {
   getRuntimeInfo(): Promise<{ status: "on" | "off" | "paused"; info: VmInfo } | null>;
   withRuntime<T>(
@@ -22,10 +24,9 @@ export interface HocusRuntime {
        * This is a map in the form <RUNTIME_PATH> -> <HOST_SPEC>
        * An entry for / is required
        */
-      fs: Record<
-        string,
-        { device: string; readonly: boolean } | { mountPoint: string; readonly: boolean }
-      >;
+      fs: {
+        "/": FsSpec;
+      } & Record<string, FsSpec>;
       /**
        * Defaults to true.
        */

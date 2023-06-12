@@ -181,7 +181,8 @@ test.concurrent.each(
     const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
     const osCt = await brService.createContainer(osIm, "osCt");
     const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
-    const vmInfo = await instance
+    let vmInfo: Awaited<ReturnType<typeof instance.getRuntimeInfo>> = null as any;
+    await instance
       .withRuntime(
         {
           ssh: {
@@ -195,11 +196,10 @@ test.concurrent.each(
           shouldPoweroff: true,
         },
         async ({ ssh }) => {
-          const info = await instance.getRuntimeInfo();
+          vmInfo = await instance.getRuntimeInfo();
           // Cause ssh might terminate unexpectedly, let the promise hang
           void execSshCmd({ ssh }, command).catch((_err) => void 0);
           await sleep(100);
-          return info;
         },
       )
       .catch((err: any) => {
@@ -221,7 +221,12 @@ test.concurrent.each(
             at Protocol.parse (node_modules/ssh2/lib/protocol/Protocol.js:293:16)
             at Socket.<anonymous> (node_modules/ssh2/lib/client.js:713:21)
         */
-        if (err?.message.includes("EPIPE") || err?.code.includes("EPIPE")) return;
+        if (
+          err?.message?.includes("EPIPE") ||
+          err?.code?.includes("EPIPE") ||
+          err?.message?.includes("Not connected to server")
+        )
+          return;
         throw err;
       });
     expect(vmInfo).not.toBeNull();

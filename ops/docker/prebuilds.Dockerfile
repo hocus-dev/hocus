@@ -21,6 +21,7 @@ COPY --from=obd-convertor-builder /convertor /convertor
 
 FROM hocusdev/workspace as hocus-workspace
 RUN { curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 -fsSL https://deb.nodesource.com/setup_18.x | sudo bash -; } \
+    && sudo apt-get update \
     && DEBIAN_FRONTEND=noninteractive sudo apt-get install -y cmake nodejs qemu-system psmisc expect unzip skopeo jq \
     && sudo npm install --global yarn \
     && fish -c "set -U fish_user_paths \$fish_user_paths ~/.yarn/bin" \
@@ -78,5 +79,7 @@ COPY --from=obd /etc/overlaybd /etc/overlaybd
 RUN chmod u+s /opt/overlaybd/bin/overlaybd-apply
 # Install the overlaybd conversion tool
 COPY --from=obd-convertor /convertor /opt/overlaybd/bin/convertor
+# Install crane
+RUN bash -c 'wget -O - "https://github.com/google/go-containerregistry/releases/download/v0.15.2/go-containerregistry_Linux_x86_64.tar.gz" | tar -zxvf - -C /usr/bin/ crane'
 
 WORKDIR /app
