@@ -28,7 +28,7 @@ export class ExecCmdError extends Error {
 
 export const execCmdWithOpts = async (
   args: string[],
-  options: Object.Modify<
+  options: Object.Overwrite<
     SpawnOptionsWithoutStdio,
     { env?: Record<string, string | undefined>; cwd?: string | undefined }
   >,

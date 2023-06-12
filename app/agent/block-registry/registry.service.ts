@@ -1,3 +1,4 @@
+import assert from "assert";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -8,8 +9,10 @@ import { flock } from "fs-ext";
 import type { A, Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
-import { doesFileExist, execCmd } from "../utils";
+import { execCmd, execCmdWithOpts } from "../utils";
 
+import type { HttpsOpencontainersOrgSchemaImageConfig } from "./oci-schema/config-schema";
+import type { HttpsOpencontainersOrgSchemaImageIndex } from "./oci-schema/image-index-schema";
 import { HOCUS_TCMU_HBA, HOCUS_TCM_LOOP_PORT, HOCUS_TCM_LOOP_WWN } from "./registry.const";
 import type { OBDConfig, OCIDescriptor, OCIImageIndex, OCIImageManifest } from "./validators";
 import { OBDConfigValidator } from "./validators";
@@ -20,6 +23,7 @@ import { GroupError } from "~/group-error";
 import type { Validator } from "~/schema/utils.server";
 import { Token } from "~/token";
 import type { valueof } from "~/types/utils";
+import { doesFileExist, sha256 } from "~/utils.server";
 import { waitForPromises, sleep } from "~/utils.shared";
 
 export type ImageId = A.Type<`im_${string}`, "image">;
@@ -43,6 +47,8 @@ export async function readJsonFileOfType<T extends TSchema>(
 ): Promise<Any.Compute<Static<T>>> {
   return validator.Parse(JSON.parse(await fs.readFile(path, { encoding: "utf-8" })));
 }
+
+type PickOne<T, I extends keyof T> = T extends infer _T ? T[I] : never;
 
 export class BlockRegistryService {
   static inject = [Token.Logger, Token.Config] as const;
@@ -123,12 +129,20 @@ export class BlockRegistryService {
     return uuidv4();
   }
 
-  private genImageId(outputId: string): ImageId {
+  static genImageId(outputId: string): ImageId {
     return ("im_" + outputId) as ImageId;
   }
 
-  private genContainerId(outputId: string): ContainerId {
+  static genContainerId(outputId: string): ContainerId {
     return ("ct_" + outputId) as ContainerId;
+  }
+
+  static isImageId(id: string): id is ImageId {
+    return id.startsWith("im_");
+  }
+
+  static isContainerId(id: string): id is ContainerId {
+    return id.startsWith("ct_");
   }
 
   // Called once after agent restart/start
@@ -317,16 +331,27 @@ export class BlockRegistryService {
 
   async loadImageFromDisk(ociDumpPath: string, outputId: string): Promise<ImageId> {
     return await this.loadLocalOCIImage(
-      this.genImageId(outputId),
+      BlockRegistryService.genImageId(outputId),
       `${path.join(ociDumpPath, "index.json")}`,
       `${path.join(ociDumpPath, "blobs")}`,
     );
   }
 
   // Mostly for convenience :)
-  async loadImageFromRemoteRepo(ref: string, outputId: string): Promise<ImageId> {
-    const imageId = this.genImageId(outputId);
+  async loadImageFromRemoteRepo(
+    ref: string,
+    outputId: string,
+    opts?: {
+      // Defaults to false
+      skipVerifyTls?: boolean;
+    },
+  ): Promise<ImageId> {
+    const imageId = BlockRegistryService.genImageId(outputId);
+    if (await this.hasImage(imageId)) {
+      return imageId;
+    }
     const imageIndexDir = path.join(this.paths.run, "ingest-" + this.genRandId());
+    const skipVerifyTls = process.env.OCI_PROXY != null || opts?.skipVerifyTls === true;
     try {
       // Get the image for the current platform from the remote repo
       // This will only download blobs we actually need due to the shared blob dir <3
@@ -335,7 +360,7 @@ export class BlockRegistryService {
       await execCmd(
         "skopeo",
         "copy",
-        ...(process.env.OCI_PROXY ? ["--src-tls-verify=false"] : []),
+        ...(skipVerifyTls ? ["--src-tls-verify=false"] : []),
         "--multi-arch",
         "system",
         "--dest-oci-accept-uncompressed-layers",
@@ -528,8 +553,14 @@ export class BlockRegistryService {
     if (imageId !== void 0 && !imageId.startsWith("im_")) {
       throw new Error(`Invalid imageId: ${imageId}`);
     }
+    if (imageId !== void 0 && opts.mkfs) {
+      throw new Error(`Cannot mkfs with an imageId. You were about to format the entire disk.`);
+    }
+    if (opts.sizeInGB > 64) {
+      throw new Error(`Cannot create a container larger than 64 GB. Overlaybd limitation.`);
+    }
     const t1 = performance.now();
-    const containerId = this.genContainerId(outputId);
+    const containerId = BlockRegistryService.genContainerId(outputId);
     const lowers = await this.imageIdToOBDLowers(imageId);
     const dataPath = path.join(this.paths.containers, containerId, "data");
     const indexPath = path.join(this.paths.containers, containerId, "index");
@@ -574,11 +605,18 @@ export class BlockRegistryService {
     return containerId;
   }
 
-  public async commitContainer(containerId: ContainerId, outputId: string): Promise<ImageId> {
-    if (!containerId.startsWith("ct_")) {
+  public async commitContainer(
+    containerId: ContainerId,
+    outputId: string,
+    opts: {
+      /** Whether to remove the container after it's committed. Defaults to `true`. */
+      removeContainer: boolean;
+    } = { removeContainer: true },
+  ): Promise<ImageId> {
+    if (!BlockRegistryService.isContainerId(containerId)) {
       throw new Error(`Invalid containerId: ${containerId}`);
     }
-    const imageId = this.genImageId(outputId);
+    const imageId = BlockRegistryService.genImageId(outputId);
 
     // If the container does not exist and the output image exists we do nothing due to idempotence
     const outputImageExists = await doesFileExist(path.join(this.paths.images, imageId));
@@ -657,7 +695,12 @@ export class BlockRegistryService {
       manifest.layers.push(layerDescriptor);
 
       await this._loadLocalOCIImage(imageId, manifest, [[layerPath, layerDescriptor]]);
-      await fs.rm(path.join(this.paths.containers, containerId), { recursive: true, force: true });
+      if (opts.removeContainer) {
+        await fs.rm(path.join(this.paths.containers, containerId), {
+          recursive: true,
+          force: true,
+        });
+      }
       return imageId;
     });
   }
@@ -735,22 +778,22 @@ export class BlockRegistryService {
       });
   }
 
-  expose(
+  async expose<M extends EXPOSE_METHOD>(
     what: ImageId | ContainerId,
-    method: typeof EXPOSE_METHOD.HOST_MOUNT,
-  ): Promise<{ mountPoint: string; readonly: boolean }>;
-  expose(
-    what: ImageId | ContainerId,
-    method: typeof EXPOSE_METHOD.BLOCK_DEV,
-  ): Promise<{ device: string; readonly: boolean }>;
-  async expose(
-    what: ImageId | ContainerId,
-    method: EXPOSE_METHOD,
-  ): Promise<{ device: string; readonly: boolean } | { mountPoint: string; readonly: boolean }> {
-    if (!what.startsWith("im_") && !what.startsWith("ct_")) {
+    method: M,
+  ): Promise<
+    PickOne<
+      {
+        [EXPOSE_METHOD.HOST_MOUNT]: { mountPoint: string; readonly: boolean };
+        [EXPOSE_METHOD.BLOCK_DEV]: { device: string; readonly: boolean };
+      },
+      M
+    >
+  > {
+    if (!BlockRegistryService.isImageId(what) && !BlockRegistryService.isContainerId(what)) {
       throw new Error(`Invalid id: ${what}`);
     }
-    const readonly = what.startsWith("im_");
+    const readonly = BlockRegistryService.isImageId(what);
     switch (method) {
       case EXPOSE_METHOD.HOST_MOUNT: {
         const bd = await this.expose(what, EXPOSE_METHOD.BLOCK_DEV);
@@ -765,7 +808,7 @@ export class BlockRegistryService {
         } catch (err: any) {
           if (!err?.message?.includes("already mounted")) throw err;
         }
-        return { mountPoint, readonly };
+        return { mountPoint, readonly } as any;
       }
       case EXPOSE_METHOD.BLOCK_DEV: {
         const t1 = performance.now();
@@ -1026,13 +1069,14 @@ export class BlockRegistryService {
         return {
           device: `/dev/hocus/${disksAndPartitions[0]}`,
           readonly,
-        };
+        } as any;
       }
     }
+    assert(false, "Unreachable");
   }
 
   async hide(what: ImageId | ContainerId): Promise<void> {
-    if (!what.startsWith("im_") && !what.startsWith("ct_")) {
+    if (!BlockRegistryService.isImageId(what) && !BlockRegistryService.isContainerId(what)) {
       throw new Error(`Invalid id: ${what}`);
     }
     const t1 = performance.now();
@@ -1075,5 +1119,119 @@ export class BlockRegistryService {
     // Remove the result file
     await fs.unlink(path.join(this.paths.run, `obd-result-${what}`)).catch(catchIgnore("ENOENT"));
     this.logger.info(`hide of ${what} took: ${(performance.now() - t1).toFixed(2)} ms`);
+  }
+
+  async hasImage(id: ImageId | ContainerId): Promise<boolean> {
+    const imageExists = await doesFileExist(path.join(this.paths.images, id));
+    const containerExists = await doesFileExist(path.join(this.paths.containers, id));
+    return imageExists || containerExists;
+  }
+
+  private tagToRegistry(tag: string): string {
+    const [registry, repo] = tag.split("/", 2);
+    if (repo === void 0) {
+      return "docker.io";
+    }
+    return registry;
+  }
+
+  private genOciConfig(
+    manifest: OCIImageManifest,
+    architecture: "amd64" | "arm64",
+  ): HttpsOpencontainersOrgSchemaImageConfig {
+    return {
+      os: "linux",
+      architecture,
+      rootfs: {
+        type: "layers",
+        // eslint-disable-next-line camelcase
+        diff_ids: manifest.layers.map((layer) => layer.digest),
+      },
+    };
+  }
+
+  /**
+   * Returns the path to the OCI image directory
+   */
+  private async exportImageForPush(imageId: ImageId): Promise<string> {
+    const manifest = await readJsonFileOfType(
+      path.join(this.paths.images, imageId),
+      OCIImageManifestValidator,
+    );
+    // TODO: Support multiple architectures
+    const config = this.genOciConfig(manifest, "amd64");
+    const layers = manifest.layers.map((layerDescriptor) => {
+      const [hashType, hash] = layerDescriptor.digest.split(":");
+      return {
+        file: path.join(this.paths.layers, layerDescriptor.digest, "layer.tar"),
+        hashType,
+        hash,
+      };
+    });
+    const configBlob = Buffer.from(JSON.stringify(config));
+    const configHash = sha256(configBlob);
+    manifest.config = {
+      mediaType: "application/vnd.oci.image.config.v1+json",
+      digest: `sha256:${configHash}`,
+      size: configBlob.length,
+    };
+    const manifestBlob = Buffer.from(JSON.stringify(manifest));
+    const manifestHash = sha256(manifestBlob);
+    const documentBlobs = [
+      [configHash, configBlob],
+      [manifestHash, manifestBlob],
+    ] as const;
+    const exportDir = path.join(this.paths.run, "export", imageId);
+    const blobsDir = path.join(exportDir, "blobs");
+    const documentBlobsDir = path.join(blobsDir, "sha256");
+    await fs.mkdir(documentBlobsDir, { recursive: true }).catch(catchAlreadyExists);
+    for (const [hash, blob] of documentBlobs) {
+      await fs.writeFile(path.join(documentBlobsDir, hash), blob);
+    }
+    for (const layer of layers) {
+      const layerDir = path.join(blobsDir, layer.hashType);
+      await fs.mkdir(layerDir, { recursive: true }).catch(catchAlreadyExists);
+      await fs.copyFile(layer.file, path.join(layerDir, layer.hash));
+    }
+    const index: HttpsOpencontainersOrgSchemaImageIndex = {
+      schemaVersion: 0,
+      manifests: [
+        {
+          mediaType: "application/vnd.oci.image.manifest.v1+json",
+          digest: `sha256:${manifestHash}`,
+          size: manifestBlob.length,
+        },
+      ],
+    };
+    await fs.writeFile(path.join(exportDir, "index.json"), JSON.stringify(index));
+    return exportDir;
+  }
+
+  async pushImage(
+    imageId: ImageId,
+    opts: { tag: string; username: string; password: string },
+  ): Promise<void> {
+    const exportDir = await this.exportImageForPush(imageId);
+    const registry = this.tagToRegistry(opts.tag);
+    await this.withTmpFile(async (tmpFile) => {
+      const cmdOpts = { env: { DOCKER_CONFIG: tmpFile } };
+      // DOCKER_CONFIG is undocumented, but it's used by crane
+      // https://github.com/google/go-containerregistry/blob/145eebe7465dc9af316736c8b4c2dab7d86562fe/cmd/crane/cmd/auth.go#L255
+      await execCmdWithOpts(
+        [
+          "crane",
+          "auth",
+          "login",
+          registry,
+          "--username",
+          opts.username,
+          "--password",
+          opts.password,
+        ],
+        cmdOpts,
+      );
+      await execCmdWithOpts(["crane", "push", exportDir, opts.tag], cmdOpts);
+    });
+    await fs.rmdir(exportDir, { recursive: true });
   }
 }
