@@ -345,7 +345,7 @@ test.concurrent(
 );
 
 test.concurrent(
-  "commitContainer without removing the container",
+  "Test commit without removing the container",
   testEnv.run(async ({ brService }) => {
     const c1 = await brService.createContainer(void 0, "c1", { mkfs: true, sizeInGB: 64 });
     const im1 = await brService.commitContainer(c1, "im1", { removeContainer: false });
@@ -742,11 +742,12 @@ test.concurrent(
     });
     try {
       const tag = `localhost:${port}/hocus/push-test:tag-1`;
-      await brService.pushImage(im3, {
+      const opts = {
         tag,
         username: "username",
         password: "password",
-      });
+      };
+      await waitForPromises([brService.pushImage(im3, opts), brService.pushImage(im3, opts)]);
       const im4 = await brService.loadImageFromRemoteRepo(tag, "im4", { skipVerifyTls: true });
       const { mountPoint: mountPoint2 } = await brService.expose(im4, EXPOSE_METHOD.HOST_MOUNT);
       await expect(fs.readFile(path.join(mountPoint2, "test"), "utf-8")).resolves.toEqual(
