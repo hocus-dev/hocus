@@ -221,7 +221,7 @@ test.concurrent.each(
             at Protocol.parse (node_modules/ssh2/lib/protocol/Protocol.js:293:16)
             at Socket.<anonymous> (node_modules/ssh2/lib/client.js:713:21)
         */
-        if (err?.message.includes("EPIPE") || err?.code.includes("EPIPE")) return;
+        if (err?.message?.includes("EPIPE") || err?.code?.includes("EPIPE")) return;
         throw err;
       });
     expect(vmInfo).not.toBeNull();
