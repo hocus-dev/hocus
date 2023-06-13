@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { Workspace, WorkspaceInstance, Prisma } from "@prisma/client";
+import type { Workspace, WorkspaceInstance, Prisma, LocalOciImage } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, SSHExecOptions } from "node-ssh";
@@ -22,8 +22,8 @@ import {
 import type { SSHGatewayService } from "./network/ssh-gateway.service";
 import type { WorkspaceNetworkService } from "./network/workspace-network.service";
 import type { ProjectConfigService } from "./project-config/project-config.service";
-import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
-import { execCmd, execSshCmd } from "./utils";
+import type { HocusRuntime } from "./runtime/hocus-runtime";
+import { execCmd, execSshCmd, withRuntimeAndImages } from "./utils";
 import { execCmdWithOpts } from "./utils";
 
 import type { Config } from "~/config";
@@ -41,7 +41,6 @@ export class WorkspaceAgentService {
     Token.ProjectConfigService,
     Token.WorkspaceNetworkService,
     Token.BlockRegistryService,
-    Token.FirecrackerService,
     Token.Config,
   ] as const;
   private readonly agentConfig: ReturnType<Config["agent"]>;
@@ -53,7 +52,6 @@ export class WorkspaceAgentService {
     private readonly projectConfigService: ProjectConfigService,
     private readonly networkService: WorkspaceNetworkService,
     private readonly brService: BlockRegistryService,
-    private readonly fcServiceFactory: (id: string) => FirecrackerService,
     config: Config,
   ) {
     this.agentConfig = config.agent();
@@ -85,24 +83,27 @@ export class WorkspaceAgentService {
       gitBranchId: bigint;
       userId: bigint;
     },
-  ): Promise<Workspace> {
+  ): Promise<
+    Workspace & {
+      rootFsImage: LocalOciImage;
+      projectImage: LocalOciImage;
+    }
+  > {
     const projectImageTag = sha256(args.externalId + "workspace-project");
     const rootFsImageTag = sha256(args.externalId + "workspace-rootfs");
 
-    const [rootFsImageId, projectImageId] = await waitForPromises(
+    const [rootFsImage, projectImage] = await waitForPromises(
       [rootFsImageTag, projectImageTag].map((tag) =>
-        db.localOciImage
-          .create({
-            data: {
-              tag,
-              readonly: false,
-              agentInstanceId: args.agentInstanceId,
-            },
-          })
-          .then((image) => image.id),
+        db.localOciImage.create({
+          data: {
+            tag,
+            readonly: false,
+            agentInstanceId: args.agentInstanceId,
+          },
+        }),
       ),
     );
-    return await db.workspace.create({
+    const workspace = await db.workspace.create({
       data: {
         name: args.name,
         externalId: args.externalId,
@@ -111,10 +112,15 @@ export class WorkspaceAgentService {
         prebuildEventId: args.prebuildEventId,
         agentInstanceId: args.agentInstanceId,
         userId: args.userId,
-        rootFsImageId,
-        projectImageId,
+        rootFsImageId: rootFsImage.id,
+        projectImageId: projectImage.id,
       },
     });
+    return {
+      ...workspace,
+      rootFsImage,
+      projectImage,
+    };
   }
 
   async writeAuthorizedKeysToFs(
@@ -196,9 +202,9 @@ export class WorkspaceAgentService {
   }
 
   async startWorkspace(args: {
-    fcInstanceId: string;
-    filesystemDrivePath: string;
-    projectDrivePath: string;
+    runtime: HocusRuntime;
+    fsContainerId: ContainerId;
+    projectContainerId: ContainerId;
     authorizedKeys: string[];
     workspaceRoot: string;
     tasks: { command: string; commandShell: string }[];
@@ -209,30 +215,30 @@ export class WorkspaceAgentService {
     memSizeMib: number;
     vcpuCount: number;
   }): Promise<{
-    firecrackerProcessPid: number;
+    runtimePid: number;
     vmIp: string;
     ipBlockId: number;
   }> {
-    const fcService = this.fcServiceFactory(args.fcInstanceId);
-
-    await this.writeAuthorizedKeysToFs(args.filesystemDrivePath, [
+    await this.writeAuthorizedKeysToFs(args.projectContainerId, [
       this.agentConfig.prebuildSshPublicKey,
     ]);
-
-    return await fcService.withVM(
+    return withRuntimeAndImages(
+      this.brService,
+      args.runtime,
       {
         ssh: {
           username: "hocus",
           privateKey: this.agentConfig.prebuildSshPrivateKey,
         },
-        kernelPath: this.agentConfig.defaultKernel,
-        rootFsPath: args.filesystemDrivePath,
-        extraDrives: [{ pathOnHost: args.projectDrivePath, guestMountPath: WORKSPACE_DEV_DIR }],
+        fs: {
+          "/": args.fsContainerId,
+          [WORKSPACE_DEV_DIR]: args.projectContainerId,
+        },
         shouldPoweroff: false,
         memSizeMib: args.memSizeMib,
         vcpuCount: args.vcpuCount,
       },
-      async ({ ssh, vmIp, firecrackerPid, ipBlockId }) => {
+      async ({ ssh, vmIp, runtimePid, ipBlockId }) => {
         const taskFn = async (
           task: { command: string; commandShell: string },
           taskIdx: number,
@@ -311,7 +317,7 @@ export class WorkspaceAgentService {
         await this.networkService.changeInterfaceVisibility(ipBlockId, "public");
         await this.sshGatewayService.addPublicKeysToAuthorizedKeys(authorizedKeys);
         return {
-          firecrackerProcessPid: firecrackerPid,
+          runtimePid,
           vmIp,
           ipBlockId,
         };

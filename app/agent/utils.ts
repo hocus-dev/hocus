@@ -12,7 +12,12 @@ import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from
 import { NodeSSH } from "node-ssh";
 import lockfile from "proper-lockfile";
 import { Tail } from "tail";
-import type { Object } from "ts-toolbelt";
+import type { Object as Obj } from "ts-toolbelt";
+
+import type { BlockRegistryService, ContainerId, ImageId } from "./block-registry/registry.service";
+import { EXPOSE_METHOD } from "./block-registry/registry.service";
+import { withExposedImages } from "./block-registry/utils";
+import type { HocusRuntime } from "./runtime/hocus-runtime";
 
 import type { valueof } from "~/types/utils";
 import { doesFileExist, sha256 } from "~/utils.server";
@@ -30,7 +35,7 @@ export class ExecCmdError extends Error {
 
 export const execCmdWithOpts = async (
   args: string[],
-  options: Object.Overwrite<
+  options: Obj.Overwrite<
     SpawnOptionsWithoutStdio,
     { env?: Record<string, string | undefined>; cwd?: string | undefined }
   >,
@@ -370,4 +375,46 @@ export const getActivityContext = (): Context | null => {
   } catch (err) {
     return null;
   }
+};
+
+type WithRuntimeFirstParam = Parameters<HocusRuntime["withRuntime"]>[0];
+type WithRuntimeAndImagesParams = Obj.Overwrite<
+  WithRuntimeFirstParam,
+  {
+    fs: {
+      "/": ContainerId | ImageId;
+      [path: string]: ContainerId | ImageId;
+    };
+  }
+>;
+
+const _withRuntime: HocusRuntime["withRuntime"] = null as any;
+type WithRuntime<T> = typeof _withRuntime<T>;
+
+export const withRuntimeAndImages = <T>(
+  brService: BlockRegistryService,
+  runtime: HocusRuntime,
+  args: WithRuntimeAndImagesParams,
+  innerFn: Parameters<WithRuntime<T>>[1],
+): Promise<T> => {
+  const exposeSpecs = Array.from(Object.entries(args.fs))
+    .map(([path, imageId]) => ({
+      path,
+      exposeArgs: [imageId, EXPOSE_METHOD.BLOCK_DEV] as const,
+    }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+  const exposeArgs = exposeSpecs.map((s) => s.exposeArgs);
+
+  return withExposedImages(
+    brService,
+    exposeArgs,
+    (deviceSpecs) => {
+      const fs = Object.fromEntries(
+        deviceSpecs.map((spec, idx) => [exposeSpecs[idx].path, spec] as const),
+      ) as WithRuntimeFirstParam["fs"];
+
+      return runtime.withRuntime({ ...args, fs }, innerFn);
+    },
+    { shouldHide: args.shouldPoweroff ?? true },
+  );
 };
