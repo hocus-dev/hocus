@@ -5,11 +5,12 @@ import type { Workspace, WorkspaceInstance, Prisma } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, SSHExecOptions } from "node-ssh";
-import { v4 as uuidv4 } from "uuid";
 
 import type { AgentUtilService } from "./agent-util.service";
+import type { BlockRegistryService, ContainerId, ImageId } from "./block-registry/registry.service";
+import { EXPOSE_METHOD } from "./block-registry/registry.service";
+import { withExposedImage } from "./block-registry/utils";
 import {
-  HOST_PERSISTENT_DIR,
   WORKSPACE_CONFIG_SYMLINK_PATH,
   WORKSPACE_DEV_DIR,
   WORKSPACE_ENV_SCRIPT_PATH,
@@ -23,10 +24,11 @@ import type { WorkspaceNetworkService } from "./network/workspace-network.servic
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import { execCmd, execSshCmd } from "./utils";
+import { execCmdWithOpts } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
-import { doesFileExist } from "~/utils.server";
+import { doesFileExist, sha256 } from "~/utils.server";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 export class InvalidWorkspaceStatusError extends Error {}
@@ -38,6 +40,7 @@ export class WorkspaceAgentService {
     Token.SSHGatewayService,
     Token.ProjectConfigService,
     Token.WorkspaceNetworkService,
+    Token.BlockRegistryService,
     Token.FirecrackerService,
     Token.Config,
   ] as const;
@@ -49,88 +52,27 @@ export class WorkspaceAgentService {
     private readonly sshGatewayService: SSHGatewayService,
     private readonly projectConfigService: ProjectConfigService,
     private readonly networkService: WorkspaceNetworkService,
+    private readonly brService: BlockRegistryService,
     private readonly fcServiceFactory: (id: string) => FirecrackerService,
     config: Config,
   ) {
     this.agentConfig = config.agent();
   }
 
-  /** Creates the files and sets the workspace status to stopped. */
-  async createWorkspaceFiles(db: Prisma.Client, workspaceId: bigint): Promise<void> {
-    const workspace = await db.workspace.findUniqueOrThrow({
-      where: {
-        id: workspaceId,
-      },
-      include: {
-        rootFsFile: true,
-        projectFile: true,
-        prebuildEvent: {
-          include: {
-            project: true,
-            prebuildEventFiles: {
-              include: {
-                projectFile: true,
-                fsFile: true,
-              },
-            },
-          },
-        },
-      },
-    });
-    if (workspace.status !== WorkspaceStatus.WORKSPACE_STATUS_PENDING_CREATE) {
-      throw new Error("Workspace is not in pending create state");
-    }
-
-    const prebuildEventFiles = unwrap(
-      workspace.prebuildEvent.prebuildEventFiles.find(
-        (f) => f.agentInstanceId === workspace.agentInstanceId,
-      ),
+  async createWorkspaceContainers(args: {
+    projectImageId: ImageId;
+    rootFsImageId: ImageId;
+    outputProjectImageTag: string;
+    outputRootFsImageTag: string;
+  }): Promise<void> {
+    await waitForPromises(
+      (
+        [
+          [args.projectImageId, args.outputProjectImageTag],
+          [args.rootFsImageId, args.outputRootFsImageTag],
+        ] as const
+      ).map(([imageId, outputId]) => this.brService.createContainer(imageId, outputId)),
     );
-
-    await Promise.all(
-      [workspace.projectFile, workspace.rootFsFile]
-        .map((f) => path.dirname(f.path))
-        .map((dir) => fs.mkdir(dir, { recursive: true })),
-    );
-    await waitForPromises([
-      await execCmd(
-        "cp",
-        "--sparse=always",
-        prebuildEventFiles.fsFile.path,
-        workspace.rootFsFile.path,
-      ),
-      await execCmd(
-        "cp",
-        "--sparse=always",
-        prebuildEventFiles.projectFile.path,
-        workspace.projectFile.path,
-      ),
-    ]);
-
-    const project = workspace.prebuildEvent.project;
-    const prevRootfsDriveSize = await this.agentUtilService.getFileSizeInMib(
-      workspace.rootFsFile.path,
-    );
-    const prevProjectDriveSize = await this.agentUtilService.getFileSizeInMib(
-      workspace.projectFile.path,
-    );
-    await this.agentUtilService.expandDriveImage(
-      workspace.rootFsFile.path,
-      Math.max(project.maxWorkspaceRootDriveSizeMib - prevRootfsDriveSize, 0),
-    );
-    await this.agentUtilService.expandDriveImage(
-      workspace.projectFile.path,
-      Math.max(project.maxWorkspaceProjectDriveSizeMib - prevProjectDriveSize, 0),
-    );
-
-    await db.workspace.update({
-      where: {
-        id: workspaceId,
-      },
-      data: {
-        status: WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
-      },
-    });
   }
 
   async createWorkspaceInDb(
@@ -144,19 +86,20 @@ export class WorkspaceAgentService {
       userId: bigint;
     },
   ): Promise<Workspace> {
-    const externalId = uuidv4();
-    const dirPath = `${HOST_PERSISTENT_DIR}/workspace/${externalId}` as const;
-    const projectFilePath = `${dirPath}/project.ext4` as const;
-    const rootFsFilePath = `${dirPath}/rootfs.ext4` as const;
+    const projectImageTag = sha256(args.externalId + "workspace-project");
+    const rootFsImageTag = sha256(args.externalId + "workspace-rootfs");
 
-    const [rootFsFile, projectFile] = await waitForPromises(
-      [rootFsFilePath, projectFilePath].map((filePath) =>
-        db.file.create({
-          data: {
-            path: filePath,
-            agentInstanceId: args.agentInstanceId,
-          },
-        }),
+    const [rootFsImageId, projectImageId] = await waitForPromises(
+      [rootFsImageTag, projectImageTag].map((tag) =>
+        db.localOciImage
+          .create({
+            data: {
+              tag,
+              readonly: false,
+              agentInstanceId: args.agentInstanceId,
+            },
+          })
+          .then((image) => image.id),
       ),
     );
     return await db.workspace.create({
@@ -168,38 +111,27 @@ export class WorkspaceAgentService {
         prebuildEventId: args.prebuildEventId,
         agentInstanceId: args.agentInstanceId,
         userId: args.userId,
-        rootFsFileId: rootFsFile.id,
-        projectFileId: projectFile.id,
+        rootFsImageId,
+        projectImageId,
       },
     });
   }
 
   async writeAuthorizedKeysToFs(
-    filesystemDrivePath: string,
+    projectContainerId: ContainerId,
     authorizedKeys: string[],
   ): Promise<void> {
-    const instanceId = uuidv4();
-    const fcService = this.fcServiceFactory(instanceId);
-    const workdir = "/workspace" as const;
-    const sshDir = `${workdir}/home/hocus/.ssh` as const;
-    const authorizedKeysPath = `${sshDir}/authorized_keys` as const;
-    return await fcService.withVM(
-      {
-        ssh: {
-          username: "hocus",
-          privateKey: this.agentConfig.prebuildSshPrivateKey,
-        },
-        kernelPath: this.agentConfig.defaultKernel,
-        rootFsPath: this.agentConfig.checkoutAndInspectRootFs,
-        copyRootFs: true,
-        extraDrives: [{ pathOnHost: filesystemDrivePath, guestMountPath: workdir }],
-        memSizeMib: 2048,
-        vcpuCount: 2,
-      },
-      async ({ ssh }) => {
-        await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
-        const authorizedKeysContent = authorizedKeys.map((key) => key.trim()).join("\n") + "\n";
-        await this.agentUtilService.writeFile(ssh, authorizedKeysPath, authorizedKeysContent);
+    const authorizedKeysContent = authorizedKeys.map((key) => key.trim()).join("\n") + "\n";
+    await withExposedImage(
+      this.brService,
+      projectContainerId,
+      EXPOSE_METHOD.HOST_MOUNT,
+      async ({ mountPoint }) => {
+        const sshDir = path.join(mountPoint, `home/hocus/.ssh`);
+        const authorizedKeysPath = path.join(sshDir, "authorized_keys");
+        await execCmdWithOpts(["mkdir", "-p", sshDir], { uid: 1000, gid: 1000 });
+        await fs.writeFile(authorizedKeysPath, authorizedKeysContent, { mode: 0o600 });
+        await execCmd("chown", "1000:1000", authorizedKeysPath);
       },
     );
   }
