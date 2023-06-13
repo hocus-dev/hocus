@@ -149,14 +149,20 @@ export class TestEnvironmentBuilder<
         const lateInitPromises: {
           [K in keyof LateInitT]: Promise<any>;
         } = {} as any;
+        let resolveLateInitBarrier = (_?: unknown) => {};
+        const lateInitBarrier = new Promise((resolve) => (resolveLateInitBarrier = resolve));
         for (const [key, asyncLateInit] of Object.entries(this.lateInit)) {
-          lateInitPromises[key as keyof LateInitT] = asyncLateInit({
-            injector,
-            runId,
-            lateInitPromises,
-            addTeardownFunction,
-          });
+          lateInitPromises[key as keyof LateInitT] = lateInitBarrier.then(() =>
+            asyncLateInit({
+              injector,
+              runId,
+              lateInitPromises,
+              addTeardownFunction,
+            }),
+          );
         }
+        resolveLateInitBarrier();
+
         const extraCtx: {
           [K in keyof LateInitT]: Awaited<ReturnType<LateInitT[K]>>;
         } = {} as any;
