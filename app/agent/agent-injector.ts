@@ -29,7 +29,7 @@ import { WorkspaceService } from "~/workspace/workspace.service";
 type Providers = typeof providers;
 type ProviderMap = GenericProviderMap<Providers>;
 type ProviderFnMap = ProvidersFns<ProviderMap>;
-type ProviderOverrides = ProvidersOverrides<Providers>;
+export type AgentProviderOverrides = ProvidersOverrides<Providers>;
 export type AgentInjector = Injector<Providers, ProviderMap, ProviderFnMap>;
 
 const providers = [
@@ -57,7 +57,7 @@ const providers = [
   { token: Token.TemporalClient, provide: { factory: clientFactory } },
 ] as const;
 
-export const createAgentInjector = (overrides?: ProviderOverrides): AgentInjector => {
+export const createAgentInjector = (overrides?: AgentProviderOverrides): AgentInjector => {
   const overriddenProviders = overrideProviders(providers, overrides ?? {});
   return new Injector(overriddenProviders);
 };

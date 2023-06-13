@@ -345,7 +345,6 @@ test.concurrent(
       },
     ])
     .run(async ({ injector, runId, db }) => {
-      console.log("im in!");
       const prebuildService = injector.resolve(Token.PrebuildService);
       const brService = injector.resolve(Token.BlockRegistryService);
 

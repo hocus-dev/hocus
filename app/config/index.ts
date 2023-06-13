@@ -49,7 +49,7 @@ export const config = makeConfig()({
       process.env.AGENT_CHECKOUT_AND_INSPECT_IMAGE_TAG ??
       "quay.io/hocus/core:checkout-and-inspect-11-jun-2023",
     defaultWorkspaceImageTag:
-      process.env.DEFAULT_WORKSPACE_IMAGE_TAG ?? "hocusdev/workspace:latest",
+      process.env.DEFAULT_WORKSPACE_IMAGE_TAG ?? "quay.io/hocus/workspace-preview:base-13-06-2023",
     prebuildSshPublicKey:
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:

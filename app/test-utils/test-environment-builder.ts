@@ -15,6 +15,7 @@ import type { Logger, LogLevel } from "@temporalio/worker";
 import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
+import type { AgentProviderOverrides } from "~/agent/agent-injector";
 import type { ContainerId, ImageId } from "~/agent/block-registry/registry.service";
 import { BlockRegistryService } from "~/agent/block-registry/registry.service";
 import type { Config } from "~/config";
@@ -200,9 +201,9 @@ export class TestEnvironmentBuilder<
     };
   }
 
-  withEarlyInits<T extends LateInitMap<InjectorT>>(
-    arg: T,
-  ): TestEnvironmentBuilder<InjectorT, OverridesT, EarlyInitT & T, LateInitT> {
+  withEarlyInits(
+    arg: EarlyInitMap,
+  ): TestEnvironmentBuilder<InjectorT, OverridesT, EarlyInitT & EarlyInitMap, LateInitT> {
     return new TestEnvironmentBuilder(
       this.injectorCtor,
       this.injectorOverrides,
@@ -330,31 +331,54 @@ export class TestEnvironmentBuilder<
   withTimeSkippingTemporal(): TestEnvironmentBuilder<
     InjectorT,
     OverridesT,
-    EarlyInitT,
+    EarlyInitT & { withTimeSkippingTemporal: EarlyInitFunction },
     LateInitT & {
       workflowBundle: LateInitFunction<InjectorT, any>;
       temporalTestEnv: LateInitFunction<InjectorT, TestWorkflowEnvironment>;
     }
   > {
-    return new TestEnvironmentBuilder(this.injectorCtor, this.injectorOverrides, this.earlyInit, {
-      workflowBundle: async () => {
-        return await generateTemporalCodeBundle();
-      },
-      temporalTestEnv: async ({ addTeardownFunction }) => {
-        const env = await TestWorkflowEnvironment.createTimeSkipping({
-          client: {
-            dataConverter: {
-              payloadConverterPath: require.resolve("~/temporal/data-converter"),
-            },
+    const temporalDependencies = (async () => {
+      const bundle = await generateTemporalCodeBundle();
+      const env = await TestWorkflowEnvironment.createLocal({
+        client: {
+          dataConverter: {
+            payloadConverterPath: require.resolve("~/temporal/data-converter"),
           },
-        });
-        addTeardownFunction(async () => {
-          await env.teardown();
-        });
-        return env;
+        },
+      });
+      return { bundle, env };
+    })();
+    return new TestEnvironmentBuilder(
+      this.injectorCtor,
+      this.injectorOverrides,
+      {
+        ...this.earlyInit,
+        withTimeSkippingTemporal: async () => {
+          const { env } = await temporalDependencies;
+          const result: AgentProviderOverrides = {
+            [Token.TemporalClient]: {
+              provide: {
+                factory: () => (fn) => fn(env.client),
+              },
+            },
+          };
+          return result;
+        },
       },
-      ...this.lateInit,
-    });
+      {
+        ...this.lateInit,
+        workflowBundle: async () => {
+          return (await temporalDependencies).bundle;
+        },
+        temporalTestEnv: async ({ addTeardownFunction }) => {
+          const env = (await temporalDependencies).env;
+          addTeardownFunction(async () => {
+            await env.teardown();
+          });
+          return env;
+        },
+      },
+    );
   }
 
   withBlockRegistry(): TestEnvironmentBuilder<

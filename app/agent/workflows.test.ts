@@ -27,112 +27,27 @@ import {
 } from "./workflows";
 import { createTestRepo } from "./workflows/tests/utils";
 
-import { config } from "~/config";
-import { generateTemporalCodeBundle } from "~/temporal/bundle";
-import { printErrors } from "~/test-utils";
 import { TESTS_REPO_URL } from "~/test-utils/constants";
-import { provideDb } from "~/test-utils/db.server";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
 import { doesFileExist } from "~/utils.server";
-import { unwrap, waitForPromises, formatBranchName, numericSort } from "~/utils.shared";
+import { unwrap, waitForPromises, formatBranchName } from "~/utils.shared";
 
-const provideActivities = (
-  testFn: (args: {
-    activities: Activities;
-    runId: string;
-    db: Prisma.NonTransactionClient;
-    injector: AgentInjector;
-  }) => Promise<void>,
-): (() => Promise<void>) => {
-  const injector = createAgentInjector({
-    [Token.Logger]: {
-      provide: {
-        factory: function () {
-          return new DefaultLogger("ERROR");
-        },
-      },
-    },
-    [Token.Config]: {
-      provide: {
-        value: {
-          ...config,
-          agent: () => ({
-            ...config.agent(),
-            /**
-             * It's a regular buildfs root fs but with docker cache.
-             * I generated it manually, by executing a buildfs workflow
-             * with the regular buildfs root fs and then copying the
-             * resulting drive to the test-buildfs.ext4 file.
-             * I also shrank it with `resize2fs -M`.
-             * The tests will also work with a regular buildfs root fs,
-             * but they will be slower.
-             */
-            buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
-          }),
-          shared: () => ({
-            ...config.shared(),
-            maxRepositoryDriveSizeMib: 100,
-          }),
-        },
-      },
-    },
-    [Token.TemporalClient]: {
-      provide: {
-        factory: () => (fn) => {
-          const { client } = testEnv;
-          return fn(client);
-        },
-      },
+jest.setTimeout(5 * 60 * 1000);
+
+const testEnv = new TestEnvironmentBuilder(createAgentInjector)
+  .withTestLogging()
+  .withTestDb()
+  .withBlockRegistry()
+  .withTimeSkippingTemporal()
+  .withLateInits({
+    activities: async ({ lateInitPromises, injector }) => {
+      const db = await lateInitPromises.db;
+      return createActivities(injector, db);
     },
   });
-  const runId = uuidv4();
-  return printErrors(
-    provideDb(async (db) =>
-      testFn({ activities: await createActivities(injector, db), runId, db, injector }),
-    ),
-  );
-};
-
-let testEnv: TestWorkflowEnvironment;
-let workflowBundle: any;
-
-const expectedErrorMessage =
-  "Workspace state WORKSPACE_STATUS_STARTED is not one of WORKSPACE_STATUS_STOPPED, WORKSPACE_STATUS_STOPPED_WITH_ERROR";
-
-beforeAll(async () => {
-  // Use console.log instead of console.error to avoid red output
-  // Filter INFO log messages for clearer test output
-  Runtime.install({
-    logger: new DefaultLogger("WARN", (entry: LogEntry) => {
-      const error = entry.meta?.error;
-      const msg = expectedErrorMessage;
-      if (error?.stack?.includes(msg) || error?.cause?.stack?.includes(msg)) {
-        // there is a test case where we expect this error,
-        // so in order not to pollute the test output with it,
-        // we suppress it
-        return;
-      }
-
-      // eslint-disable-next-line no-console
-      console.log(`[${entry.level}]`, entry.message, entry.meta);
-    }),
-  });
-
-  testEnv = await TestWorkflowEnvironment.createLocal({
-    client: {
-      dataConverter: {
-        payloadConverterPath: require.resolve("~/temporal/data-converter"),
-      },
-    },
-  });
-  workflowBundle = await generateTemporalCodeBundle();
-});
-
-afterAll(async () => {
-  await testEnv?.teardown();
-});
 
 test.concurrent("HOST_PERSISTENT_DIR has no trailing slash", async () => {
   expect(HOST_PERSISTENT_DIR).not.toMatch(/\/$/);
@@ -140,10 +55,10 @@ test.concurrent("HOST_PERSISTENT_DIR has no trailing slash", async () => {
 
 test.concurrent(
   "runBuildfsAndPrebuilds",
-  provideActivities(async ({ activities, injector, db }) => {
+  testEnv.run(async ({ activities, injector, db, workflowBundle, temporalTestEnv, runId }) => {
     let isGetWorkspaceInstanceStatusMocked = true;
-    const { client, nativeConnection } = testEnv;
-    const taskQueue = `test-${uuidv4()}`;
+    const { client, nativeConnection } = temporalTestEnv;
+    const taskQueue = runId;
     const worker = await Worker.create({
       connection: nativeConnection,
       taskQueue,
@@ -288,74 +203,6 @@ test.concurrent(
           });
           expect(prebuildEvents.length).toBe(1);
           const prebuildEvent = prebuildEvents[0];
-          if (prebuildEvent.status !== expectedPrebuildStatus) {
-            const prebuildEventWithTasks = await db.prebuildEvent.findUniqueOrThrow({
-              where: {
-                id: prebuildEvent.id,
-              },
-              include: {
-                tasks: {
-                  include: {
-                    vmTask: {
-                      include: {
-                        logGroup: {
-                          include: {
-                            logs: {
-                              orderBy: {
-                                idx: "asc",
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            });
-            const vmTasks = prebuildEventWithTasks.tasks
-              .sort((a, b) => numericSort(a.idx, b.idx))
-              .map((t) => t.vmTask);
-            if (buildfsStatus != null) {
-              const buildfsEvent = await db.buildfsEvent.findUniqueOrThrow({
-                where: {
-                  id: unwrap(prebuildEvent.buildfsEventId),
-                },
-                include: {
-                  vmTask: {
-                    include: {
-                      logGroup: {
-                        include: {
-                          logs: {
-                            orderBy: {
-                              idx: "asc",
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              });
-              vmTasks.unshift(buildfsEvent.vmTask);
-            }
-            console.error(`Repository: ${repo.url}, root directory: ${project.rootDirectoryPath}`);
-            console.error(
-              `Expected prebuild event status ${expectedPrebuildStatus}, got ${prebuildEvent.status}`,
-            );
-            console.error(`Tasks:`);
-            for (const vmTask of vmTasks) {
-              console.error(`### ${vmTask.command} ###`);
-              console.error(`Status: ${vmTask.status}`);
-              if (
-                vmTask.status === VmTaskStatus.VM_TASK_STATUS_ERROR ||
-                vmTask.status === VmTaskStatus.VM_TASK_STATUS_CANCELLED
-              ) {
-                console.error(`Logs:`);
-                console.error(vmTask.logGroup.logs.map((l) => l.content).join());
-              }
-            }
-          }
           expect(prebuildEvent.status).toBe(expectedPrebuildStatus);
           if (buildfsStatus != null) {
             expect(prebuildEvent.buildfsEvent?.vmTask?.status).toBe(buildfsStatus);
@@ -619,9 +466,9 @@ test.concurrent(
 
 test.concurrent(
   "runAddProjectAndRepository",
-  provideActivities(async ({ activities }) => {
-    const { client, nativeConnection } = testEnv;
-    const taskQueue = `test-${uuidv4()}`;
+  testEnv.run(async ({ activities, temporalTestEnv, runId, workflowBundle }) => {
+    const { client, nativeConnection } = temporalTestEnv;
+    const taskQueue = runId;
     const updateGitBranchesAndObjects: typeof activities.updateGitBranchesAndObjects = async () => {
       return {
         newGitBranches: [],
@@ -670,9 +517,9 @@ test.concurrent(
 
 test.concurrent(
   "scheduleNewPrebuild",
-  provideActivities(async ({ activities, db, injector }) => {
-    const { client, nativeConnection } = testEnv;
-    const taskQueue = `test-${uuidv4()}`;
+  testEnv.run(async ({ activities, temporalTestEnv, runId, workflowBundle, injector, db }) => {
+    const { client, nativeConnection } = temporalTestEnv;
+    const taskQueue = runId;
     const worker = await Worker.create({
       connection: nativeConnection,
       taskQueue,

@@ -21,7 +21,7 @@ import { withSharedWorkflow } from "./shared-workflow";
 import type { Activities } from "~/agent/activities/list";
 import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
 
-const { checkoutAndInspect, fetchRepository, prebuild, createPrebuildFiles } =
+const { checkoutAndInspect, fetchRepository, prebuild, createPrebuildImages } =
   proxyActivities<Activities>({
     startToCloseTimeout: "24 hours",
     heartbeatTimeout: "20 seconds",
@@ -79,11 +79,10 @@ export async function runPrebuild(
   prebuildEventId: bigint,
   checkoutOutputId: string,
 ): Promise<void> {
-  await createPrebuildFiles({
+  await createPrebuildImages({
     prebuildEventId,
-    sourceProjectDrivePath,
   });
-  const prebuildOutput = await prebuild({ prebuildEventId });
+  const prebuildOutput = await prebuild({ prebuildEventId, checkoutOutputId });
   const prebuildTasksFailed = prebuildOutput.some((o) => o.status === "VM_TASK_STATUS_ERROR");
   await changePrebuildEventStatus(
     prebuildEventId,
@@ -186,12 +185,12 @@ async function runSingleBuildfsAndPrebuildInner(
     });
     if (!buildSuccessful) {
       throw new ApplicationFailure(
-        `Buildfs failed. Project root dir path: "${prebuildEvent.project.rootDirectoryPath}", checkout drive path: "${checkoutPath}": ${error}`,
+        `Buildfs failed. Project root dir path: "${prebuildEvent.project.rootDirectoryPath}", checkout output id: "${checkoutOutputId}": ${error}`,
       );
     }
   }
   await executeChild(runPrebuild, {
-    args: [prebuildEvent.id, checkoutPath],
+    args: [prebuildEvent.id, checkoutOutputId],
   });
 }
 

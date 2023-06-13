@@ -1,4 +1,3 @@
-import fs from "fs/promises";
 import path from "path";
 
 import type {
@@ -23,7 +22,7 @@ import { BlockRegistryService } from "./block-registry/registry.service";
 import { EXPOSE_METHOD } from "./block-registry/registry.service";
 import { withExposedImages } from "./block-registry/utils";
 import type { BuildfsService } from "./buildfs.service";
-import { HOST_PERSISTENT_DIR, WORKSPACE_ENV_SCRIPT_PATH } from "./constants";
+import { WORKSPACE_ENV_SCRIPT_PATH } from "./constants";
 import {
   PREBUILD_DEV_DIR,
   PREBUILD_SCRIPTS_DIR,
@@ -41,7 +40,7 @@ import type { PerfService } from "~/perf.service.server";
 import { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
 import { sha256 } from "~/utils.server";
-import { displayError, mapOverNull, unwrap, waitForPromises } from "~/utils.shared";
+import { displayError, mapOverNull, waitForPromises } from "~/utils.shared";
 
 export class PrebuildService {
   static inject = [
