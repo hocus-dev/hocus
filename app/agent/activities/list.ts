@@ -15,7 +15,7 @@ import { changePrebuildEventStatus } from "./change-prebuild-event-status";
 import { checkoutAndInspect } from "./checkout-and-inspect";
 import { cleanUpAfterPrebuildError } from "./clean-up-after-prebuild-error";
 import { createPrebuildEvent } from "./create-prebuild-event";
-import { createPrebuildFiles } from "./create-prebuild-files";
+import { createPrebuildImages } from "./create-prebuild-images";
 import { createWorkspace } from "./create-workspace";
 import { deleteWorkspace } from "./delete-workspace";
 import { fetchRepository } from "./fetch-repository";
@@ -49,7 +49,7 @@ const activities = {
   startWorkspace,
   stopWorkspace,
   getOrCreateBuildfsEvents,
-  createPrebuildFiles,
+  createPrebuildImages,
   getWorkspaceInstanceStatus,
   addProjectAndRepository,
   getRepositoryProjects,

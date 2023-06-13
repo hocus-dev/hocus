@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { BuildfsEvent, BuildfsEventFiles, Prisma, VmTask } from "@prisma/client";
+import type { BuildfsEvent, BuildfsEventImages, Prisma, VmTask } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { Add, Copy, DockerfileParser } from "dockerfile-ast";
 import type { NodeSSH } from "node-ssh";
@@ -63,8 +63,7 @@ export class BuildfsService {
     db: Prisma.TransactionClient,
     args: {
       agentInstanceId: bigint;
-      projectFilePath: string;
-      outputFilePath: string;
+      outputId: string;
       /**
        * Path to the directory which will be used as context for the docker build.
        * Relative to the given project's directory.
@@ -92,8 +91,7 @@ export class BuildfsService {
       },
     });
     await this.createBuildfsEventFiles(db, {
-      projectFilePath: args.projectFilePath,
-      outputFilePath: args.outputFilePath,
+      outputId: args.outputId,
       agentInstanceId: args.agentInstanceId,
       buildfsEventId: buildfsEvent.id,
     });
@@ -103,31 +101,35 @@ export class BuildfsService {
   async createBuildfsEventFiles(
     db: Prisma.TransactionClient,
     args: {
-      projectFilePath: string;
-      outputFilePath: string;
+      outputId: string;
       agentInstanceId: bigint;
       buildfsEventId: bigint;
     },
-  ): Promise<BuildfsEventFiles> {
-    const result = await db.$queryRaw<[{ id: bigint }]>`
-      INSERT INTO "File" ("agentInstanceId", "path")
-      VALUES (${args.agentInstanceId}, ${args.projectFilePath})
-      ON CONFLICT ("agentInstanceId", "path")
-      DO UPDATE SET "agentInstanceId" = ${args.agentInstanceId}
-      RETURNING id`;
-    const projectFileId = BigInt(result[0].id);
-    const outputFile = await db.file.create({
+  ): Promise<BuildfsEventImages> {
+    return db.buildfsEventImages.create({
       data: {
-        agentInstanceId: args.agentInstanceId,
-        path: args.outputFilePath,
-      },
-    });
-    return await db.buildfsEventFiles.create({
-      data: {
-        buildfsEventId: args.buildfsEventId,
-        projectFileId,
-        outputFileId: outputFile.id,
-        agentInstanceId: args.agentInstanceId,
+        buildfsEvent: {
+          connect: {
+            id: args.buildfsEventId,
+          },
+        },
+        agentInstance: {
+          connect: {
+            id: args.agentInstanceId,
+          },
+        },
+        outputImage: {
+          create: {
+            readonly: true,
+            tag: args.outputId,
+            agentInstance: {
+              connect: {
+                id: args.agentInstanceId,
+              },
+            },
+          },
+        },
+        outputImageAgentMatch: {},
       },
     });
   }
@@ -198,7 +200,7 @@ export class BuildfsService {
     cacheHash: string,
     agentInstanceId: bigint,
   ): Promise<BuildfsEvent | null> {
-    const buildfsFile = await db.buildfsEventFiles.findFirst({
+    const buildfsFile = await db.buildfsEventImages.findFirst({
       where: {
         agentInstanceId,
         buildfsEvent: {
@@ -224,8 +226,7 @@ export class BuildfsService {
   async getOrCreateBuildfsEvent(
     db: Prisma.TransactionClient,
     args: {
-      outputFilePath: string;
-      projectFilePath: string;
+      outputId: string;
       agentInstanceId: bigint;
       contextPath: string;
       dockerfilePath: string;

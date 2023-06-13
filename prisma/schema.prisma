@@ -187,17 +187,13 @@ model BuildfsEventImages {
   id              BigInt        @id @default(autoincrement())
   buildfsEvent    BuildfsEvent  @relation(fields: [buildfsEventId], references: [id])
   buildfsEventId  BigInt
-  projectImage    LocalOciImage @relation("buildfs_event_project_image", fields: [projectImageId], references: [id])
-  projectImageId  BigInt
   outputImage     LocalOciImage @relation("buildfs_event_output_image", fields: [outputImageId], references: [id])
   outputImageId   BigInt
   agentInstance   AgentInstance @relation(fields: [agentInstanceId], references: [id])
   agentInstanceId BigInt
 
-  /// Enforce that agentInstanceId and projectImage.agentInstanceId are the same.
-  projectImageAgentMatch LocalOciImage @relation("buildfs_event_project_image_agent_match", fields: [projectImageId, agentInstanceId], references: [id, agentInstanceId])
   /// Enforce that agentInstanceId and outputImage.agentInstanceId are the same.
-  outputImageAgentMatch  LocalOciImage @relation("buildfs_event_output_image_agent_match", fields: [outputImageId, agentInstanceId], references: [id, agentInstanceId])
+  outputImageAgentMatch LocalOciImage @relation("buildfs_event_output_image_agent_match", fields: [outputImageId, agentInstanceId], references: [id, agentInstanceId])
 
   @@unique([buildfsEventId, agentInstanceId])
 }
@@ -358,9 +354,7 @@ model LocalOciImage {
   prebuildEventProjectImages           PrebuildEventImages[] @relation("prebuild_event_project_image")
   prebuildEventFsAgentMatchImages      PrebuildEventImages[] @relation("prebuild_event_fs_image_agent_match")
   prebuildEventProjectAgentMatchImages PrebuildEventImages[] @relation("prebuild_event_project_image_agent_match")
-  buildfsEventProjectImages            BuildfsEventImages[]  @relation("buildfs_event_project_image")
   buildfsEventOutputImages             BuildfsEventImages[]  @relation("buildfs_event_output_image")
-  buildfsEventProjectImageAgentMatch   BuildfsEventImages[]  @relation("buildfs_event_project_image_agent_match")
   buildfsEventOutputImageAgentMatch    BuildfsEventImages[]  @relation("buildfs_event_output_image_agent_match")
   workspacesRootFs                     Workspace[]           @relation("workspace_project_image")
   workspacesProject                    Workspace[]           @relation("workspace_root_fs_image")

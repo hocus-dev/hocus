@@ -45,11 +45,11 @@ export const config = makeConfig()({
     // in production. `get` would throw an error if the env var was not set.
     fetchRepoImageTag:
       process.env.AGENT_FETCH_REPO_IMAGE_TAG ?? "quay.io/hocus/core:fetchrepo-11-jun-2023",
-    checkoutAndInspectImageTag:
+    checkoutOutputId:
       process.env.AGENT_CHECKOUT_AND_INSPECT_IMAGE_TAG ??
       "quay.io/hocus/core:checkout-and-inspect-11-jun-2023",
-    defaultWorkspaceRootFs:
-      process.env.DEFAULT_WORKSPACE_ROOTFS_PATH ?? "/srv/jailer/resources/default-workspace.ext4",
+    defaultWorkspaceImageTag:
+      process.env.DEFAULT_WORKSPACE_IMAGE_TAG ?? "hocusdev/workspace:latest",
     prebuildSshPublicKey:
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:

@@ -3,7 +3,7 @@ import path from "path";
 
 import type {
   PrebuildEvent,
-  PrebuildEventFiles,
+  PrebuildEventImages,
   PrebuildEventReservation,
   Prisma,
   Project,
@@ -34,7 +34,7 @@ import {
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
 import type { HocusRuntime } from "./runtime/hocus-runtime";
-import { LocalLockNamespace, execCmd, execSshCmd, withLocalLock } from "./utils";
+import { LocalLockNamespace, execSshCmd, withLocalLock } from "./utils";
 
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
@@ -170,137 +170,60 @@ export class PrebuildService {
     });
   }
 
-  async getSourceFsDrivePath(
-    db: Prisma.Client,
-    prebuildEventId: bigint,
-    agentInstanceId: bigint,
-  ): Promise<string> {
-    let sourceFsDrivePath: string;
-    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
-      where: { id: prebuildEventId },
-      include: {
-        buildfsEvent: {
-          include: { buildfsEventFiles: { include: { outputFile: true } } },
-        },
-      },
-    });
-    if (prebuildEvent.buildfsEvent != null) {
-      const buildfsEvent = prebuildEvent.buildfsEvent;
-      sourceFsDrivePath = unwrap(
-        buildfsEvent.buildfsEventFiles.find((f) => f.agentInstanceId === agentInstanceId),
-      ).outputFile.path;
-    } else {
-      sourceFsDrivePath = this.agentConfig.defaultWorkspaceRootFs;
-    }
-    return sourceFsDrivePath;
-  }
-
-  async createLocalPrebuildEventFiles(args: {
-    sourceProjectDrivePath: string;
-    outputProjectDrivePath: string;
-    sourceFsDrivePath: string;
-    outputFsDrivePath: string;
-  }): Promise<void> {
-    await waitForPromises([
-      fs.mkdir(path.dirname(args.outputProjectDrivePath), { recursive: true }),
-      fs.mkdir(path.dirname(args.outputFsDrivePath), { recursive: true }),
-    ]);
-    await waitForPromises([
-      execCmd("cp", "--sparse=always", args.sourceProjectDrivePath, args.outputProjectDrivePath),
-      execCmd("cp", "--sparse=always", args.sourceFsDrivePath, args.outputFsDrivePath),
-    ]);
-  }
-
-  async createDbPrebuildEventFiles(
+  async createPrebuildEventImagesInDb(
     db: Prisma.TransactionClient,
     args: {
-      outputProjectDrivePath: string;
-      outputFsDrivePath: string;
+      outputProjectImageTag: string;
+      outputFsImageTag: string;
       agentInstanceId: bigint;
       prebuildEventId: bigint;
     },
-  ): Promise<PrebuildEventFiles> {
-    const fsFile = await db.file.create({
+  ): Promise<PrebuildEventImages> {
+    return db.prebuildEventImages.create({
       data: {
-        agentInstanceId: args.agentInstanceId,
-        path: args.outputFsDrivePath,
-      },
-    });
-    const projectFile = await db.file.create({
-      data: {
-        agentInstanceId: args.agentInstanceId,
-        path: args.outputProjectDrivePath,
-      },
-    });
-    return await db.prebuildEventFiles.create({
-      data: {
-        prebuildEventId: args.prebuildEventId,
-        fsFileId: fsFile.id,
-        projectFileId: projectFile.id,
-        agentInstanceId: args.agentInstanceId,
+        prebuildEvent: {
+          connect: { id: args.prebuildEventId },
+        },
+        agentInstance: { connect: { id: args.agentInstanceId } },
+        fsImage: {
+          create: {
+            tag: args.outputFsImageTag,
+            agentInstance: {
+              connect: { id: args.agentInstanceId },
+            },
+            readonly: true,
+          },
+        },
+        projectImage: {
+          create: {
+            tag: args.outputProjectImageTag,
+            agentInstance: {
+              connect: { id: args.agentInstanceId },
+            },
+            readonly: true,
+          },
+        },
+        fsImageAgentMatch: {},
+        projectImageAgentMatch: {},
       },
     });
   }
 
-  async createPrebuildEventFiles(
-    db: Prisma.NonTransactionClient,
-    args: {
-      sourceProjectDrivePath: string;
-      agentInstanceId: bigint;
-      prebuildEventId: bigint;
-    },
-  ): Promise<PrebuildEventFiles> {
-    const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
-      where: { id: args.prebuildEventId },
-    });
-    const outputFsDrivePath = path.join(
-      HOST_PERSISTENT_DIR,
-      "fs",
-      `${prebuildEvent.externalId}.ext4`,
+  async createLocalPrebuildEventImages(args: {
+    projectImageId: ImageId;
+    fsImageId: ImageId;
+    projectOutputId: string;
+    fsOutputId: string;
+  }): Promise<{ fsContainerId: ContainerId; projectContainerId: ContainerId }> {
+    const [fsContainerId, projectContainerId] = await waitForPromises(
+      (
+        [
+          [args.fsImageId, args.fsOutputId],
+          [args.projectImageId, args.projectOutputId],
+        ] as const
+      ).map(([imageId, outputId]) => this.brService.createContainer(imageId, outputId)),
     );
-    const outputProjectDrivePath = path.join(
-      HOST_PERSISTENT_DIR,
-      "project",
-      `${prebuildEvent.externalId}.ext4`,
-    );
-    const sourceFsDrivePath = await this.getSourceFsDrivePath(
-      db,
-      args.prebuildEventId,
-      args.agentInstanceId,
-    );
-    await this.createLocalPrebuildEventFiles({
-      sourceFsDrivePath,
-      sourceProjectDrivePath: args.sourceProjectDrivePath,
-      outputProjectDrivePath,
-      outputFsDrivePath,
-    });
-    return await db.$transaction((tdb) =>
-      this.createDbPrebuildEventFiles(tdb, {
-        outputProjectDrivePath,
-        outputFsDrivePath,
-        agentInstanceId: args.agentInstanceId,
-        prebuildEventId: args.prebuildEventId,
-      }),
-    );
-  }
-
-  /** Does not throw if files don't exist. */
-  async removeLocalPrebuildEventFiles(args: {
-    projectDrivePath: string;
-    fsDrivePath: string;
-  }): Promise<void> {
-    const files = [args.projectDrivePath, args.fsDrivePath];
-    await waitForPromises(
-      files.map((f) =>
-        fs.unlink(f).catch((err) => {
-          if (err?.code === "ENOENT") {
-            this.logger.warn(`File ${f} does not exist`);
-          } else {
-            throw err;
-          }
-        }),
-      ),
-    );
+    return { fsContainerId, projectContainerId };
   }
 
   /**
@@ -338,11 +261,11 @@ export class PrebuildService {
     const outputContainerId = await this.brService.createContainer(tmpOutputImageId, args.outputId);
     // TODO: remove the tmpOutputImage once the block registry allows it
 
-    const localRootFsImageTag = sha256(this.agentConfig.checkoutAndInspectImageTag);
+    const localRootFsImageTag = sha256(this.agentConfig.checkoutOutputId);
     const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
     if (!(await this.brService.hasImage(rootFsImageId))) {
       await this.brService.loadImageFromRemoteRepo(
-        this.agentConfig.checkoutAndInspectImageTag,
+        this.agentConfig.checkoutOutputId,
         localRootFsImageTag,
       );
     }
@@ -706,8 +629,8 @@ export class PrebuildService {
     const [rootFsContainerId, projectContainerId] = await waitForPromises(
       (
         [
-          [rootFsImageId, outputRootFsId + "xd"],
-          [projectImageId, outputProjectId + "xd"],
+          [rootFsImageId, outputRootFsId],
+          [projectImageId, outputProjectId],
         ] as const
       ).map(([imageId, outputId]) => this.brService.createContainer(imageId, outputId)),
     );

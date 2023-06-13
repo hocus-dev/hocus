@@ -24,8 +24,8 @@ export type CheckoutAndInspectActivity = (args: {
    */
   targetBranch: string;
   /**
-   * A new container will be created with this id.
-   */
+   * A new image will be created from this output id.
+   * */
   outputId: string;
   /**
    * Relative paths to directories where `hocus.yml` files are located.

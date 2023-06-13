@@ -13,7 +13,6 @@ import path from "path-browserify";
 
 import type { CheckoutAndInspectResult } from "../activities-types";
 import type { GetOrCreateBuildfsEventsReturnType } from "../buildfs.service";
-import { HOST_PERSISTENT_DIR } from "../constants";
 import { PREBUILD_REPOSITORY_DIR } from "../prebuild-constants";
 import { parseWorkflowError } from "../workflows-utils";
 
@@ -65,9 +64,10 @@ const {
 
 export async function runBuildfs(
   buildfsEventId: bigint,
+  checkoutOutputId: string,
 ): Promise<{ buildSuccessful: boolean; error?: string }> {
   try {
-    return await buildfs({ buildfsEventId });
+    return await buildfs({ buildfsEventId, checkoutOutputId });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);
@@ -77,7 +77,7 @@ export async function runBuildfs(
 
 export async function runPrebuild(
   prebuildEventId: bigint,
-  sourceProjectDrivePath: string,
+  checkoutOutputId: string,
 ): Promise<void> {
   await createPrebuildFiles({
     prebuildEventId,
@@ -97,7 +97,7 @@ export async function runFetchRepository(gitRepositoryId: bigint): Promise<void>
 
 export async function runCheckoutAndInspect(args: {
   gitRepositoryId: bigint;
-  outputDrivePath: string;
+  outputId: string;
   targetBranch: string;
   projectConfigPaths: string[];
 }): Promise<CheckoutAndInspectResult[]> {
@@ -129,15 +129,14 @@ async function runSingleBuildfsAndPrebuildInner(
     workflow: runFetchRepository,
     params: [gitRepositoryId],
   });
-  const checkoutFileStem = `${batchId}-${prebuildEvent.gitObject.id}` as const;
-  const checkoutPath = `${HOST_PERSISTENT_DIR}/checked-out/${checkoutFileStem}.ext4` as const;
+  const checkoutOutputId = `${batchId}-checkout-${prebuildEvent.gitObject.id}` as const;
   const inspection = await withSharedWorkflow({
-    lockId: `checkout-${checkoutFileStem}`,
+    lockId: checkoutOutputId,
     workflow: runCheckoutAndInspect,
     params: [
       {
         gitRepositoryId,
-        outputDrivePath: checkoutPath,
+        outputId: checkoutOutputId,
         targetBranch: prebuildEvent.gitObject.hash,
         projectConfigPaths: batchProjectConfigPaths,
       },
@@ -148,14 +147,14 @@ async function runSingleBuildfsAndPrebuildInner(
   }
   let buildfsEvent: GetOrCreateBuildfsEventsReturnType | null = null;
   if (inspection != null) {
+    const buildfsOutputId = uuid4();
     const buildfsEventsArgs = {
       prebuildEventId: prebuildEvent.id,
       projectId: prebuildEvent.project.id,
       contextPath: inspection.projectConfig.image.buildContext,
       dockerfilePath: inspection.projectConfig.image.file,
       cacheHash: inspection.imageFileHash,
-      outputFilePath: `${HOST_PERSISTENT_DIR}/buildfs/${uuid4()}.ext4` as const,
-      projectFilePath: checkoutPath,
+      outputId: buildfsOutputId,
     };
     buildfsEvent = await getOrCreateBuildfsEvents([buildfsEventsArgs]).then((r) => r[0]);
   }
@@ -183,7 +182,7 @@ async function runSingleBuildfsAndPrebuildInner(
     const { buildSuccessful, error } = await withSharedWorkflow({
       lockId: `buildfs-${buildfsEvent.event.id}`,
       workflow: runBuildfs,
-      params: [buildfsEvent.event.id],
+      params: [buildfsEvent.event.id, checkoutOutputId],
     });
     if (!buildSuccessful) {
       throw new ApplicationFailure(

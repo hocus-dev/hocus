@@ -1,15 +1,13 @@
-import type { PrebuildEventFiles } from "@prisma/client";
-
 import type { CreateActivity } from "./types";
 import { runActivityHeartbeat } from "./utils";
 
 import { Token } from "~/token";
 
-export type CreatePrebuildFilesActivity = (args: {
+export type CreatePrebuildImagesActivity = (args: {
   prebuildEventId: bigint;
-  sourceProjectDrivePath: string;
-}) => Promise<PrebuildEventFiles>;
-export const createPrebuildFiles: CreateActivity<CreatePrebuildFilesActivity> =
+  checkoutOutputId: string;
+}) => Promise<PrebuildEventImages>;
+export const createPrebuildImages: CreateActivity<CreatePrebuildImagesActivity> =
   ({ injector, db }) =>
   async (args) => {
     const prebuildService = injector.resolve(Token.PrebuildService);
@@ -18,12 +16,12 @@ export const createPrebuildFiles: CreateActivity<CreatePrebuildFilesActivity> =
 
     perfService.log("createPrebuildFiles", "start", args);
     const result = await runActivityHeartbeat({}, async () => {
-      const agentInstance = await db.$transaction(async (tdb) =>
-        agentUtilService.getOrCreateSoloAgentInstance(tdb),
-      );
-      return await prebuildService.createPrebuildEventFiles(db, {
-        ...args,
-        agentInstanceId: agentInstance.id,
+      await db.$transaction(async (tdb) => {
+        const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(tdb);
+        return prebuildService.createPrebuildEventImagesInDb(tdb, {
+          ...args,
+          agentInstanceId: agentInstance.id,
+        });
       });
     });
     perfService.log("createPrebuildFiles", "end", args);
