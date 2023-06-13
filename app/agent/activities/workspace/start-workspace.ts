@@ -1,7 +1,7 @@
 import type { WorkspaceInstance } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 
-import type { CreateActivity } from "./types";
+import type { CreateActivity } from "../types";
 
 import { Token } from "~/token";
 import { formatBranchName } from "~/utils.shared";

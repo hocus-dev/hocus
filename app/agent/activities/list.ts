@@ -16,8 +16,6 @@ import { checkoutAndInspect } from "./checkout-and-inspect";
 import { cleanUpAfterPrebuildError } from "./clean-up-after-prebuild-error";
 import { createPrebuildEvent } from "./create-prebuild-event";
 import { createPrebuildImages } from "./create-prebuild-images";
-import { createWorkspace } from "./create-workspace";
-import { deleteWorkspace } from "./delete-workspace";
 import { fetchRepository } from "./fetch-repository";
 import { getDefaultBranch } from "./get-default-branch";
 import { getOrCreateBuildfsEvents } from "./get-or-create-buildfs-events";
@@ -25,19 +23,21 @@ import { getOrCreatePrebuildEvents } from "./get-or-create-prebuild-events";
 import { getPrebuildEvents } from "./get-prebuild-events";
 import { getProjectsRepository } from "./get-projects-repository";
 import { getRepositoryProjects } from "./get-repository-projects";
-import { getWorkspaceInstanceStatus } from "./get-workspace-instance-status";
 import { initPrebuildEvents } from "./init-prebuild-events";
 import { getWorkflowStatus } from "./mutex/get-workflow-status";
 import { signalWithStartLockWorkflow } from "./mutex/signal-with-start-lock-workflow";
 import { prebuild } from "./prebuild";
 import { saveGitRepoConnectionStatus } from "./save-git-repo-connection-status";
 import { signalWithStartWaitWorkflow } from "./shared-workflow/signal-with-start-wait-workflow";
-import { startWorkspace } from "./start-workspace";
-import { stopWorkspace } from "./stop-workspace";
 import type { CreateActivity } from "./types";
 import { updateGitBranchesAndObjects } from "./update-git-branches-and-objects";
 import { cleanUpWorkspaceInstanceDb } from "./workspace/clean-up-workspace-instance";
 import { cleanUpWorkspaceInstanceLocal } from "./workspace/clean-up-workspace-instance";
+import { createWorkspace } from "./workspace/create-workspace";
+import { deleteWorkspace } from "./workspace/delete-workspace";
+import { getWorkspaceInstanceStatus } from "./workspace/get-workspace-instance-status";
+import { startWorkspace } from "./workspace/start-workspace";
+import { stopWorkspace } from "./workspace/stop-workspace";
 
 const activities = {
   fetchRepository,

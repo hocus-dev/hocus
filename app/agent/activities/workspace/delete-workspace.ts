@@ -1,6 +1,6 @@
 import { WorkspaceStatus } from "@prisma/client";
 
-import type { CreateActivity } from "./types";
+import type { CreateActivity } from "../types";
 
 import { Token } from "~/token";
 
