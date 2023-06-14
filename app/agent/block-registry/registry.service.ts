@@ -7,7 +7,7 @@ import type { Static, TSchema } from "@sinclair/typebox";
 import { type DefaultLogger } from "@temporalio/worker";
 import { flock } from "fs-ext";
 import { match } from "ts-pattern";
-import { A, Any, F } from "ts-toolbelt";
+import type { A, Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
 import { execCmd, execCmdWithOpts } from "../utils";
