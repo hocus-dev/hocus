@@ -6,6 +6,7 @@ import * as path from "path";
 import type { Static, TSchema } from "@sinclair/typebox";
 import { type DefaultLogger } from "@temporalio/worker";
 import { flock } from "fs-ext";
+import { match } from "ts-pattern";
 import type { A, Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
@@ -34,6 +35,13 @@ export const EXPOSE_METHOD = {
   HOST_MOUNT: "EXPOSE_METHOD_HOST_MOUNT",
 } as const;
 export type EXPOSE_METHOD = valueof<typeof EXPOSE_METHOD>;
+
+export const CONTENT_TYPE = {
+  IMAGE: "CONTENT_TYPE_IMAGE",
+  CONTAINER: "CONTENT_TYPE_CONTAINER",
+  ANY: "CONTENT_TYPE_ANY",
+} as const;
+export type CONTENT_TYPE = valueof<typeof CONTENT_TYPE>;
 
 const catchIgnore = (toIgnore: string) => (err: any) => {
   if (!err?.message?.startsWith(toIgnore)) throw err;
@@ -117,6 +125,14 @@ export class BlockRegistryService {
     };
   }
 
+  private genObdResultPath(contentId: ContainerId | ImageId): string {
+    return path.join(this.paths.run, `obd-result-${contentId}`);
+  }
+
+  private genBlockConfigPath(contentId: ContainerId | ImageId): string {
+    return path.join(this.paths.blockConfig, contentId);
+  }
+
   static genTCMUSubtype(length = 14): string {
     const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     const charsetLength = charset.length;
@@ -143,6 +159,10 @@ export class BlockRegistryService {
 
   static isContainerId(id: string): id is ContainerId {
     return id.startsWith("ct_");
+  }
+
+  static isContentId(id: string): id is ContainerId | ImageId {
+    return id.startsWith("ct_") || id.startsWith("im_");
   }
 
   // Called once after agent restart/start
@@ -228,12 +248,17 @@ export class BlockRegistryService {
       path.join(this.paths.root, "overlaybd.json"),
       JSON.stringify({
         tcmuSubtype: await this.getTCMUSubtype(),
+        registryFsVersion: "v2",
+        ioEngine: 0,
+        enableThread: true,
         logConfig: {
           logLevel: 1,
           logPath: path.join(this.paths.logs, "overlaybd.log"),
         },
         cacheConfig: {
-          cacheType: "file",
+          // Use the download file for the RegistryFS cache :)
+          cacheType: "download",
+          // Those options don't apply to the download cache
           cacheDir: this.paths.obdRegistryCache,
           cacheSizeGB: 4,
         },
@@ -246,9 +271,8 @@ export class BlockRegistryService {
           mode: "file",
           path: "/opt/overlaybd/cred.json",
         },
-        ioEngine: 0,
         download: {
-          enable: false,
+          enable: true,
           delay: 600,
           delayExtra: 30,
           maxMBps: 100,
@@ -321,11 +345,13 @@ export class BlockRegistryService {
     // For that do a full HBA scan
     const tcmuSubtype = await this.getTCMUSubtype();
     const dirs = await fs.readdir(this.paths.tcmuHBA);
+    // Don't use listExposedContent as this implementation works well and will still work if someone changes
+    // listExposedContent in the future and introduce bugs
     await waitForPromises(
       dirs
         .filter((tcmuStorageObjectId) => tcmuStorageObjectId.startsWith(`${tcmuSubtype}_`))
         .map((tcmuStorageObjectId) => tcmuStorageObjectId.substring(tcmuSubtype.length + 1))
-        .map((registryId) => this.hide(registryId as ImageId | ContainerId)),
+        .map((contentId) => this.hide(contentId as ImageId | ContainerId)),
     );
   }
 
@@ -347,9 +373,8 @@ export class BlockRegistryService {
     },
   ): Promise<ImageId> {
     const imageId = BlockRegistryService.genImageId(outputId);
-    const imageIndexDir = path.join(this.paths.run, "ingest-" + this.genRandId());
     const skipVerifyTls = process.env.OCI_PROXY != null || opts?.skipVerifyTls === true;
-    try {
+    return await this.withTmpDir("ingest", async (imageIndexDir) => {
       // Get the image for the current platform from the remote repo
       // This will only download blobs we actually need due to the shared blob dir <3
       // Also skopeo properly handles concurrent pulls with a shared blob dir <3
@@ -372,11 +397,7 @@ export class BlockRegistryService {
         `${path.join(imageIndexDir, "index.json")}`,
         this.paths.sharedOCIBlobsDir,
       );
-    } finally {
-      // The only thing this directory holds is the index file :P
-      // Nothing bad will happen if that index is not deleted
-      await fs.rm(imageIndexDir, { force: true, recursive: true });
-    }
+    });
   }
 
   private getPathToBlob(ociBlobsDir: string, descriptor: OCIDescriptor): string {
@@ -432,41 +453,62 @@ export class BlockRegistryService {
     manifest: OCIImageManifest,
     layersToLoad: [string, OCIDescriptor][],
   ): Promise<ImageId> {
-    // We have the data locally so this should be fairly quick
-    for (const [layerPath, layerDescriptor] of layersToLoad) {
-      await this.loadLocalLayer(layerPath, layerDescriptor);
+    const loadSignals: string[] = [];
+    try {
+      // We have the data locally so this should be fairly quick
+      for (const [layerPath, layerDescriptor] of layersToLoad) {
+        const signal = path.join(this.paths.run, `load-signal-${this.genRandId()}`);
+        loadSignals.push(signal);
+        await this.loadLocalLayer(layerPath, layerDescriptor, signal);
+      }
+
+      // Ok the blobs were loaded, time to write the image manifest :)
+      if (
+        !(await this.idempotentConfigWrite<OCIImageManifest>(
+          manifest,
+          path.join(this.paths.images, imageId),
+        ))
+      ) {
+        throw new Error(`Image with id ${imageId} already exists`);
+      }
+
+      // Ok, almost done, generate a config for OBD
+      await this.idempotentConfigWrite<OBDConfig>(
+        {
+          lowers: this.imageManifestToOBDLowers(manifest),
+          resultFile: this.genObdResultPath(imageId),
+          hocusImageId: imageId,
+        },
+        this.genBlockConfigPath(imageId),
+      );
+
+      return imageId;
+    } finally {
+      // Release the load signals
+      await waitForPromises(loadSignals.map((x) => fs.unlink(x).catch(() => {})));
     }
-
-    // Ok the blobs were loaded, time to write the image manifest :)
-    if (
-      !(await this.idempotentConfigWrite<OCIImageManifest>(
-        manifest,
-        path.join(this.paths.images, imageId),
-      ))
-    ) {
-      throw new Error(`Image with id ${imageId} already exists`);
-    }
-
-    // Ok, almost done, generate a config for OBD
-    await this.idempotentConfigWrite<OBDConfig>(
-      {
-        lowers: this.imageManifestToOBDLowers(manifest),
-        resultFile: path.join(this.paths.run, "obd-result-" + imageId),
-        hocusImageId: imageId,
-      },
-      path.join(this.paths.blockConfig, imageId),
-    );
-
-    return imageId;
   }
 
-  private async loadLocalLayer(srcPath: string, layerDescriptor: OCIDescriptor): Promise<void> {
+  private async loadLocalLayer(
+    srcPath: string,
+    layerDescriptor: OCIDescriptor,
+    loadSignalPath: string,
+  ): Promise<void> {
     // Path to the blob in the ingest
     const sharedOCIBlobPath = this.getPathToBlob(this.paths.sharedOCIBlobsDir, layerDescriptor);
     const dstDir = path.join(this.paths.layers, layerDescriptor.digest);
     await fs.mkdir(dstDir).catch(catchAlreadyExists);
+    // If a hardlink exists on this file then loading is in progress and the layer won't be GCed
+    // We can't use overlaybd.commit for this as we may have a sealed layer or a lazy downloaded layer
+    // First ensure the signal exists by opening and closing the file in append mode
+    // If open failed then GC managed to delete this layer before we signaled a load was in progress
+    const layerLoadSignal = path.join(dstDir, ".loadSignal");
+    await (await fs.open(layerLoadSignal, "a")).close();
+    // Now we need to hardlink it. If the hardlink was created then we can be sure the layer won't be deleted by GC
+    // If this fails then it means that GC deleted the folder and we need to restart the operation :(
+    await fs.link(layerLoadSignal, loadSignalPath);
     // This should be the root of the layer, hardlinks should point to that inode
-    const dstPath = path.join(dstDir, "layer.tar");
+    const dstPath = path.join(dstDir, "overlaybd.commit");
     // Hardlink the blob from the src to the layers directory
     if (srcPath !== dstPath) {
       await fs.link(srcPath, dstPath).catch(async (err) => {
@@ -525,6 +567,18 @@ export class BlockRegistryService {
     }
   }
 
+  private async withTmpDir<T>(type: string, fn: (tmpDir: string) => Promise<T>): Promise<T> {
+    const tmpDir = path.join(this.paths.run, type, this.genRandId());
+    try {
+      await fs.mkdir(tmpDir, { recursive: true });
+      return await fn(tmpDir);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {
+        void 0;
+      });
+    }
+  }
+
   private async imageIdToOBDLowers(imageId?: ImageId): Promise<OBDConfig["lowers"]> {
     if (imageId === void 0) {
       return [];
@@ -538,7 +592,7 @@ export class BlockRegistryService {
 
   private imageManifestToOBDLowers(manifest: OCIImageManifest): OBDConfig["lowers"] {
     return manifest.layers.map((layerDescriptor) => ({
-      file: path.join(this.paths.layers, layerDescriptor.digest, "layer.tar"),
+      file: path.join(this.paths.layers, layerDescriptor.digest, "overlaybd.commit"),
     }));
   }
 
@@ -584,10 +638,10 @@ export class BlockRegistryService {
         {
           lowers,
           upper: { index: indexPath, data: dataPath },
-          resultFile: path.join(this.paths.run, "obd-result-" + containerId),
+          resultFile: this.genObdResultPath(containerId),
           hocusImageId: imageId,
         },
-        path.join(this.paths.blockConfig, containerId),
+        this.genBlockConfigPath(containerId),
       ))
     ) {
       throw new Error(`Container with id ${containerId} already exists`);
@@ -616,8 +670,8 @@ export class BlockRegistryService {
     const imageId = BlockRegistryService.genImageId(outputId);
 
     // If the container does not exist and the output image exists we do nothing due to idempotence
-    const outputImageExists = await doesFileExist(path.join(this.paths.images, imageId));
-    const containerExists = await doesFileExist(path.join(this.paths.containers, containerId));
+    const outputImageExists = await this.hasContent(imageId);
+    const containerExists = await this.hasContent(containerId);
 
     // We have 4 cases:
     // - If the output image exists and we don't have the container then:
@@ -640,7 +694,7 @@ export class BlockRegistryService {
     // Ensure the container is hidden
     await this.hide(containerId);
     const obdConfig: OBDConfig = await readJsonFileOfType(
-      path.join(this.paths.blockConfig, containerId),
+      this.genBlockConfigPath(containerId),
       OBDConfigValidator,
     );
 
@@ -691,12 +745,11 @@ export class BlockRegistryService {
       };
       manifest.layers.push(layerDescriptor);
 
+      // Loading the new image must happen before deleting the source container
+      // as the source container holds a reference to the lower layers and protects them against GC
       await this._loadLocalOCIImage(imageId, manifest, [[layerPath, layerDescriptor]]);
       if (opts.removeContainer) {
-        await fs.rm(path.join(this.paths.containers, containerId), {
-          recursive: true,
-          force: true,
-        });
+        await this._removeContent(containerId);
       }
       return imageId;
     });
@@ -776,7 +829,7 @@ export class BlockRegistryService {
   }
 
   async expose<M extends EXPOSE_METHOD>(
-    what: ImageId | ContainerId,
+    contentId: ImageId | ContainerId,
     method: M,
   ): Promise<
     PickOne<
@@ -787,21 +840,23 @@ export class BlockRegistryService {
       M
     >
   > {
-    if (!BlockRegistryService.isImageId(what) && !BlockRegistryService.isContainerId(what)) {
-      throw new Error(`Invalid id: ${what}`);
+    if (!BlockRegistryService.isContentId(contentId)) {
+      throw new Error(`Invalid id: ${contentId}`);
     }
-    const readonly = BlockRegistryService.isImageId(what);
+    const readonly = BlockRegistryService.isImageId(contentId);
     switch (method) {
       case EXPOSE_METHOD.HOST_MOUNT: {
-        const bd = await this.expose(what, EXPOSE_METHOD.BLOCK_DEV);
-        const mountPoint = path.join(this.paths.mounts, what);
+        const bd = await this.expose(contentId, EXPOSE_METHOD.BLOCK_DEV);
+        const mountPoint = path.join(this.paths.mounts, contentId);
         await fs.mkdir(mountPoint).catch(catchAlreadyExists);
         try {
           let flags = readonly ? ["--read-only"] : ["--read-write", "-o", "discard"];
           const t1 = performance.now();
           // TODO: Calling the mount syscall directly is much much faster
           await execCmd("mount", ...flags, bd.device, mountPoint);
-          this.logger.info(`mount for ${what} took: ${(performance.now() - t1).toFixed(2)} ms`);
+          this.logger.info(
+            `mount for ${contentId} took: ${(performance.now() - t1).toFixed(2)} ms`,
+          );
         } catch (err: any) {
           if (!err?.message?.includes("already mounted")) throw err;
         }
@@ -811,7 +866,7 @@ export class BlockRegistryService {
         const t1 = performance.now();
         // Get the tcmuSubtype
         const tcmuSubtype = await this.getTCMUSubtype();
-        const tcmuStorageObjectId = `${tcmuSubtype}_${what}`;
+        const tcmuStorageObjectId = `${tcmuSubtype}_${contentId}`;
         const tcmuPath = path.join(this.paths.tcmuHBA, tcmuStorageObjectId);
         // Create a storage object on that HBA, if it already exists then check for a LUN
         let aluaMembers: string[] = [];
@@ -873,7 +928,7 @@ export class BlockRegistryService {
             //    a) Open and set up a shared ring buffer using the UIO device
             //    b) Open all layers, and combine them into one view
             //    c) Write the result of the setup into the result file provided in the config
-            //       aka. <ROOT_DIR>/run/obd-result-<image_id or container_id>
+            //       aka. this.genObdResultPath(<image_id or container_id>)
             // Those are a lot of moving parts and not everything may work:
             // 1. If there is no TCMU process or the handler process never attaches we can't know that without extra info
             // 2. If netlink replay is enabled and the handler attached but the handler failed setting up its stuff then
@@ -894,9 +949,8 @@ export class BlockRegistryService {
             await fs
               .writeFile(
                 path.join(tcmuPath, "control"),
-                `dev_config=${tcmuSubtype}/${path.join(
-                  this.paths.blockConfig,
-                  what,
+                `dev_config=${tcmuSubtype}/${this.genBlockConfigPath(
+                  contentId,
                 )},nl_reply_supported=-1`,
               )
               .catch(catchAlreadyExists);
@@ -917,10 +971,7 @@ export class BlockRegistryService {
           // https://linear.app/hocus-dev/issue/HOC-204/modify-overlaybd-tcmu-to-work-without-netlink-and-expose-a-grpc-api
           for (let i = 0; i < 100; i += 1) {
             try {
-              obdResult = await fs.readFile(
-                path.join(this.paths.run, `obd-result-${what}`),
-                "utf-8",
-              );
+              obdResult = await fs.readFile(this.genObdResultPath(contentId), "utf-8");
             } catch (err) {
               if (!(err as Error).message.startsWith("ENOENT")) throw err;
               await sleep(5);
@@ -1060,7 +1111,9 @@ export class BlockRegistryService {
         }
 
         this.logger.info(
-          `Setting up block device for ${what} took: ${(performance.now() - t1).toFixed(2)} ms`,
+          `Setting up block device for ${contentId} took: ${(performance.now() - t1).toFixed(
+            2,
+          )} ms`,
         );
 
         return {
@@ -1072,13 +1125,13 @@ export class BlockRegistryService {
     assert(false, "Unreachable");
   }
 
-  async hide(what: ImageId | ContainerId): Promise<void> {
-    if (!BlockRegistryService.isImageId(what) && !BlockRegistryService.isContainerId(what)) {
-      throw new Error(`Invalid id: ${what}`);
+  async hide(contentId: ImageId | ContainerId): Promise<void> {
+    if (!BlockRegistryService.isContentId(contentId)) {
+      throw new Error(`Invalid id: ${contentId}`);
     }
     const t1 = performance.now();
     // Ensure the device was unmounted
-    const mountPoint = path.join(this.paths.mounts, what);
+    const mountPoint = path.join(this.paths.mounts, contentId);
     const dirPresent = await doesFileExist(mountPoint);
     if (dirPresent) {
       try {
@@ -1092,7 +1145,7 @@ export class BlockRegistryService {
     }
     // Remove the TCMU <-> LUN mapping
     const tcmuSubtype = await this.getTCMUSubtype();
-    const tcmuStorageObjectId = `${tcmuSubtype}_${what}`;
+    const tcmuStorageObjectId = `${tcmuSubtype}_${contentId}`;
     const tcmuPath = path.join(this.paths.tcmuHBA, tcmuStorageObjectId);
     const aluaMembers = await this.getTCMUAluaMembers(tcmuStorageObjectId).catch(
       catchIgnore("ENOENT"),
@@ -1114,14 +1167,236 @@ export class BlockRegistryService {
     // Remove the TCMU storage object
     await fs.rmdir(tcmuPath).catch(catchIgnore("ENOENT"));
     // Remove the result file
-    await fs.unlink(path.join(this.paths.run, `obd-result-${what}`)).catch(catchIgnore("ENOENT"));
-    this.logger.info(`hide of ${what} took: ${(performance.now() - t1).toFixed(2)} ms`);
+    await fs.unlink(this.genObdResultPath(contentId)).catch(catchIgnore("ENOENT"));
+    this.logger.info(`hide of ${contentId} took: ${(performance.now() - t1).toFixed(2)} ms`);
   }
 
-  async hasImage(id: ImageId | ContainerId): Promise<boolean> {
-    const imageExists = await doesFileExist(path.join(this.paths.images, id));
-    const containerExists = await doesFileExist(path.join(this.paths.containers, id));
-    return imageExists || containerExists;
+  async hasContent(contentId: ImageId | ContainerId): Promise<boolean> {
+    return await doesFileExist(this.genBlockConfigPath(contentId));
+  }
+
+  /* Warning: The only way to get the block device/mount point is to call the expose method again
+   * This should be used mostly for introspection/debugging as this will return true if the expose method
+   * was interrupted and didn't finish
+   */
+  async wasExposed(contentId: ImageId | ContainerId): Promise<boolean> {
+    const tcmuSubtype = await this.getTCMUSubtype();
+    const tcmuStorageObjectId = `${tcmuSubtype}_${contentId}`;
+    const tcmuPath = path.join(this.paths.tcmuHBA, tcmuStorageObjectId);
+    return await doesFileExist(tcmuPath);
+  }
+
+  /* Warning: The only way to get the block device/mount point is to call the expose method again
+   * This should be used mostly for introspection/debugging as this will return true if the expose method
+   * was interrupted and didn't finish
+   */
+  async listExposedContent<T extends CONTENT_TYPE>(
+    contentType: T = CONTENT_TYPE.ANY as T,
+  ): Promise<
+    PickOne<
+      {
+        [CONTENT_TYPE.ANY]: ImageId | ContainerId;
+        [CONTENT_TYPE.IMAGE]: ImageId;
+        [CONTENT_TYPE.CONTAINER]: ContainerId;
+      },
+      T
+    >[]
+  > {
+    const res = [];
+    const filterF = match(contentType as CONTENT_TYPE)
+      .with(CONTENT_TYPE.ANY, () => BlockRegistryService.isContentId)
+      .with(CONTENT_TYPE.CONTAINER, () => BlockRegistryService.isContainerId)
+      .with(CONTENT_TYPE.IMAGE, () => BlockRegistryService.isImageId)
+      .exhaustive();
+    const tcmuSubtype = await this.getTCMUSubtype();
+    const dirs = await fs.readdir(this.paths.tcmuHBA);
+    const ids = dirs
+      .filter((tcmuStorageObjectId) => tcmuStorageObjectId.startsWith(`${tcmuSubtype}_`))
+      .map((tcmuStorageObjectId) => tcmuStorageObjectId.substring(tcmuSubtype.length + 1));
+    for (const id of ids) {
+      if (filterF(id)) res.push(id);
+    }
+    return res as any;
+  }
+
+  async listContent<T extends CONTENT_TYPE>(
+    contentType: T = CONTENT_TYPE.ANY as T,
+  ): Promise<
+    PickOne<
+      {
+        [CONTENT_TYPE.ANY]: ImageId | ContainerId;
+        [CONTENT_TYPE.IMAGE]: ImageId;
+        [CONTENT_TYPE.CONTAINER]: ContainerId;
+      },
+      T
+    >[]
+  > {
+    const res = [];
+    const filterF = match(contentType as CONTENT_TYPE)
+      .with(CONTENT_TYPE.ANY, () => BlockRegistryService.isContentId)
+      .with(CONTENT_TYPE.CONTAINER, () => BlockRegistryService.isContainerId)
+      .with(CONTENT_TYPE.IMAGE, () => BlockRegistryService.isImageId)
+      .exhaustive();
+    for (const filename of await fs.readdir(this.paths.blockConfig)) {
+      if (filterF(filename)) res.push(filename);
+    }
+    return res as any;
+  }
+
+  async removeContent(contentId: ImageId | ContainerId): Promise<void> {
+    if (!BlockRegistryService.isContentId(contentId)) {
+      throw new Error(`Invalid id: ${contentId}`);
+    }
+    // Ensure the content is hidden
+    await this.hide(contentId);
+    await this._removeContent(contentId);
+  }
+
+  private async _removeContent(contentId: ImageId | ContainerId): Promise<void> {
+    // The block config defines if something is available in the registry
+    await fs.unlink(this.genBlockConfigPath(contentId)).catch(catchIgnore("ENOENT"));
+    if (BlockRegistryService.isContainerId(contentId)) {
+      // By definition a writable container layer can't be shared among
+      // multiple tags so we just deleted the only reference to this layer
+      await fs.rm(path.join(this.paths.containers, contentId), {
+        recursive: true,
+        force: true,
+      });
+    }
+    if (BlockRegistryService.isImageId(contentId)) {
+      // The OCI manifest is not longer necessary
+      // Blobs may have multiple xrefs on the disk so we need to
+      await fs.unlink(path.join(this.paths.images, contentId)).catch(catchIgnore("ENOENT"));
+    }
+  }
+
+  private async estimateDirStorageUsage(path: string): Promise<bigint> {
+    // Don't use -b as it implies --apparent-size which fails on sparse files
+    const du = await execCmd("du", "-s", "--block-size=1", path);
+    return BigInt(du.stdout.split("\t")[0]);
+  }
+
+  async estimateStorageUsage(): Promise<{
+    layers: bigint;
+    containers: bigint;
+    // > 0 when when lazy pulling is enabled and we operate in ocf cache mode with download disabled
+    obdRegistryCache: bigint;
+    // > 0 when FastOCI is in use OR we use gzipped layers and not zfile
+    obdGzipCache: bigint;
+  }> {
+    const [layers, containers, obdRegistryCache, obdGzipCache] = await waitForPromises(
+      [
+        this.paths.layers,
+        this.paths.containers,
+        this.paths.obdRegistryCache,
+        this.paths.obdGzipCache,
+      ].map(this.estimateDirStorageUsage),
+    );
+    return {
+      layers,
+      containers,
+      obdRegistryCache,
+      obdGzipCache,
+    };
+  }
+
+  async garbageCollect(): Promise<void> {
+    // This is fully lockless and should even work when someone runs this method concurrently(due to a bug)
+    // Special carefulness must be employed in this method as the registry is lockless and delete/loadImage operations
+    // might run concurrently. The algorithm is as follows:
+    // 1. Gather a list of all resources on the disk and check their hardlink count on their load signal
+    // 2. Load all block configs and calculate the set of referenced resources
+    // 3. Delete all resources which are unreferenced and are not signaled
+    const [allManifests, allLayers, allContainers] = await waitForPromises([
+      fs.readdir(this.paths.images).then((x) => x.filter(BlockRegistryService.isImageId)),
+      // Only consider the layer directory, the shared oci dir will be removed when lazy pulling will be enabled
+      // Blobs are still deleted from the shared dir but a dangling file in the shared dir won't be deleted
+      fs.readdir(this.paths.layers).then((x) => x.filter((y) => y.startsWith("sha256:"))),
+      fs.readdir(this.paths.containers).then((x) => x.filter(BlockRegistryService.isContainerId)),
+    ]);
+
+    // Skip any signaled layers, this is needed as otherwise there is a race where we might delete an already loaded image
+    const allDigests: string[] = [];
+    await waitForPromises(
+      allLayers.map(async (layerDigest) => {
+        const stat = await fs.stat(path.join(this.paths.layers, layerDigest, ".loadSignal"));
+        if (stat.nlink === 1) allDigests.push(layerDigest);
+      }),
+    );
+    const referencedManifests = new Set<ImageId>();
+    const referencedContainers = new Set<ContainerId>();
+    const referencedLayers = new Set<string>();
+    const allConfigs = await fs
+      .readdir(this.paths.blockConfig)
+      .then((ids) =>
+        waitForPromises(
+          ids.map((id) =>
+            readJsonFileOfType(path.join(this.paths.blockConfig, id), OBDConfigValidator).catch(
+              () => ({ lowers: [], resultFile: "" } as OBDConfig),
+            ),
+          ),
+        ),
+      );
+    // Calculate the reference counts based on configs. This will also work with container sealing and lazy pulling
+    for (const config of allConfigs) {
+      if (config.hocusImageId) {
+        if (BlockRegistryService.isImageId(config.hocusImageId)) {
+          referencedManifests.add(config.hocusImageId);
+        } else {
+          this.logger.error(`Found invalid image id in block config ${config.hocusImageId}`);
+        }
+      }
+      if (config.upper) {
+        const directoryName = path.basename(path.dirname(config.upper.data));
+        if (BlockRegistryService.isContainerId(directoryName)) {
+          referencedContainers.add(directoryName);
+        } else {
+          this.logger.error(`Found upper layer with invalid name ${directoryName}`);
+        }
+      }
+      for (const lower of config.lowers) {
+        const layerHash = path.basename(path.dirname(lower.file));
+        referencedLayers.add(layerHash);
+      }
+    }
+
+    // Perform garbage collection of dangling resources
+    const tasks = [];
+    for (const manifest of allManifests) {
+      if (referencedManifests.has(manifest as ImageId)) continue;
+      // Ok this manifest wasn't deleted cause removeContent was interrupted
+      tasks.push(fs.unlink(path.join(this.paths.images, manifest)).catch(catchIgnore("ENOENT")));
+    }
+    for (const container of allContainers) {
+      if (referencedContainers.has(container as ContainerId)) continue;
+      // Ok this container wasn't deleted cause removeContent was interrupted
+      tasks.push(
+        fs.rm(path.join(this.paths.containers, container), {
+          recursive: true,
+          force: true,
+        }),
+      );
+    }
+    for (const layerDigest of allDigests) {
+      if (referencedLayers.has(layerDigest)) continue;
+      tasks.push(
+        (async () => {
+          // TODO: analyze whether this actually works or the race is absurdly rare
+          const stat = await fs.stat(path.join(this.paths.layers, layerDigest, ".loadSignal"));
+          if (stat.nlink !== 1) return;
+          const [algo, hash] = layerDigest.split(":");
+          await waitForPromises([
+            fs
+              .rm(path.join(this.paths.layers, layerDigest), { force: true, recursive: true })
+              .catch(catchIgnore("ENOTEMPTY")),
+            fs
+              .unlink(path.join(this.paths.sharedOCIBlobsDir, algo, hash))
+              .catch(catchIgnore("ENOENT")),
+          ]);
+        })(),
+      );
+    }
+    await waitForPromises(tasks);
   }
 
   private tagToRegistry(tag: string): string {
@@ -1132,7 +1407,7 @@ export class BlockRegistryService {
     return registry;
   }
 
-  private genOciConfig(
+  private genOCIConfig(
     manifest: OCIImageManifest,
     architecture: "amd64" | "arm64",
   ): HttpsOpencontainersOrgSchemaImageConfig {
@@ -1150,17 +1425,17 @@ export class BlockRegistryService {
   /**
    * Returns the path to the OCI image directory
    */
-  private async exportImageForPush(imageId: ImageId): Promise<string> {
+  private async exportImageForPush(imageId: ImageId, exportDir: string): Promise<void> {
     const manifest = await readJsonFileOfType(
       path.join(this.paths.images, imageId),
       OCIImageManifestValidator,
     );
     // TODO: Support multiple architectures
-    const config = this.genOciConfig(manifest, "amd64");
+    const config = this.genOCIConfig(manifest, "amd64");
     const layers = manifest.layers.map((layerDescriptor) => {
       const [hashType, hash] = layerDescriptor.digest.split(":");
       return {
-        file: path.join(this.paths.layers, layerDescriptor.digest, "layer.tar"),
+        file: path.join(this.paths.layers, layerDescriptor.digest, "overlaybd.commit"),
         hashType,
         hash,
       };
@@ -1178,7 +1453,6 @@ export class BlockRegistryService {
       [configHash, configBlob],
       [manifestHash, manifestBlob],
     ] as const;
-    const exportDir = path.join(this.paths.run, "export", imageId);
     const blobsDir = path.join(exportDir, "blobs");
     const documentBlobsDir = path.join(blobsDir, "sha256");
     await fs.mkdir(documentBlobsDir, { recursive: true }).catch(catchAlreadyExists);
@@ -1188,7 +1462,7 @@ export class BlockRegistryService {
     for (const layer of layers) {
       const layerDir = path.join(blobsDir, layer.hashType);
       await fs.mkdir(layerDir, { recursive: true }).catch(catchAlreadyExists);
-      await fs.copyFile(layer.file, path.join(layerDir, layer.hash));
+      await fs.link(layer.file, path.join(layerDir, layer.hash));
     }
     const index: HttpsOpencontainersOrgSchemaImageIndex = {
       schemaVersion: 0,
@@ -1201,34 +1475,37 @@ export class BlockRegistryService {
       ],
     };
     await fs.writeFile(path.join(exportDir, "index.json"), JSON.stringify(index));
-    return exportDir;
   }
 
   async pushImage(
     imageId: ImageId,
     opts: { tag: string; username: string; password: string },
   ): Promise<void> {
-    const exportDir = await this.exportImageForPush(imageId);
-    const registry = this.tagToRegistry(opts.tag);
-    await this.withTmpFile(async (tmpFile) => {
-      const cmdOpts = { env: { DOCKER_CONFIG: tmpFile } };
-      // DOCKER_CONFIG is undocumented, but it's used by crane
-      // https://github.com/google/go-containerregistry/blob/145eebe7465dc9af316736c8b4c2dab7d86562fe/cmd/crane/cmd/auth.go#L255
-      await execCmdWithOpts(
-        [
-          "crane",
-          "auth",
-          "login",
-          registry,
-          "--username",
-          opts.username,
-          "--password",
-          opts.password,
-        ],
-        cmdOpts,
-      );
-      await execCmdWithOpts(["crane", "push", exportDir, opts.tag], cmdOpts);
+    if (!BlockRegistryService.isImageId(imageId)) {
+      throw new Error(`Invalid id: ${imageId}`);
+    }
+    await this.withTmpDir("export", async (exportDir) => {
+      await this.exportImageForPush(imageId, exportDir);
+      const registry = this.tagToRegistry(opts.tag);
+      await this.withTmpFile(async (tmpFile) => {
+        const cmdOpts = { env: { DOCKER_CONFIG: tmpFile } };
+        // DOCKER_CONFIG is undocumented, but it's used by crane
+        // https://github.com/google/go-containerregistry/blob/145eebe7465dc9af316736c8b4c2dab7d86562fe/cmd/crane/cmd/auth.go#L255
+        await execCmdWithOpts(
+          [
+            "crane",
+            "auth",
+            "login",
+            registry,
+            "--username",
+            opts.username,
+            "--password",
+            opts.password,
+          ],
+          cmdOpts,
+        );
+        await execCmdWithOpts(["crane", "push", exportDir, opts.tag], cmdOpts);
+      });
     });
-    await fs.rmdir(exportDir, { recursive: true });
   }
 }

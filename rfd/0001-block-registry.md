@@ -67,9 +67,10 @@ interface BlockRegistry {
   // If no image was given then creates an empty container
   // mkfs - if true then creates an filesystem on the block device
   // sizeInGB - max size of the layer
+  // Will throw if imageId !== void 0 and mkfs === true
   createContainer(imageId: ImageId | undefined, outputId: IdempotenceKey, opts: { mkfs: boolean; sizeInGB: number }): Promise<ContainerId>;
-  // Converts the RW layer back into a RO layer, this deletes the container as overlaybd does not support cow snapshots
-  commitContainer(containerId: Container, outputId: IdempotenceKey): Promise<ImageId>
+  // Converts the RW layer back into a RO layer, If removeContainer is set this deletes the container
+  commitContainer(containerId: Container, outputId: IdempotenceKey, opts: { removeContainer: boolean }): Promise<ImageId>
   // Gets the TCMU subtype of the registry
   getTCMUSubtype(): Promise<string>
   // Gets the Host Bus Target address of the block devices managed by the registry
@@ -78,25 +79,70 @@ interface BlockRegistry {
 
   // Exposes the given Image/Container to the host system. Images will be exposed as RO block devices, Containers as RW block devices.
   expose(
-    what: ImageId,
+    contentId: ImageId,
     method: typeof EXPOSE_METHOD.HOST_MOUNT,
   ): Promise<{ mountPoint: string; readonly: true }>;
   expose(
-    what: ContainerId,
+    contentId: ContainerId,
     method: typeof EXPOSE_METHOD.HOST_MOUNT,
   ): Promise<{ mountPoint: string; readonly: false }>;
   expose(
-    what: ImageId,
+    contentId: ImageId,
     method: typeof EXPOSE_METHOD.BLOCK_DEV,
   ): Promise<{ device: string; readonly: true }>;
   expose(
-    what: ContainerId,
+    contentId: ContainerId,
     method: typeof EXPOSE_METHOD.BLOCK_DEV,
   ): Promise<{ device: string; readonly: false }>;
   // Hides the given Image/Container from the host system
-  hide(what: ImageId | ContainerId): Promise<void>
+  hide(contentId: ImageId | ContainerId): Promise<void>
 
-  /* FUTURE: P2P, perhaps expose a Docker registry api? */
+  // Pushes a given image to a remote OCI compatible registry
+  pushImage(
+    imageId: ImageId,
+    opts: { tag: string; username: string; password: string },
+  ): Promise<void>
+
+  /** Enumeration */
+  // Checks if the given contentId is available in the block registry
+  async hasContent(contentId: ImageId | ContainerId): Promise<boolean>;
+  // Checks if the given contentId was exposed from the block registry
+  async wasExposed(contentId: ImageId | ContainerId): Promise<boolean>;
+  // Returns a list of exposed contentId's of the given type
+  async listExposedContent<T extends CONTENT_TYPE>(
+    contentType: T = CONTENT_TYPE.ANY as T,
+  ): Promise<
+    PickOne<
+      {
+        [CONTENT_TYPE.ANY]: ImageId | ContainerId;
+        [CONTENT_TYPE.IMAGE]: ImageId;
+        [CONTENT_TYPE.CONTAINER]: ContainerId;
+      },
+      T
+    >[]
+  >;
+  // Returns a list of available contentId's of the given type
+  async listContent<T extends CONTENT_TYPE>(
+    contentType: T = CONTENT_TYPE.ANY as T,
+  ): Promise<
+    PickOne<
+      {
+        [CONTENT_TYPE.ANY]: ImageId | ContainerId;
+        [CONTENT_TYPE.IMAGE]: ImageId;
+        [CONTENT_TYPE.CONTAINER]: ContainerId;
+      },
+      T
+    >[]
+  >;
+
+  /** Storage management */
+  // Removes the given content from the registry
+  async removeContent(contentId: ImageId | ContainerId): Promise<void>;
+  // Garbage collect unreferenced data from the registry, might do nothing
+  async garbageCollect(): Promise<void>;
+  // Self report storage usage of various registry components
+  // Returns an object with the keys as the subsystem name an the values as the subsystem storage usage
+  async estimateStorageUsage(): Promise<Record<string, bigint>>;
 }
 ```
 
@@ -115,12 +161,12 @@ This is the current implementation using OverlayBD.
 ```bash
 <BLOCK_REGISTRY_DIR>/tcmu_subtype # TCMU subtype for this registry
 <BLOCK_REGISTRY_DIR>/block_config/<ImageId or ContainerId> # OverlayBD configs for block devices
-<BLOCK_REGISTRY_DIR>/layers/<content hash>/layer.tar # RO OCI image layers, folder per layer
+<BLOCK_REGISTRY_DIR>/layers/<content hash>/* # OverlayBD RO layers, for now the folder contains 2 files - overlaybd.commit and .loadSignal. The former being an OCI obd layer and the latter is used for syncing GC operations
 <BLOCK_REGISTRY_DIR>/containers/<ContainerId>/* # OverlayBD RW layers
 <BLOCK_REGISTRY_DIR>/images/<ImageId> # OCI manifests of images
 <BLOCK_REGISTRY_DIR>/run/* # On Disk temporary files
 <BLOCK_REGISTRY_DIR>/mounts/<ImageId or ContainerId> # MountPoints when exposing using a mount
-<BLOCK_REGISTRY_DIR>/blobs/sha256/<content hash> # OCI layout blob store, contains hardlinks to <BLOCK_REGISTRY_DIR>/layers/<content hash>/layer.tar
+<BLOCK_REGISTRY_DIR>/blobs/sha256/<content hash> # OCI layout blob store, contains hardlinks to <BLOCK_REGISTRY_DIR>/layers/<content hash>/overlaybd.commit
 <BLOCK_REGISTRY_DIR>/overlaybd.json # OverlayBD config
 <BLOCK_REGISTRY_DIR>/logs # OverlayBD log files
 <BLOCK_REGISTRY_DIR>/obd_registry_cache # OverlayBD registry cache
