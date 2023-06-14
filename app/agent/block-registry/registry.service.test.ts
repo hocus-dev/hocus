@@ -292,6 +292,48 @@ test.concurrent(
 );
 
 test.concurrent(
+  "Race loadImage/commit & removeContent & garbageCollect together",
+  testEnv.run(async ({ brService }) => {
+    for (let i = 0; i < 10; i++) {
+      const [ima, imb, ct] = await waitForPromises([
+        brService.loadImageFromRemoteRepo(testImages.test1, `imAPreDelete${i}`),
+        brService.loadImageFromRemoteRepo(testImages.test2, `imBPreDelete${i}`),
+        brService.createContainer(void 0, `ct${i}`, { mkfs: true, sizeInGB: 64 }),
+      ]);
+      await brService.removeContent(ima);
+      await brService.removeContent(imb);
+      const [imc, imd, ime, _gcRes] = await waitForPromises([
+        brService.commitContainer(ct as ContainerId, `commit${i}`).catch(() => null),
+        brService.loadImageFromRemoteRepo(testImages.test1, `imAPostDelete${i}`).catch(() => null),
+        brService.loadImageFromRemoteRepo(testImages.test2, `imBPostDelete${i}`).catch(() => null),
+        brService.garbageCollect(),
+      ]);
+      await waitForPromises(
+        [imc, imd, ime].map(async (imId) => {
+          if (imId !== null) {
+            await brService.expose(imId as ImageId, EXPOSE_METHOD.BLOCK_DEV);
+            await brService.removeContent(imId as ImageId);
+          }
+        }),
+      );
+    }
+
+    // GC the registry and check storage usage
+    await brService.garbageCollect();
+    const usage1 = await brService.estimateStorageUsage();
+    expect(usage1.containers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage1.containers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage1.layers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage1.layers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage1.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage1.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage1.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage1.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    await expect(brService.listContent()).resolves.toEqual([]);
+  }),
+);
+
+test.concurrent(
   "Concurrency and idempotence of loadImageFromRemoteRepo",
   testEnv.run(async ({ brService }) => {
     const tasks: Promise<ImageId>[][] = [[], []];

@@ -1386,7 +1386,9 @@ export class BlockRegistryService {
           if (stat.nlink !== 1) return;
           const [algo, hash] = layerDigest.split(":");
           await waitForPromises([
-            fs.rm(path.join(this.paths.layers, layerDigest), { force: true, recursive: true }),
+            fs
+              .rm(path.join(this.paths.layers, layerDigest), { force: true, recursive: true })
+              .catch(catchIgnore("ENOTEMPTY")),
             fs
               .unlink(path.join(this.paths.sharedOCIBlobsDir, algo, hash))
               .catch(catchIgnore("ENOENT")),
