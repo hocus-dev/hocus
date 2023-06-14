@@ -7,7 +7,8 @@ import { v4 as uuidv4 } from "uuid";
 import { createAgentInjector } from "../agent-injector";
 import { execCmd, execCmdWithOpts } from "../utils";
 
-import { ContainerId, CONTENT_TYPE, ImageId } from "./registry.service";
+import type { ContainerId, ImageId } from "./registry.service";
+import { CONTENT_TYPE } from "./registry.service";
 import { BlockRegistryService } from "./registry.service";
 import { EXPOSE_METHOD } from "./registry.service";
 import { testImages } from "./test-data/test-images.const";
