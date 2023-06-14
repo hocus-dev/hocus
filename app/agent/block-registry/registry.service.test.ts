@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { createAgentInjector } from "../agent-injector";
 import { execCmd, execCmdWithOpts } from "../utils";
 
-import type { ContainerId, ImageId } from "./registry.service";
+import { ContainerId, CONTENT_TYPE, ImageId } from "./registry.service";
 import { BlockRegistryService } from "./registry.service";
 import { EXPOSE_METHOD } from "./registry.service";
 import { testImages } from "./test-data/test-images.const";
@@ -177,6 +177,121 @@ test.concurrent(
 );
 
 test.concurrent(
+  "Test enumeration",
+  testEnv.run(async ({ brService }) => {
+    await expect(brService.listContent()).resolves.toEqual([]);
+    await expect(brService.listExposedContent()).resolves.toEqual([]);
+    const [im1, ct1, ct2] = await waitForPromises([
+      brService.loadImageFromRemoteRepo(testImages.test1, "im1"),
+      brService.createContainer(void 0, "ct1", { mkfs: true, sizeInGB: 64 }),
+      brService.createContainer(void 0, "ct2", { mkfs: true, sizeInGB: 64 }),
+    ]);
+    await expect(brService.hasContent(im1)).resolves.toEqual(true);
+    await expect(brService.hasContent(ct1)).resolves.toEqual(true);
+    await expect(brService.hasContent(ct2)).resolves.toEqual(true);
+    await expect(brService.hasContent(BlockRegistryService.genContainerId("ct2"))).resolves.toEqual(
+      true,
+    );
+    await expect(brService.hasContent(BlockRegistryService.genContainerId("ct3"))).resolves.toEqual(
+      false,
+    );
+    await expect(brService.listContent().then((x) => x.sort())).resolves.toEqual([ct1, ct2, im1]);
+    await expect(brService.listContent(CONTENT_TYPE.ANY).then((x) => x.sort())).resolves.toEqual([
+      ct1,
+      ct2,
+      im1,
+    ]);
+    await expect(
+      brService.listContent(CONTENT_TYPE.CONTAINER).then((x) => x.sort()),
+    ).resolves.toEqual([ct1, ct2]);
+    await expect(brService.listContent(CONTENT_TYPE.IMAGE).then((x) => x.sort())).resolves.toEqual([
+      im1,
+    ]);
+    await expect(brService.wasExposed(ct1)).resolves.toEqual(false);
+    await brService.expose(ct1, EXPOSE_METHOD.BLOCK_DEV);
+    await expect(brService.wasExposed(ct1)).resolves.toEqual(true);
+    await brService.expose(im1, EXPOSE_METHOD.BLOCK_DEV);
+    await expect(brService.listExposedContent().then((x) => x.sort())).resolves.toEqual([ct1, im1]);
+    await expect(
+      brService.listExposedContent(CONTENT_TYPE.ANY).then((x) => x.sort()),
+    ).resolves.toEqual([ct1, im1]);
+    await expect(
+      brService.listExposedContent(CONTENT_TYPE.CONTAINER).then((x) => x.sort()),
+    ).resolves.toEqual([ct1]);
+    await expect(
+      brService.listExposedContent(CONTENT_TYPE.IMAGE).then((x) => x.sort()),
+    ).resolves.toEqual([im1]);
+  }),
+);
+
+test.concurrent(
+  "Test removeContent & garbageCollect",
+  testEnv.run(async ({ brService }) => {
+    // First check that the registry is empty
+    const usage1 = await brService.estimateStorageUsage();
+    // TODO: https://stackoverflow.com/questions/53369407/include-tobecloseto-in-jest-tomatchobject
+    expect(usage1.containers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage1.containers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage1.layers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage1.layers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage1.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage1.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage1.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage1.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+
+    await expect(brService.listContent()).resolves.toEqual([]);
+    // Then load an container and an image
+    const [ct1, im1] = await waitForPromises([
+      brService.createContainer(void 0, "ct1", { mkfs: true, sizeInGB: 64 }),
+      brService.loadImageFromRemoteRepo(testImages.test1, "im1"),
+    ]);
+    // Check that the storage usage had increased
+    await expect(brService.hasContent(ct1)).resolves.toEqual(true);
+    await expect(brService.hasContent(im1)).resolves.toEqual(true);
+    await expect(brService.listContent().then((x) => x.sort())).resolves.toEqual([ct1, im1]);
+    const usage2 = await brService.estimateStorageUsage();
+    expect(usage2.containers / 1024n / 1024n).toBeLessThanOrEqual(9);
+    expect(usage2.containers / 1024n / 1024n).toBeGreaterThanOrEqual(8);
+    expect(usage2.layers / 1024n / 1024n).toBeLessThanOrEqual(5);
+    expect(usage2.layers / 1024n / 1024n).toBeGreaterThanOrEqual(4);
+    expect(usage2.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage2.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage2.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage2.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+
+    // Now delete the images
+    await waitForPromises([ct1, im1].map(brService.removeContent.bind(brService)));
+    // Check that the registry is empty
+    await expect(brService.listContent()).resolves.toEqual([]);
+    await expect(brService.hasContent(ct1)).resolves.toEqual(false);
+    await expect(brService.hasContent(im1)).resolves.toEqual(false);
+    // Now check the storage usage
+    // Containers are deleted instantly but images need to be GCed
+    const usage3 = await brService.estimateStorageUsage();
+    expect(usage3.containers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage3.containers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage3.layers / 1024n / 1024n).toBeLessThanOrEqual(5);
+    expect(usage3.layers / 1024n / 1024n).toBeGreaterThanOrEqual(4);
+    expect(usage3.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage3.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage3.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage3.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+
+    // GC the registry and check storage usage
+    await brService.garbageCollect();
+    const usage4 = await brService.estimateStorageUsage();
+    expect(usage4.containers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage4.containers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage4.layers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage4.layers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage4.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage4.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage4.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage4.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+  }),
+);
+
+test.concurrent(
   "Concurrency and idempotence of loadImageFromRemoteRepo",
   testEnv.run(async ({ brService }) => {
     const tasks: Promise<ImageId>[][] = [[], []];
@@ -217,7 +332,7 @@ test.concurrent(
     await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
-      const layerPath = path.join(brService["paths"].layers, dirName, "layer.tar");
+      const layerPath = path.join(brService["paths"].layers, dirName, "overlaybd.commit");
       const layerDigest = `sha256:${(await execCmd("sha256sum", layerPath)).stdout.split(" ")[0]}`;
       // Check for data corruption
       expect(layerDigest).toEqual(dirName);
@@ -279,7 +394,7 @@ test.concurrent(
     await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
-      const layerPath = path.join(brService["paths"].layers, dirName, "layer.tar");
+      const layerPath = path.join(brService["paths"].layers, dirName, "overlaybd.commit");
       const layerDigest = `sha256:${(await execCmd("sha256sum", layerPath)).stdout.split(" ")[0]}`;
       // Check for data corruption
       expect(layerDigest).toEqual(dirName);
@@ -710,7 +825,7 @@ test.concurrent.skip(
 );
 
 test.concurrent(
-  "pushImage",
+  "Concurrent image pushImage",
   testEnv.run(async ({ brService }) => {
     const writeToNewImage = async (
       imageId: ImageId | undefined,
