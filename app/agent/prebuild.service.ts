@@ -262,7 +262,7 @@ export class PrebuildService {
 
     const localRootFsImageTag = sha256(this.agentConfig.checkoutOutputId);
     const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
-    if (!(await this.brService.hasImage(rootFsImageId))) {
+    if (!(await this.brService.hasContent(rootFsImageId))) {
       await this.brService.loadImageFromRemoteRepo(
         this.agentConfig.checkoutOutputId,
         localRootFsImageTag,

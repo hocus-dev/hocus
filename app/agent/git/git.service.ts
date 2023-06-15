@@ -298,7 +298,7 @@ export class AgentGitService {
   ): Promise<void> {
     const localRootFsImageTag = sha256(this.agentConfig.fetchRepoImageTag);
     const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
-    if (!(await this.blockRegistryService.hasImage(rootFsImageId))) {
+    if (!(await this.blockRegistryService.hasContent(rootFsImageId))) {
       await this.blockRegistryService.loadImageFromRemoteRepo(
         this.agentConfig.fetchRepoImageTag,
         localRootFsImageTag,

@@ -88,7 +88,7 @@ export const prebuild: CreateActivity<PrebuildActivity> = ({ injector, db }) =>
         agentConfig.defaultWorkspaceImageTag + "default-workspace-image",
       );
       rootFsImageId = BlockRegistryService.genImageId(defaultOutputId);
-      if (!(await brService.hasImage(rootFsImageId))) {
+      if (!(await brService.hasContent(rootFsImageId))) {
         await brService.loadImageFromRemoteRepo(
           agentConfig.defaultWorkspaceImageTag,
           defaultOutputId,

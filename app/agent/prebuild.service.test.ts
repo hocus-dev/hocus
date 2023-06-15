@@ -368,8 +368,8 @@ test.concurrent(
 
       const outputRootFsImageId = BlockRegistryService.genImageId(outputRootFsId);
       const outputProjectImageId = BlockRegistryService.genImageId(outputProjectId);
-      expect(await brService.hasImage(outputRootFsImageId)).toBe(false);
-      expect(await brService.hasImage(outputProjectImageId)).toBe(false);
+      expect(await brService.hasContent(outputRootFsImageId)).toBe(false);
+      expect(await brService.hasContent(outputProjectImageId)).toBe(false);
 
       const envVarValue = "value1";
       const result = await prebuildService.prebuild({
