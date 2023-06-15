@@ -19,15 +19,15 @@ export const cleanUpWorkspaceInstanceLocal: CreateActivity<
         activeInstance: true,
       },
     });
-    const vmInstanceId = workspace.activeInstance?.firecrackerInstanceId ?? args.vmInstanceId;
+    const vmInstanceId = workspace.activeInstance?.runtimeInstanceId ?? args.vmInstanceId;
     if (vmInstanceId == null) {
       logger.warn(
         `No VM instance id found for workspace with id ${workspace.id}. Skipping local cleanup.`,
       );
       return;
     }
-    const firecrackerService = injector.resolve(Token.FirecrackerService)(vmInstanceId);
-    await firecrackerService.cleanup();
+    const runtime = injector.resolve(Token.QemuService)(vmInstanceId);
+    await runtime.cleanup();
   });
 
 export type CleanUpWorkspaceInstanceDbActivity = (args: {

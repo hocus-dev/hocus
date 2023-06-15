@@ -2,6 +2,7 @@ import { WorkspaceStatus } from "@prisma/client";
 
 import type { CreateActivity } from "../types";
 
+import { BlockRegistryService } from "~/agent/block-registry/registry.service";
 import { Token } from "~/token";
 
 export type DeleteWorkspaceActivity = (workspaceId: bigint) => Promise<void>;
@@ -19,13 +20,13 @@ export const deleteWorkspace: CreateActivity<DeleteWorkspaceActivity> =
     const workspace = await db.workspace.findUniqueOrThrow({
       where: { id: workspaceId },
       include: {
-        rootFsFile: true,
-        projectFile: true,
+        rootFsImage: true,
+        projectImage: true,
       },
     });
-    await workspaceAgentService.deleteWorkspaceFilesFromDisk({
-      rootFsFilePath: workspace.rootFsFile.path,
-      projectFilePath: workspace.projectFile.path,
+    await workspaceAgentService.deleteWorkspaceImagesFromDisk({
+      rootFsContainerId: BlockRegistryService.genContainerId(workspace.rootFsImage.tag),
+      projectContainerId: BlockRegistryService.genContainerId(workspace.projectImage.tag),
     });
     await db.$transaction((tdb) => workspaceAgentService.deleteWorkspaceFromDb(tdb, workspaceId));
   };

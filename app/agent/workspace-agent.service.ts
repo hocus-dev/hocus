@@ -468,10 +468,9 @@ export class WorkspaceAgentService {
     projectContainerId: ContainerId;
   }): Promise<void> {
     await waitForPromises(
-      [args.rootFsContainerId, args.projectContainerId].map(() => {
-        // TODO: delete images
-        return null;
-      }),
+      [args.rootFsContainerId, args.projectContainerId].map((contentId) =>
+        this.brService.removeContent(contentId),
+      ),
     );
   }
 
