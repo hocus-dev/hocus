@@ -22,10 +22,8 @@ export const getWorkspaceInstanceStatus: CreateActivity<GetWorkspaceInstanceStat
     if (workspace.activeInstance == null) {
       throw new Error("impossible");
     }
-    const firecrackerService = injector.resolve(Token.FirecrackerService)(
-      workspace.activeInstance.firecrackerInstanceId,
-    );
-    const vmInfo = await firecrackerService.getVMInfo();
+    const runtime = injector.resolve(Token.QemuService)(workspace.activeInstance.runtimeInstanceId);
+    const vmInfo = await runtime.getRuntimeInfo();
     if (vmInfo == null) {
       return "off";
     }

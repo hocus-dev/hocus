@@ -25,11 +25,9 @@ export const stopWorkspace: CreateActivity<StopWorkspaceActivity> =
       },
     });
     const instance = unwrap(workspace.activeInstance);
-    const firecrackerService = injector.resolve(Token.FirecrackerService)(
-      instance.firecrackerInstanceId,
-    );
+    const runtime = injector.resolve(Token.QemuService)(instance.runtimeInstanceId);
 
-    await firecrackerService.cleanup();
+    await runtime.cleanup();
 
     await db.$transaction((tdb) =>
       workspaceAgentService.removeWorkspaceInstanceFromDb(tdb, workspaceId),

@@ -3,7 +3,6 @@ import path from "path";
 
 import type { Workspace, WorkspaceInstance, Prisma, LocalOciImage } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
-import type { DefaultLogger } from "@temporalio/worker";
 import type { NodeSSH, SSHExecOptions } from "node-ssh";
 
 import type { AgentUtilService } from "./agent-util.service";
@@ -28,14 +27,13 @@ import { execCmdWithOpts } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
-import { doesFileExist, sha256 } from "~/utils.server";
+import { sha256 } from "~/utils.server";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 export class InvalidWorkspaceStatusError extends Error {}
 
 export class WorkspaceAgentService {
   static inject = [
-    Token.Logger,
     Token.AgentUtilService,
     Token.SSHGatewayService,
     Token.ProjectConfigService,
@@ -46,7 +44,6 @@ export class WorkspaceAgentService {
   private readonly agentConfig: ReturnType<Config["agent"]>;
 
   constructor(
-    private readonly logger: DefaultLogger,
     private readonly agentUtilService: AgentUtilService,
     private readonly sshGatewayService: SSHGatewayService,
     private readonly projectConfigService: ProjectConfigService,
@@ -376,7 +373,7 @@ export class WorkspaceAgentService {
     db: Prisma.TransactionClient,
     args: {
       workspaceId: bigint;
-      firecrackerInstanceId: string;
+      runtimeInstanceId: string;
       monitoringWorkflowId: string;
       vmIp: string;
     },
@@ -391,7 +388,7 @@ export class WorkspaceAgentService {
     }
     const workspaceInstance = await db.workspaceInstance.create({
       data: {
-        firecrackerInstanceId: args.firecrackerInstanceId,
+        runtimeInstanceId: args.runtimeInstanceId,
         monitoringWorkflowId: args.monitoringWorkflowId,
         vmIp: args.vmIp,
       },
@@ -466,18 +463,16 @@ export class WorkspaceAgentService {
     });
   }
 
-  async deleteWorkspaceFilesFromDisk(args: {
-    rootFsFilePath: string;
-    projectFilePath: string;
+  async deleteWorkspaceImagesFromDisk(args: {
+    rootFsContainerId: ContainerId;
+    projectContainerId: ContainerId;
   }): Promise<void> {
-    for (const filePath of [args.rootFsFilePath, args.projectFilePath]) {
-      const fileExists = await doesFileExist(filePath);
-      if (fileExists) {
-        await fs.unlink(filePath);
-      } else {
-        this.logger.warn(`File at ${filePath} does not exist`);
-      }
-    }
+    await waitForPromises(
+      [args.rootFsContainerId, args.projectContainerId].map(() => {
+        // TODO: delete images
+        return null;
+      }),
+    );
   }
 
   async deleteWorkspaceFromDb(db: Prisma.TransactionClient, workspaceId: bigint): Promise<void> {
@@ -494,10 +489,10 @@ export class WorkspaceAgentService {
         id: workspaceId,
       },
     });
-    await db.file.deleteMany({
+    await db.localOciImage.deleteMany({
       where: {
         id: {
-          in: [workspace.rootFsFileId, workspace.projectFileId],
+          in: [workspace.rootFsImageId, workspace.projectImageId],
         },
       },
     });

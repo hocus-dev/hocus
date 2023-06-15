@@ -429,11 +429,11 @@ model Workspace {
 }
 
 model WorkspaceInstance {
-  id                    BigInt      @id @default(autoincrement())
-  firecrackerInstanceId String
-  vmIp                  String
-  monitoringWorkflowId  String
-  workspaces            Workspace[]
+  id                   BigInt      @id @default(autoincrement())
+  runtimeInstanceId    String
+  vmIp                 String
+  monitoringWorkflowId String
+  workspaces           Workspace[]
 }
 
 model UserProjectEnvironmentVariableSet {

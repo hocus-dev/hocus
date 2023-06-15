@@ -3,6 +3,7 @@ import { WorkspaceStatus } from "@prisma/client";
 
 import type { CreateActivity } from "../types";
 
+import { BlockRegistryService } from "~/agent/block-registry/registry.service";
 import { Token } from "~/token";
 import { formatBranchName } from "~/utils.shared";
 
@@ -14,10 +15,10 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
   ({ injector, db }) =>
   async (args) => {
     const monitoringWorkflowId = args.vmInstanceId;
-    const fcInstanceId = args.vmInstanceId;
 
     const t1 = performance.now();
     const workspaceAgentService = injector.resolve(Token.WorkspaceAgentService);
+    const runtime = injector.resolve(Token.QemuService)(args.vmInstanceId);
     const logger = injector.resolve(Token.Logger);
     const t2 = performance.now();
     logger.info(`Resolving dependencies took: ${(t2 - t1).toFixed(2)} ms`);
@@ -47,8 +48,8 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
     const workspace = await db.workspace.findUniqueOrThrow({
       where: { id: args.workspaceId },
       include: {
-        rootFsFile: true,
-        projectFile: true,
+        rootFsImage: true,
+        projectImage: true,
         prebuildEvent: {
           include: {
             project: {
@@ -101,9 +102,9 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
 
     const t3 = performance.now();
     const instanceInfo = await workspaceAgentService.startWorkspace({
-      fcInstanceId,
-      filesystemDrivePath: workspace.rootFsFile.path,
-      projectDrivePath: workspace.projectFile.path,
+      runtime,
+      fsContainerId: BlockRegistryService.genContainerId(workspace.rootFsImage.tag),
+      projectContainerId: BlockRegistryService.genContainerId(workspace.projectImage.tag),
       authorizedKeys: workspace.user.sshPublicKeys.map((k) => k.publicKey),
       workspaceRoot: workspace.prebuildEvent.project.rootDirectoryPath,
       tasks: workspace.prebuildEvent.workspaceTasksCommand.map((command, idx) => ({
@@ -125,7 +126,7 @@ export const startWorkspace: CreateActivity<StartWorkspaceActivity> =
     const workspaceInstance = await db.$transaction((tdb) =>
       workspaceAgentService.createWorkspaceInstanceInDb(tdb, {
         workspaceId: args.workspaceId,
-        firecrackerInstanceId: fcInstanceId,
+        runtimeInstanceId: args.vmInstanceId,
         monitoringWorkflowId,
         vmIp: instanceInfo.vmIp,
       }),
