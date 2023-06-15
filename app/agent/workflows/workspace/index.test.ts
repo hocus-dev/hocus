@@ -3,7 +3,7 @@ import { LogGroupType, PrebuildEventStatus, VmTaskStatus } from "@prisma/client"
 import { Worker } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
-import { runCreateWorkspace, runStartWorkspace, runStopWorkspace } from ".";
+import { runCreateWorkspace, runDeleteWorkspace, runStartWorkspace, runStopWorkspace } from ".";
 
 import { createActivities } from "~/agent/activities/list";
 import { createAgentInjector } from "~/agent/agent-injector";
@@ -200,6 +200,18 @@ test.concurrent(
           retry: { maximumAttempts: 1 },
           args: [workspace.id],
         });
+        const getWorkspace = () =>
+          db.workspace.findUnique({
+            where: { id: workspace.id },
+          });
+        expect(await getWorkspace()).not.toBeNull();
+        await client.workflow.execute(runDeleteWorkspace, {
+          workflowId: uuidv4(),
+          taskQueue,
+          retry: { maximumAttempts: 1 },
+          args: [{ workspaceId: workspace.id }],
+        });
+        expect(await getWorkspace()).toBeNull();
       });
     },
   ),
