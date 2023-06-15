@@ -10,11 +10,9 @@ import {
   ParentClosePolicy,
 } from "@temporalio/workflow";
 
-import type { Activities } from "../activities/list";
-import { parseWorkflowError } from "../workflows-utils";
-
-import { withLock } from "./mutex";
-
+import type { Activities } from "~/agent/activities/list";
+import { withLock } from "~/agent/workflows/mutex";
+import { parseWorkflowError } from "~/agent/workflows-utils";
 import { retryWorkflow } from "~/temporal/utils";
 
 const {
