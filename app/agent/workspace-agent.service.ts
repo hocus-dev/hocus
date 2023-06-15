@@ -216,9 +216,7 @@ export class WorkspaceAgentService {
     vmIp: string;
     ipBlockId: number;
   }> {
-    await this.writeAuthorizedKeysToFs(args.projectContainerId, [
-      this.agentConfig.prebuildSshPublicKey,
-    ]);
+    await this.writeAuthorizedKeysToFs(args.fsContainerId, [this.agentConfig.prebuildSshPublicKey]);
     return withRuntimeAndImages(
       this.brService,
       args.runtime,

@@ -1,4 +1,4 @@
-import type { WorkspaceInstance } from "@prisma/client";
+import { WorkspaceStatus } from "@prisma/client";
 import { LogGroupType, PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
 import { Worker } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
@@ -8,12 +8,13 @@ import { runCreateWorkspace, runDeleteWorkspace, runStartWorkspace, runStopWorks
 import { createActivities } from "~/agent/activities/list";
 import { createAgentInjector } from "~/agent/agent-injector";
 import { execSshCmdThroughProxy } from "~/agent/test-utils";
+import { retry } from "~/agent/utils";
 import { createTestRepo } from "~/agent/workflows/tests/utils";
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
-import { sleep, unwrap, waitForPromises } from "~/utils.shared";
+import { formatBranchName, sleep, unwrap, waitForPromises } from "~/utils.shared";
 
 jest.setTimeout(5 * 60 * 1000);
 
@@ -137,10 +138,11 @@ test.concurrent(
           },
         },
       });
+      const branchName = "refs/heads/checkout-and-inspect-test-1";
       const branch = unwrap(
         await db.gitBranch.findFirst({
           where: {
-            name: "refs/heads/checkout-and-inspect-test-1",
+            name: branchName,
           },
         }),
       );
@@ -175,31 +177,96 @@ test.concurrent(
           ],
         });
         expect(workspace).toBeDefined();
-        const { workspaceInstance } = await client.workflow.execute(runStartWorkspace, {
-          workflowId: uuidv4(),
-          taskQueue,
-          retry: { maximumAttempts: 1 },
-          args: [workspace.id],
-        });
-        const execInWorkspace = async (instance: WorkspaceInstance, cmd: string) => {
+        const startWorkspace = () =>
+          client.workflow.execute(runStartWorkspace, {
+            workflowId: uuidv4(),
+            taskQueue,
+            retry: { maximumAttempts: 1 },
+            args: [workspace.id],
+          });
+        const stopWorkspace = () =>
+          client.workflow.execute(runStopWorkspace, {
+            workflowId: uuidv4(),
+            taskQueue,
+            retry: { maximumAttempts: 1 },
+            args: [workspace.id],
+          });
+
+        const { workspaceInstance: workspaceInstance1 } = await startWorkspace();
+        const execInInstance1 = async (cmd: string) => {
           const cmdBash = `bash -c '${cmd}'`;
           return await execSshCmdThroughProxy({
-            vmIp: instance.vmIp,
+            vmIp: workspaceInstance1.vmIp,
             privateKey: TEST_USER_PRIVATE_SSH_KEY,
             cmd: cmdBash,
           });
         };
-        const { stdout } = await execInWorkspace(
-          workspaceInstance,
-          "cd dev/project && git branch --show-current",
+        const sshOutput = await execInInstance1("cat /home/hocus/dev/project/proxy-test.txt");
+        expect(sshOutput.stdout.toString()).toEqual("hello from the tests repository!\n");
+        const cdRepo = "cd /home/hocus/dev/project &&";
+        const [gitName, gitEmail] = await waitForPromises(
+          ["user.name", "user.email"].map((item) =>
+            execInInstance1(`${cdRepo} git config --global ${item}`).then((o) =>
+              o.stdout.toString().trim(),
+            ),
+          ),
         );
-        expect(stdout).toContain("checkout-and-inspect-test-1");
-        await client.workflow.execute(runStopWorkspace, {
-          workflowId: uuidv4(),
-          taskQueue,
-          retry: { maximumAttempts: 1 },
-          args: [workspace.id],
-        });
+        expect(gitName).toEqual(testUser.gitConfig.gitUsername);
+        expect(gitEmail).toEqual(testUser.gitConfig.gitEmail);
+        const gitBranchName = await execInInstance1(`${cdRepo} git branch --show-current`).then(
+          (o) => o.stdout.toString().trim(),
+        );
+        expect(gitBranchName).toEqual(formatBranchName(branchName));
+
+        await stopWorkspace();
+
+        const { workspaceInstance: workspaceInstance2 } = await startWorkspace();
+        const runtime2 = injector.resolve(Token.QemuService)(workspaceInstance2.runtimeInstanceId);
+        await runtime2.cleanup();
+        await stopWorkspace();
+
+        const { workspaceInstance: workspaceInstance3 } = await startWorkspace();
+        const { status: startWorkspaceStatus } = await startWorkspace();
+        expect(startWorkspaceStatus).toBe("found");
+        const runtime3 = injector.resolve(Token.QemuService)(workspaceInstance3.runtimeInstanceId);
+        await runtime3.cleanup();
+        await stopWorkspace();
+
+        const { workspaceInstance: workspaceInstance4 } = await startWorkspace();
+        isGetWorkspaceInstanceStatusMocked = false;
+        const runtime4 = injector.resolve(Token.QemuService)(workspaceInstance4.runtimeInstanceId);
+        await runtime4.cleanup();
+        await sleep(1000);
+        const waitForStatus = (statuses: WorkspaceStatus[]) =>
+          retry(
+            async () => {
+              const workspace4 = await db.workspace.findUniqueOrThrow({
+                where: {
+                  id: workspace.id,
+                },
+              });
+              // the monitoring workflow should have stopped the workspace
+              expect(statuses.includes(workspace4.status)).toBe(true);
+            },
+            10,
+            1000,
+          );
+        await waitForStatus([
+          WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP,
+          WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
+        ]);
+        await waitForStatus([WorkspaceStatus.WORKSPACE_STATUS_STOPPED]);
+        await retry(
+          async () => {
+            const monitoringWorkflowInfo = await client.workflow
+              .getHandle(workspaceInstance4.monitoringWorkflowId)
+              .describe();
+            expect(monitoringWorkflowInfo.status.name).toBe("COMPLETED");
+          },
+          5,
+          3000,
+        );
+
         const getWorkspace = () =>
           db.workspace.findUnique({
             where: { id: workspace.id },
