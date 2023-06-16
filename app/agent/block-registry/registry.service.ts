@@ -6,7 +6,7 @@ import * as path from "path";
 import type { Static, TSchema } from "@sinclair/typebox";
 import { type DefaultLogger } from "@temporalio/worker";
 import { flock } from "fs-ext";
-import { match } from "ts-pattern";
+import { match, P } from "ts-pattern";
 import type { A, Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
@@ -15,7 +15,13 @@ import { execCmd, execCmdWithOpts } from "../utils";
 import type { HttpsOpencontainersOrgSchemaImageConfig } from "./oci-schema/config-schema";
 import type { HttpsOpencontainersOrgSchemaImageIndex } from "./oci-schema/image-index-schema";
 import { HOCUS_TCMU_HBA, HOCUS_TCM_LOOP_PORT, HOCUS_TCM_LOOP_WWN } from "./registry.const";
-import type { OBDConfig, OCIDescriptor, OCIImageIndex, OCIImageManifest } from "./validators";
+import type {
+  OBDConfig,
+  OBDLower,
+  OCIDescriptor,
+  OCIImageIndex,
+  OCIImageManifest,
+} from "./validators";
 import { OBDConfigValidator } from "./validators";
 import { OCIImageIndexValidator, OCIImageManifestValidator } from "./validators";
 
@@ -70,8 +76,6 @@ export class BlockRegistryService {
     images: string;
     run: string;
     mounts: string;
-    sharedOCIBlobsDir: string;
-    _sharedOCIBlobsDirSha256: string;
     tcmLoopTarget: string;
     tcmuHBA: string;
     logs: string;
@@ -105,10 +109,6 @@ export class BlockRegistryService {
       run: path.join(root, "run"),
       // Filesystem mounts
       mounts: path.join(root, "mounts"),
-      // OCI layout blob dir, used for downloading images from OCI registries
-      sharedOCIBlobsDir: path.join(root, "blobs"),
-      // Only to create it ahead of time
-      _sharedOCIBlobsDirSha256: path.join(root, "blobs/sha256"),
       // ConfigFS tcm_loop
       tcmLoopTarget: path.join(
         configfs,
@@ -248,7 +248,8 @@ export class BlockRegistryService {
       path.join(this.paths.root, "overlaybd.json"),
       JSON.stringify({
         tcmuSubtype: await this.getTCMUSubtype(),
-        registryFsVersion: "v2",
+        // WARNING: Registry fs v2 is better but improperly resolves domain names and hosts :(
+        registryFsVersion: "v1",
         ioEngine: 0,
         enableThread: true,
         logConfig: {
@@ -356,47 +357,36 @@ export class BlockRegistryService {
   }
 
   async loadImageFromDisk(ociDumpPath: string, outputId: string): Promise<ImageId> {
-    return await this.loadLocalOCIImage(
+    return await this.loadImageFromOCILayout(
       BlockRegistryService.genImageId(outputId),
       `${path.join(ociDumpPath, "index.json")}`,
       `${path.join(ociDumpPath, "blobs")}`,
     );
   }
 
-  // Mostly for convenience :)
   async loadImageFromRemoteRepo(
-    ref: string,
+    remoteRef: string,
     outputId: string,
     opts?: {
       // Defaults to false
       skipVerifyTls?: boolean;
+      disableDownload?: boolean;
     },
   ): Promise<ImageId> {
     const imageId = BlockRegistryService.genImageId(outputId);
     const skipVerifyTls = process.env.OCI_PROXY != null || opts?.skipVerifyTls === true;
-    return await this.withTmpDir("ingest", async (imageIndexDir) => {
-      // Get the image for the current platform from the remote repo
-      // This will only download blobs we actually need due to the shared blob dir <3
-      // Also skopeo properly handles concurrent pulls with a shared blob dir <3
-      // This will place the image index in a random directory
-      await execCmd(
-        "skopeo",
-        "copy",
-        ...(skipVerifyTls ? ["--src-tls-verify=false"] : []),
-        "--multi-arch",
-        "system",
-        "--dest-oci-accept-uncompressed-layers",
-        "--dest-shared-blob-dir",
-        this.paths.sharedOCIBlobsDir,
-        `docker://${ref}`,
-        `oci:${imageIndexDir}`,
-      );
-
-      return await this.loadLocalOCIImage(
-        imageId,
-        `${path.join(imageIndexDir, "index.json")}`,
-        this.paths.sharedOCIBlobsDir,
-      );
+    const craneFetch = await execCmd(
+      "crane",
+      "manifest",
+      "--platform",
+      "linux/amd64",
+      ...(skipVerifyTls ? ["--insecure"] : []),
+      remoteRef,
+    );
+    const manifest = OCIImageManifestValidator.Parse(JSON.parse(craneFetch.stdout));
+    return await this.loadImageFromOCIManifest(imageId, manifest, {
+      remoteRef,
+      disableDownload: opts?.disableDownload,
     });
   }
 
@@ -405,7 +395,7 @@ export class BlockRegistryService {
     return path.join(ociBlobsDir, algo, digest);
   }
 
-  private async loadLocalOCIImage(
+  private async loadImageFromOCILayout(
     imageId: ImageId,
     ociIndexPath: string,
     ociBlobsDir: string,
@@ -420,7 +410,14 @@ export class BlockRegistryService {
       this.getPathToBlob(ociBlobsDir, manifestDescriptor),
       OCIImageManifestValidator,
     );
+    return await this.loadImageFromOCIManifest(imageId, manifest, { ociBlobsDir });
+  }
 
+  private async loadImageFromOCIManifest(
+    imageId: ImageId,
+    manifest: OCIImageManifest,
+    opts: { remoteRef?: string; ociBlobsDir?: string; disableDownload?: boolean },
+  ): Promise<ImageId> {
     // Now check if that image is in overlaybd format, no fastoci support cause it's slow
     // Also we would need to pull another image for that
     for (const layerDescriptor of manifest.layers) {
@@ -438,29 +435,50 @@ export class BlockRegistryService {
     }
 
     // OK great! We know that we deal with an OverlayBD OCI image, time to load it into the blob store :)
-    return await this._loadLocalOCIImage(
+    return await this._loadImageFromOCIManifest(
       imageId,
       manifest,
-      manifest.layers.map((layerDescriptor) => [
-        this.getPathToBlob(ociBlobsDir, layerDescriptor),
-        layerDescriptor,
-      ]),
+      [],
+      opts.remoteRef,
+      manifest.layers.map((descriptor) => ({
+        descriptor,
+        // Sealed layers are non distributable
+        sealed: false,
+        localPath: opts.ociBlobsDir ? this.getPathToBlob(opts.ociBlobsDir, descriptor) : void 0,
+      })),
+      { disableDownload: opts.disableDownload },
     );
   }
 
-  private async _loadLocalOCIImage(
+  private async _loadImageFromOCIManifest(
     imageId: ImageId,
     manifest: OCIImageManifest,
-    layersToLoad: [string, OCIDescriptor][],
+    existingLowers: OBDLower[],
+    // Original ref used to pull the image
+    hocusBaseRemoteRef: string | undefined,
+    layers: {
+      // OCI descriptor of the layer
+      descriptor: OCIDescriptor;
+      // Was the layer sealed?
+      sealed: boolean;
+      // If downloaded ahead of time the path to the layer
+      localPath?: string;
+    }[],
+    opts: { disableDownload?: boolean } = {},
   ): Promise<ImageId> {
     const loadSignals: string[] = [];
     try {
       // We have the data locally so this should be fairly quick
-      for (const [layerPath, layerDescriptor] of layersToLoad) {
+      const tasks: Promise<void>[] = [];
+      for (const layerOpts of layers) {
         const signal = path.join(this.paths.run, `load-signal-${this.genRandId()}`);
         loadSignals.push(signal);
-        await this.loadLocalLayer(layerPath, layerDescriptor, signal);
+        tasks.push(
+          this.loadLocalLayer(layerOpts.localPath, layerOpts.sealed, layerOpts.descriptor, signal),
+        );
       }
+
+      await waitForPromises(tasks);
 
       // Ok the blobs were loaded, time to write the image manifest :)
       if (
@@ -472,10 +490,33 @@ export class BlockRegistryService {
         throw new Error(`Image with id ${imageId} already exists`);
       }
 
+      const ref = hocusBaseRemoteRef ? this.decomposeRef(hocusBaseRemoteRef) : null;
       // Ok, almost done, generate a config for OBD
       await this.idempotentConfigWrite<OBDConfig>(
         {
-          lowers: this.imageManifestToOBDLowers(manifest),
+          hocusBaseRemoteRef,
+          repoBlobUrl: ref ? `${ref.registry}/v2/${ref.repo}/blobs` : void 0,
+          download: { enable: opts.disableDownload ? false : true, delay: 0 },
+          lowers: [
+            ...existingLowers,
+            ...layers.map((layerOpts) =>
+              layerOpts.localPath
+                ? ({
+                    hocusLayerType: "local",
+                    file: path.join(
+                      this.paths.layers,
+                      layerOpts.descriptor.digest,
+                      layerOpts.sealed ? "overlaybd.sealed" : "overlaybd.commit",
+                    ),
+                  } as OBDLower)
+                : ({
+                    hocusLayerType: "lazy",
+                    dir: path.join(this.paths.layers, layerOpts.descriptor.digest),
+                    digest: layerOpts.descriptor.digest,
+                    size: layerOpts.descriptor.size,
+                  } as OBDLower),
+            ),
+          ],
           resultFile: this.genObdResultPath(imageId),
           hocusImageId: imageId,
         },
@@ -490,12 +531,11 @@ export class BlockRegistryService {
   }
 
   private async loadLocalLayer(
-    srcPath: string,
+    srcPath: string | undefined,
+    sealed: boolean,
     layerDescriptor: OCIDescriptor,
     loadSignalPath: string,
   ): Promise<void> {
-    // Path to the blob in the ingest
-    const sharedOCIBlobPath = this.getPathToBlob(this.paths.sharedOCIBlobsDir, layerDescriptor);
     const dstDir = path.join(this.paths.layers, layerDescriptor.digest);
     await fs.mkdir(dstDir).catch(catchAlreadyExists);
     // If a hardlink exists on this file then loading is in progress and the layer won't be GCed
@@ -507,19 +547,16 @@ export class BlockRegistryService {
     // Now we need to hardlink it. If the hardlink was created then we can be sure the layer won't be deleted by GC
     // If this fails then it means that GC deleted the folder and we need to restart the operation :(
     await fs.link(layerLoadSignal, loadSignalPath);
+    // Ok setup was done for lazy loaded layers
+    if (srcPath === void 0) return;
     // This should be the root of the layer, hardlinks should point to that inode
-    const dstPath = path.join(dstDir, "overlaybd.commit");
+    const dstPath = path.join(dstDir, sealed ? "overlaybd.sealed" : "overlaybd.commit");
     // Hardlink the blob from the src to the layers directory
     if (srcPath !== dstPath) {
       await fs.link(srcPath, dstPath).catch(async (err) => {
         if (!err?.message?.startsWith("EEXIST")) throw err;
         await this.forceReplaceWithHardlink(dstPath, srcPath);
       });
-    }
-
-    // If a blob was loaded out of band place it in the shared oci dir :)
-    if (sharedOCIBlobPath !== srcPath) {
-      await this.forceReplaceWithHardlink(dstPath, sharedOCIBlobPath);
     }
   }
 
@@ -579,23 +616,6 @@ export class BlockRegistryService {
     }
   }
 
-  private async imageIdToOBDLowers(imageId?: ImageId): Promise<OBDConfig["lowers"]> {
-    if (imageId === void 0) {
-      return [];
-    }
-    const manifest: OCIImageManifest = await readJsonFileOfType(
-      path.join(this.paths.images, imageId),
-      OCIImageManifestValidator,
-    );
-    return this.imageManifestToOBDLowers(manifest);
-  }
-
-  private imageManifestToOBDLowers(manifest: OCIImageManifest): OBDConfig["lowers"] {
-    return manifest.layers.map((layerDescriptor) => ({
-      file: path.join(this.paths.layers, layerDescriptor.digest, "overlaybd.commit"),
-    }));
-  }
-
   public async createContainer(
     imageId: ImageId | undefined,
     outputId: string,
@@ -612,7 +632,9 @@ export class BlockRegistryService {
     }
     const t1 = performance.now();
     const containerId = BlockRegistryService.genContainerId(outputId);
-    const lowers = await this.imageIdToOBDLowers(imageId);
+    const baseImageConfig = imageId
+      ? await readJsonFileOfType(this.genBlockConfigPath(imageId), OBDConfigValidator)
+      : null;
     const dataPath = path.join(this.paths.containers, containerId, "data");
     const indexPath = path.join(this.paths.containers, containerId, "index");
     await fs.mkdir(path.join(this.paths.containers, containerId)).catch(catchAlreadyExists);
@@ -636,7 +658,11 @@ export class BlockRegistryService {
     if (
       !(await this.idempotentConfigWrite<OBDConfig>(
         {
-          lowers,
+          hocusBaseRemoteRef: baseImageConfig ? baseImageConfig.hocusBaseRemoteRef : void 0,
+          repoBlobUrl: baseImageConfig ? baseImageConfig.repoBlobUrl : void 0,
+          accelerationLayer: baseImageConfig ? baseImageConfig.accelerationLayer : void 0,
+          download: baseImageConfig ? baseImageConfig.download : void 0,
+          lowers: baseImageConfig ? baseImageConfig.lowers : [],
           upper: { index: indexPath, data: dataPath },
           resultFile: this.genObdResultPath(containerId),
           hocusImageId: imageId,
@@ -747,7 +773,21 @@ export class BlockRegistryService {
 
       // Loading the new image must happen before deleting the source container
       // as the source container holds a reference to the lower layers and protects them against GC
-      await this._loadLocalOCIImage(imageId, manifest, [[layerPath, layerDescriptor]]);
+      await this._loadImageFromOCIManifest(
+        imageId,
+        manifest,
+        // TODO: Investigate this typechecking problem
+        obdConfig.lowers as OBDLower[],
+        obdConfig.hocusBaseRemoteRef,
+        [{ descriptor: layerDescriptor, sealed: false, localPath: layerPath }],
+        {
+          disableDownload: obdConfig.download
+            ? obdConfig.download.enable === false
+              ? true
+              : false
+            : false,
+        },
+      );
       if (opts.removeContainer) {
         await this._removeContent(containerId);
       }
@@ -853,7 +893,8 @@ export class BlockRegistryService {
           let flags = readonly ? ["--read-only"] : ["--read-write", "-o", "discard"];
           const t1 = performance.now();
           // TODO: Calling the mount syscall directly is much much faster
-          await execCmd("mount", ...flags, bd.device, mountPoint);
+          // By specifying ext4 mount avoids scanning for supported fs types
+          await execCmd("mount", "-t", "ext4", ...flags, bd.device, mountPoint);
           this.logger.info(
             `mount for ${contentId} took: ${(performance.now() - t1).toFixed(2)} ms`,
           );
@@ -967,14 +1008,15 @@ export class BlockRegistryService {
 
           // Ok the device was enabled, check if obd succeeded :)
           let obdResult: string | undefined = void 0;
-          // Wait up to half a second for overlaybd to setup the device
+          // Wait up to four seconds for overlaybd to setup the device
+          // With lazy pulling enabled overlaybd will query the registry to sanity check if the blobs exists etc...
           // https://linear.app/hocus-dev/issue/HOC-204/modify-overlaybd-tcmu-to-work-without-netlink-and-expose-a-grpc-api
-          for (let i = 0; i < 100; i += 1) {
+          for (let i = 0; i < 400; i += 1) {
             try {
               obdResult = await fs.readFile(this.genObdResultPath(contentId), "utf-8");
             } catch (err) {
               if (!(err as Error).message.startsWith("ENOENT")) throw err;
-              await sleep(5);
+              await sleep(10);
             }
           }
           if (obdResult === void 0) {
@@ -1354,8 +1396,12 @@ export class BlockRegistryService {
           this.logger.error(`Found upper layer with invalid name ${directoryName}`);
         }
       }
-      for (const lower of config.lowers) {
-        const layerHash = path.basename(path.dirname(lower.file));
+      const lowers: OBDLower[] = config.lowers as OBDLower[];
+      for (const lower of lowers) {
+        const layerHash =
+          lower.hocusLayerType === "local"
+            ? path.basename(path.dirname(lower.file))
+            : path.basename(lower.dir);
         referencedLayers.add(layerHash);
       }
     }
@@ -1384,27 +1430,41 @@ export class BlockRegistryService {
           // TODO: analyze whether this actually works or the race is absurdly rare
           const stat = await fs.stat(path.join(this.paths.layers, layerDigest, ".loadSignal"));
           if (stat.nlink !== 1) return;
-          const [algo, hash] = layerDigest.split(":");
-          await waitForPromises([
-            fs
-              .rm(path.join(this.paths.layers, layerDigest), { force: true, recursive: true })
-              .catch(catchIgnore("ENOTEMPTY")),
-            fs
-              .unlink(path.join(this.paths.sharedOCIBlobsDir, algo, hash))
-              .catch(catchIgnore("ENOENT")),
-          ]);
+          await fs
+            .rm(path.join(this.paths.layers, layerDigest), { force: true, recursive: true })
+            .catch(catchIgnore("ENOTEMPTY"));
         })(),
       );
     }
     await waitForPromises(tasks);
   }
 
-  private tagToRegistry(tag: string): string {
-    const [registry, repo] = tag.split("/", 2);
-    if (repo === void 0) {
-      return "docker.io";
+  // Mimics the parsing algorithm in crane
+  private decomposeRef(remoteRef: string): { registry: string; repo: string } {
+    let repo: string;
+    let registry: string;
+    const firstSlashPos = remoteRef.indexOf("/");
+    if (firstSlashPos === -1) {
+      // If there is no slash then assume the default registry
+      registry = "docker.io";
+      repo = remoteRef;
+    } else {
+      const perhapsRegistry = remoteRef.slice(0, firstSlashPos);
+      if (perhapsRegistry.includes(".") || perhapsRegistry.includes(":")) {
+        // Ok the registry seems sane
+        registry = perhapsRegistry;
+        repo = remoteRef.slice(firstSlashPos + 1);
+      } else {
+        // We got for ex. library/ubuntu
+        registry = "docker.io";
+        repo = remoteRef;
+      }
     }
-    return registry;
+    // Ok now strip the tag/digest
+    repo = repo.split(":")[0].split("@")[0];
+    // For ex. ubuntu:latest
+    if (repo.indexOf("/") === -1) repo = "library/" + repo;
+    return { registry, repo };
   }
 
   private genOCIConfig(
@@ -1430,16 +1490,58 @@ export class BlockRegistryService {
       path.join(this.paths.images, imageId),
       OCIImageManifestValidator,
     );
+    const obdConfig = await readJsonFileOfType(
+      this.genBlockConfigPath(imageId),
+      OBDConfigValidator,
+    );
     // TODO: Support multiple architectures
     const config = this.genOCIConfig(manifest, "amd64");
-    const layers = manifest.layers.map((layerDescriptor) => {
-      const [hashType, hash] = layerDescriptor.digest.split(":");
-      return {
-        file: path.join(this.paths.layers, layerDescriptor.digest, "overlaybd.commit"),
-        hashType,
-        hash,
-      };
-    });
+    // Ok get the layers to export
+    const layers = await waitForPromises(
+      (obdConfig.lowers as OBDLower[]).map(async (lower: OBDLower) => {
+        if (lower.hocusLayerType === "local") {
+          if (lower.file.endsWith("overlaybd.commit")) {
+            const digest = path.basename(path.dirname(lower.file));
+            const [hashType, hash] = digest.split(":");
+            // Ok the layer is present locally - we're done
+            return {
+              file: lower.file,
+              hashType,
+              hash,
+            };
+          } else if (lower.file.endsWith("overlaybd.sealed")) {
+            // The manifest contained dummy digests, time to actually commit the layer
+            // and fixup the manifests and block config
+            throw new Error("TODO");
+          }
+        } else {
+          const digest = lower.digest;
+          const [hashType, hash] = digest.split(":");
+          // Ok perhaps obd already downloaded the layer?
+          if (await doesFileExist(path.join(lower.dir, "overlaybd.commit"))) {
+            return { file: path.join(lower.dir, "overlaybd.commit"), hashType, hash };
+          }
+          if (await doesFileExist(path.join(lower.dir, "overlaybd.sealed"))) {
+            return { file: path.join(lower.dir, "overlaybd.sealed"), hashType, hash };
+          }
+          if (!obdConfig.hocusBaseRemoteRef)
+            throw new Error("Unable to find location of source blob");
+          // Well we don't have the layer locally at all. Use crane to download the layer
+          // TODO: in 99% of cases we may just do a cross repo mount instead of downloading the data
+          const tmpPath = path.join(exportDir, digest);
+          await execCmd(
+            "sh",
+            "-c",
+            `crane blob ${obdConfig.hocusBaseRemoteRef.split("@sha256")[0]}@${digest} > ${tmpPath}`,
+          );
+          return {
+            file: tmpPath,
+            hashType,
+            hash,
+          };
+        }
+      }),
+    );
     const configBlob = Buffer.from(JSON.stringify(config));
     const configHash = sha256(configBlob);
     manifest.config = {
@@ -1486,7 +1588,7 @@ export class BlockRegistryService {
     }
     await this.withTmpDir("export", async (exportDir) => {
       await this.exportImageForPush(imageId, exportDir);
-      const registry = this.tagToRegistry(opts.tag);
+      const { registry } = this.decomposeRef(opts.tag);
       await this.withTmpFile(async (tmpFile) => {
         const cmdOpts = { env: { DOCKER_CONFIG: tmpFile } };
         // DOCKER_CONFIG is undocumented, but it's used by crane
