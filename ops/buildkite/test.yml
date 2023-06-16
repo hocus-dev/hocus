@@ -141,7 +141,7 @@ steps:
   - label: ":jest: Backend tests"
     command: |
       mkdir /tmp/tests;
-      TEST_STORAGE_DIR=/tmp/tests yarn run test:startTestManager > /dev/null &
+      TEST_STORAGE_DIR=/tmp/tests yarn run test:startTestManager > /tmp/testManager.log &
       export P=\$! ;
       sleep 0.5;
       set +e;
@@ -151,6 +151,7 @@ steps:
       kill \$P;
       echo "Waiting for helper";
       wait \$P || true;
+      if [ $R -eq 0 ]; then buildkite artifact upload /tmp/testManager.log fi
       exit \$R
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
@@ -167,7 +168,7 @@ steps:
       export AGENT_DATABASE_URL="postgres://postgres:pass@db:5432/rooms";
       ops/docker/resources/setup-network.sh;
       mkdir /srv/jailer/tests;
-      TEST_STORAGE_DIR=/srv/jailer/tests yarn run test:startTestManager > /dev/null &
+      TEST_STORAGE_DIR=/srv/jailer/tests yarn run test:startTestManager > /tmp/testManager.log &
       export P=\$! ;
       sleep 0.5;
       set +e;
@@ -177,6 +178,7 @@ steps:
       kill \$P;
       echo "Waiting for helper";
       wait \$P || true;
+      if [ $R -eq 0 ]; then buildkite artifact upload /tmp/testManager.log fi
       exit \$R
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
