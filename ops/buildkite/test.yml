@@ -151,7 +151,7 @@ steps:
       kill \$P;
       echo "Waiting for helper";
       wait \$P || true;
-      if [ $R -eq 0 ]; then buildkite artifact upload /tmp/testManager.log; fi
+      if [ ! \$R -eq 0 ]; then buildkite artifact upload /tmp/testManager.log; fi
       exit \$R
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
@@ -178,7 +178,7 @@ steps:
       kill \$P;
       echo "Waiting for helper";
       wait \$P || true;
-      if [ $R -eq 0 ]; then buildkite artifact upload /tmp/testManager.log; fi
+      if [ ! \$R -eq 0 ]; then buildkite artifact upload /tmp/testManager.log; fi
       exit \$R
     env:
       REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
