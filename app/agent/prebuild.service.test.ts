@@ -150,11 +150,12 @@ test.concurrent(
         externalId: "xd",
       },
     });
-    const [projectFile, rootFsFile] = await waitForPromises(
-      ["a", "b"].map((path) =>
-        db.file.create({
+    const [projectImage, rootFsImage] = await waitForPromises(
+      ["a", "b"].map((tag) =>
+        db.localOciImage.create({
           data: {
-            path,
+            tag,
+            readonly: false,
             agentInstanceId: agentInstance.id,
           },
         }),
@@ -168,8 +169,8 @@ test.concurrent(
         prebuildEventId: archivedPrebuildEvents[1].id,
         status: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
         agentInstanceId: agentInstance.id,
-        projectFileId: projectFile.id,
-        rootFsFileId: rootFsFile.id,
+        projectImageId: projectImage.id,
+        rootFsImageId: rootFsImage.id,
         gitBranchId: newGitBranch.id,
       },
     });
