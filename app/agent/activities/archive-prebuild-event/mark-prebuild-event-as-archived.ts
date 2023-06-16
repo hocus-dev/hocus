@@ -12,19 +12,19 @@ export const markPrebuildEventAsArchived: CreateActivity<MarkPrebuildEventAsArch
       const prebuildEvent = await tdb.prebuildEvent.findUniqueOrThrow({
         where: { id: args.prebuildEventId },
         include: {
-          prebuildEventFiles: true,
+          prebuildEventImages: true,
         },
       });
       if (prebuildEvent.status === PrebuildEventStatus.PREBUILD_EVENT_STATUS_ARCHIVED) {
         return;
       }
-      await tdb.prebuildEventFiles.deleteMany({
+      await tdb.prebuildEventImages.deleteMany({
         where: { prebuildEventId: args.prebuildEventId },
       });
-      await tdb.file.deleteMany({
+      await tdb.localOciImage.deleteMany({
         where: {
           id: {
-            in: prebuildEvent.prebuildEventFiles.flatMap((f) => [f.fsFileId, f.projectFileId]),
+            in: prebuildEvent.prebuildEventImages.flatMap((f) => [f.fsImageId, f.projectImageId]),
           },
         },
       });

@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { createActivities } from "./activities/list";
 import { createAgentInjector } from "./agent-injector";
+import { BlockRegistryService } from "./block-registry/registry.service";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { sleep } from "./utils";
 import {
@@ -23,7 +24,6 @@ import { TESTS_REPO_URL } from "~/test-utils/constants";
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { createTestUser } from "~/user/test-utils";
-import { doesFileExist } from "~/utils.server";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 jest.setTimeout(5 * 60 * 1000);
@@ -82,6 +82,7 @@ test.concurrent(
 
     const agentGitService = injector.resolve(Token.AgentGitService);
     const projectService = injector.resolve(Token.ProjectService);
+    const brService = injector.resolve(Token.BlockRegistryService);
     const repo = await createTestRepo(db, injector);
     const updates = await agentGitService.updateBranches(db, repo.id);
     console.log("branches updated");
@@ -173,9 +174,7 @@ test.concurrent(
       console.log("prebuild events created");
 
       await suppressLogPattern("Failed to parse project config");
-      await suppressLogPattern(
-        "dockerfile parse error on line 1: unknown instruction: an (did you mean arg?)",
-      );
+      await suppressLogPattern("dockerfile parse error on line 1: unknown instruction: an");
 
       await client.workflow.execute(runBuildfsAndPrebuilds, {
         workflowId: uuidv4(),
@@ -282,30 +281,30 @@ test.concurrent(
           status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS,
         },
         include: {
-          prebuildEventFiles: {
+          prebuildEventImages: {
             include: {
-              projectFile: true,
-              fsFile: true,
+              projectImage: true,
+              fsImage: true,
             },
           },
         },
       });
       await waitForPromises(
         successfulPrebuildEvents.map(async (e) => {
-          const doPrebuildFilesExist: () => Promise<boolean[]> = () =>
+          const doPrebuildImagesExist: () => Promise<boolean[]> = () =>
             waitForPromises(
-              [e.prebuildEventFiles[0].projectFile, e.prebuildEventFiles[0].fsFile].map((f) =>
-                doesFileExist(f.path),
+              [e.prebuildEventImages[0].projectImage, e.prebuildEventImages[0].fsImage].map((im) =>
+                brService.hasContent(BlockRegistryService.genImageId(im.tag)),
               ),
             );
-          expect(await doPrebuildFilesExist()).toEqual([true, true]);
+          expect(await doPrebuildImagesExist()).toEqual([true, true]);
           await client.workflow.execute(runArchivePrebuild, {
             workflowId: uuidv4(),
             taskQueue,
             retry: { maximumAttempts: 1 },
             args: [{ prebuildEventId: e.id, waitForDeletion: true }],
           });
-          expect(await doPrebuildFilesExist()).toEqual([false, false]);
+          expect(await doPrebuildImagesExist()).toEqual([false, false]);
           const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
             where: {
               id: e.id,

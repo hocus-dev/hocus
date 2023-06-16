@@ -183,7 +183,7 @@ export class TestEnvironmentBuilder<
         return res;
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error(`[${testLocation}]\nFailed test run`, runId, err, JSON.stringify(err));
+        console.error(`[${testLocation}]\nFailed test run`, runId, err);
         throw err;
       } finally {
         const rsp = await this.#getStateManager().mkRequest(

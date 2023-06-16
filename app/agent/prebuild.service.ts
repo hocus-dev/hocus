@@ -292,8 +292,8 @@ export class PrebuildService {
               "/": rootFsSpec,
               [workdir]: workdirFsSpec,
             },
-            memSizeMib: 4096,
-            vcpuCount: 2,
+            memSizeMib: 1024,
+            vcpuCount: 1,
           },
           async ({ ssh }) => {
             const repoPath = `${workdir}/project`;
