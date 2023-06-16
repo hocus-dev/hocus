@@ -5,7 +5,7 @@ import assert from "assert";
 import { spawn } from "child_process";
 import fs from "fs/promises";
 import { join } from "path";
-import { formatWithOptions } from "util";
+import { formatWithOptions, format } from "util";
 
 import type { Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
@@ -336,12 +336,42 @@ export class TestEnvironmentBuilder<
     LateInitT & {
       workflowBundle: LateInitFunction<InjectorT, any>;
       temporalTestEnv: LateInitFunction<InjectorT, TestWorkflowEnvironment>;
+      taskQueue: LateInitFunction<InjectorT, string>;
+      suppressLogPattern: LateInitFunction<InjectorT, (pattern: string | RegExp) => number>;
+      unsuppressLogPattern: LateInitFunction<InjectorT, (patternId: number) => void>;
     }
   > {
+    let logPatternCounter = 0;
+    const suppressedPatterns = new Map<string, Map<number, RegExp | string>>();
     Runtime.install({
-      logger: new DefaultLogger("ERROR", (entry: LogEntry) => {
-        // eslint-disable-next-line no-console
-        console.log(`[${entry.level}]`, entry.message, entry.meta);
+      logger: new DefaultLogger("WARN", (entry: LogEntry) => {
+        const logMessage = `[${entry.level}] ${format(entry.message)}, ${format(entry.meta)}`;
+        const shouldLog: boolean = (() => {
+          const taskQueue = entry.meta?.taskQueue;
+          if (typeof taskQueue !== "string") {
+            return true;
+          }
+          const suppressedPatternsForTaskQueue = suppressedPatterns.get(taskQueue);
+          if (suppressedPatternsForTaskQueue === void 0) {
+            return true;
+          }
+          for (const pattern of suppressedPatternsForTaskQueue.values()) {
+            if (typeof pattern === "string") {
+              if (logMessage.includes(pattern)) {
+                return false;
+              }
+            } else {
+              if (pattern.test(logMessage)) {
+                return false;
+              }
+            }
+          }
+          return true;
+        })();
+        if (shouldLog) {
+          // eslint-disable-next-line no-console
+          console.log(logMessage);
+        }
       }),
     });
     const temporalDependencies = (async () => {
@@ -383,6 +413,31 @@ export class TestEnvironmentBuilder<
             await env.teardown();
           });
           return env;
+        },
+        taskQueue: async ({ runId }) => runId,
+        suppressLogPattern: async ({ lateInitPromises }) => {
+          const taskQueue = await lateInitPromises.taskQueue;
+          assert(typeof taskQueue === "string");
+          return (pattern) => {
+            const idx = logPatternCounter++;
+            const suppressedPatternsForTaskQueue = suppressedPatterns.get(taskQueue);
+            if (suppressedPatternsForTaskQueue === void 0) {
+              suppressedPatterns.set(taskQueue, new Map([[idx, pattern]]));
+            } else {
+              suppressedPatternsForTaskQueue.set(idx, pattern);
+            }
+            return idx;
+          };
+        },
+        unsuppressLogPattern: async ({ lateInitPromises }) => {
+          const taskQueue = await lateInitPromises.taskQueue;
+          assert(typeof taskQueue === "string");
+          return (idx) => {
+            const suppressedPatternsForTaskQueue = suppressedPatterns.get(taskQueue);
+            if (suppressedPatternsForTaskQueue !== void 0) {
+              suppressedPatternsForTaskQueue.delete(idx);
+            }
+          };
         },
       },
     );

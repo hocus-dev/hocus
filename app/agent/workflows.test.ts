@@ -46,10 +46,19 @@ test.concurrent("HOST_PERSISTENT_DIR has no trailing slash", async () => {
 
 test.concurrent(
   "runBuildfsAndPrebuilds",
-  testEnv.run(async ({ activities, injector, db, workflowBundle, temporalTestEnv, runId }) => {
+  testEnv.run(async (args) => {
+    const {
+      activities,
+      injector,
+      db,
+      workflowBundle,
+      temporalTestEnv,
+      taskQueue,
+      suppressLogPattern,
+      unsuppressLogPattern,
+    } = args;
     let isGetWorkspaceInstanceStatusMocked = true;
     const { client, nativeConnection } = temporalTestEnv;
-    const taskQueue = runId;
     const worker = await Worker.create({
       connection: nativeConnection,
       taskQueue,
@@ -163,6 +172,11 @@ test.concurrent(
       }
       console.log("prebuild events created");
 
+      await suppressLogPattern("Failed to parse project config");
+      await suppressLogPattern(
+        "dockerfile parse error on line 1: unknown instruction: an (did you mean arg?)",
+      );
+
       await client.workflow.execute(runBuildfsAndPrebuilds, {
         workflowId: uuidv4(),
         taskQueue,
@@ -259,6 +273,8 @@ test.concurrent(
         setWorkspaceInstanceStatusMocked: (value) => {
           isGetWorkspaceInstanceStatusMocked = value;
         },
+        suppressLogPattern,
+        unsuppressLogPattern,
       });
 
       const successfulPrebuildEvents = await db.prebuildEvent.findMany({
@@ -332,9 +348,8 @@ test.concurrent(
 
 test.concurrent(
   "runAddProjectAndRepository",
-  testEnv.run(async ({ activities, temporalTestEnv, runId, workflowBundle }) => {
+  testEnv.run(async ({ activities, temporalTestEnv, taskQueue, workflowBundle }) => {
     const { client, nativeConnection } = temporalTestEnv;
-    const taskQueue = runId;
     const updateGitBranchesAndObjects: typeof activities.updateGitBranchesAndObjects = async () => {
       return {
         newGitBranches: [],

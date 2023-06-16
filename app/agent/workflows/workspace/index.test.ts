@@ -31,10 +31,19 @@ const testEnv = new TestEnvironmentBuilder(createAgentInjector)
 test.concurrent(
   "workspace create, start, stop, delete",
   testEnv.run(
-    async ({ activities, injector, db, workflowBundle, temporalTestEnv, runId, brService }) => {
+    async ({
+      activities,
+      injector,
+      db,
+      workflowBundle,
+      temporalTestEnv,
+      taskQueue,
+      brService,
+      suppressLogPattern,
+      unsuppressLogPattern,
+    }) => {
       let isGetWorkspaceInstanceStatusMocked = true;
       const { client, nativeConnection } = temporalTestEnv;
-      const taskQueue = runId;
       const worker = await Worker.create({
         connection: nativeConnection,
         taskQueue,
@@ -185,6 +194,8 @@ test.concurrent(
           setWorkspaceInstanceStatusMocked: (value) => {
             isGetWorkspaceInstanceStatusMocked = value;
           },
+          suppressLogPattern,
+          unsuppressLogPattern,
         });
       });
     },
