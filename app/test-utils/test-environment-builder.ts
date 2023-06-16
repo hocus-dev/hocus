@@ -11,7 +11,8 @@ import type { Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
-import type { Logger, LogLevel } from "@temporalio/worker";
+import type { LogEntry, Logger, LogLevel } from "@temporalio/worker";
+import { Runtime } from "@temporalio/worker";
 import { DefaultLogger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
@@ -337,6 +338,12 @@ export class TestEnvironmentBuilder<
       temporalTestEnv: LateInitFunction<InjectorT, TestWorkflowEnvironment>;
     }
   > {
+    Runtime.install({
+      logger: new DefaultLogger("ERROR", (entry: LogEntry) => {
+        // eslint-disable-next-line no-console
+        console.log(`[${entry.level}]`, entry.message, entry.meta);
+      }),
+    });
     const temporalDependencies = (async () => {
       const bundle = await generateTemporalCodeBundle();
       const env = await TestWorkflowEnvironment.createLocal({

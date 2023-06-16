@@ -1,39 +1,30 @@
 /* eslint-disable no-console */
-import type { PrebuildEvent, Prisma } from "@prisma/client";
-import { WorkspaceStatus } from "@prisma/client";
+import type { PrebuildEvent } from "@prisma/client";
 import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
-import { TestWorkflowEnvironment } from "@temporalio/testing";
-import type { LogEntry } from "@temporalio/worker";
-import { Worker, Runtime, DefaultLogger } from "@temporalio/worker";
+import { Worker } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
-import type { Activities } from "./activities/list";
 import { createActivities } from "./activities/list";
-import type { AgentInjector } from "./agent-injector";
 import { createAgentInjector } from "./agent-injector";
 import { HOST_PERSISTENT_DIR } from "./constants";
-import { execSshCmdThroughProxy } from "./test-utils";
-import { retry, sleep } from "./utils";
+import { sleep } from "./utils";
 import {
   runBuildfsAndPrebuilds,
   runAddProjectAndRepository,
   runCreateWorkspace,
-  runStartWorkspace,
-  runStopWorkspace,
-  runDeleteWorkspace,
   runArchivePrebuild,
   runDeleteRemovablePrebuilds,
   scheduleNewPrebuild,
 } from "./workflows";
 import { createTestRepo } from "./workflows/tests/utils";
+import { testWorkspace } from "./workflows/workspace/test-utils";
 
 import { TESTS_REPO_URL } from "~/test-utils/constants";
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
-import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
 import { doesFileExist } from "~/utils.server";
-import { unwrap, waitForPromises, formatBranchName } from "~/utils.shared";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
 jest.setTimeout(5 * 60 * 1000);
 
@@ -255,145 +246,20 @@ test.concurrent(
           },
         ],
       });
-      const updateWorkspace = (update: { status: WorkspaceStatus }) =>
-        db.workspace.update({
-          where: {
-            id: workspace.id,
-          },
-          data: update,
-        });
-      const startWorkspace = () =>
-        client.workflow.execute(runStartWorkspace, {
-          workflowId: uuidv4(),
-          taskQueue,
-          retry: { maximumAttempts: 1 },
-          args: [workspace.id],
-        });
-      const stopWorkspace = () =>
-        client.workflow.execute(runStopWorkspace, {
-          workflowId: uuidv4(),
-          taskQueue,
-          retry: { maximumAttempts: 1 },
-          args: [workspace.id],
-        });
 
-      const { workspaceInstance: workspaceInstance1 } = await startWorkspace();
-      const execInInstance1 = async (cmd: string) => {
-        const cmdBash = `bash -c '${cmd}'`;
-        return await execSshCmdThroughProxy({
-          vmIp: workspaceInstance1.vmIp,
-          privateKey: TEST_USER_PRIVATE_SSH_KEY,
-          cmd: cmdBash,
-        });
-      };
       console.log("running workspace tests");
-      const sshOutput = await execInInstance1("cat /home/hocus/dev/project/proxy-test.txt");
-      expect(sshOutput.stdout.toString()).toEqual("hello from the tests repository!\n");
-      const cdRepo = "cd /home/hocus/dev/project &&";
-      const [gitName, gitEmail] = await waitForPromises(
-        ["user.name", "user.email"].map((item) =>
-          execInInstance1(`${cdRepo} git config --global ${item}`).then((o) =>
-            o.stdout.toString().trim(),
-          ),
-        ),
-      );
-      expect(gitName).toEqual(testUser.gitConfig.gitUsername);
-      expect(gitEmail).toEqual(testUser.gitConfig.gitEmail);
-      const gitBranchName = await execInInstance1(`${cdRepo} git branch --show-current`).then((o) =>
-        o.stdout.toString().trim(),
-      );
-      expect(gitBranchName).toEqual(formatBranchName(testBranches[0].name));
-
-      await stopWorkspace();
-
-      const { workspaceInstance: workspaceInstance2 } = await startWorkspace();
-      const firecrackerService2 = injector.resolve(Token.FirecrackerService)(
-        workspaceInstance2.firecrackerInstanceId,
-      );
-      await firecrackerService2.cleanup();
-      await stopWorkspace();
-
-      const { workspaceInstance: workspaceInstance3 } = await startWorkspace();
-      const { status: startWorkspaceStatus } = await startWorkspace();
-      expect(startWorkspaceStatus).toBe("found");
-      const firecrackerService3 = injector.resolve(Token.FirecrackerService)(
-        workspaceInstance3.firecrackerInstanceId,
-      );
-      await firecrackerService3.cleanup();
-      await stopWorkspace();
-
-      const { workspaceInstance: workspaceInstance4 } = await startWorkspace();
-      isGetWorkspaceInstanceStatusMocked = false;
-      const firecrackerService4 = injector.resolve(Token.FirecrackerService)(
-        workspaceInstance4.firecrackerInstanceId,
-      );
-      await firecrackerService4.cleanup();
-      await sleep(1000);
-      const waitForStatus = (statuses: WorkspaceStatus[]) =>
-        retry(
-          async () => {
-            const workspace4 = await db.workspace.findUniqueOrThrow({
-              where: {
-                id: workspace.id,
-              },
-            });
-            // the monitoring workflow should have stopped the workspace
-            expect(statuses.includes(workspace4.status)).toBe(true);
-          },
-          10,
-          1000,
-        );
-      await waitForStatus([
-        WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP,
-        WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
-      ]);
-      await waitForStatus([WorkspaceStatus.WORKSPACE_STATUS_STOPPED]);
-      await retry(
-        async () => {
-          const monitoringWorkflowInfo = await client.workflow
-            .getHandle(workspaceInstance4.monitoringWorkflowId)
-            .describe();
-          expect(monitoringWorkflowInfo.status.name).toBe("COMPLETED");
-        },
-        5,
-        3000,
-      );
-
-      await updateWorkspace({
-        status: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
-      });
-      await startWorkspace()
-        .then(() => {
-          throw new Error("should have thrown");
-        })
-        .catch((err: any) => {
-          expect(err?.cause?.cause?.message).toMatch(expectedErrorMessage);
-        });
-      const workspaceWithFiles = await db.workspace.findUniqueOrThrow({
-        where: {
-          id: workspace.id,
-        },
-        include: {
-          projectFile: true,
-          rootFsFile: true,
-        },
-      });
-      expect(workspaceWithFiles.status).toBe(WorkspaceStatus.WORKSPACE_STATUS_STOPPED_WITH_ERROR);
-      expect(workspaceWithFiles.latestError).not.toBeNull();
-      await client.workflow.execute(runDeleteWorkspace, {
-        workflowId: uuidv4(),
+      await testWorkspace({
+        db,
+        client,
         taskQueue,
-        retry: { maximumAttempts: 1 },
-        args: [{ workspaceId: workspace.id }],
-      });
-      expect(await doesFileExist(workspaceWithFiles.projectFile.path)).toBe(false);
-      expect(await doesFileExist(workspaceWithFiles.rootFsFile.path)).toBe(false);
-      const workspaceAfterDelete = await db.workspace.findUnique({
-        where: {
-          id: workspace.id,
+        workspace,
+        branchName: testBranches[0].name,
+        injector,
+        testUser,
+        setWorkspaceInstanceStatusMocked: (value) => {
+          isGetWorkspaceInstanceStatusMocked = value;
         },
       });
-      expect(workspaceAfterDelete).toBeNull();
 
       const successfulPrebuildEvents = await db.prebuildEvent.findMany({
         where: {
