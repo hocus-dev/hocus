@@ -65,8 +65,8 @@ const OBDConfigSchema = Type.Object({
   accelerationLayer: Type.Optional(Type.Boolean()),
   // Where to record a prefetch trace
   recordTracePath: Type.Optional(Type.String()),
-  // Which hocus image id refers to this config?
-  hocusImageId: Type.Optional(Type.String()),
+  // What OCI manifest was used to create this container?
+  hocusImageManifest: Type.Optional(HttpsOpencontainersOrgSchemaImageManifest),
   // Where were the original base layers were pulled from?
   hocusBaseRemoteRef: Type.Optional(Type.String()),
 });

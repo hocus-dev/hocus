@@ -99,6 +99,23 @@ test.concurrent(
 );
 
 test.concurrent(
+  "Test commit of container with deleted base image",
+  testEnv.run(async ({ brService }) => {
+    const im1 = await brService.loadImageFromRemoteRepo(testImages.test1, "im1");
+    const ct1 = await brService.createContainer(im1, "ct1");
+    await brService.removeContent(im1);
+    const im2 = await brService.commitContainer(ct1, "im2");
+    const imMount = await brService.expose(im2, EXPOSE_METHOD.HOST_MOUNT);
+    await expect(fs.readFile(path.join(imMount.mountPoint, "fileA"), "utf-8")).resolves.toEqual(
+      "This is layer 1\n",
+    );
+    await expect(fs.readFile(path.join(imMount.mountPoint, "fileBA"), "utf-8")).resolves.toEqual(
+      "This is layer 2a\n",
+    );
+  }),
+);
+
+test.concurrent(
   "Test loadImageFromRemoteRepo",
   testEnv.run(async ({ brService }) => {
     const im1 = await brService.loadImageFromRemoteRepo(testImages.test1, "im1");
@@ -238,7 +255,11 @@ test.concurrent(
     // Then load an container and an image
     const [ct1, im1] = await waitForPromises([
       brService.createContainer(void 0, "ct1", { mkfs: true, sizeInGB: 64 }),
-      brService.loadImageFromRemoteRepo(testImages.test1, "im1"),
+      brService.loadImageFromRemoteRepo(testImages.test1, "im1", {
+        // Never pull the layers eagerly for this test
+        enableObdLazyPulling: true,
+        eagerLayerDownloadThreshold: -1,
+      }),
     ]);
     // Check that the storage usage had increased
     await expect(brService.hasContent(ct1)).resolves.toEqual(true);
@@ -309,26 +330,31 @@ test.concurrent(
 test.concurrent(
   "Race loadImage/commit & removeContent & garbageCollect together",
   testEnv.run(async ({ brService }) => {
-    for (let i = 0; i < 4; i++) {
-      const [ima, imb, ct] = await waitForPromises([
-        brService.loadImageFromRemoteRepo(testImages.test1, `imAPreDelete${i}`),
-        brService.loadImageFromRemoteRepo(testImages.test2, `imBPreDelete${i}`),
-        brService.createContainer(void 0, `ct${i}`, { mkfs: true, sizeInGB: 64 }),
+    // Shaves off a second in this test :)
+    const loadOpts = {
+      disableObdDownload: true,
+      enableObdLazyPulling: true,
+      eagerLayerDownloadThreshold: -1,
+    };
+    for (let i = 0; i < 10; i++) {
+      const [ima, imb, ct1] = await waitForPromises([
+        brService.loadImageFromRemoteRepo(testImages.test1, `imAPreDelete${i}`, loadOpts),
+        brService.loadImageFromRemoteRepo(testImages.test2, `imBPreDelete${i}`, loadOpts),
+        brService.createContainer(void 0, `ct1-${i}`, { mkfs: true, sizeInGB: 64 }),
       ]);
       await brService.removeContent(ima);
       await brService.removeContent(imb);
-      const [imc, imd, ime, _gcRes] = await waitForPromises([
-        brService.commitContainer(ct as ContainerId, `commit${i}`).catch(() => null),
-        brService.loadImageFromRemoteRepo(testImages.test1, `imAPostDelete${i}`).catch(() => null),
-        brService.loadImageFromRemoteRepo(testImages.test2, `imBPostDelete${i}`).catch(() => null),
+      const [imc, imd, ime, ct2, _gcRes] = await waitForPromises([
+        brService.commitContainer(ct1 as ContainerId, `commit${i}`),
+        brService.loadImageFromRemoteRepo(testImages.test1, `imAPostDelete${i}`, loadOpts),
+        brService.loadImageFromRemoteRepo(testImages.test2, `imBPostDelete${i}`, loadOpts),
+        brService.createContainer(void 0, `ct2-${i}`),
         brService.garbageCollect(),
       ]);
       await waitForPromises(
-        [imc, imd, ime].map(async (imId) => {
-          if (imId !== null) {
-            await brService.expose(imId as ImageId, EXPOSE_METHOD.BLOCK_DEV);
-            await brService.removeContent(imId as ImageId);
-          }
+        [imc, imd, ime, ct2].map(async (imId) => {
+          await brService.expose(imId as ImageId, EXPOSE_METHOD.BLOCK_DEV);
+          await brService.removeContent(imId as ImageId);
         }),
       );
     }

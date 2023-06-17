@@ -574,11 +574,11 @@ export class QemuService implements HocusRuntime {
         // In case qemu shuts down while interacting with the qmp socket
         if (
           !(
-            err?.message.includes("EPIPE") ||
-            err?.message.includes("ECONNRESET") ||
-            err?.code.includes("EPIPE") ||
-            err?.code.includes("ECONNRESET") ||
-            err?.message.includes("Failed to press")
+            (err?.message && err?.message.includes("EPIPE")) ||
+            (err?.message && err?.message.includes("ECONNRESET")) ||
+            (err?.code && err?.code.includes("EPIPE")) ||
+            (err?.code && err?.code.includes("ECONNRESET")) ||
+            (err?.message && err?.message.includes("Failed to press"))
           )
         ) {
           throw err;
