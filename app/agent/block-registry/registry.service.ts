@@ -521,7 +521,7 @@ export class BlockRegistryService {
             }
           }
 
-          // Deffer loading the layer until we have a lock
+          // Defer loading the layer until we have a lock
           loadLayerTasks.push(
             async () =>
               await this.loadLocalLayer(layerFilePath, layerOpts.sealed, layerOpts.descriptor),
