@@ -116,6 +116,26 @@ test.concurrent(
 );
 
 test.concurrent(
+  "Test commit of container with lazy pulled base image",
+  testEnv.run(async ({ brService }) => {
+    const im1 = await brService.loadImageFromRemoteRepo(testImages.test1, "im1", {
+      enableObdLazyPulling: true,
+      disableObdDownload: true,
+      eagerLayerDownloadThreshold: -1,
+    });
+    const ct1 = await brService.createContainer(im1, "ct1");
+    const im2 = await brService.commitContainer(ct1, "im2");
+    const imMount = await brService.expose(im2, EXPOSE_METHOD.HOST_MOUNT);
+    await expect(fs.readFile(path.join(imMount.mountPoint, "fileA"), "utf-8")).resolves.toEqual(
+      "This is layer 1\n",
+    );
+    await expect(fs.readFile(path.join(imMount.mountPoint, "fileBA"), "utf-8")).resolves.toEqual(
+      "This is layer 2a\n",
+    );
+  }),
+);
+
+test.concurrent(
   "Test loadImageFromRemoteRepo",
   testEnv.run(async ({ brService }) => {
     const im1 = await brService.loadImageFromRemoteRepo(testImages.test1, "im1");
@@ -936,7 +956,9 @@ test.concurrent(
       await expect(brService.listContent()).resolves.toEqual([]);
       const im4 = await brService.loadImageFromRemoteRepo(tag1, "im4", {
         skipVerifyTls: true,
-        disableDownload: true,
+        disableObdDownload: true,
+        enableObdLazyPulling: true,
+        eagerLayerDownloadThreshold: -1,
       });
       const { mountPoint: mountPoint2 } = await brService.expose(im4, EXPOSE_METHOD.HOST_MOUNT);
       await expect(fs.readFile(path.join(mountPoint2, "test"), "utf-8")).resolves.toEqual(

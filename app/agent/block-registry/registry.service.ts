@@ -850,6 +850,7 @@ export class BlockRegistryService {
         [{ descriptor: layerDescriptor, sealed: false, localPath: layerPath }],
         {
           remoteRef: obdConfig.hocusBaseRemoteRef,
+          enableObdLazyPulling: obdConfig.repoBlobUrl ? true : false,
           disableObdDownload: obdConfig.download
             ? obdConfig.download.enable === false
               ? true
