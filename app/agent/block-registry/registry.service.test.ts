@@ -159,7 +159,7 @@ test.concurrent(
     // Ensure layers aren't duplicated in storage
     // In the layer store we will have 4 blobs
     await expect(fs.readdir(brService["paths"].layers)).resolves.toHaveLength(4);
-    await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
+    await expect(fs.readdir(brService["paths"].blockConfig)).resolves.toHaveLength(2);
   }),
 );
 
@@ -204,7 +204,7 @@ test.concurrent(
     // Ensure layers aren't duplicated in storage
     // In the layer store we will have 4 blobs
     await expect(fs.readdir(brService["paths"].layers)).resolves.toHaveLength(4);
-    await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
+    await expect(fs.readdir(brService["paths"].blockConfig)).resolves.toHaveLength(2);
   }),
 );
 
@@ -428,7 +428,7 @@ test.concurrent(
     // Ensure layers aren't duplicated in storage
     // In the layer store we will have 4 blobs
     await expect(fs.readdir(brService["paths"].layers)).resolves.toHaveLength(4);
-    await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
+    await expect(fs.readdir(brService["paths"].blockConfig)).resolves.toHaveLength(2);
   }),
 );
 
@@ -476,7 +476,7 @@ test.concurrent(
     // Ensure layers aren't duplicated in storage
     // In the layer store we will have 4 blobs
     await expect(fs.readdir(brService["paths"].layers)).resolves.toHaveLength(4);
-    await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
+    await expect(fs.readdir(brService["paths"].blockConfig)).resolves.toHaveLength(2);
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
       const layerPath = path.join(brService["paths"].layers, dirName, "overlaybd.commit");

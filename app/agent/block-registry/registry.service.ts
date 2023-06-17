@@ -73,7 +73,6 @@ export class BlockRegistryService {
     blockConfig: string;
     layers: string;
     containers: string;
-    images: string;
     run: string;
     gcSignal: string;
     mounts: string;
@@ -99,8 +98,6 @@ export class BlockRegistryService {
       layers: path.join(root, "layers"),
       // RW Layer storage
       containers: path.join(root, "containers"),
-      // OCI Image manifest storage
-      images: path.join(root, "images"),
       // Directory for anything temporary which should be nuked after a restart
       // This can't be /tmp as I need the directory to be on the same partition as the registry
       // I'm abusing hardlinks to create synchronization primitives
@@ -552,35 +549,29 @@ export class BlockRegistryService {
         await this.acquireFlock(gcSignalFile, true);
         await waitForPromises(loadLayerTasks.map(async (fn) => fn()));
 
-        // Ok the blobs were loaded, time to write the image manifest :)
+        const ref =
+          opts.enableObdLazyPulling && opts.remoteRef ? this.decomposeRef(opts.remoteRef) : null;
+        // Ok, almost done, generate a config for OBD
         if (
-          !(await this.idempotentConfigWrite<OCIImageManifest>(
-            manifest,
-            path.join(this.paths.images, imageId),
+          !(await this.idempotentConfigWrite<OBDConfig>(
+            {
+              hocusBaseRemoteRef: opts.remoteRef,
+              repoBlobUrl:
+                opts.enableObdLazyPulling && ref ? `${ref.registry}/v2/${ref.repo}/blobs` : void 0,
+              download: {
+                enable: opts.disableObdDownload ? false : true,
+                delay: 0,
+                blockSize: 10 * 1024 * 1024,
+              },
+              lowers: [...existingLowers, ...extraLowers],
+              resultFile: this.genObdResultPath(imageId),
+              hocusImageManifest: manifest,
+            },
+            this.genBlockConfigPath(imageId),
           ))
         ) {
           throw new Error(`Image with id ${imageId} already exists`);
         }
-
-        const ref =
-          opts.enableObdLazyPulling && opts.remoteRef ? this.decomposeRef(opts.remoteRef) : null;
-        // Ok, almost done, generate a config for OBD
-        await this.idempotentConfigWrite<OBDConfig>(
-          {
-            hocusBaseRemoteRef: opts.remoteRef,
-            repoBlobUrl:
-              opts.enableObdLazyPulling && ref ? `${ref.registry}/v2/${ref.repo}/blobs` : void 0,
-            download: {
-              enable: opts.disableObdDownload ? false : true,
-              delay: 0,
-              blockSize: 10 * 1024 * 1024,
-            },
-            lowers: [...existingLowers, ...extraLowers],
-            resultFile: this.genObdResultPath(imageId),
-            hocusImageManifest: void 0,
-          },
-          this.genBlockConfigPath(imageId),
-        );
 
         return imageId;
       } finally {
@@ -724,12 +715,7 @@ export class BlockRegistryService {
               lowers: baseImageConfig ? baseImageConfig.lowers : [],
               upper: { index: indexPath, data: dataPath },
               resultFile: this.genObdResultPath(containerId),
-              hocusImageManifest: imageId
-                ? await readJsonFileOfType(
-                    path.join(this.paths.images, imageId),
-                    OCIImageManifestValidator,
-                  )
-                : void 0,
+              hocusImageManifest: baseImageConfig ? baseImageConfig.hocusImageManifest : void 0,
             },
             this.genBlockConfigPath(containerId),
           ))
@@ -1379,11 +1365,6 @@ export class BlockRegistryService {
         force: true,
       });
     }
-    if (BlockRegistryService.isImageId(contentId)) {
-      // The OCI manifest is not longer necessary
-      // Blobs may have multiple xrefs on the disk so we need to
-      await fs.unlink(path.join(this.paths.images, contentId)).catch(catchIgnore("ENOENT"));
-    }
   }
 
   private async estimateDirStorageUsage(path: string): Promise<bigint> {
@@ -1422,38 +1403,26 @@ export class BlockRegistryService {
     try {
       await this.acquireFlock(gcSignalFile, false);
       this.logger.info("Garbage collector lock acquired");
-      const [allManifests, allDigests, allContainers] = await waitForPromises([
-        fs.readdir(this.paths.images).then((x) => x.filter(BlockRegistryService.isImageId)),
-        // Only consider the layer directory, the shared oci dir will be removed when lazy pulling will be enabled
-        // Blobs are still deleted from the shared dir but a dangling file in the shared dir won't be deleted
+      const [allDigests, allContainers] = await waitForPromises([
         fs.readdir(this.paths.layers).then((x) => x.filter((y) => y.startsWith("sha256:"))),
         fs.readdir(this.paths.containers).then((x) => x.filter(BlockRegistryService.isContainerId)),
       ]);
 
-      const referencedManifests = new Set<ImageId>();
       const referencedContainers = new Set<ContainerId>();
       const referencedLayers = new Set<string>();
       const allConfigs = await fs
         .readdir(this.paths.blockConfig)
         .then((ids) =>
           waitForPromises(
-            ids.map(
-              async (id) =>
-                [
-                  id,
-                  await readJsonFileOfType(
-                    path.join(this.paths.blockConfig, id),
-                    OBDConfigValidator,
-                  ).catch(() => ({ lowers: [], resultFile: "" } as OBDConfig)),
-                ] as const,
+            ids.map(async (id) =>
+              readJsonFileOfType(path.join(this.paths.blockConfig, id), OBDConfigValidator).catch(
+                () => ({ lowers: [], resultFile: "" } as OBDConfig),
+              ),
             ),
           ),
         );
       // Calculate the reference counts based on configs. This will also work with container sealing and lazy pulling
-      for (const [referencedId, config] of allConfigs) {
-        if (BlockRegistryService.isImageId(referencedId)) {
-          referencedManifests.add(referencedId);
-        }
+      for (const config of allConfigs) {
         if (config.upper) {
           const directoryName = path.basename(path.dirname(config.upper.data));
           if (BlockRegistryService.isContainerId(directoryName)) {
@@ -1474,12 +1443,6 @@ export class BlockRegistryService {
 
       // Perform garbage collection of dangling resources
       const tasks = [];
-      for (const manifest of allManifests) {
-        if (referencedManifests.has(manifest as ImageId)) continue;
-        // Ok this manifest wasn't deleted cause removeContent was interrupted
-        this.logger.debug(`GC image manifest of ${manifest}`);
-        tasks.push(fs.unlink(path.join(this.paths.images, manifest)).catch(catchIgnore("ENOENT")));
-      }
       for (const container of allContainers) {
         if (referencedContainers.has(container as ContainerId)) continue;
         this.logger.debug(`GC container ${container}`);
@@ -1556,14 +1519,14 @@ export class BlockRegistryService {
    * Returns the path to the OCI image directory
    */
   private async exportImageForPush(imageId: ImageId, exportDir: string): Promise<void> {
-    const manifest = await readJsonFileOfType(
-      path.join(this.paths.images, imageId),
-      OCIImageManifestValidator,
-    );
     const obdConfig = await readJsonFileOfType(
       this.genBlockConfigPath(imageId),
       OBDConfigValidator,
     );
+    if (!obdConfig.hocusImageManifest) {
+      throw new Error(`Logic error, manifest for ${imageId} not found`);
+    }
+    const manifest = obdConfig.hocusImageManifest;
     // TODO: Support multiple architectures
     const config = this.genOCIConfig(manifest, "amd64");
     // Ok get the layers to export
