@@ -62,7 +62,16 @@ interface BlockRegistry {
   // Layers will be hardlinked into the registry
   loadImageFromDisk(ociDumpPath: string, outputId: IdempotenceKey): Promise<ImageId>;
   // Loads an OCI image from a remote registry
-  loadImageFromRemoteRepo(ref: string, outputId: IdempotenceKey): Promise<ImageId>;
+  loadImageFromRemoteRepo(ref: string, outputId: IdempotenceKey, opts: {
+      // Skip TLS when accessing the registry
+      skipVerifyTls?: boolean;
+      // When in lazy pulling mode whether to download the entire blobs in the background
+      disableObdDownload?: boolean;
+      // Enable lazy pulling mode
+      enableObdLazyPulling?: boolean;
+      // Specifies the size threshold bellow which layers will always be downloaded eagerly
+      eagerLayerDownloadThreshold?: number;
+    }): Promise<ImageId>;
   // Creates an RW layer on top of an image
   // If no image was given then creates an empty container
   // mkfs - if true then creates an filesystem on the block device
@@ -160,13 +169,11 @@ This is the current implementation using OverlayBD.
 
 ```bash
 <BLOCK_REGISTRY_DIR>/tcmu_subtype # TCMU subtype for this registry
-<BLOCK_REGISTRY_DIR>/block_config/<ImageId or ContainerId> # OverlayBD configs for block devices
-<BLOCK_REGISTRY_DIR>/layers/<content hash>/* # OverlayBD RO layers, for now the folder contains 2 files - overlaybd.commit and .loadSignal. The former being an OCI obd layer and the latter is used for syncing GC operations
-<BLOCK_REGISTRY_DIR>/containers/<ContainerId>/* # OverlayBD RW layers
-<BLOCK_REGISTRY_DIR>/images/<ImageId> # OCI manifests of images
+<BLOCK_REGISTRY_DIR>/block_config/<ContentId> # Metadata for the content, contains the OverlayBD device config along with the OCI manifest of the image
+<BLOCK_REGISTRY_DIR>/layers/<content hash>/* # OverlayBD RO layers, either eager, lazy or sealed layers
+<BLOCK_REGISTRY_DIR>/containers/<ContainerId>/* # OverlayBD RW sparse layers
 <BLOCK_REGISTRY_DIR>/run/* # On Disk temporary files
-<BLOCK_REGISTRY_DIR>/mounts/<ImageId or ContainerId> # MountPoints when exposing using a mount
-<BLOCK_REGISTRY_DIR>/blobs/sha256/<content hash> # OCI layout blob store, contains hardlinks to <BLOCK_REGISTRY_DIR>/layers/<content hash>/overlaybd.commit
+<BLOCK_REGISTRY_DIR>/mounts/<ContentId> # MountPoints when exposing using a mount
 <BLOCK_REGISTRY_DIR>/overlaybd.json # OverlayBD config
 <BLOCK_REGISTRY_DIR>/logs # OverlayBD log files
 <BLOCK_REGISTRY_DIR>/obd_registry_cache # OverlayBD registry cache
