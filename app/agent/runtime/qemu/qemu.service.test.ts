@@ -16,8 +16,8 @@ const testCases = [
   // TODO: Enable when the oci proxy is deployed in CI
   //       I've tested that those images work locally
   //       and they even found one bug :3
-  //["Archlinux", testImages.testArchlinux],
-  //["NixOS", testImages.testNixos],
+  ["Archlinux", testImages.testArchlinux],
+  ["NixOS", testImages.testNixos],
 ];
 
 const testEnv = new TestEnvironmentBuilder(createAgentInjector)
@@ -29,7 +29,9 @@ const testEnv = new TestEnvironmentBuilder(createAgentInjector)
 
 test.concurrent.each(testCases)(`Boots and connects to %s`, async (_name, remoteTag) =>
   testEnv.run(async ({ runId, brService, instance }) => {
-    const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm");
+    const osIm = await brService.loadImageFromRemoteRepo(remoteTag, "osIm", {
+      disableDownload: true,
+    });
     const osCt = await brService.createContainer(osIm, "osCt");
     const osB = await brService.expose(osCt, EXPOSE_METHOD.BLOCK_DEV);
     const vmInfo = await instance.withRuntime(

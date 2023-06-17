@@ -6,7 +6,7 @@ import * as path from "path";
 import type { Static, TSchema } from "@sinclair/typebox";
 import { type DefaultLogger } from "@temporalio/worker";
 import { flock } from "fs-ext";
-import { match, P } from "ts-pattern";
+import { match } from "ts-pattern";
 import type { A, Any } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
 
@@ -262,6 +262,8 @@ export class BlockRegistryService {
           // Those options don't apply to the download cache
           cacheDir: this.paths.obdRegistryCache,
           cacheSizeGB: 4,
+          // Fetch data in 10MB chunks
+          refillSize: 10 * 1024 * 1024,
         },
         gzipCacheConfig: {
           enable: true,
@@ -496,7 +498,11 @@ export class BlockRegistryService {
         {
           hocusBaseRemoteRef,
           repoBlobUrl: ref ? `${ref.registry}/v2/${ref.repo}/blobs` : void 0,
-          download: { enable: opts.disableDownload ? false : true, delay: 0 },
+          download: {
+            enable: opts.disableDownload ? false : true,
+            delay: 0,
+            blockSize: 10 * 1024 * 1024,
+          },
           lowers: [
             ...existingLowers,
             ...layers.map((layerOpts) =>
@@ -1008,7 +1014,7 @@ export class BlockRegistryService {
 
           // Ok the device was enabled, check if obd succeeded :)
           let obdResult: string | undefined = void 0;
-          // Wait up to four seconds for overlaybd to setup the device
+          // Wait up to eight seconds for overlaybd to setup the device
           // With lazy pulling enabled overlaybd will query the registry to sanity check if the blobs exists etc...
           // https://linear.app/hocus-dev/issue/HOC-204/modify-overlaybd-tcmu-to-work-without-netlink-and-expose-a-grpc-api
           for (let i = 0; i < 400; i += 1) {
@@ -1016,7 +1022,7 @@ export class BlockRegistryService {
               obdResult = await fs.readFile(this.genObdResultPath(contentId), "utf-8");
             } catch (err) {
               if (!(err as Error).message.startsWith("ENOENT")) throw err;
-              await sleep(10);
+              await sleep(20);
             }
           }
           if (obdResult === void 0) {
@@ -1562,6 +1568,7 @@ export class BlockRegistryService {
       await fs.writeFile(path.join(documentBlobsDir, hash), blob);
     }
     for (const layer of layers) {
+      if (layer === void 0) continue;
       const layerDir = path.join(blobsDir, layer.hashType);
       await fs.mkdir(layerDir, { recursive: true }).catch(catchAlreadyExists);
       await fs.link(layer.file, path.join(layerDir, layer.hash));
