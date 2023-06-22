@@ -9,7 +9,4 @@ export const EditProjectVmSettingsSchema = t.Object({
   maxPrebuildVCPUCount: t.Optional(NonnegativeIntegerSchema),
   maxWorkspaceRamMib: t.Optional(NonnegativeIntegerSchema),
   maxWorkspaceVCPUCount: t.Optional(NonnegativeIntegerSchema),
-  maxWorkspaceProjectDriveSizeMib: t.Optional(NonnegativeIntegerSchema),
-  maxWorkspaceRootDriveSizeMib: t.Optional(NonnegativeIntegerSchema),
-  maxPrebuildRootDriveSizeMib: t.Optional(NonnegativeIntegerSchema),
 });

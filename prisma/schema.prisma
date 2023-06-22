@@ -318,9 +318,6 @@ model Project {
   maxPrebuildVCPUCount                    Int
   maxWorkspaceRamMib                      Int
   maxWorkspaceVCPUCount                   Int
-  maxWorkspaceProjectDriveSizeMib         Int
-  maxWorkspaceRootDriveSizeMib            Int
-  maxPrebuildRootDriveSizeMib             Int
 
   createdAt                         DateTime                            @default(now()) @db.Timestamptz(3)
   prebuildEvents                    PrebuildEvent[]

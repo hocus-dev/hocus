@@ -382,7 +382,6 @@ test.concurrent(
         data: {
           maxPrebuildRamMib: 1024,
           maxPrebuildVCPUCount: 1,
-          maxPrebuildRootDriveSizeMib: 1024,
         },
       });
       await agentGitService.updateBranches(db, repo.id);

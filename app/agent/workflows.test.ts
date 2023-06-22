@@ -108,7 +108,6 @@ test.concurrent(
           maxPrebuildVCPUCount: 1,
           maxWorkspaceRamMib: 1024,
           maxWorkspaceVCPUCount: 1,
-          maxPrebuildRootDriveSizeMib: 1024,
         },
       });
     }

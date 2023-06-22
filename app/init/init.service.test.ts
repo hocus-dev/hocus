@@ -21,11 +21,8 @@ const USER2_ID = "166908ef-15d0-498f-88e3-bfd97cf5d21b";
 const EXPECTED_CONFIG = `projects:
   - config:
       maxPrebuildRamMib: 1
-      maxPrebuildRootDriveSizeMib: 7
       maxPrebuildVCPUCount: 2
-      maxWorkspaceProjectDriveSizeMib: 5
       maxWorkspaceRamMib: 3
-      maxWorkspaceRootDriveSizeMib: 6
       maxWorkspaceVCPUCount: 4
     env:
       project:
@@ -131,9 +128,6 @@ test.concurrent(
           maxPrebuildVCPUCount: 2,
           maxWorkspaceRamMib: 3,
           maxWorkspaceVCPUCount: 4,
-          maxWorkspaceProjectDriveSizeMib: 5,
-          maxWorkspaceRootDriveSizeMib: 6,
-          maxPrebuildRootDriveSizeMib: 7,
           gitRepository: {
             connect: {
               id: repo.id,

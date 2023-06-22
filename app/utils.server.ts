@@ -36,3 +36,24 @@ export const doesFileExist = async (filePath: string): Promise<boolean> => {
     throw err;
   }
 };
+
+export const runOnTimeout = async <T>(
+  opts: { waitFor: Promise<T>; timeoutMs: number },
+  runOnTimeoutFn: () => void,
+): Promise<{ ok: true; result: T } | { ok: false; result?: undefined }> => {
+  let timeout: NodeJS.Timeout | undefined;
+  const result = await Promise.race([
+    opts.waitFor.then((result) => ({ ok: true, result } as const)),
+    new Promise<undefined>((resolve) => {
+      timeout = setTimeout(() => {
+        runOnTimeoutFn();
+        resolve(void 0);
+      }, opts.timeoutMs);
+    }),
+  ]);
+  clearTimeout(timeout);
+  if (result === void 0) {
+    return { ok: false };
+  }
+  return result;
+};
