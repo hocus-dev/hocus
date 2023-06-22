@@ -15,7 +15,13 @@ import { execCmd, execCmdWithOpts } from "../utils";
 import type { HttpsOpencontainersOrgSchemaImageConfig } from "./oci-schema/config-schema";
 import type { HttpsOpencontainersOrgSchemaImageIndex } from "./oci-schema/image-index-schema";
 import { HOCUS_TCMU_HBA, HOCUS_TCM_LOOP_PORT, HOCUS_TCM_LOOP_WWN } from "./registry.const";
-import type { OBDConfig, OCIDescriptor, OCIImageIndex, OCIImageManifest } from "./validators";
+import type {
+  OBDConfig,
+  OBDLower,
+  OCIDescriptor,
+  OCIImageIndex,
+  OCIImageManifest,
+} from "./validators";
 import { OBDConfigValidator } from "./validators";
 import { OCIImageIndexValidator, OCIImageManifestValidator } from "./validators";
 
@@ -67,11 +73,9 @@ export class BlockRegistryService {
     blockConfig: string;
     layers: string;
     containers: string;
-    images: string;
     run: string;
+    gcSignal: string;
     mounts: string;
-    sharedOCIBlobsDir: string;
-    _sharedOCIBlobsDirSha256: string;
     tcmLoopTarget: string;
     tcmuHBA: string;
     logs: string;
@@ -94,8 +98,6 @@ export class BlockRegistryService {
       layers: path.join(root, "layers"),
       // RW Layer storage
       containers: path.join(root, "containers"),
-      // OCI Image manifest storage
-      images: path.join(root, "images"),
       // Directory for anything temporary which should be nuked after a restart
       // This can't be /tmp as I need the directory to be on the same partition as the registry
       // I'm abusing hardlinks to create synchronization primitives
@@ -103,12 +105,12 @@ export class BlockRegistryService {
       // (We have a per imageId/containerId flock on configfs in the expose method, due to a data corruption kernel bug),
       // wait free and all operations on it are idempotent
       run: path.join(root, "run"),
+      // File used to sync garbage collection on the registry
+      // Writers of manifests should obtain a shared lock on this file to ensure their blobs don't get nuked
+      // The garbage collector waits for an exclusive flock on this file
+      gcSignal: path.join(root, "run", "gc-signal"),
       // Filesystem mounts
       mounts: path.join(root, "mounts"),
-      // OCI layout blob dir, used for downloading images from OCI registries
-      sharedOCIBlobsDir: path.join(root, "blobs"),
-      // Only to create it ahead of time
-      _sharedOCIBlobsDirSha256: path.join(root, "blobs/sha256"),
       // ConfigFS tcm_loop
       tcmLoopTarget: path.join(
         configfs,
@@ -225,6 +227,7 @@ export class BlockRegistryService {
             await fs
               .writeFile(requiredPath, BlockRegistryService.genTCMUSubtype() + "\n")
               .catch(catchAlreadyExists);
+          else if (key === "gcSignal") await (await fs.open(requiredPath, "a")).close();
           else {
             await fs.mkdir(requiredPath).catch(catchAlreadyExists);
           }
@@ -248,7 +251,8 @@ export class BlockRegistryService {
       path.join(this.paths.root, "overlaybd.json"),
       JSON.stringify({
         tcmuSubtype: await this.getTCMUSubtype(),
-        registryFsVersion: "v2",
+        // WARNING: Registry fs v2 is better but improperly resolves domain names and hosts :(
+        registryFsVersion: "v1",
         ioEngine: 0,
         enableThread: true,
         logConfig: {
@@ -261,6 +265,8 @@ export class BlockRegistryService {
           // Those options don't apply to the download cache
           cacheDir: this.paths.obdRegistryCache,
           cacheSizeGB: 4,
+          // Fetch data in 10MB chunks
+          refillSize: 10 * 1024 * 1024,
         },
         gzipCacheConfig: {
           enable: true,
@@ -356,47 +362,39 @@ export class BlockRegistryService {
   }
 
   async loadImageFromDisk(ociDumpPath: string, outputId: string): Promise<ImageId> {
-    return await this.loadLocalOCIImage(
+    return await this.loadImageFromOCILayout(
       BlockRegistryService.genImageId(outputId),
       `${path.join(ociDumpPath, "index.json")}`,
       `${path.join(ociDumpPath, "blobs")}`,
     );
   }
 
-  // Mostly for convenience :)
   async loadImageFromRemoteRepo(
-    ref: string,
+    remoteRef: string,
     outputId: string,
-    opts?: {
+    opts: {
       // Defaults to false
       skipVerifyTls?: boolean;
-    },
+      disableObdDownload?: boolean;
+      enableObdLazyPulling?: boolean;
+      // By default if a layer is less than 10 MB then it will be downloaded ahead of time even with lazy pulling enabled
+      eagerLayerDownloadThreshold?: number;
+    } = {},
   ): Promise<ImageId> {
     const imageId = BlockRegistryService.genImageId(outputId);
-    const skipVerifyTls = process.env.OCI_PROXY != null || opts?.skipVerifyTls === true;
-    return await this.withTmpDir("ingest", async (imageIndexDir) => {
-      // Get the image for the current platform from the remote repo
-      // This will only download blobs we actually need due to the shared blob dir <3
-      // Also skopeo properly handles concurrent pulls with a shared blob dir <3
-      // This will place the image index in a random directory
-      await execCmd(
-        "skopeo",
-        "copy",
-        ...(skipVerifyTls ? ["--src-tls-verify=false"] : []),
-        "--multi-arch",
-        "system",
-        "--dest-oci-accept-uncompressed-layers",
-        "--dest-shared-blob-dir",
-        this.paths.sharedOCIBlobsDir,
-        `docker://${ref}`,
-        `oci:${imageIndexDir}`,
-      );
-
-      return await this.loadLocalOCIImage(
-        imageId,
-        `${path.join(imageIndexDir, "index.json")}`,
-        this.paths.sharedOCIBlobsDir,
-      );
+    opts.skipVerifyTls = process.env.OCI_PROXY != null || opts?.skipVerifyTls === true;
+    const craneFetch = await execCmd(
+      "crane",
+      "manifest",
+      "--platform",
+      "linux/amd64",
+      ...(opts.skipVerifyTls ? ["--insecure"] : []),
+      remoteRef,
+    );
+    const manifest = OCIImageManifestValidator.Parse(JSON.parse(craneFetch.stdout));
+    return await this.loadImageFromOCIManifest(imageId, manifest, {
+      ...opts,
+      remoteRef,
     });
   }
 
@@ -405,7 +403,7 @@ export class BlockRegistryService {
     return path.join(ociBlobsDir, algo, digest);
   }
 
-  private async loadLocalOCIImage(
+  private async loadImageFromOCILayout(
     imageId: ImageId,
     ociIndexPath: string,
     ociBlobsDir: string,
@@ -420,7 +418,21 @@ export class BlockRegistryService {
       this.getPathToBlob(ociBlobsDir, manifestDescriptor),
       OCIImageManifestValidator,
     );
+    return await this.loadImageFromOCIManifest(imageId, manifest, { ociBlobsDir });
+  }
 
+  private async loadImageFromOCIManifest(
+    imageId: ImageId,
+    manifest: OCIImageManifest,
+    opts: {
+      remoteRef?: string;
+      ociBlobsDir?: string;
+      skipVerifyTls?: boolean;
+      disableObdDownload?: boolean;
+      enableObdLazyPulling?: boolean;
+      eagerLayerDownloadThreshold?: number;
+    },
+  ): Promise<ImageId> {
     // Now check if that image is in overlaybd format, no fastoci support cause it's slow
     // Also we would need to pull another image for that
     for (const layerDescriptor of manifest.layers) {
@@ -438,88 +450,155 @@ export class BlockRegistryService {
     }
 
     // OK great! We know that we deal with an OverlayBD OCI image, time to load it into the blob store :)
-    return await this._loadLocalOCIImage(
+    return await this._loadImageFromOCIManifest(
       imageId,
       manifest,
-      manifest.layers.map((layerDescriptor) => [
-        this.getPathToBlob(ociBlobsDir, layerDescriptor),
-        layerDescriptor,
-      ]),
+      [],
+      manifest.layers.map((descriptor) => ({
+        descriptor,
+        // Sealed layers are non distributable
+        sealed: false,
+        localPath: opts.ociBlobsDir ? this.getPathToBlob(opts.ociBlobsDir, descriptor) : void 0,
+      })),
+      opts,
     );
   }
 
-  private async _loadLocalOCIImage(
+  private async _loadImageFromOCIManifest(
     imageId: ImageId,
     manifest: OCIImageManifest,
-    layersToLoad: [string, OCIDescriptor][],
+    existingLowers: OBDLower[],
+    layers: {
+      // OCI descriptor of the layer
+      descriptor: OCIDescriptor;
+      // Was the layer sealed?
+      sealed: boolean;
+      // If downloaded ahead of time the path to the layer
+      localPath?: string;
+    }[],
+    opts: {
+      remoteRef?: string;
+      skipVerifyTls?: boolean;
+      disableObdDownload?: boolean;
+      enableObdLazyPulling?: boolean;
+      eagerLayerDownloadThreshold?: number;
+    } = {},
   ): Promise<ImageId> {
-    const loadSignals: string[] = [];
+    if (opts.enableObdLazyPulling && !opts.remoteRef)
+      throw new Error("No remote repository provided for lazy pulling");
+
+    const unlinkOnExit: string[] = [];
     try {
-      // We have the data locally so this should be fairly quick
-      for (const [layerPath, layerDescriptor] of layersToLoad) {
-        const signal = path.join(this.paths.run, `load-signal-${this.genRandId()}`);
-        loadSignals.push(signal);
-        await this.loadLocalLayer(layerPath, layerDescriptor, signal);
-      }
+      const loadLayerTasks: (() => Promise<void>)[] = [];
+      // Resolve the layers possibly downloading some layers ahead of time
+      const extraLowers: OBDLower[] = await waitForPromises(
+        layers.map(async (layerOpts) => {
+          let layerFilePath = layerOpts.localPath;
+          if (layerFilePath === void 0) {
+            if (opts.remoteRef === void 0) {
+              throw new Error("No remote repository provided and layer not on disk");
+            }
+            // If the layer is not on the disk and we have a remote ref then consider downloading the layer ahead of time
+            // Download either if lazy pulling is not desired OR the layer is very small(for ex. a prefetch layer will be very small)
+            // I've set the size cutoff for 10Mb for now
+            if (
+              !opts.enableObdLazyPulling ||
+              layerOpts.descriptor.size <
+                (opts.eagerLayerDownloadThreshold
+                  ? opts.eagerLayerDownloadThreshold
+                  : 10 * 1024 * 1024)
+            ) {
+              // Ok we want this layer to be downloaded ahead of time
+              const layerDownloadPath = path.join(this.paths.run, `download-${this.genRandId()}`);
+              unlinkOnExit.push(layerDownloadPath);
+              await this.downloadOCIBlob(
+                opts.remoteRef,
+                layerOpts.descriptor.digest,
+                layerDownloadPath,
+                opts,
+              );
+              layerFilePath = layerDownloadPath;
+            }
+          }
 
-      // Ok the blobs were loaded, time to write the image manifest :)
-      if (
-        !(await this.idempotentConfigWrite<OCIImageManifest>(
-          manifest,
-          path.join(this.paths.images, imageId),
-        ))
-      ) {
-        throw new Error(`Image with id ${imageId} already exists`);
-      }
-
-      // Ok, almost done, generate a config for OBD
-      await this.idempotentConfigWrite<OBDConfig>(
-        {
-          lowers: this.imageManifestToOBDLowers(manifest),
-          resultFile: this.genObdResultPath(imageId),
-          hocusImageId: imageId,
-        },
-        this.genBlockConfigPath(imageId),
+          // Defer loading the layer until we have a lock
+          loadLayerTasks.push(
+            async () =>
+              await this.loadLocalLayer(layerFilePath, layerOpts.sealed, layerOpts.descriptor),
+          );
+          return layerFilePath
+            ? {
+                hocusLayerType: "local",
+                file: path.join(
+                  this.paths.layers,
+                  layerOpts.descriptor.digest,
+                  layerOpts.sealed ? "overlaybd.sealed" : "overlaybd.commit",
+                ),
+              }
+            : {
+                hocusLayerType: "lazy",
+                dir: path.join(this.paths.layers, layerOpts.descriptor.digest),
+                digest: layerOpts.descriptor.digest,
+                size: layerOpts.descriptor.size,
+              };
+        }),
       );
 
-      return imageId;
+      const gcSignalFile = await fs.open(this.paths.gcSignal);
+      try {
+        await this.acquireFlock(gcSignalFile, true);
+        await waitForPromises(loadLayerTasks.map(async (fn) => fn()));
+
+        const ref =
+          opts.enableObdLazyPulling && opts.remoteRef ? this.decomposeRef(opts.remoteRef) : null;
+        // Ok, almost done, generate a config for OBD
+        if (
+          !(await this.idempotentConfigWrite<OBDConfig>(
+            {
+              hocusBaseRemoteRef: opts.remoteRef,
+              repoBlobUrl:
+                opts.enableObdLazyPulling && ref ? `${ref.registry}/v2/${ref.repo}/blobs` : void 0,
+              download: {
+                enable: opts.disableObdDownload ? false : true,
+                delay: 0,
+                blockSize: 10 * 1024 * 1024,
+              },
+              lowers: [...existingLowers, ...extraLowers],
+              resultFile: this.genObdResultPath(imageId),
+              hocusImageManifest: manifest,
+            },
+            this.genBlockConfigPath(imageId),
+          ))
+        ) {
+          throw new Error(`Image with id ${imageId} already exists`);
+        }
+
+        return imageId;
+      } finally {
+        await gcSignalFile.close();
+      }
     } finally {
-      // Release the load signals
-      await waitForPromises(loadSignals.map((x) => fs.unlink(x).catch(() => {})));
+      await waitForPromises(unlinkOnExit.map((x) => fs.unlink(x).catch(() => {})));
     }
   }
 
   private async loadLocalLayer(
-    srcPath: string,
+    srcPath: string | undefined,
+    sealed: boolean,
     layerDescriptor: OCIDescriptor,
-    loadSignalPath: string,
   ): Promise<void> {
-    // Path to the blob in the ingest
-    const sharedOCIBlobPath = this.getPathToBlob(this.paths.sharedOCIBlobsDir, layerDescriptor);
     const dstDir = path.join(this.paths.layers, layerDescriptor.digest);
     await fs.mkdir(dstDir).catch(catchAlreadyExists);
-    // If a hardlink exists on this file then loading is in progress and the layer won't be GCed
-    // We can't use overlaybd.commit for this as we may have a sealed layer or a lazy downloaded layer
-    // First ensure the signal exists by opening and closing the file in append mode
-    // If open failed then GC managed to delete this layer before we signaled a load was in progress
-    const layerLoadSignal = path.join(dstDir, ".loadSignal");
-    await (await fs.open(layerLoadSignal, "a")).close();
-    // Now we need to hardlink it. If the hardlink was created then we can be sure the layer won't be deleted by GC
-    // If this fails then it means that GC deleted the folder and we need to restart the operation :(
-    await fs.link(layerLoadSignal, loadSignalPath);
+    // Ok setup was done for lazy loaded layers
+    if (srcPath === void 0) return;
     // This should be the root of the layer, hardlinks should point to that inode
-    const dstPath = path.join(dstDir, "overlaybd.commit");
+    const dstPath = path.join(dstDir, sealed ? "overlaybd.sealed" : "overlaybd.commit");
     // Hardlink the blob from the src to the layers directory
     if (srcPath !== dstPath) {
       await fs.link(srcPath, dstPath).catch(async (err) => {
         if (!err?.message?.startsWith("EEXIST")) throw err;
         await this.forceReplaceWithHardlink(dstPath, srcPath);
       });
-    }
-
-    // If a blob was loaded out of band place it in the shared oci dir :)
-    if (sharedOCIBlobPath !== srcPath) {
-      await this.forceReplaceWithHardlink(dstPath, sharedOCIBlobPath);
     }
   }
 
@@ -579,23 +658,6 @@ export class BlockRegistryService {
     }
   }
 
-  private async imageIdToOBDLowers(imageId?: ImageId): Promise<OBDConfig["lowers"]> {
-    if (imageId === void 0) {
-      return [];
-    }
-    const manifest: OCIImageManifest = await readJsonFileOfType(
-      path.join(this.paths.images, imageId),
-      OCIImageManifestValidator,
-    );
-    return this.imageManifestToOBDLowers(manifest);
-  }
-
-  private imageManifestToOBDLowers(manifest: OCIImageManifest): OBDConfig["lowers"] {
-    return manifest.layers.map((layerDescriptor) => ({
-      file: path.join(this.paths.layers, layerDescriptor.digest, "overlaybd.commit"),
-    }));
-  }
-
   public async createContainer(
     imageId: ImageId | undefined,
     outputId: string,
@@ -612,39 +674,59 @@ export class BlockRegistryService {
     }
     const t1 = performance.now();
     const containerId = BlockRegistryService.genContainerId(outputId);
-    const lowers = await this.imageIdToOBDLowers(imageId);
+    const baseImageConfig = imageId
+      ? await readJsonFileOfType(this.genBlockConfigPath(imageId), OBDConfigValidator)
+      : null;
     const dataPath = path.join(this.paths.containers, containerId, "data");
     const indexPath = path.join(this.paths.containers, containerId, "index");
-    await fs.mkdir(path.join(this.paths.containers, containerId)).catch(catchAlreadyExists);
-    await this.withTmpFile(async (tmpDataPath) => {
-      await this.withTmpFile(async (tmpIndexPath) => {
-        // TODO: Set the parent uuid, the only reason i did not do it right now is that i don't want to rewrite the algo for converting layer_digest -> obd_uuid
-        // FIXME: For now hardcode the size to 64GB as the base images are hardcoded to this size
-        await execCmd(
-          "/opt/overlaybd/bin/overlaybd-create",
-          "-s",
-          ...(opts.mkfs ? ["--mkfs"] : []),
-          tmpDataPath,
-          tmpIndexPath,
-          opts.sizeInGB.toString(),
-        );
+    const unlinkOnExit: string[] = [];
+    try {
+      const tmpDataPath = path.join(this.paths.run, `ct-data-${this.genRandId()}`);
+      const tmpIndexPath = path.join(this.paths.run, `ct-index-${this.genRandId()}`);
+      unlinkOnExit.push(tmpDataPath);
+      unlinkOnExit.push(tmpIndexPath);
+
+      // TODO: Set the parent uuid, the only reason i did not do it right now is that i don't want to rewrite the algo for converting layer_digest -> obd_uuid
+      // FIXME: For now hardcode the size to 64GB as the base images are hardcoded to this size
+      await execCmd(
+        "/opt/overlaybd/bin/overlaybd-create",
+        "-s",
+        ...(opts.mkfs ? ["--mkfs"] : []),
+        tmpDataPath,
+        tmpIndexPath,
+        opts.sizeInGB.toString(),
+      );
+
+      const gcSignalFile = await fs.open(this.paths.gcSignal);
+      try {
+        await this.acquireFlock(gcSignalFile, true);
+
+        await fs.mkdir(path.join(this.paths.containers, containerId)).catch(catchAlreadyExists);
         await fs.link(tmpDataPath, dataPath).catch(catchAlreadyExists);
         await fs.link(tmpIndexPath, indexPath).catch(catchAlreadyExists);
-      });
-    });
 
-    if (
-      !(await this.idempotentConfigWrite<OBDConfig>(
-        {
-          lowers,
-          upper: { index: indexPath, data: dataPath },
-          resultFile: this.genObdResultPath(containerId),
-          hocusImageId: imageId,
-        },
-        this.genBlockConfigPath(containerId),
-      ))
-    ) {
-      throw new Error(`Container with id ${containerId} already exists`);
+        if (
+          !(await this.idempotentConfigWrite<OBDConfig>(
+            {
+              hocusBaseRemoteRef: baseImageConfig ? baseImageConfig.hocusBaseRemoteRef : void 0,
+              repoBlobUrl: baseImageConfig ? baseImageConfig.repoBlobUrl : void 0,
+              accelerationLayer: baseImageConfig ? baseImageConfig.accelerationLayer : void 0,
+              download: baseImageConfig ? baseImageConfig.download : void 0,
+              lowers: baseImageConfig ? baseImageConfig.lowers : [],
+              upper: { index: indexPath, data: dataPath },
+              resultFile: this.genObdResultPath(containerId),
+              hocusImageManifest: baseImageConfig ? baseImageConfig.hocusImageManifest : void 0,
+            },
+            this.genBlockConfigPath(containerId),
+          ))
+        ) {
+          throw new Error(`Container with id ${containerId} already exists`);
+        }
+      } finally {
+        await gcSignalFile.close();
+      }
+    } finally {
+      await waitForPromises(unlinkOnExit.map((x) => fs.unlink(x).catch(() => {})));
     }
 
     this.logger.info(
@@ -720,9 +802,8 @@ export class BlockRegistryService {
       );
       const layerDigest = `sha256:${(await execCmd("sha256sum", layerPath)).stdout.split(" ")[0]}`;
       const layerSize = (await fs.stat(layerPath)).size;
-      const image = obdConfig.hocusImageId as ImageId | undefined;
-      let manifest: OCIImageManifest = image
-        ? await readJsonFileOfType(path.join(this.paths.images, image), OCIImageManifestValidator)
+      let manifest: OCIImageManifest = obdConfig.hocusImageManifest
+        ? obdConfig.hocusImageManifest
         : {
             schemaVersion: 2,
             mediaType: "application/vnd.oci.image.manifest.v1+json",
@@ -747,7 +828,22 @@ export class BlockRegistryService {
 
       // Loading the new image must happen before deleting the source container
       // as the source container holds a reference to the lower layers and protects them against GC
-      await this._loadLocalOCIImage(imageId, manifest, [[layerPath, layerDescriptor]]);
+      await this._loadImageFromOCIManifest(
+        imageId,
+        manifest,
+        // TODO: Investigate this typechecking problem
+        obdConfig.lowers as OBDLower[],
+        [{ descriptor: layerDescriptor, sealed: false, localPath: layerPath }],
+        {
+          remoteRef: obdConfig.hocusBaseRemoteRef,
+          enableObdLazyPulling: obdConfig.repoBlobUrl ? true : false,
+          disableObdDownload: obdConfig.download
+            ? obdConfig.download.enable === false
+              ? true
+              : false
+            : false,
+        },
+      );
       if (opts.removeContainer) {
         await this._removeContent(containerId);
       }
@@ -853,7 +949,8 @@ export class BlockRegistryService {
           let flags = readonly ? ["--read-only"] : ["--read-write", "-o", "discard"];
           const t1 = performance.now();
           // TODO: Calling the mount syscall directly is much much faster
-          await execCmd("mount", ...flags, bd.device, mountPoint);
+          // By specifying ext4 mount avoids scanning for supported fs types
+          await execCmd("mount", "-t", "ext4", ...flags, bd.device, mountPoint);
           this.logger.info(
             `mount for ${contentId} took: ${(performance.now() - t1).toFixed(2)} ms`,
           );
@@ -886,27 +983,7 @@ export class BlockRegistryService {
           const enableFd = await fs.open(path.join(tcmuPath, "enable"), "w");
           let tcmuAttachFailed = false;
           try {
-            let flockAcquired = false;
-            while (!flockAcquired) {
-              try {
-                await new Promise((resolve, reject) => {
-                  flock(enableFd.fd, "exnb", (err) => {
-                    if (err === void 0 || err === null) {
-                      resolve(void 0);
-                    } else {
-                      reject(err);
-                    }
-                  });
-                });
-              } catch (err: any) {
-                if (!err?.message?.startsWith("EAGAIN") && !err?.message?.startsWith("EWOULDBLOCK"))
-                  throw err;
-                flockAcquired = false;
-                await sleep(5);
-                continue;
-              }
-              flockAcquired = true;
-            }
+            await this.acquireFlock(enableFd, false);
             // Ok we got the flock, time to proceed with the setup
             // Set the vendor for convenience, this is for filtering
             // EINVAL is thrown when the storage object is already exposed on a LUN
@@ -967,14 +1044,15 @@ export class BlockRegistryService {
 
           // Ok the device was enabled, check if obd succeeded :)
           let obdResult: string | undefined = void 0;
-          // Wait up to half a second for overlaybd to setup the device
+          // Wait up to eight seconds for overlaybd to setup the device
+          // With lazy pulling enabled overlaybd will query the registry to sanity check if the blobs exists etc...
           // https://linear.app/hocus-dev/issue/HOC-204/modify-overlaybd-tcmu-to-work-without-netlink-and-expose-a-grpc-api
-          for (let i = 0; i < 100; i += 1) {
+          for (let i = 0; i < 400; i += 1) {
             try {
               obdResult = await fs.readFile(this.genObdResultPath(contentId), "utf-8");
             } catch (err) {
               if (!(err as Error).message.startsWith("ENOENT")) throw err;
-              await sleep(5);
+              await sleep(20);
             }
           }
           if (obdResult === void 0) {
@@ -1125,6 +1203,30 @@ export class BlockRegistryService {
     assert(false, "Unreachable");
   }
 
+  private async acquireFlock(fileHandle: fs.FileHandle, shared: boolean): Promise<void> {
+    let flockAcquired = false;
+    while (!flockAcquired) {
+      try {
+        await new Promise((resolve, reject) => {
+          flock(fileHandle.fd, shared ? "shnb" : "exnb", (err) => {
+            if (err === void 0 || err === null) {
+              resolve(void 0);
+            } else {
+              reject(err);
+            }
+          });
+        });
+      } catch (err: any) {
+        if (!err?.message?.startsWith("EAGAIN") && !err?.message?.startsWith("EWOULDBLOCK"))
+          throw err;
+        flockAcquired = false;
+        await sleep(5);
+        continue;
+      }
+      flockAcquired = true;
+    }
+  }
+
   async hide(contentId: ImageId | ContainerId): Promise<void> {
     if (!BlockRegistryService.isContentId(contentId)) {
       throw new Error(`Invalid id: ${contentId}`);
@@ -1263,11 +1365,6 @@ export class BlockRegistryService {
         force: true,
       });
     }
-    if (BlockRegistryService.isImageId(contentId)) {
-      // The OCI manifest is not longer necessary
-      // Blobs may have multiple xrefs on the disk so we need to
-      await fs.unlink(path.join(this.paths.images, contentId)).catch(catchIgnore("ENOENT"));
-    }
   }
 
   private async estimateDirStorageUsage(path: string): Promise<bigint> {
@@ -1301,110 +1398,106 @@ export class BlockRegistryService {
   }
 
   async garbageCollect(): Promise<void> {
-    // This is fully lockless and should even work when someone runs this method concurrently(due to a bug)
-    // Special carefulness must be employed in this method as the registry is lockless and delete/loadImage operations
-    // might run concurrently. The algorithm is as follows:
-    // 1. Gather a list of all resources on the disk and check their hardlink count on their load signal
-    // 2. Load all block configs and calculate the set of referenced resources
-    // 3. Delete all resources which are unreferenced and are not signaled
-    const [allManifests, allLayers, allContainers] = await waitForPromises([
-      fs.readdir(this.paths.images).then((x) => x.filter(BlockRegistryService.isImageId)),
-      // Only consider the layer directory, the shared oci dir will be removed when lazy pulling will be enabled
-      // Blobs are still deleted from the shared dir but a dangling file in the shared dir won't be deleted
-      fs.readdir(this.paths.layers).then((x) => x.filter((y) => y.startsWith("sha256:"))),
-      fs.readdir(this.paths.containers).then((x) => x.filter(BlockRegistryService.isContainerId)),
-    ]);
+    this.logger.info("Starting garbage collection of storage. Acquiring lock");
+    const gcSignalFile = await fs.open(this.paths.gcSignal);
+    try {
+      await this.acquireFlock(gcSignalFile, false);
+      this.logger.info("Garbage collector lock acquired");
+      const [allDigests, allContainers] = await waitForPromises([
+        fs.readdir(this.paths.layers).then((x) => x.filter((y) => y.startsWith("sha256:"))),
+        fs.readdir(this.paths.containers).then((x) => x.filter(BlockRegistryService.isContainerId)),
+      ]);
 
-    // Skip any signaled layers, this is needed as otherwise there is a race where we might delete an already loaded image
-    const allDigests: string[] = [];
-    await waitForPromises(
-      allLayers.map(async (layerDigest) => {
-        const stat = await fs.stat(path.join(this.paths.layers, layerDigest, ".loadSignal"));
-        if (stat.nlink === 1) allDigests.push(layerDigest);
-      }),
-    );
-    const referencedManifests = new Set<ImageId>();
-    const referencedContainers = new Set<ContainerId>();
-    const referencedLayers = new Set<string>();
-    const allConfigs = await fs
-      .readdir(this.paths.blockConfig)
-      .then((ids) =>
-        waitForPromises(
-          ids.map((id) =>
-            readJsonFileOfType(path.join(this.paths.blockConfig, id), OBDConfigValidator).catch(
-              () => ({ lowers: [], resultFile: "" } as OBDConfig),
+      const referencedContainers = new Set<ContainerId>();
+      const referencedLayers = new Set<string>();
+      const allConfigs = await fs
+        .readdir(this.paths.blockConfig)
+        .then((ids) =>
+          waitForPromises(
+            ids.map(async (id) =>
+              readJsonFileOfType(path.join(this.paths.blockConfig, id), OBDConfigValidator).catch(
+                () => ({ lowers: [], resultFile: "" } as OBDConfig),
+              ),
             ),
           ),
-        ),
-      );
-    // Calculate the reference counts based on configs. This will also work with container sealing and lazy pulling
-    for (const config of allConfigs) {
-      if (config.hocusImageId) {
-        if (BlockRegistryService.isImageId(config.hocusImageId)) {
-          referencedManifests.add(config.hocusImageId);
-        } else {
-          this.logger.error(`Found invalid image id in block config ${config.hocusImageId}`);
+        );
+      // Calculate the reference counts based on configs. This will also work with container sealing and lazy pulling
+      for (const config of allConfigs) {
+        if (config.upper) {
+          const directoryName = path.basename(path.dirname(config.upper.data));
+          if (BlockRegistryService.isContainerId(directoryName)) {
+            referencedContainers.add(directoryName);
+          } else {
+            this.logger.error(`Found upper layer with invalid name ${directoryName}`);
+          }
+        }
+        const lowers: OBDLower[] = config.lowers as OBDLower[];
+        for (const lower of lowers) {
+          const layerHash =
+            lower.hocusLayerType === "local"
+              ? path.basename(path.dirname(lower.file))
+              : path.basename(lower.dir);
+          referencedLayers.add(layerHash);
         }
       }
-      if (config.upper) {
-        const directoryName = path.basename(path.dirname(config.upper.data));
-        if (BlockRegistryService.isContainerId(directoryName)) {
-          referencedContainers.add(directoryName);
-        } else {
-          this.logger.error(`Found upper layer with invalid name ${directoryName}`);
-        }
-      }
-      for (const lower of config.lowers) {
-        const layerHash = path.basename(path.dirname(lower.file));
-        referencedLayers.add(layerHash);
-      }
-    }
 
-    // Perform garbage collection of dangling resources
-    const tasks = [];
-    for (const manifest of allManifests) {
-      if (referencedManifests.has(manifest as ImageId)) continue;
-      // Ok this manifest wasn't deleted cause removeContent was interrupted
-      tasks.push(fs.unlink(path.join(this.paths.images, manifest)).catch(catchIgnore("ENOENT")));
-    }
-    for (const container of allContainers) {
-      if (referencedContainers.has(container as ContainerId)) continue;
-      // Ok this container wasn't deleted cause removeContent was interrupted
-      tasks.push(
-        fs.rm(path.join(this.paths.containers, container), {
-          recursive: true,
-          force: true,
-        }),
-      );
-    }
-    for (const layerDigest of allDigests) {
-      if (referencedLayers.has(layerDigest)) continue;
-      tasks.push(
-        (async () => {
-          // TODO: analyze whether this actually works or the race is absurdly rare
-          const stat = await fs.stat(path.join(this.paths.layers, layerDigest, ".loadSignal"));
-          if (stat.nlink !== 1) return;
-          const [algo, hash] = layerDigest.split(":");
-          await waitForPromises([
-            fs
+      // Perform garbage collection of dangling resources
+      const tasks = [];
+      for (const container of allContainers) {
+        if (referencedContainers.has(container as ContainerId)) continue;
+        this.logger.debug(`GC container ${container}`);
+        // Ok this container wasn't deleted cause removeContent was interrupted
+        tasks.push(
+          fs.rm(path.join(this.paths.containers, container), {
+            recursive: true,
+            force: true,
+          }),
+        );
+      }
+      for (const layerDigest of allDigests) {
+        if (referencedLayers.has(layerDigest)) continue;
+        tasks.push(
+          (async () => {
+            this.logger.debug(`GC layer ${layerDigest}`);
+            await fs
               .rm(path.join(this.paths.layers, layerDigest), { force: true, recursive: true })
-              .catch(catchIgnore("ENOTEMPTY")),
-            fs
-              .unlink(path.join(this.paths.sharedOCIBlobsDir, algo, hash))
-              .catch(catchIgnore("ENOENT")),
-          ]);
-        })(),
-      );
+              .catch(catchIgnore("ENOTEMPTY"));
+          })(),
+        );
+      }
+      await waitForPromises(tasks);
+      this.logger.info(`Garbage collection done`);
+    } finally {
+      await gcSignalFile.close();
     }
-    await waitForPromises(tasks);
   }
 
-  private tagToRegistry(tag: string): string {
-    const [registry, repo] = tag.split("/", 2);
-    if (repo === void 0) {
-      return "docker.io";
+  // Mimics the parsing algorithm in crane
+  private decomposeRef(remoteRef: string): { registry: string; repo: string } {
+    let repo: string;
+    let registry: string;
+    const firstSlashPos = remoteRef.indexOf("/");
+    if (firstSlashPos === -1) {
+      // If there is no slash then assume the default registry
+      registry = "docker.io";
+      repo = remoteRef;
+    } else {
+      const perhapsRegistry = remoteRef.slice(0, firstSlashPos);
+      if (perhapsRegistry.includes(".") || perhapsRegistry.includes(":")) {
+        // Ok the registry seems sane
+        registry = perhapsRegistry;
+        repo = remoteRef.slice(firstSlashPos + 1);
+      } else {
+        // We got for ex. library/ubuntu
+        registry = "docker.io";
+        repo = remoteRef;
+      }
     }
-    return registry;
+    // Ok now strip the tag/digest
+    repo = repo.split(":")[0].split("@")[0];
+    // For ex. ubuntu:latest
+    if (repo.indexOf("/") === -1) repo = "library/" + repo;
+    return { registry, repo };
   }
 
   private genOCIConfig(
@@ -1426,20 +1519,58 @@ export class BlockRegistryService {
    * Returns the path to the OCI image directory
    */
   private async exportImageForPush(imageId: ImageId, exportDir: string): Promise<void> {
-    const manifest = await readJsonFileOfType(
-      path.join(this.paths.images, imageId),
-      OCIImageManifestValidator,
+    const obdConfig = await readJsonFileOfType(
+      this.genBlockConfigPath(imageId),
+      OBDConfigValidator,
     );
+    if (!obdConfig.hocusImageManifest) {
+      throw new Error(`Logic error, manifest for ${imageId} not found`);
+    }
+    const manifest = obdConfig.hocusImageManifest;
     // TODO: Support multiple architectures
     const config = this.genOCIConfig(manifest, "amd64");
-    const layers = manifest.layers.map((layerDescriptor) => {
-      const [hashType, hash] = layerDescriptor.digest.split(":");
-      return {
-        file: path.join(this.paths.layers, layerDescriptor.digest, "overlaybd.commit"),
-        hashType,
-        hash,
-      };
-    });
+    // Ok get the layers to export
+    const layers = await waitForPromises(
+      (obdConfig.lowers as OBDLower[]).map(async (lower: OBDLower) => {
+        if (lower.hocusLayerType === "local") {
+          if (lower.file.endsWith("overlaybd.commit")) {
+            const digest = path.basename(path.dirname(lower.file));
+            const [hashType, hash] = digest.split(":");
+            // Ok the layer is present locally - we're done
+            return {
+              file: lower.file,
+              hashType,
+              hash,
+            };
+          } else if (lower.file.endsWith("overlaybd.sealed")) {
+            // The manifest contained dummy digests, time to actually commit the layer
+            // and fixup the manifests and block config
+            throw new Error("TODO");
+          }
+        } else {
+          const digest = lower.digest;
+          const [hashType, hash] = digest.split(":");
+          // Ok perhaps obd already downloaded the layer?
+          if (await doesFileExist(path.join(lower.dir, "overlaybd.commit"))) {
+            return { file: path.join(lower.dir, "overlaybd.commit"), hashType, hash };
+          }
+          if (await doesFileExist(path.join(lower.dir, "overlaybd.sealed"))) {
+            return { file: path.join(lower.dir, "overlaybd.sealed"), hashType, hash };
+          }
+          if (!obdConfig.hocusBaseRemoteRef)
+            throw new Error("Unable to find location of source blob");
+          // Well we don't have the layer locally at all. Use crane to download the layer
+          // TODO: in 99% of cases we may just do a cross repo mount instead of downloading the data
+          const tmpPath = path.join(exportDir, digest);
+          await this.downloadOCIBlob(obdConfig.hocusBaseRemoteRef, digest, tmpPath);
+          return {
+            file: tmpPath,
+            hashType,
+            hash,
+          };
+        }
+      }),
+    );
     const configBlob = Buffer.from(JSON.stringify(config));
     const configHash = sha256(configBlob);
     manifest.config = {
@@ -1460,6 +1591,7 @@ export class BlockRegistryService {
       await fs.writeFile(path.join(documentBlobsDir, hash), blob);
     }
     for (const layer of layers) {
+      if (layer === void 0) continue;
       const layerDir = path.join(blobsDir, layer.hashType);
       await fs.mkdir(layerDir, { recursive: true }).catch(catchAlreadyExists);
       await fs.link(layer.file, path.join(layerDir, layer.hash));
@@ -1477,6 +1609,21 @@ export class BlockRegistryService {
     await fs.writeFile(path.join(exportDir, "index.json"), JSON.stringify(index));
   }
 
+  private async downloadOCIBlob(
+    remoteRef: string,
+    digest: string,
+    tmpPath: string,
+    opts: { skipVerifyTls?: boolean } = {},
+  ): Promise<void> {
+    await execCmd(
+      "sh",
+      "-c",
+      `crane blob ${opts.skipVerifyTls ? "--insecure" : ""} ${
+        remoteRef.split("@sha256")[0]
+      }@${digest} > ${tmpPath}`,
+    );
+  }
+
   async pushImage(
     imageId: ImageId,
     opts: { tag: string; username: string; password: string },
@@ -1486,7 +1633,7 @@ export class BlockRegistryService {
     }
     await this.withTmpDir("export", async (exportDir) => {
       await this.exportImageForPush(imageId, exportDir);
-      const registry = this.tagToRegistry(opts.tag);
+      const { registry } = this.decomposeRef(opts.tag);
       await this.withTmpFile(async (tmpFile) => {
         const cmdOpts = { env: { DOCKER_CONFIG: tmpFile } };
         // DOCKER_CONFIG is undocumented, but it's used by crane

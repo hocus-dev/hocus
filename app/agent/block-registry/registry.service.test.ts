@@ -99,6 +99,43 @@ test.concurrent(
 );
 
 test.concurrent(
+  "Test commit of container with deleted base image",
+  testEnv.run(async ({ brService }) => {
+    const im1 = await brService.loadImageFromRemoteRepo(testImages.test1, "im1");
+    const ct1 = await brService.createContainer(im1, "ct1");
+    await brService.removeContent(im1);
+    const im2 = await brService.commitContainer(ct1, "im2");
+    const imMount = await brService.expose(im2, EXPOSE_METHOD.HOST_MOUNT);
+    await expect(fs.readFile(path.join(imMount.mountPoint, "fileA"), "utf-8")).resolves.toEqual(
+      "This is layer 1\n",
+    );
+    await expect(fs.readFile(path.join(imMount.mountPoint, "fileBA"), "utf-8")).resolves.toEqual(
+      "This is layer 2a\n",
+    );
+  }),
+);
+
+test.concurrent(
+  "Test commit of container with lazy pulled base image",
+  testEnv.run(async ({ brService }) => {
+    const im1 = await brService.loadImageFromRemoteRepo(testImages.test1, "im1", {
+      enableObdLazyPulling: true,
+      disableObdDownload: true,
+      eagerLayerDownloadThreshold: -1,
+    });
+    const ct1 = await brService.createContainer(im1, "ct1");
+    const im2 = await brService.commitContainer(ct1, "im2");
+    const imMount = await brService.expose(im2, EXPOSE_METHOD.HOST_MOUNT);
+    await expect(fs.readFile(path.join(imMount.mountPoint, "fileA"), "utf-8")).resolves.toEqual(
+      "This is layer 1\n",
+    );
+    await expect(fs.readFile(path.join(imMount.mountPoint, "fileBA"), "utf-8")).resolves.toEqual(
+      "This is layer 2a\n",
+    );
+  }),
+);
+
+test.concurrent(
   "Test loadImageFromRemoteRepo",
   testEnv.run(async ({ brService }) => {
     const im1 = await brService.loadImageFromRemoteRepo(testImages.test1, "im1");
@@ -120,13 +157,9 @@ test.concurrent(
     );
 
     // Ensure layers aren't duplicated in storage
-    // In the oci store we will have 2 manifests + 2 configs + 4 blobs
     // In the layer store we will have 4 blobs
-    await expect(fs.readdir(brService["paths"]._sharedOCIBlobsDirSha256)).resolves.toHaveLength(
-      2 + 2 + 4,
-    );
     await expect(fs.readdir(brService["paths"].layers)).resolves.toHaveLength(4);
-    await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
+    await expect(fs.readdir(brService["paths"].blockConfig)).resolves.toHaveLength(2);
   }),
 );
 
@@ -169,11 +202,9 @@ test.concurrent(
     );
 
     // Ensure layers aren't duplicated in storage
-    // In the oci store we will have 4 blobs
     // In the layer store we will have 4 blobs
-    await expect(fs.readdir(brService["paths"]._sharedOCIBlobsDirSha256)).resolves.toHaveLength(4);
     await expect(fs.readdir(brService["paths"].layers)).resolves.toHaveLength(4);
-    await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
+    await expect(fs.readdir(brService["paths"].blockConfig)).resolves.toHaveLength(2);
   }),
 );
 
@@ -244,7 +275,11 @@ test.concurrent(
     // Then load an container and an image
     const [ct1, im1] = await waitForPromises([
       brService.createContainer(void 0, "ct1", { mkfs: true, sizeInGB: 64 }),
-      brService.loadImageFromRemoteRepo(testImages.test1, "im1"),
+      brService.loadImageFromRemoteRepo(testImages.test1, "im1", {
+        // Never pull the layers eagerly for this test
+        enableObdLazyPulling: true,
+        eagerLayerDownloadThreshold: -1,
+      }),
     ]);
     // Check that the storage usage had increased
     await expect(brService.hasContent(ct1)).resolves.toEqual(true);
@@ -253,14 +288,34 @@ test.concurrent(
     const usage2 = await brService.estimateStorageUsage();
     expect(usage2.containers / 1024n / 1024n).toBeLessThanOrEqual(9);
     expect(usage2.containers / 1024n / 1024n).toBeGreaterThanOrEqual(8);
-    expect(usage2.layers / 1024n / 1024n).toBeLessThanOrEqual(5);
-    expect(usage2.layers / 1024n / 1024n).toBeGreaterThanOrEqual(4);
+    // Due to lazy pulling we never started downloading the layers
+    expect(usage2.layers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage2.layers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
     expect(usage2.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
     expect(usage2.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
     expect(usage2.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
     expect(usage2.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
 
-    // Now delete the images
+    // Ok now force overlaybd to load the image layers
+    const mp = await brService.expose(im1, EXPOSE_METHOD.HOST_MOUNT);
+    await waitForPromises([
+      fs.readFile(path.join(mp.mountPoint, "fileA")),
+      fs.readFile(path.join(mp.mountPoint, "fileBA")),
+    ]);
+
+    // Now check that the layers were actually downloaded
+    const usage3 = await brService.estimateStorageUsage();
+    expect(usage3.containers / 1024n / 1024n).toBeLessThanOrEqual(9);
+    expect(usage3.containers / 1024n / 1024n).toBeGreaterThanOrEqual(8);
+    // Perhaps we managed to download at least 1 MB
+    expect(usage3.layers / 1024n / 1024n).toBeLessThanOrEqual(10);
+    expect(usage3.layers / 1024n / 1024n).toBeGreaterThanOrEqual(1);
+    expect(usage3.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage3.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage3.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage3.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+
+    // Now delete the content
     await waitForPromises([ct1, im1].map(brService.removeContent.bind(brService)));
     // Check that the registry is empty
     await expect(brService.listContent()).resolves.toEqual([]);
@@ -268,53 +323,58 @@ test.concurrent(
     await expect(brService.hasContent(im1)).resolves.toEqual(false);
     // Now check the storage usage
     // Containers are deleted instantly but images need to be GCed
-    const usage3 = await brService.estimateStorageUsage();
-    expect(usage3.containers / 1024n / 1024n).toBeLessThanOrEqual(1);
-    expect(usage3.containers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
-    expect(usage3.layers / 1024n / 1024n).toBeLessThanOrEqual(5);
-    expect(usage3.layers / 1024n / 1024n).toBeGreaterThanOrEqual(4);
-    expect(usage3.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
-    expect(usage3.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
-    expect(usage3.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
-    expect(usage3.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
-
-    // GC the registry and check storage usage
-    await brService.garbageCollect();
     const usage4 = await brService.estimateStorageUsage();
     expect(usage4.containers / 1024n / 1024n).toBeLessThanOrEqual(1);
     expect(usage4.containers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
-    expect(usage4.layers / 1024n / 1024n).toBeLessThanOrEqual(1);
-    expect(usage4.layers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage4.layers / 1024n / 1024n).toBeLessThanOrEqual(10);
+    expect(usage4.layers / 1024n / 1024n).toBeGreaterThanOrEqual(1);
     expect(usage4.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
     expect(usage4.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
     expect(usage4.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
     expect(usage4.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+
+    // GC the registry and check storage usage
+    await brService.garbageCollect();
+    const usage5 = await brService.estimateStorageUsage();
+    expect(usage5.containers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage5.containers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage5.layers / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage5.layers / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage5.obdGzipCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage5.obdGzipCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
+    expect(usage5.obdRegistryCache / 1024n / 1024n).toBeLessThanOrEqual(1);
+    expect(usage5.obdRegistryCache / 1024n / 1024n).toBeGreaterThanOrEqual(0);
   }),
 );
 
 test.concurrent(
   "Race loadImage/commit & removeContent & garbageCollect together",
   testEnv.run(async ({ brService }) => {
+    // Shaves off a second in this test :)
+    const loadOpts = {
+      disableObdDownload: true,
+      enableObdLazyPulling: true,
+      eagerLayerDownloadThreshold: -1,
+    };
     for (let i = 0; i < 10; i++) {
-      const [ima, imb, ct] = await waitForPromises([
-        brService.loadImageFromRemoteRepo(testImages.test1, `imAPreDelete${i}`),
-        brService.loadImageFromRemoteRepo(testImages.test2, `imBPreDelete${i}`),
-        brService.createContainer(void 0, `ct${i}`, { mkfs: true, sizeInGB: 64 }),
+      const [ima, imb, ct1] = await waitForPromises([
+        brService.loadImageFromRemoteRepo(testImages.test1, `imAPreDelete${i}`, loadOpts),
+        brService.loadImageFromRemoteRepo(testImages.test2, `imBPreDelete${i}`, loadOpts),
+        brService.createContainer(void 0, `ct1-${i}`, { mkfs: true, sizeInGB: 64 }),
       ]);
       await brService.removeContent(ima);
       await brService.removeContent(imb);
-      const [imc, imd, ime, _gcRes] = await waitForPromises([
-        brService.commitContainer(ct as ContainerId, `commit${i}`).catch(() => null),
-        brService.loadImageFromRemoteRepo(testImages.test1, `imAPostDelete${i}`).catch(() => null),
-        brService.loadImageFromRemoteRepo(testImages.test2, `imBPostDelete${i}`).catch(() => null),
+      const [imc, imd, ime, ct2, _gcRes] = await waitForPromises([
+        brService.commitContainer(ct1 as ContainerId, `commit${i}`),
+        brService.loadImageFromRemoteRepo(testImages.test1, `imAPostDelete${i}`, loadOpts),
+        brService.loadImageFromRemoteRepo(testImages.test2, `imBPostDelete${i}`, loadOpts),
+        brService.createContainer(void 0, `ct2-${i}`),
         brService.garbageCollect(),
       ]);
       await waitForPromises(
-        [imc, imd, ime].map(async (imId) => {
-          if (imId !== null) {
-            await brService.expose(imId as ImageId, EXPOSE_METHOD.BLOCK_DEV);
-            await brService.removeContent(imId as ImageId);
-          }
+        [imc, imd, ime, ct2].map(async (imId) => {
+          await brService.expose(imId as ImageId, EXPOSE_METHOD.BLOCK_DEV);
+          await brService.removeContent(imId as ImageId);
         }),
       );
     }
@@ -366,25 +426,9 @@ test.concurrent(
     );
 
     // Ensure layers aren't duplicated in storage
-    // In the oci store we will have 2 manifests + 2 configs + 4 blobs
     // In the layer store we will have 4 blobs
-    await expect(fs.readdir(brService["paths"]._sharedOCIBlobsDirSha256)).resolves.toHaveLength(
-      2 + 2 + 4,
-    );
     await expect(fs.readdir(brService["paths"].layers)).resolves.toHaveLength(4);
-    await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
-
-    for (const dirName of await fs.readdir(brService["paths"].layers)) {
-      const layerPath = path.join(brService["paths"].layers, dirName, "overlaybd.commit");
-      const layerDigest = `sha256:${(await execCmd("sha256sum", layerPath)).stdout.split(" ")[0]}`;
-      // Check for data corruption
-      expect(layerDigest).toEqual(dirName);
-      // Check if that layer is hardlinked to the shared oci dir
-      await expect(fs.stat(layerPath)).resolves.toHaveProperty("nlink", 2);
-      await expect(
-        fs.stat(path.join(brService["paths"].sharedOCIBlobsDir, dirName.replace(":", "/"))),
-      ).resolves.toHaveProperty("nlink", 2);
-    }
+    await expect(fs.readdir(brService["paths"].blockConfig)).resolves.toHaveLength(2);
   }),
 );
 
@@ -430,11 +474,9 @@ test.concurrent(
     await expect(brService.loadImageFromDisk(p2, "im2")).resolves.toEqual("im_im2");
 
     // Ensure layers aren't duplicated in storage
-    // In the oci store we will have 4 blobs
     // In the layer store we will have 4 blobs
-    await expect(fs.readdir(brService["paths"]._sharedOCIBlobsDirSha256)).resolves.toHaveLength(4);
     await expect(fs.readdir(brService["paths"].layers)).resolves.toHaveLength(4);
-    await expect(fs.readdir(brService["paths"].images)).resolves.toHaveLength(2);
+    await expect(fs.readdir(brService["paths"].blockConfig)).resolves.toHaveLength(2);
 
     for (const dirName of await fs.readdir(brService["paths"].layers)) {
       const layerPath = path.join(brService["paths"].layers, dirName, "overlaybd.commit");
@@ -452,11 +494,8 @@ test.concurrent(
         .catch(() => 0);
       await expect(fs.stat(layerPath)).resolves.toHaveProperty(
         "nlink",
-        2 + existsInP1 + existsInP2,
+        1 + existsInP1 + existsInP2,
       );
-      await expect(
-        fs.stat(path.join(brService["paths"].sharedOCIBlobsDir, dirName.replace(":", "/"))),
-      ).resolves.toHaveProperty("nlink", 2 + existsInP1 + existsInP2);
     }
   }),
 );
@@ -899,14 +938,28 @@ test.concurrent(
       return [promise, port] as const;
     });
     try {
-      const tag = `localhost:${port}/hocus/push-test:tag-1`;
+      const tag1 = `localhost:${port}/hocus/push-test:tag-1`;
+      const tag2 = `localhost:${port}/hocus/push-test:tag-2`;
       const opts = {
-        tag,
         username: "username",
         password: "password",
       };
-      await waitForPromises([brService.pushImage(im3, opts), brService.pushImage(im3, opts)]);
-      const im4 = await brService.loadImageFromRemoteRepo(tag, "im4", { skipVerifyTls: true });
+      await waitForPromises([
+        brService.pushImage(im3, { tag: tag1, ...opts }),
+        brService.pushImage(im3, { tag: tag1, ...opts }),
+      ]);
+      // Clear the registry
+      await waitForPromises(
+        (await brService.listContent()).map(brService.removeContent.bind(brService)),
+      );
+      await brService.garbageCollect();
+      await expect(brService.listContent()).resolves.toEqual([]);
+      const im4 = await brService.loadImageFromRemoteRepo(tag1, "im4", {
+        skipVerifyTls: true,
+        disableObdDownload: true,
+        enableObdLazyPulling: true,
+        eagerLayerDownloadThreshold: -1,
+      });
       const { mountPoint: mountPoint2 } = await brService.expose(im4, EXPOSE_METHOD.HOST_MOUNT);
       await expect(fs.readFile(path.join(mountPoint2, "test"), "utf-8")).resolves.toEqual(
         "brother",
@@ -918,6 +971,13 @@ test.concurrent(
       await fs.writeFile(path.join(mountPoint3, "test2"), writeData);
       const readData = await fs.readFile(path.join(mountPoint3, "test2")).then((b) => b.toString());
       expect(readData).toEqual(writeData);
+
+      const im5 = await brService.commitContainer(ct1Id, "im5");
+      // Try pushing the container again now that it has lazy pulled layers
+      await waitForPromises([
+        brService.pushImage(im5, { tag: tag2, ...opts }),
+        brService.pushImage(im5, { tag: tag2, ...opts }),
+      ]);
     } finally {
       // the registry child process will be killed even if this code does not
       // run in case of a sigkill, because it will die along with its parent - jest

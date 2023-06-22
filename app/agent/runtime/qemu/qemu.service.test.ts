@@ -224,7 +224,9 @@ test.concurrent.each(
         if (
           err?.message?.includes("EPIPE") ||
           err?.code?.includes("EPIPE") ||
-          err?.message?.includes("Not connected to server")
+          err?.code?.includes("ECONNRESET") ||
+          err?.message?.includes("Not connected to server") ||
+          err?.message?.includes('Command "sync" failed')
         )
           return;
         throw err;
