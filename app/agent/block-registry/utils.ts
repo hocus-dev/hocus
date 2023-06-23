@@ -1,7 +1,9 @@
 import type { List, Function, Object } from "ts-toolbelt";
 
-import type { BlockRegistryService, ContainerId, ImageId } from "./registry.service";
-import type { EXPOSE_METHOD } from "./registry.service";
+import { BlockRegistryService } from "./registry.service";
+import type { EXPOSE_METHOD, ContainerId, ImageId } from "./registry.service";
+
+import { waitForPromises } from "~/utils.shared";
 
 const _expose: BlockRegistryService["expose"] = null as any;
 type ExposeResult<M extends EXPOSE_METHOD> = Awaited<ReturnType<typeof _expose<M>>>;
@@ -70,3 +72,11 @@ export const withExposedImages = async <
 };
 
 export const getTagLockFile = (id: string) => `/tmp/tag-${id}.lock`;
+
+export const removeContentWithPrefix = async (brService: BlockRegistryService, prefix: string) => {
+  const content = await brService.listContent();
+  const toRemove = content.filter((c) =>
+    BlockRegistryService.extractOutputId(c).startsWith(prefix),
+  );
+  await waitForPromises(toRemove.map((c) => brService.removeContent(c)));
+};

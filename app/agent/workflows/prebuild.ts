@@ -40,7 +40,7 @@ const { buildfs } = proxyActivities<Activities>({
   cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
 });
 
-const { createPrebuildEvent } = proxyActivities<Activities>({
+const { createPrebuildEvent, removeContentWithPrefix } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
   heartbeatTimeout: "5 seconds",
   retry: {
@@ -92,8 +92,11 @@ export async function runPrebuild(
   );
 }
 
-export async function runFetchRepository(gitRepositoryId: bigint): Promise<void> {
-  await fetchRepository(gitRepositoryId);
+export async function runFetchRepository(
+  gitRepositoryId: bigint,
+  tmpContentPrefix: string,
+): Promise<void> {
+  await fetchRepository(gitRepositoryId, tmpContentPrefix);
 }
 
 export async function runCheckoutAndInspect(args: {
@@ -129,7 +132,7 @@ async function runSingleBuildfsAndPrebuildInner(
   await withSharedWorkflow({
     lockId: `fetchrepo-${gitRepositoryId}-${batchId}`,
     workflow: runFetchRepository,
-    params: [gitRepositoryId],
+    params: [gitRepositoryId, batchId],
   });
   // Prefixing the outputId with batchId will make it garbage collected after the
   // batch is done.
@@ -152,7 +155,7 @@ async function runSingleBuildfsAndPrebuildInner(
   }
   let buildfsEvent: GetOrCreateBuildfsEventsReturnType | null = null;
   if (inspection != null) {
-    const buildfsOutputId = uuid4();
+    const buildfsOutputId = `buildfs-out-${uuid4()}`;
     const buildfsEventsArgs = {
       prebuildEventId: prebuildEvent.id,
       projectId: prebuildEvent.project.id,
@@ -253,6 +256,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
   ).catch(() => {
     // Ignore errors, they will be handled by the children.
   });
+  await removeContentWithPrefix({ prefix: batch.id });
 }
 
 export async function scheduleNewPrebuild(args: {

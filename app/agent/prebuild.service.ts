@@ -661,14 +661,16 @@ export class PrebuildService {
         );
       },
     );
-    await waitForPromises(
-      (
-        [
-          [rootFsContainerId, outputRootFsId],
-          [projectContainerId, outputProjectId],
-        ] as const
-      ).map(([containerId, outputId]) => this.brService.commitContainer(containerId, outputId)),
-    );
+    if (result.every((r) => r.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS)) {
+      await waitForPromises(
+        (
+          [
+            [rootFsContainerId, outputRootFsId],
+            [projectContainerId, outputProjectId],
+          ] as const
+        ).map(([containerId, outputId]) => this.brService.commitContainer(containerId, outputId)),
+      );
+    }
     this.perfService.log("prebuild", "end", outputRootFsId);
     return result;
   }

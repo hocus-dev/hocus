@@ -5,12 +5,15 @@ import { runActivityHeartbeat } from "./utils";
 
 import { Token } from "~/token";
 
-export type FetchRepositoryActivity = (gitRepositoryId: bigint) => Promise<void>;
+export type FetchRepositoryActivity = (
+  gitRepositoryId: bigint,
+  tmpContentPrefix: string,
+) => Promise<void>;
 export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
   ({ injector, db }) =>
-  async (gitRepositoryId) => {
+  async (gitRepositoryId, tmpContentPrefix) => {
     const instanceId = `fetchrepo-${uuidv4()}`;
-    const runtimeService = injector.resolve(Token.QemuService)(instanceId);
+    const runtime = injector.resolve(Token.QemuService)(instanceId);
     const gitService = injector.resolve(Token.AgentGitService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
     const perfService = injector.resolve(Token.PerfService);
@@ -26,10 +29,15 @@ export const fetchRepository: CreateActivity<FetchRepositoryActivity> =
         const agentInstance = await agentUtilService.getOrCreateSoloAgentInstance(tdb);
         return await gitService.getOrCreateGitRepoImage(tdb, agentInstance.id, repo.id);
       });
-      await gitService.fetchRepository(runtimeService, repoImage.localOciImage.tag, {
-        url: repo.url,
-        credentials: {
-          privateSshKey: repo.sshKeyPair.privateKey,
+      await gitService.fetchRepository({
+        runtime,
+        outputId: repoImage.localOciImage.tag,
+        tmpContentPrefix,
+        repository: {
+          url: repo.url,
+          credentials: {
+            privateSshKey: repo.sshKeyPair.privateKey,
+          },
         },
       });
     });

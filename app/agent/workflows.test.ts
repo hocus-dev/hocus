@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { createActivities } from "./activities/list";
 import { createAgentInjector } from "./agent-injector";
 import { BlockRegistryService } from "./block-registry/registry.service";
+import { expectContent } from "./block-registry/test-utils";
 import { HOST_PERSISTENT_DIR } from "./constants";
 import { sleep } from "./utils";
 import {
@@ -175,6 +176,9 @@ test.concurrent(
       await suppressLogPattern("Failed to parse project config");
       await suppressLogPattern("dockerfile parse error on line 1: unknown instruction: an");
 
+      await expectContent(brService, {
+        numTotalContent: 0,
+      });
       await client.workflow.execute(runBuildfsAndPrebuilds, {
         workflowId: uuidv4(),
         taskQueue,
@@ -214,6 +218,40 @@ test.concurrent(
           }
         }
       }
+      // we expect the following block registry content:
+      //
+      // - fetchRepository
+      //   - 1 root fs image
+      //   - 1 repo container
+      // - checkoutAndInspect
+      //   - 1 root fs image
+      // - buildfs
+      //   - 1 root fs image
+      //   - 1 root fs container
+      //   - 1 workspace image for prebuild case 1
+      //   - 1 workspace image for prebuild case 2
+      //   - 1 default workspace image for case 3
+      // - prebuilds
+      //   - case 1
+      //     - 1 workspace fs image
+      //     - 1 project image
+      //   - case 2
+      //     - 1 workspace fs image
+      //     - 1 project image
+      //   - case 3
+      //     - nothing, because the prebuild ended with error
+      //   - case 4
+      //     - 1 workspace fs image
+      //     - 1 project image
+      //   - case 5
+      //     - nothing, because the prebuild ended with error
+      //   - case 6
+      //     - nothing, because the prebuild ended with error
+      //
+      // In total, we expect 14 content items. All temporary content items should have been garbage collected.
+      await expectContent(brService, {
+        numTotalContent: 14,
+      });
 
       const project = await db.project.findUniqueOrThrow({
         where: {

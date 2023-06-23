@@ -279,10 +279,12 @@ export class AgentGitService {
     });
   }
 
-  async fetchRepository(
-    runtime: HocusRuntime,
+  async fetchRepository(args: {
+    runtime: HocusRuntime;
     /** A container with the fetched repository will be created from this */
-    outputId: string,
+    outputId: string;
+    /** Every temporary image and container id will use this prefix. Used for garbage collection. */
+    tmpContentPrefix: string;
     repository: {
       url: string;
       credentials: {
@@ -298,9 +300,10 @@ export class AgentGitService {
          */
         privateSshKey: string;
       };
-    },
-  ): Promise<void> {
-    const localRootFsImageTag = sha256(this.agentConfig.fetchRepoImageTag);
+    };
+  }): Promise<void> {
+    const { runtime, outputId, repository, tmpContentPrefix } = args;
+    const localRootFsImageTag = `fetchrepo-${sha256(this.agentConfig.fetchRepoImageTag)}`;
     const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
     if (!(await this.blockRegistryService.hasContent(rootFsImageId))) {
       await this.blockRegistryService.loadImageFromRemoteRepo(
@@ -310,7 +313,7 @@ export class AgentGitService {
     }
     const rootFsContainerId = await this.blockRegistryService.createContainer(
       rootFsImageId,
-      localRootFsImageTag,
+      `${tmpContentPrefix}-fetchrepo-${uuidv4()}`,
     );
     const containerId = BlockRegistryService.genContainerId(outputId);
     return await withLocalLock(LocalLockNamespace.CONTAINER, containerId, async () => {
@@ -442,7 +445,7 @@ export class AgentGitService {
         url: true,
       },
     });
-    const imageTag = sha256(repo.url);
+    const imageTag = `repo-${sha256(repo.url)}`;
     return await db.gitRepositoryImage.create({
       data: {
         gitRepository: {

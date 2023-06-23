@@ -29,9 +29,10 @@ export const createPrebuildImages: CreateActivity<CreatePrebuildImagesActivity> 
           externalId: true,
         },
       });
+      const suffix = sha256(externalId);
       return prebuildService.createPrebuildEventImagesInDb(tdb, {
-        outputProjectImageTag: sha256(externalId + "project"),
-        outputFsImageTag: sha256(externalId + "fs"),
+        outputProjectImageTag: `pre-pr-${suffix}`,
+        outputFsImageTag: `pre-fs-${suffix}`,
         prebuildEventId: args.prebuildEventId,
         agentInstanceId: agentInstance.id,
       });

@@ -27,6 +27,7 @@ import { initPrebuildEvents } from "./init-prebuild-events";
 import { getWorkflowStatus } from "./mutex/get-workflow-status";
 import { signalWithStartLockWorkflow } from "./mutex/signal-with-start-lock-workflow";
 import { prebuild } from "./prebuild";
+import { removeContentWithPrefix } from "./registry/remove-content-with-prefix";
 import { saveGitRepoConnectionStatus } from "./save-git-repo-connection-status";
 import { signalWithStartWaitWorkflow } from "./shared-workflow/signal-with-start-wait-workflow";
 import type { CreateActivity } from "./types";
@@ -75,6 +76,7 @@ const activities = {
   createPrebuildEvent,
   signalWithStartWaitWorkflow,
   getProjectsRepository,
+  removeContentWithPrefix,
 } as const;
 
 const _typeCheck: typeof activities extends Record<string, CreateActivity<any>> ? 1 : 0 = 1;

@@ -137,10 +137,11 @@ export class BlockRegistryService {
     return path.join(this.paths.blockConfig, contentId);
   }
 
-  static genTCMUSubtype(length = 14): string {
+  static readonly tcmuSubtypeLength = 14;
+  static genTCMUSubtype(): string {
     const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     const charsetLength = charset.length;
-    const randomValues = new Uint32Array(length);
+    const randomValues = new Uint32Array(BlockRegistryService.tcmuSubtypeLength);
     crypto.webcrypto.getRandomValues(randomValues);
     return Array.from(randomValues, (value) => charset[value % charsetLength]).join("");
   }
@@ -149,11 +150,29 @@ export class BlockRegistryService {
     return uuidv4();
   }
 
+  /**
+   * The max length is dictated by https://github.com/open-iscsi/tcmu-runner/blob/1bdb239fa183c84d2ace6b52aa33476968a0cef7/libtcmu.c#L466
+   * The `tcm_dev_name` in the linked code has a maximum length of 128 characters.
+   * It consists of the tcmuSubtype, the content id, and 2 more chars.
+   * The content id is prefixed with `im_` for images and `ct_` for containers - that's
+   * the 3 chars in the formula below.
+   */
+  static maxOutputIdLength = 128 - (BlockRegistryService.tcmuSubtypeLength + 3 + 2);
+  static checkOutputIdLength(outputId: string): void {
+    if (outputId.length > BlockRegistryService.maxOutputIdLength) {
+      throw new Error(
+        `Output ID "${outputId}" is too long. Max length is ${BlockRegistryService.maxOutputIdLength}.`,
+      );
+    }
+  }
+
   static genImageId(outputId: string): ImageId {
+    BlockRegistryService.checkOutputIdLength(outputId);
     return ("im_" + outputId) as ImageId;
   }
 
   static genContainerId(outputId: string): ContainerId {
+    BlockRegistryService.checkOutputIdLength(outputId);
     return ("ct_" + outputId) as ContainerId;
   }
 
