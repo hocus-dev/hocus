@@ -3,8 +3,8 @@ import path from "path";
 
 import { createAgentInjector } from "./agent-injector";
 import { BlockRegistryService, EXPOSE_METHOD } from "./block-registry/registry.service";
-import { withExposedImages } from "./block-registry/utils";
-import { execSshCmd } from "./utils";
+import { expectContent } from "./block-registry/test-utils";
+import { execSshCmd, withRuntimeAndImages } from "./utils";
 
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
@@ -100,32 +100,30 @@ test.concurrent(
 
     const imageId = await brService.loadImageFromRemoteRepo(agentConfig.buildfsImageTag, "im1");
     const containerId = await brService.createContainer(imageId, "c1");
-    await withExposedImages(
+    await withRuntimeAndImages(
       brService,
-      [[containerId, EXPOSE_METHOD.BLOCK_DEV]] as const,
-      ([fsSpec]) =>
-        runtime.withRuntime(
-          {
-            ssh: {
-              username: "hocus",
-              password: "hocus",
-            },
-            fs: {
-              "/": fsSpec,
-            },
-            memSizeMib: 1024,
-            vcpuCount: 1,
-          },
-          async ({ ssh }) => {
-            await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/foo"]);
-            await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/bar"]);
-            await waitForPromises(
-              files.map(({ path, content }) => agentUtilService.writeFile(ssh, path, content)),
-            );
-            const hash = await buildfsService.getSha256FromFiles(ssh, "/tmp", ["foo", "bar/hugo"]);
-            expect(hash).toBe(expectedHash);
-          },
-        ),
+      runtime,
+
+      {
+        ssh: {
+          username: "hocus",
+          password: "hocus",
+        },
+        fs: {
+          "/": containerId,
+        },
+        memSizeMib: 1024,
+        vcpuCount: 1,
+      },
+      async ({ ssh }) => {
+        await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/foo"]);
+        await execSshCmd({ ssh }, ["mkdir", "-p", "/tmp/bar"]);
+        await waitForPromises(
+          files.map(({ path, content }) => agentUtilService.writeFile(ssh, path, content)),
+        );
+        const hash = await buildfsService.getSha256FromFiles(ssh, "/tmp", ["foo", "bar/hugo"]);
+        expect(hash).toBe(expectedHash);
+      },
     );
   }),
 );
@@ -160,6 +158,8 @@ test.concurrent(
       );
       const outputId = "output";
 
+      await expectContent(brService, { numTotalContent: 1 });
+      const tmpContentPrefix = "hello-there";
       const result = await buildfsService.buildfs({
         db,
         runtime,
@@ -168,14 +168,42 @@ test.concurrent(
         vcpuCount: 1,
         repoImageId,
         outputId,
+        tmpContentPrefix,
       });
       if (!result.buildSuccessful) {
         // eslint-disable-next-line no-console
         console.error(result);
       }
       expect(result.buildSuccessful).toBe(true);
+      await expectContent(brService, {
+        numTotalContent: 4,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 0,
+        },
+      });
 
-      const outputImageId = await BlockRegistryService.genImageId(outputId);
+      await expect(
+        buildfsService.buildfs({
+          db,
+          runtime,
+          vmTaskId: vmTask.id,
+          memSizeMib: 1024,
+          vcpuCount: 1,
+          repoImageId: BlockRegistryService.genImageId("nonexistent-image-id"),
+          outputId: "output-2",
+          tmpContentPrefix,
+        }),
+      ).rejects.toThrow();
+      await expectContent(brService, {
+        numTotalContent: 5,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 1,
+        },
+      });
+
+      const outputImageId = BlockRegistryService.genImageId(outputId);
       const { mountPoint } = await brService.expose(outputImageId, EXPOSE_METHOD.HOST_MOUNT);
       expect(await doesFileExist(path.join(mountPoint, "home/hocus"))).toBe(true);
     }),

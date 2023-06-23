@@ -5,14 +5,13 @@ import type { BuildfsEvent, BuildfsEventImages, Prisma, VmTask } from "@prisma/c
 import { VmTaskStatus } from "@prisma/client";
 import { Add, Copy, DockerfileParser } from "dockerfile-ast";
 import type { NodeSSH } from "node-ssh";
+import { v4 as uuidv4 } from "uuid";
 
 import type { AgentUtilService } from "./agent-util.service";
 import type { ImageId } from "./block-registry/registry.service";
 import { BlockRegistryService } from "./block-registry/registry.service";
-import { EXPOSE_METHOD } from "./block-registry/registry.service";
-import { withExposedImages } from "./block-registry/utils";
 import type { HocusRuntime } from "./runtime/hocus-runtime";
-import { LocalLockNamespace, execSshCmd, withLocalLock } from "./utils";
+import { LocalLockNamespace, execSshCmd, withLocalLock, withRuntimeAndImages } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
@@ -270,6 +269,8 @@ export class BuildfsService {
     repoImageId: ImageId;
     /** A new image will be created based on this id. */
     outputId: string;
+    /** Every temporary image and container id will use this prefix. Used for garbage collection. */
+    tmpContentPrefix: string;
   }): Promise<{ buildSuccessful: boolean; error?: string }> {
     const buildfsImageOutputId = "buildfs";
     const rootFsImageId = BlockRegistryService.genImageId(buildfsImageOutputId);
@@ -283,66 +284,60 @@ export class BuildfsService {
       rootFsImageId,
       buildfsImageOutputId,
     );
-    const outputContainerId = await this.brService.createContainer(void 0, args.outputId, {
-      mkfs: true,
-      sizeInGB: 64,
-    });
+    const outputContainerOutputId = `${args.tmpContentPrefix}-${uuidv4()}`;
+    const outputContainerId = await this.brService.createContainer(
+      void 0,
+      outputContainerOutputId,
+      {
+        mkfs: true,
+        sizeInGB: 64,
+      },
+    );
 
-    try {
-      const result = await withLocalLock(LocalLockNamespace.CONTAINER, "buildfs", () =>
-        withExposedImages(
-          this.brService,
-          [
-            [rootFsContainerId, EXPOSE_METHOD.BLOCK_DEV],
-            [args.repoImageId, EXPOSE_METHOD.BLOCK_DEV],
-            [outputContainerId, EXPOSE_METHOD.BLOCK_DEV],
-          ] as const,
-          async ([rootFsSpec, repoFsSpec, outputFsSpec]) =>
-            args.runtime.withRuntime(
-              {
-                ssh: {
-                  username: "root",
-                  password: "root",
-                },
-                kernelPath: this.agentConfig.defaultKernel,
-                fs: {
-                  "/": rootFsSpec,
-                  [this.inputDir]: repoFsSpec,
-                  [this.outputDir]: outputFsSpec,
-                },
-                memSizeMib: args.memSizeMib,
-                vcpuCount: args.vcpuCount,
-              },
-              async ({ ssh, sshConfig }) => {
-                const workdir = this.workdir;
-                await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
-                await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
-                await this.transferBuildfsScript(ssh);
+    const result = await withLocalLock(LocalLockNamespace.CONTAINER, "buildfs", () =>
+      withRuntimeAndImages(
+        this.brService,
+        args.runtime,
+        {
+          ssh: {
+            username: "root",
+            password: "root",
+          },
+          kernelPath: this.agentConfig.defaultKernel,
+          fs: {
+            "/": rootFsContainerId,
+            [this.inputDir]: args.repoImageId,
+            [this.outputDir]: outputContainerId,
+          },
+          memSizeMib: args.memSizeMib,
+          vcpuCount: args.vcpuCount,
+        },
+        async ({ ssh, sshConfig }) => {
+          const workdir = this.workdir;
+          await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
+          await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
+          await this.transferBuildfsScript(ssh);
 
-                const taskResults = await this.agentUtilService.execVmTasks(sshConfig, args.db, [
-                  { vmTaskId: args.vmTaskId },
-                ]);
-                return taskResults[0];
-              },
-            ),
-        ),
-      );
+          const taskResults = await this.agentUtilService.execVmTasks(sshConfig, args.db, [
+            { vmTaskId: args.vmTaskId },
+          ]);
+          return taskResults[0];
+        },
+      ),
+    );
 
-      const buildSuccessful = result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS;
-      if (buildSuccessful) {
-        await this.brService.commitContainer(outputContainerId, args.outputId);
-        return { buildSuccessful };
-      } else {
-        const task = await args.db.vmTask.findUniqueOrThrow({
-          where: { id: args.vmTaskId },
-        });
-        return {
-          buildSuccessful,
-          error: await getLogsFromGroup(args.db, task.logGroupId).then((b) => b.toString("utf-8")),
-        };
-      }
-    } finally {
-      await this.brService.removeContent(outputContainerId);
+    const buildSuccessful = result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS;
+    if (buildSuccessful) {
+      await this.brService.commitContainer(outputContainerId, args.outputId);
+      return { buildSuccessful };
+    } else {
+      const task = await args.db.vmTask.findUniqueOrThrow({
+        where: { id: args.vmTaskId },
+      });
+      return {
+        buildSuccessful,
+        error: await getLogsFromGroup(args.db, task.logGroupId).then((b) => b.toString("utf-8")),
+      };
     }
   }
 }
