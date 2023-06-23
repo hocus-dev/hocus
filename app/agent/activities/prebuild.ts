@@ -15,6 +15,7 @@ import { unwrap } from "~/utils.shared";
 export type PrebuildActivity = (args: {
   prebuildEventId: bigint;
   checkoutOutputId: string;
+  tmpContentPrefix: string;
 }) => Promise<VMTaskOutput[]>;
 /**
  * Returns the result for every task.
@@ -108,5 +109,6 @@ export const prebuild: CreateActivity<PrebuildActivity> = ({ injector, db }) =>
       outputProjectId: images.projectImage.tag,
       memSizeMib: prebuildEvent.project.maxPrebuildRamMib,
       vcpuCount: prebuildEvent.project.maxPrebuildVCPUCount,
+      tmpContentPrefix: args.tmpContentPrefix,
     });
   });

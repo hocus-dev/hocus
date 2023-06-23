@@ -65,9 +65,10 @@ const {
 export async function runBuildfs(
   buildfsEventId: bigint,
   checkoutOutputId: string,
+  tmpContentPrefix: string,
 ): Promise<{ buildSuccessful: boolean; error?: string }> {
   try {
-    return await buildfs({ buildfsEventId, checkoutOutputId });
+    return await buildfs({ buildfsEventId, checkoutOutputId, tmpContentPrefix });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);
@@ -78,11 +79,12 @@ export async function runBuildfs(
 export async function runPrebuild(
   prebuildEventId: bigint,
   checkoutOutputId: string,
+  tmpContentPrefix: string,
 ): Promise<void> {
   await createPrebuildImages({
     prebuildEventId,
   });
-  const prebuildOutput = await prebuild({ prebuildEventId, checkoutOutputId });
+  const prebuildOutput = await prebuild({ prebuildEventId, checkoutOutputId, tmpContentPrefix });
   const prebuildTasksFailed = prebuildOutput.some((o) => o.status === "VM_TASK_STATUS_ERROR");
   await changePrebuildEventStatus(
     prebuildEventId,
@@ -99,6 +101,7 @@ export async function runCheckoutAndInspect(args: {
   outputId: string;
   targetBranch: string;
   projectConfigPaths: string[];
+  tmpContentPrefix: string;
 }): Promise<CheckoutAndInspectResult[]> {
   return await checkoutAndInspect(args);
 }
@@ -128,6 +131,8 @@ async function runSingleBuildfsAndPrebuildInner(
     workflow: runFetchRepository,
     params: [gitRepositoryId],
   });
+  // Prefixing the outputId with batchId will make it garbage collected after the
+  // batch is done.
   const checkoutOutputId = `${batchId}-checkout-${prebuildEvent.gitObject.id}` as const;
   const inspection = await withSharedWorkflow({
     lockId: checkoutOutputId,
@@ -138,6 +143,7 @@ async function runSingleBuildfsAndPrebuildInner(
         outputId: checkoutOutputId,
         targetBranch: prebuildEvent.gitObject.hash,
         projectConfigPaths: batchProjectConfigPaths,
+        tmpContentPrefix: batchId,
       },
     ],
   }).then((r) => r[inspectResultIdx]);
@@ -181,7 +187,7 @@ async function runSingleBuildfsAndPrebuildInner(
     const { buildSuccessful, error } = await withSharedWorkflow({
       lockId: `buildfs-${buildfsEvent.event.id}`,
       workflow: runBuildfs,
-      params: [buildfsEvent.event.id, checkoutOutputId],
+      params: [buildfsEvent.event.id, checkoutOutputId, batchId],
     });
     if (!buildSuccessful) {
       throw new ApplicationFailure(
@@ -190,7 +196,7 @@ async function runSingleBuildfsAndPrebuildInner(
     }
   }
   await executeChild(runPrebuild, {
-    args: [prebuildEvent.id, checkoutOutputId],
+    args: [prebuildEvent.id, checkoutOutputId, batchId],
   });
 }
 

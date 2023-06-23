@@ -31,6 +31,7 @@ export type CheckoutAndInspectActivity = (args: {
    * Relative paths to directories where `hocus.yml` files are located.
    */
   projectConfigPaths: string[];
+  tmpContentPrefix: string;
 }) => Promise<CheckoutAndInspectResult[]>;
 export const checkoutAndInspect: CreateActivity<CheckoutAndInspectActivity> = ({ injector, db }) =>
   withActivityHeartbeat({ intervalMs: 5000 }, async (args) => {
@@ -59,6 +60,7 @@ export const checkoutAndInspect: CreateActivity<CheckoutAndInspectActivity> = ({
       targetBranch: args.targetBranch,
       outputId: args.outputId,
       projectConfigPaths: args.projectConfigPaths,
+      tmpContentPrefix: args.tmpContentPrefix,
     });
 
     perfService.log("checkoutAndInspect", "end", args.gitRepositoryId, args.targetBranch);

@@ -13,6 +13,7 @@ import { unwrap } from "~/utils.shared";
 export type BuildfsActivity = (args: {
   buildfsEventId: bigint;
   checkoutOutputId: string;
+  tmpContentPrefix: string;
 }) => Promise<{ buildSuccessful: boolean; error?: string }>;
 export const buildfs: CreateActivity<BuildfsActivity> = ({ injector, db }) =>
   withActivityHeartbeat({ intervalMs: 5000 }, async (args) => {
@@ -61,6 +62,7 @@ export const buildfs: CreateActivity<BuildfsActivity> = ({ injector, db }) =>
       vcpuCount: buildfsEvent.project.maxPrebuildVCPUCount,
       repoImageId,
       outputId: outputImage.tag,
+      tmpContentPrefix: args.tmpContentPrefix,
     });
     perfService.log("buildfs", "end", args.buildfsEventId);
 
