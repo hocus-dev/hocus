@@ -157,6 +157,10 @@ export class BlockRegistryService {
     return ("ct_" + outputId) as ContainerId;
   }
 
+  static extractOutputId(contentId: ContainerId | ImageId): string {
+    return contentId.slice(3);
+  }
+
   static isImageId(id: string): id is ImageId {
     return id.startsWith("im_");
   }

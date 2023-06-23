@@ -986,3 +986,11 @@ test.concurrent(
     }
   }),
 );
+
+test.concurrent("extractOutputId", async () => {
+  const outputId = "hello-there";
+  const imageId = BlockRegistryService.genImageId(outputId);
+  const containerId = BlockRegistryService.genContainerId(outputId);
+  expect(BlockRegistryService.extractOutputId(imageId)).toEqual(outputId);
+  expect(BlockRegistryService.extractOutputId(containerId)).toEqual(outputId);
+});

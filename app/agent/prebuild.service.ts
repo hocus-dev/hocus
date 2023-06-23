@@ -33,7 +33,7 @@ import {
 import type { ProjectConfigService } from "./project-config/project-config.service";
 import type { ProjectConfig } from "./project-config/validator";
 import type { HocusRuntime } from "./runtime/hocus-runtime";
-import { LocalLockNamespace, execSshCmd, withLocalLock } from "./utils";
+import { LocalLockNamespace, execSshCmd, withLocalLock, withRuntimeAndImages } from "./utils";
 
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
@@ -244,10 +244,13 @@ export class PrebuildService {
     outputId: string;
     /** Relative paths to directories where `hocus.yml` files are located in the repository. */
     projectConfigPaths: string[];
+    /** Every temporary image and container id will use this prefix. Used for garbage collection. */
+    tmpContentPrefix: string;
   }): Promise<
     ({ projectConfig: ProjectConfig; imageFileHash: string | null } | null | ValidationError)[]
   > {
-    const tmpOutputId = `tmp-${sha256(args.outputId)}`;
+    const tmpContentPrefix = args.tmpContentPrefix;
+    const tmpOutputId = `${tmpContentPrefix}-tmp-${sha256(args.outputId)}`;
     const tmpOutputImageId = await withLocalLock(
       LocalLockNamespace.CONTAINER,
       args.repoContainerId,
@@ -258,7 +261,6 @@ export class PrebuildService {
       },
     );
     const outputContainerId = await this.brService.createContainer(tmpOutputImageId, args.outputId);
-    // TODO: remove the tmpOutputImage once the block registry allows it
 
     const localRootFsImageTag = sha256(this.agentConfig.checkoutOutputId);
     const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
@@ -268,91 +270,79 @@ export class PrebuildService {
         localRootFsImageTag,
       );
     }
-    const rootFsContainerTag = uuidv4();
-    // TODO: delete this container once the block registry allows it
+    const rootFsContainerTag = `${tmpContentPrefix}-${uuidv4()}`;
     const rootFsContainerId = await this.brService.createContainer(
       rootFsImageId,
       rootFsContainerTag,
     );
     const workdir = "/workdir";
-    const result = await withExposedImages(
+    const result = await withRuntimeAndImages(
       this.brService,
-      [
-        [rootFsContainerId, EXPOSE_METHOD.BLOCK_DEV],
-        [outputContainerId, EXPOSE_METHOD.BLOCK_DEV],
-      ] as const,
-      async ([rootFsSpec, workdirFsSpec]) =>
-        args.runtime.withRuntime(
-          {
-            ssh: {
-              username: "hocus",
-              password: "hocus",
-            },
-            fs: {
-              "/": rootFsSpec,
-              [workdir]: workdirFsSpec,
-            },
-            memSizeMib: 1024,
-            vcpuCount: 1,
-          },
-          async ({ ssh }) => {
-            const repoPath = `${workdir}/project`;
+      args.runtime,
+      {
+        ssh: {
+          username: "hocus",
+          password: "hocus",
+        },
+        fs: {
+          "/": rootFsContainerId,
+          [workdir]: outputContainerId,
+        },
+        memSizeMib: 1024,
+        vcpuCount: 1,
+      },
+      async ({ ssh }) => {
+        const repoPath = `${workdir}/project`;
 
-            await execSshCmd({ ssh, opts: { cwd: repoPath } }, [
-              "git",
-              "checkout",
-              args.targetBranch,
-            ]);
-            const configs: (ProjectConfig | null | ValidationError)[] = mapOverNull(
-              await waitForPromises(
-                args.projectConfigPaths.map((p) =>
-                  this.projectConfigService.getConfig(ssh, repoPath, p),
-                ),
-              ),
-              (c) => {
-                if (c instanceof ValidationError || c == null) {
-                  return c;
-                }
-                return c[0];
-              },
-            );
-            return await waitForPromises(
-              configs.map(async (config, idx) => {
-                if (config == null || config instanceof ValidationError) {
-                  return config;
-                }
-                const pathToImageFile = path.join(
-                  repoPath,
-                  args.projectConfigPaths[idx],
-                  config.image.file,
-                );
-                const imageFile = await this.agentUtilService.readFile(ssh, pathToImageFile);
-                let externalFilesHash: null | string = null;
-                try {
-                  const externalFilesPaths =
-                    this.buildfsService.getExternalFilePathsFromDockerfile(imageFile);
-                  const absoluteFilePaths = externalFilesPaths.map((p) =>
-                    path.join(repoPath, args.projectConfigPaths[idx], config.image.buildContext, p),
-                  );
-                  externalFilesHash = await this.buildfsService.getSha256FromFiles(
-                    ssh,
-                    repoPath,
-                    absoluteFilePaths,
-                  );
-                } catch (err) {
-                  this.logger.error(displayError(err));
-                }
-                const imageFileHash = sha256(imageFile);
-
-                return {
-                  projectConfig: config,
-                  imageFileHash:
-                    externalFilesHash === null ? null : imageFileHash + externalFilesHash,
-                };
-              }),
-            );
+        await execSshCmd({ ssh, opts: { cwd: repoPath } }, ["git", "checkout", args.targetBranch]);
+        const configs: (ProjectConfig | null | ValidationError)[] = mapOverNull(
+          await waitForPromises(
+            args.projectConfigPaths.map((p) =>
+              this.projectConfigService.getConfig(ssh, repoPath, p),
+            ),
+          ),
+          (c) => {
+            if (c instanceof ValidationError || c == null) {
+              return c;
+            }
+            return c[0];
           },
-        ),
+        );
+        return await waitForPromises(
+          configs.map(async (config, idx) => {
+            if (config == null || config instanceof ValidationError) {
+              return config;
+            }
+            const pathToImageFile = path.join(
+              repoPath,
+              args.projectConfigPaths[idx],
+              config.image.file,
+            );
+            const imageFile = await this.agentUtilService.readFile(ssh, pathToImageFile);
+            let externalFilesHash: null | string = null;
+            try {
+              const externalFilesPaths =
+                this.buildfsService.getExternalFilePathsFromDockerfile(imageFile);
+              const absoluteFilePaths = externalFilesPaths.map((p) =>
+                path.join(repoPath, args.projectConfigPaths[idx], config.image.buildContext, p),
+              );
+              externalFilesHash = await this.buildfsService.getSha256FromFiles(
+                ssh,
+                repoPath,
+                absoluteFilePaths,
+              );
+            } catch (err) {
+              this.logger.error(displayError(err));
+            }
+            const imageFileHash = sha256(imageFile);
+
+            return {
+              projectConfig: config,
+              imageFileHash: externalFilesHash === null ? null : imageFileHash + externalFilesHash,
+            };
+          }),
+        );
+      },
     );
     await this.brService.commitContainer(outputContainerId, args.outputId);
     return result;

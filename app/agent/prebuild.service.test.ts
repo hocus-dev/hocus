@@ -8,6 +8,7 @@ import { PrebuildEventStatus } from "@prisma/client";
 
 import { createAgentInjector } from "./agent-injector";
 import { BlockRegistryService, EXPOSE_METHOD } from "./block-registry/registry.service";
+import { expectContent } from "./block-registry/test-utils";
 import { SUCCESSFUL_PREBUILD_STATES } from "./prebuild-constants";
 
 import { createExampleRepositoryAndProject } from "~/test-utils/project";
@@ -314,8 +315,12 @@ test.concurrent(
         repoImageTag,
       );
       const repoContainerId = await brService.createContainer(repoImageId, "fetchrepo");
+      await expectContent(brService, {
+        numTotalContent: 2,
+      });
       const runtime = injector.resolve(Token.QemuService)(runId);
       const outputId = "output";
+      const tmpContentPrefix = "tmp-content-1337-";
 
       await prebuildService.checkoutAndInspect({
         runtime,
@@ -323,6 +328,14 @@ test.concurrent(
         targetBranch: "checkout-and-inspect-test-1",
         outputId,
         projectConfigPaths: ["/"],
+        tmpContentPrefix,
+      });
+      await expectContent(brService, {
+        numTotalContent: 6,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 2,
+        },
       });
 
       const imId = await BlockRegistryService.genImageId(outputId);
