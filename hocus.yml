@@ -39,6 +39,7 @@ tasks:
     workspaceShell: fish
     workspace: |
       sudo mkdir -p /home/hocus/dev/hocus-resources/tests
+      sudo rm -f /home/hocus/dev/hocus-resources/tests/state_manager.sock
       sudo TEST_STORAGE_DIR=/home/hocus/dev/hocus-resources/tests yarn run test:startTestManager
   - name: Zot
     prebuild: |

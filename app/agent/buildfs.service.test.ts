@@ -164,8 +164,8 @@ test.concurrent(
         db,
         runtime,
         vmTaskId: vmTask.id,
-        memSizeMib: 4096,
-        vcpuCount: 4,
+        memSizeMib: 1024,
+        vcpuCount: 1,
         repoImageId,
         outputId,
       });
