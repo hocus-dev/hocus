@@ -1,5 +1,3 @@
-import { spawn } from "child_process";
-import fs from "fs/promises";
 import { join } from "path";
 
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
@@ -22,19 +20,8 @@ async function run() {
   const blockRegistryRoot = agentConfig.blockRegistryRoot;
 
   await brService.initializeRegistry();
-
-  const obdLogFile = await fs.open(join(blockRegistryRoot, "overlaybd.log"), "a");
-  const overlaybdProcess = spawn(
-    "/opt/overlaybd/bin/overlaybd-tcmu",
-    [join(blockRegistryRoot, "overlaybd.json")],
-    { stdio: ["ignore", obdLogFile.fd, obdLogFile.fd] },
-  );
-  const overlaybdProcessPromise = new Promise<void>((resolve, reject) => {
-    overlaybdProcess.on("error", reject);
-    overlaybdProcess.on("close", () => {
-      void obdLogFile.close();
-      resolve(void 0);
-    });
+  const [overlaybdProcess, overlaybdProcessPromise] = await brService.startOverlaybdProcess({
+    logFilePath: join(blockRegistryRoot, "overlaybd.log"),
   });
 
   if (agentConfig.createHocusProjects || agentConfig.createDevelopmentProjects) {

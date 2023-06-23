@@ -1,4 +1,6 @@
 import assert from "assert";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -1654,5 +1656,45 @@ export class BlockRegistryService {
         await execCmdWithOpts(["crane", "push", exportDir, opts.tag], cmdOpts);
       });
     });
+  }
+
+  /**
+   * Returns the handle to the overlaybd process and a promise that resolves when the process exits,
+   * or rejects if the process errors out.
+   *
+   * Must be run after the block registry is initialized.
+   */
+  async startOverlaybdProcess(opts: {
+    logFilePath: string;
+  }): Promise<[ChildProcess, Promise<void>]> {
+    const obdLogFile = await fs.open(opts.logFilePath, "a");
+    const processHandle = spawn(
+      "/opt/overlaybd/bin/overlaybd-tcmu",
+      [path.join(this.agentConfig.blockRegistryRoot, "overlaybd.json")],
+      { stdio: ["ignore", obdLogFile.fd, obdLogFile.fd] },
+    );
+    const processPromise = new Promise<void>((resolve, reject) => {
+      processHandle.on("error", reject);
+      processHandle.on("close", () => {
+        void obdLogFile.close();
+        resolve(void 0);
+      });
+    });
+    // Wait for tcmu to overlaybd to fully initialize
+    for (let i = 0; i < 100; i++) {
+      try {
+        await fs.readFile(
+          path.join(this.agentConfig.blockRegistryRoot, "logs", "overlaybd.log"),
+          "utf-8",
+        );
+        break;
+      } catch (err) {
+        await sleep(5);
+      }
+      if (i >= 99) {
+        throw new Error("TCMU failed to initialize");
+      }
+    }
+    return [processHandle, processPromise];
   }
 }

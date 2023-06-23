@@ -2,7 +2,6 @@
 import "./prisma-export-patch.server";
 
 import assert from "assert";
-import { spawn } from "child_process";
 import fs from "fs/promises";
 import { join } from "path";
 import { formatWithOptions, format } from "util";
@@ -28,7 +27,8 @@ import { TEST_STATE_MANAGER_REQUEST_TAG } from "~/test-state-manager/api";
 import type { TestStateManager } from "~/test-state-manager/client";
 import type { TimeService } from "~/time.service";
 import { Token } from "~/token";
-import { genFormattedTimestamp, sleep, waitForPromises } from "~/utils.shared";
+import { runOnTimeout } from "~/utils.server";
+import { genFormattedTimestamp, waitForPromises } from "~/utils.shared";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
 
@@ -479,36 +479,14 @@ export class TestEnvironmentBuilder<
             TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE,
             { runId },
           );
-          const obdLogFile = await fs.open(obdLogRsp.path, "a");
 
           const brService: BlockRegistryService = injector.resolve(Token.BlockRegistryService);
           const config: Config = injector.resolve(Token.Config);
           const blockRegistryRoot: string = config.agent().blockRegistryRoot;
           await brService.initializeRegistry();
-          const cp = spawn(
-            "/opt/overlaybd/bin/overlaybd-tcmu",
-            [join(blockRegistryRoot, "overlaybd.json")],
-            { stdio: ["ignore", obdLogFile.fd, obdLogFile.fd] },
-          );
-          const cpWait = new Promise<void>((resolve, reject) => {
-            cp.on("error", reject);
-            cp.on("close", () => {
-              void obdLogFile.close();
-              resolve(void 0);
-            });
+          const [cp, cpWait] = await brService.startOverlaybdProcess({
+            logFilePath: obdLogRsp.path,
           });
-          // Wait for tcmu to overlaybd to fully initialize
-          for (let i = 0; i < 100; i += 1) {
-            try {
-              await fs.readFile(join(blockRegistryRoot, "logs", "overlaybd.log"), "utf-8");
-              break;
-            } catch (err) {
-              await sleep(5);
-            }
-            if (i == 99) {
-              throw new Error("TCMU failed to initialize");
-            }
-          }
 
           await this.#getStateManager().mkRequest(
             TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH,
@@ -522,17 +500,7 @@ export class TestEnvironmentBuilder<
           addTeardownFunction(async () => {
             await brService.hideEverything();
             cp.kill("SIGINT");
-            let timeout: NodeJS.Timeout | undefined;
-            await Promise.race([
-              cpWait,
-              new Promise((resolve) => {
-                timeout = setTimeout(() => {
-                  cp.kill("SIGKILL");
-                  resolve(void 0);
-                }, 1000);
-              }),
-            ]);
-            clearTimeout(timeout);
+            await runOnTimeout({ waitFor: cpWait, timeoutMs: 1000 }, () => cp.kill("SIGKILL"));
           });
 
           return brService;
