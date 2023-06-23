@@ -386,7 +386,8 @@ test.concurrent(
       expect(await brService.hasContent(outputProjectImageId)).toBe(false);
 
       const envVarValue = "value1";
-      const result = await prebuildService.prebuild({
+      const tmpContentPrefix = "tmp-content-1337-";
+      const prebuildArgs = {
         db,
         runtime,
         envVariables: [
@@ -406,10 +407,19 @@ test.concurrent(
         outputProjectId,
         memSizeMib: 1024,
         vcpuCount: 1,
-      });
+        tmpContentPrefix,
+      };
+      const result = await prebuildService.prebuild(prebuildArgs);
       expect(result.length).toBe(2);
       expect(result[0].status).toBe(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
       expect(result[1].status).toBe(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
+      await expectContent(brService, {
+        numTotalContent: 4,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 0,
+        },
+      });
 
       const readFile = (mountPoint: string, relativePath: string) =>
         fs.readFile(path.join(mountPoint, relativePath)).then((b) => b.toString());
@@ -418,5 +428,14 @@ test.concurrent(
 
       expect(await readFile(rootFs.mountPoint, "hey.txt")).toBe(envVarValue);
       expect(await readFile(projectFs.mountPoint, "project/hey.txt")).toBe(envVarValue);
+
+      await expect(prebuildService.prebuild({ ...prebuildArgs, memSizeMib: -1 })).rejects.toThrow();
+      await expectContent(brService, {
+        numTotalContent: 6,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 2,
+        },
+      });
     }),
 );

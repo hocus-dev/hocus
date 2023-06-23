@@ -19,8 +19,6 @@ import type { AgentUtilService } from "./agent-util.service";
 import type { VMTaskOutput } from "./agent-util.types";
 import type { ContainerId, ImageId } from "./block-registry/registry.service";
 import { BlockRegistryService } from "./block-registry/registry.service";
-import { EXPOSE_METHOD } from "./block-registry/registry.service";
-import { withExposedImages } from "./block-registry/utils";
 import type { BuildfsService } from "./buildfs.service";
 import { WORKSPACE_ENV_SCRIPT_PATH } from "./constants";
 import {
@@ -601,6 +599,8 @@ export class PrebuildService {
     outputProjectId: string;
     memSizeMib: number;
     vcpuCount: number;
+    /** Every temporary image and container id will use this prefix. Used for garbage collection. */
+    tmpContentPrefix: string;
   }): Promise<VMTaskOutput[]> {
     const {
       db,
@@ -613,60 +613,53 @@ export class PrebuildService {
       outputProjectId,
       memSizeMib,
       vcpuCount,
+      tmpContentPrefix,
     } = args;
     this.perfService.log("prebuild", "start", outputRootFsId);
     const [rootFsContainerId, projectContainerId] = await waitForPromises(
       (
         [
-          [rootFsImageId, outputRootFsId],
-          [projectImageId, outputProjectId],
+          [rootFsImageId, `${tmpContentPrefix}-${outputRootFsId}`],
+          [projectImageId, `${tmpContentPrefix}-${outputProjectId}`],
         ] as const
       ).map(([imageId, outputId]) => this.brService.createContainer(imageId, outputId)),
     );
-    const result = await withExposedImages(
+    const result = await withRuntimeAndImages(
       this.brService,
-      [
-        [rootFsContainerId, EXPOSE_METHOD.BLOCK_DEV],
-        [projectContainerId, EXPOSE_METHOD.BLOCK_DEV],
-      ] as const,
-      ([rootFsSpec, projectFsSpec]) =>
-        runtime.withRuntime(
-          {
-            ssh: {
-              username: "hocus",
-              privateKey: this.agentConfig.prebuildSshPrivateKey,
-            },
-            fs: {
-              "/": rootFsSpec,
-              [this.devDir]: projectFsSpec,
-            },
-            memSizeMib,
-            vcpuCount,
-          },
-          async ({ ssh, sshConfig }) => {
-            const envScript = this.agentUtilService.generateEnvVarsScript(envVariables);
-            await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
-            await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
-            await waitForPromises(
-              tasks.map(async (task) => {
-                const script = this.agentUtilService.generatePrebuildTaskScript(
-                  task.originalCommand,
-                );
-                const paths = this.getPrebuildTaskPaths(task.idx);
-                await execSshCmd({ ssh }, ["mkdir", "-p", this.prebuildScriptsDir]);
-                await this.agentUtilService.writeFile(ssh, paths.scriptPath, script);
-              }),
-            );
+      runtime,
+      {
+        ssh: {
+          username: "hocus",
+          privateKey: this.agentConfig.prebuildSshPrivateKey,
+        },
+        fs: {
+          "/": rootFsContainerId,
+          [this.devDir]: projectContainerId,
+        },
+        memSizeMib,
+        vcpuCount,
+      },
+      async ({ ssh, sshConfig }) => {
+        const envScript = this.agentUtilService.generateEnvVarsScript(envVariables);
+        await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(WORKSPACE_ENV_SCRIPT_PATH)]);
+        await this.agentUtilService.writeFile(ssh, WORKSPACE_ENV_SCRIPT_PATH, envScript);
+        await waitForPromises(
+          tasks.map(async (task) => {
+            const script = this.agentUtilService.generatePrebuildTaskScript(task.originalCommand);
+            const paths = this.getPrebuildTaskPaths(task.idx);
+            await execSshCmd({ ssh }, ["mkdir", "-p", this.prebuildScriptsDir]);
+            await this.agentUtilService.writeFile(ssh, paths.scriptPath, script);
+          }),
+        );
 
-            return await this.agentUtilService.execVmTasks(
-              sshConfig,
-              db,
-              tasks.map((t) => ({
-                vmTaskId: t.vmTaskId,
-              })),
-            );
-          },
-        ),
+        return await this.agentUtilService.execVmTasks(
+          sshConfig,
+          db,
+          tasks.map((t) => ({
+            vmTaskId: t.vmTaskId,
+          })),
+        );
+      },
     );
     await waitForPromises(
       (
