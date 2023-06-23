@@ -8,11 +8,15 @@ import { v4 as uuidv4 } from "uuid";
 
 import type { AgentUtilService } from "../agent-util.service";
 import { BlockRegistryService } from "../block-registry/registry.service";
-import { EXPOSE_METHOD } from "../block-registry/registry.service";
-import { withExposedImages } from "../block-registry/utils";
 import { PROJECT_DIR } from "../constants";
 import type { HocusRuntime } from "../runtime/hocus-runtime";
-import { LocalLockNamespace, execCmdWithOpts, execSshCmd, withLocalLock } from "../utils";
+import {
+  LocalLockNamespace,
+  execCmdWithOpts,
+  execSshCmd,
+  withLocalLock,
+  withRuntimeAndImages,
+} from "../utils";
 
 import { RemoteInfoTupleValidator } from "./validator";
 
@@ -315,93 +319,86 @@ export class AgentGitService {
         sizeInGB: 64,
       });
       const outputDir = "/fr";
-      await withExposedImages(
+      await withRuntimeAndImages(
         this.blockRegistryService,
-        [
-          [rootFsContainerId, EXPOSE_METHOD.BLOCK_DEV],
-          [containerId, EXPOSE_METHOD.BLOCK_DEV],
-        ] as const,
-        async ([exposedRootFsContainer, exposedRepoContainer]) => {
-          await runtime.withRuntime(
-            {
-              ssh: {
-                username: "hocus",
-                password: "hocus",
-              },
-              kernelPath: this.agentConfig.defaultKernel,
-              fs: {
-                "/": exposedRootFsContainer,
-                [outputDir]: exposedRepoContainer,
-              },
-              memSizeMib: 4096,
-              vcpuCount: 2,
+        runtime,
+        {
+          ssh: {
+            username: "hocus",
+            password: "hocus",
+          },
+          kernelPath: this.agentConfig.defaultKernel,
+          fs: {
+            "/": rootFsContainerId,
+            [outputDir]: containerId,
+          },
+          memSizeMib: 1024,
+          vcpuCount: 1,
+        },
+        async ({ ssh }) => {
+          const repositoryDir = path.join(outputDir, PROJECT_DIR);
+          const outputDirOwner = await execSshCmd({ ssh }, [
+            "sudo",
+            "stat",
+            "-c",
+            "%U",
+            outputDir,
+          ]).then((r) => r.stdout.trim());
+          if (outputDirOwner !== "hocus") {
+            await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
+          }
+          const sshKey = repository.credentials.privateSshKey;
+          const sshDir = "/home/hocus/.ssh";
+          const sshKeyPath = path.join(sshDir, `${uuidv4()}.key`);
+          await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
+          await execSshCmd({ ssh }, ["sudo", "mount", "-t", "tmpfs", "ssh", sshDir]);
+          await execSshCmd({ ssh }, ["sudo", "chown", "hocus:hocus", sshDir]);
+          await execSshCmd({ ssh }, ["chmod", "700", sshDir]);
+          await this.agentUtilService.writeFile(ssh, sshKeyPath, sshKey);
+          await execSshCmd({ ssh }, ["chmod", "400", sshKeyPath]);
+
+          const sshOpts = {
+            execOptions: {
+              env: {
+                // Without this, git will ask for user input and the command will fail.
+                // This is obviously not secure, the correct method would be to
+                // TODO: allow the user to specify a known_hosts file.
+                GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o  UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no`,
+              } as any,
             },
-            async ({ ssh }) => {
-              const repositoryDir = path.join(outputDir, PROJECT_DIR);
-              const outputDirOwner = await execSshCmd({ ssh }, [
-                "sudo",
-                "stat",
-                "-c",
-                "%U",
-                outputDir,
-              ]).then((r) => r.stdout.trim());
-              if (outputDirOwner !== "hocus") {
-                await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
-              }
-              const sshKey = repository.credentials.privateSshKey;
-              const sshDir = "/home/hocus/.ssh";
-              const sshKeyPath = path.join(sshDir, `${uuidv4()}.key`);
-              await execSshCmd({ ssh }, ["mkdir", "-p", sshDir]);
-              await execSshCmd({ ssh }, ["sudo", "mount", "-t", "tmpfs", "ssh", sshDir]);
-              await execSshCmd({ ssh }, ["sudo", "chown", "hocus:hocus", sshDir]);
-              await execSshCmd({ ssh }, ["chmod", "700", sshDir]);
-              await this.agentUtilService.writeFile(ssh, sshKeyPath, sshKey);
-              await execSshCmd({ ssh }, ["chmod", "400", sshKeyPath]);
+          };
 
-              const sshOpts = {
-                execOptions: {
-                  env: {
-                    // Without this, git will ask for user input and the command will fail.
-                    // This is obviously not secure, the correct method would be to
-                    // TODO: allow the user to specify a known_hosts file.
-                    GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o  UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no`,
-                  } as any,
-                },
-              };
+          const repositoryExists =
+            (
+              await execSshCmd({ ssh, allowNonZeroExitCode: true }, [
+                "test",
+                "-d",
+                `${repositoryDir}/.git`,
+              ])
+            ).code === 0;
+          if (repositoryExists) {
+            await execSshCmd({ ssh, opts: { ...sshOpts, cwd: repositoryDir } }, [
+              "git",
+              "fetch",
+              "--all",
+            ]);
+          } else {
+            await execSshCmd(
+              {
+                ssh,
+                opts: sshOpts,
+              },
+              ["git", "clone", "--no-checkout", repository.url, repositoryDir],
+            );
+          }
 
-              const repositoryExists =
-                (
-                  await execSshCmd({ ssh, allowNonZeroExitCode: true }, [
-                    "test",
-                    "-d",
-                    `${repositoryDir}/.git`,
-                  ])
-                ).code === 0;
-              if (repositoryExists) {
-                await execSshCmd({ ssh, opts: { ...sshOpts, cwd: repositoryDir } }, [
-                  "git",
-                  "fetch",
-                  "--all",
-                ]);
-              } else {
-                await execSshCmd(
-                  {
-                    ssh,
-                    opts: sshOpts,
-                  },
-                  ["git", "clone", "--no-checkout", repository.url, repositoryDir],
-                );
-              }
-
-              // TODO: This is a PITA as LFS might span TB's of data .-. we need to revisit this in the future
-              await execSshCmd({ ssh, opts: { ...sshOpts, cwd: repositoryDir } }, [
-                "git",
-                "lfs",
-                "fetch",
-                "--all",
-              ]);
-            },
-          );
+          // TODO: This is a PITA as LFS might span TB's of data .-. we need to revisit this in the future
+          await execSshCmd({ ssh, opts: { ...sshOpts, cwd: repositoryDir } }, [
+            "git",
+            "lfs",
+            "fetch",
+            "--all",
+          ]);
         },
       );
     });
