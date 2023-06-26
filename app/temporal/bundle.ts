@@ -10,5 +10,9 @@ export async function generateTemporalCodeBundle(
       ((config.resolve as any).alias as any)["~"] = "/app";
       return config;
     },
+    logger: {
+      ...console,
+      info: () => {},
+    },
   });
 }

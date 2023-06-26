@@ -1,3 +1,5 @@
+import type { Object as Obj } from "ts-toolbelt";
+
 import { makeConfig, get, getEnv } from "./utils.server";
 
 import {
@@ -104,3 +106,11 @@ export const config = makeConfig()({
     testOutputOciRegistryPassword: process.env.TEST_OUTPUT_OCI_REGISTRY_PASSWORD,
   }),
 });
+
+export type ConfigOverrides = {
+  [K in keyof Config]?: Config[K] extends () => infer R
+    ? R extends object
+      ? Obj.Partial<R, "deep">
+      : R
+    : Config[K];
+};

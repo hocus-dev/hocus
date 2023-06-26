@@ -1,3 +1,3 @@
 export const mutexTest = async (): Promise<number> => {
-  return 0;
+  throw new Error("must be overridden");
 };

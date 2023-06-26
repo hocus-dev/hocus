@@ -1,12 +1,15 @@
 import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
 import { Context } from "@temporalio/activity";
-import type { WorkflowExecutionStatusName, WorkflowHandle } from "@temporalio/client";
+import type { Client, WorkflowExecutionStatusName, WorkflowHandle } from "@temporalio/client";
+import { Worker } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 import { v4 as uuidv4 } from "uuid";
 
+import type { TestActivities } from "./activities";
+import { createTestActivities } from "./activities";
 import { cancelLockSignal, isLockAcquiredQuery, releaseLockSignal } from "./mutex/shared";
 import { runSharedWorkflowTest } from "./shared-workflow/workflow";
-import { createTestRepo, prepareTests } from "./utils";
+import { createTestRepo } from "./utils";
 import {
   testLock,
   cancellationTestWorkflow,
@@ -21,10 +24,53 @@ import {
   sharedWorkflowIdQuery,
 } from "~/agent/activities/shared-workflow/shared";
 import { withActivityHeartbeat } from "~/agent/activities/utils";
+import { createAgentInjector } from "~/agent/agent-injector";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { sleep, unwrap, waitForPromises } from "~/utils.shared";
 
-const { provideTestActivities } = prepareTests();
+type CreateWorkerFn = (args?: {
+  activityOverrides?: Partial<TestActivities>;
+  taskQueue?: string;
+}) => Promise<{ worker: Worker; client: Client; taskQueue: string }>;
+
+const testEnv = new TestEnvironmentBuilder(createAgentInjector)
+  .withTestLogging()
+  .withTestDb()
+  .withTimeSkippingTemporal("~/agent/workflows/tests/workflows")
+  .withBlockRegistry()
+  .withLateInits({
+    activities: async ({ lateInitPromises, injector }) => {
+      const db = await lateInitPromises.db;
+      return createTestActivities(injector, db);
+    },
+  })
+  .withLateInits({
+    createWorker: async ({ lateInitPromises }) => {
+      const taskQueue = await lateInitPromises.taskQueue;
+      const workflowBundle = await lateInitPromises.workflowBundle;
+      const temporalTestEnv = await lateInitPromises.temporalTestEnv;
+      const activities = await lateInitPromises.activities;
+
+      const result: CreateWorkerFn = async (args) => {
+        const { nativeConnection } = temporalTestEnv;
+        const worker = await Worker.create({
+          connection: nativeConnection,
+          taskQueue,
+          activities: {
+            ...activities,
+            ...args?.activityOverrides,
+          },
+          dataConverter: {
+            payloadConverterPath: require.resolve("~/temporal/data-converter"),
+          },
+          workflowBundle,
+        });
+        return { worker, client: temporalTestEnv.client, taskQueue };
+      };
+      return result;
+    },
+  });
 
 // Temporal worker setup is long
 jest.setTimeout(300 * 1000);
@@ -44,7 +90,7 @@ jest.setTimeout(300 * 1000);
 // CancellationScope.nonCancellable to prevent this.
 test.concurrent(
   "cancellationTest",
-  provideTestActivities(async ({ createWorker }) => {
+  testEnv.run(async ({ createWorker }) => {
     const locks = new Map(
       await Promise.all(
         ["1", "2", "3", "4"].map(async (id) => {
@@ -97,7 +143,7 @@ test.concurrent(
 
 test.concurrent(
   "withLock",
-  provideTestActivities(async ({ createWorker }) => {
+  testEnv.run(async ({ createWorker }) => {
     let counter = 0;
     const { worker, client, taskQueue } = await createWorker({
       activityOverrides: {
@@ -179,7 +225,7 @@ const waitForStatus = async (
 // - mutex lock can start again after completion
 test.concurrent(
   "lock cancellation",
-  provideTestActivities(async ({ createWorker, activities }) => {
+  testEnv.run(async ({ createWorker, activities }) => {
     const { worker, client, taskQueue } = await createWorker();
 
     const scheduleAcquireLock = (lockId: string) =>
@@ -263,7 +309,7 @@ test.concurrent(
 // 5. running shared workflow again after it completed successfully works
 test.concurrent(
   "withSharedWorkflow",
-  provideTestActivities(async ({ createWorker }) => {
+  testEnv.run(async ({ createWorker }) => {
     const mutex = new Mutex();
     let counter = 0;
     let release = await mutex.acquire();
@@ -363,10 +409,11 @@ test.concurrent(
 
 test.concurrent(
   "cancel prebuild",
-  provideTestActivities(async ({ createWorker, injector, db }) => {
+  testEnv.run(async ({ createWorker, injector, db, suppressLogPattern }) => {
     const { worker, client, taskQueue } = await createWorker();
     const projectService = injector.resolve(Token.ProjectService);
     const agentGitService = injector.resolve(Token.AgentGitService);
+    suppressLogPattern("Not connected to server");
 
     await worker.runUntil(async () => {
       const repo = await createTestRepo(db, injector);

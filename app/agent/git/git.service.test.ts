@@ -163,12 +163,17 @@ test.concurrent(
     ])
     .run(async ({ injector, runId, brService }) => {
       const gitService = injector.resolve(Token.AgentGitService);
-      const imageTag = "fetchrepo";
+      const outputId = "fetchrepo";
 
-      const fetchRepo = (runtimeService: HocusRuntime) =>
-        gitService.fetchRepository(runtimeService, imageTag, {
-          credentials: { privateSshKey: TESTS_PRIVATE_SSH_KEY },
-          url: TESTS_REPO_URL,
+      const fetchRepo = (runtime: HocusRuntime) =>
+        gitService.fetchRepository({
+          runtime,
+          outputId,
+          repository: {
+            credentials: { privateSshKey: TESTS_PRIVATE_SSH_KEY },
+            url: TESTS_REPO_URL,
+          },
+          tmpContentPrefix: "test",
         });
       let ctr = 0;
       const getRuntime = () => {
@@ -180,7 +185,7 @@ test.concurrent(
 
       const txtFilePath = "test.txt";
       const txtFileContent = "test";
-      const containerId = BlockRegistryService.genContainerId(imageTag);
+      const containerId = BlockRegistryService.genContainerId(outputId);
       await withExposedImage(
         brService,
         containerId,
