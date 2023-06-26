@@ -56,7 +56,6 @@ test.concurrent(
       temporalTestEnv,
       taskQueue,
       suppressLogPattern,
-      unsuppressLogPattern,
     } = args;
     let isGetWorkspaceInstanceStatusMocked = true;
     const { client, nativeConnection } = temporalTestEnv;
@@ -310,7 +309,6 @@ test.concurrent(
           isGetWorkspaceInstanceStatusMocked = value;
         },
         suppressLogPattern,
-        unsuppressLogPattern,
       });
 
       const successfulPrebuildEvents = await db.prebuildEvent.findMany({

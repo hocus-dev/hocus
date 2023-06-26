@@ -23,8 +23,7 @@ export const testWorkspace = async (args: {
   injector: AgentInjector;
   testUser: Awaited<ReturnType<typeof createTestUser>>;
   setWorkspaceInstanceStatusMocked: (mocked: boolean) => void;
-  suppressLogPattern: (pattern: string) => number;
-  unsuppressLogPattern: (patternId: number) => void;
+  suppressLogPattern: (pattern: string) => void;
 }): Promise<void> => {
   const { db, client, taskQueue, workspace, branchName, injector, testUser } = args;
   const brService = injector.resolve(Token.BlockRegistryService);
@@ -132,7 +131,7 @@ export const testWorkspace = async (args: {
   });
   const expectedErrorMessage =
     "Workspace state WORKSPACE_STATUS_STARTED is not one of WORKSPACE_STATUS_STOPPED, WORKSPACE_STATUS_STOPPED_WITH_ERROR";
-  const patternId = args.suppressLogPattern(expectedErrorMessage);
+  args.suppressLogPattern(expectedErrorMessage);
   await startWorkspace()
     .then(() => {
       throw new Error("should have thrown");
@@ -140,7 +139,6 @@ export const testWorkspace = async (args: {
     .catch((err: any) => {
       expect(err?.cause?.cause?.message).toMatch(expectedErrorMessage);
     });
-  args.unsuppressLogPattern(patternId);
   const workspaceWithImages = await db.workspace.findUniqueOrThrow({
     where: {
       id: workspace.id,

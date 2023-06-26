@@ -40,7 +40,6 @@ test.concurrent(
       taskQueue,
       brService,
       suppressLogPattern,
-      unsuppressLogPattern,
     }) => {
       let isGetWorkspaceInstanceStatusMocked = true;
       const { client, nativeConnection } = temporalTestEnv;
@@ -195,7 +194,6 @@ test.concurrent(
             isGetWorkspaceInstanceStatusMocked = value;
           },
           suppressLogPattern,
-          unsuppressLogPattern,
         });
       });
     },
