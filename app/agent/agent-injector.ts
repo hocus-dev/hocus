@@ -9,7 +9,6 @@ import { LowLevelStorageService, StorageService } from "./network/storage/storag
 import { WorkspaceNetworkService } from "./network/workspace-network.service";
 import { PrebuildService } from "./prebuild.service";
 import { ProjectConfigService } from "./project-config/project-config.service";
-import { factoryFirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
 import { factoryQemuService } from "./runtime/qemu/qemu.service";
 import { WorkspaceAgentService } from "./workspace-agent.service";
 
@@ -51,7 +50,6 @@ const providers = [
   { token: Token.PrebuildService, provide: { class: PrebuildService } },
   { token: Token.SSHGatewayService, provide: { class: SSHGatewayService } },
   { token: Token.WorkspaceNetworkService, provide: { class: WorkspaceNetworkService } },
-  { token: Token.FirecrackerService, provide: { factory: factoryFirecrackerService } },
   { token: Token.QemuService, provide: { factory: factoryQemuService } },
   { token: Token.WorkspaceAgentService, provide: { class: WorkspaceAgentService } },
   { token: Token.TemporalClient, provide: { factory: clientFactory } },
