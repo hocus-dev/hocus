@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 
 import { SshKeyPairType } from "@prisma/client";
-import { DefaultLogger, Runtime, Worker } from "@temporalio/worker";
+import { Worker } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import { createActivities } from "~/agent/activities/list";
@@ -71,12 +71,6 @@ users:
       - name: name_b7b83d63-a9b0-4871-92d0-07779f28cfa8
         publicKey: pk_b7b83d63-a9b0-4871-92d0-07779f28cfa8
 `;
-
-beforeAll(async () => {
-  Runtime.install({
-    logger: new DefaultLogger("WARN"),
-  });
-});
 
 test.concurrent(
   "getInitConfig",
