@@ -11,7 +11,7 @@
 <p>
 
 <p align="center">
-  <a href="https://hocus.dev/docs">Docs</a> - <a href="https://github.com/hocus-dev/hocus/issues/new/choose">Bug report</a>
+  <a href="https://hocus.dev/docs">Docs</a> - <a href="https://github.com/hocus-dev/hocus/issues/new/choose">Bug report</a> - <a href="https://join.slack.com/t/hocus-dev/shared_invite/zt-1yhsrtd84-lL7~bPl1Rd~_ZqVBzp2Ycg">Slack</a>
 </p>
 
 **Hocus** is a self-hosted application that spins up ready-to-code, disposable development environments on your own servers in seconds. You define your dev environments as code and launch them instantly from your browser. It's a **self-hosted alternative** to **Gitpod** and **Github Codespaces**.
