@@ -6,18 +6,18 @@ import type { LogEntry } from "@temporalio/worker";
 import { DefaultLogger, Runtime } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 
-let loggingInstalled: boolean = false;
+let testEnv: TestWorkflowEnvironment | undefined = void 0;
+let envAddress = "";
 const suppressedLogPatterns = new Map<string, Array<string | RegExp>>();
 const mutex = new Mutex();
-const secondMutex = new Mutex();
 
 export const initTemporal = async (): Promise<{
   env: TestWorkflowEnvironment;
   address: string;
 }> => {
-  await mutex.runExclusive(async () => {
-    if (loggingInstalled) {
-      return null;
+  return mutex.runExclusive(async () => {
+    if (testEnv != null) {
+      return { env: testEnv, address: envAddress };
     }
     Runtime.install({
       logger: new DefaultLogger("WARN", (entry: LogEntry) => {
@@ -50,10 +50,7 @@ export const initTemporal = async (): Promise<{
         }
       }),
     });
-    loggingInstalled = true;
-  });
-  const testEnv = await secondMutex.runExclusive(() =>
-    TestWorkflowEnvironment.createLocal({
+    const env = await TestWorkflowEnvironment.createLocal({
       server: {
         ip: "127.0.0.1",
       },
@@ -62,11 +59,11 @@ export const initTemporal = async (): Promise<{
           payloadConverterPath: require.resolve("~/temporal/data-converter"),
         },
       },
-    }),
-  );
-  const address = getEphemeralServerTarget(testEnv["server"]);
-  console.log(`initialized temporal test env at ${address}`);
-  return { env: testEnv, address };
+    });
+    const address = getEphemeralServerTarget(env["server"]);
+    console.log(`initialized temporal test env at ${address}`);
+    return { env, address };
+  });
 };
 
 export const suppressLogPattern = (taskQueue: string, pattern: string | RegExp) => {
@@ -81,3 +78,10 @@ export const suppressLogPattern = (taskQueue: string, pattern: string | RegExp) 
 export const removeSuppressedLogPatterns = (taskQueue: string): void => {
   suppressedLogPatterns.delete(taskQueue);
 };
+
+afterAll(async () => {
+  if (testEnv != null) {
+    await testEnv.teardown();
+    testEnv = void 0;
+  }
+});

@@ -411,11 +411,8 @@ export class TestEnvironmentBuilder<
           }
           return bundles[bundlePath];
         },
-        temporalTestEnv: async ({ addTeardownFunction }) => {
+        temporalTestEnv: async () => {
           const { env } = await initTemporal();
-          addTeardownFunction(async () => {
-            await env.teardown();
-          });
           return env;
         },
         taskQueue: async ({ runId }) => runId,
