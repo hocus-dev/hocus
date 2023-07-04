@@ -53,7 +53,7 @@ export const initTemporal = async (): Promise<{
     });
     loggingInstalled = true;
   });
-  return portfinder.getPortPromise().then(async (port) => ({
+  const testEnv = await portfinder.getPortPromise().then(async (port) => ({
     host,
     port,
     env: await TestWorkflowEnvironment.createLocal({
@@ -68,6 +68,8 @@ export const initTemporal = async (): Promise<{
       },
     }),
   }));
+  console.log(`initialized temporal test env at ${testEnv.host}:${testEnv.port}`);
+  return testEnv;
 };
 
 export const suppressLogPattern = (taskQueue: string, pattern: string | RegExp) => {
