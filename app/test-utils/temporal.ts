@@ -6,8 +6,7 @@ import { DefaultLogger, Runtime } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 import portfinder from "portfinder";
 
-let testEnv: TestWorkflowEnvironment | undefined = void 0;
-let temporalPort: number = 0;
+let loggingInstalled: boolean = false;
 const host = "127.0.0.1";
 const suppressedLogPatterns = new Map<string, Array<string | RegExp>>();
 const mutex = new Mutex();
@@ -17,9 +16,9 @@ export const initTemporal = async (): Promise<{
   host: string;
   port: number;
 }> => {
-  return mutex.runExclusive(async () => {
-    if (testEnv != null) {
-      return { env: testEnv, host, port: temporalPort };
+  await mutex.runExclusive(async () => {
+    if (loggingInstalled) {
+      return null;
     }
     Runtime.install({
       logger: new DefaultLogger("WARN", (entry: LogEntry) => {
@@ -52,24 +51,23 @@ export const initTemporal = async (): Promise<{
         }
       }),
     });
-    const { port, env } = await portfinder.getPortPromise().then(async (port) => ({
-      port,
-      env: await TestWorkflowEnvironment.createLocal({
-        server: {
-          ip: "127.0.0.1",
-          port,
-        },
-        client: {
-          dataConverter: {
-            payloadConverterPath: require.resolve("~/temporal/data-converter"),
-          },
-        },
-      }),
-    }));
-    testEnv = env;
-    temporalPort = port;
-    return { env, host, port };
+    loggingInstalled = true;
   });
+  return portfinder.getPortPromise().then(async (port) => ({
+    host,
+    port,
+    env: await TestWorkflowEnvironment.createLocal({
+      server: {
+        ip: "127.0.0.1",
+        port,
+      },
+      client: {
+        dataConverter: {
+          payloadConverterPath: require.resolve("~/temporal/data-converter"),
+        },
+      },
+    }),
+  }));
 };
 
 export const suppressLogPattern = (taskQueue: string, pattern: string | RegExp) => {
@@ -84,10 +82,3 @@ export const suppressLogPattern = (taskQueue: string, pattern: string | RegExp) 
 export const removeSuppressedLogPatterns = (taskQueue: string): void => {
   suppressedLogPatterns.delete(taskQueue);
 };
-
-afterAll(async () => {
-  if (testEnv != null) {
-    await testEnv.teardown();
-    testEnv = void 0;
-  }
-});
