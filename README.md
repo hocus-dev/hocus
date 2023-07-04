@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <a target="_blank" rel="nofollow" href="https://join.slack.com/t/hocus-dev/shared_invite/zt-1yhsrtd84-lL7~bPl1Rd~_ZqVBzp2Ycg">
-    <img src="https://github.com/hocus-dev/hocus/assets/28019628/9fe874f4-53cd-4a31-895e-296037c0e516" alt="slack" style="max-width: 100%;">
+  <a rel="nofollow" href="https://join.slack.com/t/hocus-dev/shared_invite/zt-1yhsrtd84-lL7~bPl1Rd~_ZqVBzp2Ycg">
+    <img src="https://user-images.githubusercontent.com/28019628/250884222-9fe874f4-53cd-4a31-895e-296037c0e516.svg" alt="slack" style="max-width: 100%;">
   </a>
 </p>
 
