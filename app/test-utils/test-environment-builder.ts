@@ -390,8 +390,7 @@ export class TestEnvironmentBuilder<
       {
         ...this.earlyInit,
         withTimeSkippingTemporal: async ({ overrideConfig }) => {
-          const { host, port } = await initTemporal();
-          const address = `${host}:${port}`;
+          const { address } = await initTemporal();
           overrideConfig({
             agent: {
               temporalAddress: address,
