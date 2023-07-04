@@ -9,6 +9,7 @@ import { Mutex } from "async-mutex";
 let loggingInstalled: boolean = false;
 const suppressedLogPatterns = new Map<string, Array<string | RegExp>>();
 const mutex = new Mutex();
+const secondMutex = new Mutex();
 
 export const initTemporal = async (): Promise<{
   env: TestWorkflowEnvironment;
@@ -51,16 +52,18 @@ export const initTemporal = async (): Promise<{
     });
     loggingInstalled = true;
   });
-  const testEnv = await TestWorkflowEnvironment.createLocal({
-    server: {
-      ip: "127.0.0.1",
-    },
-    client: {
-      dataConverter: {
-        payloadConverterPath: require.resolve("~/temporal/data-converter"),
+  const testEnv = await secondMutex.runExclusive(() =>
+    TestWorkflowEnvironment.createLocal({
+      server: {
+        ip: "127.0.0.1",
       },
-    },
-  });
+      client: {
+        dataConverter: {
+          payloadConverterPath: require.resolve("~/temporal/data-converter"),
+        },
+      },
+    }),
+  );
   const address = getEphemeralServerTarget(testEnv["server"]);
   console.log(`initialized temporal test env at ${address}`);
   return { env: testEnv, address };
