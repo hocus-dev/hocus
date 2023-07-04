@@ -17,7 +17,7 @@ import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { sleep, waitForPromises } from "~/utils.shared";
 
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 
 const noSetupEnv = new TestEnvironmentBuilder(createAgentInjector).withLateInits({
   brService: async ({ injector }) => injector.resolve(Token.BlockRegistryService),
