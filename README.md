@@ -3,15 +3,13 @@
 </p>
 
 <p align="center">
-   <a href="https://hocus.dev">
-      <img alt="Website" src="https://img.shields.io/badge/website-hocus.dev-blue"/>
-   </a>
-   <img alt="Language" src="https://img.shields.io/badge/platform-linux-green"/>
-   <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/m/hocus-dev/hocus"/>
-<p>
+  <a target="_blank" rel="nofollow" href="https://join.slack.com/t/hocus-dev/shared_invite/zt-1yhsrtd84-lL7~bPl1Rd~_ZqVBzp2Ycg">
+    <img src="https://github.com/hocus-dev/hocus/assets/28019628/9fe874f4-53cd-4a31-895e-296037c0e516" alt="slack" style="max-width: 100%;">
+  </a>
+</p>
 
 <p align="center">
-  <a href="https://hocus.dev/docs">Docs</a> - <a href="https://github.com/hocus-dev/hocus/issues/new/choose">Bug report</a> - <a href="https://join.slack.com/t/hocus-dev/shared_invite/zt-1yhsrtd84-lL7~bPl1Rd~_ZqVBzp2Ycg">Slack</a>
+  <a href="https://hocus.dev/">Website</a> - <a href="https://hocus.dev/docs">Docs</a> - <a href="https://github.com/hocus-dev/hocus/issues/new/choose">Bug report</a> - <a href="https://join.slack.com/t/hocus-dev/shared_invite/zt-1yhsrtd84-lL7~bPl1Rd~_ZqVBzp2Ycg">Slack</a>
 </p>
 
 **Hocus** is a self-hosted application that spins up ready-to-code, disposable development environments on your own servers in seconds. You define your dev environments as code and launch them instantly from your browser. It's a **self-hosted alternative** to **Gitpod** and **Github Codespaces**.
