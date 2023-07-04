@@ -5,12 +5,17 @@ import type { LogEntry } from "@temporalio/worker";
 import { DefaultLogger, Runtime } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 
+import { withFreePort } from "./port";
+
 let loggingInstalled: boolean = false;
+const host = "127.0.0.1";
 const suppressedLogPatterns = new Map<string, Array<string | RegExp>>();
 const mutex = new Mutex();
 
 export const initTemporal = async (): Promise<{
   env: TestWorkflowEnvironment;
+  host: string;
+  port: number;
 }> => {
   await mutex.runExclusive(async () => {
     if (loggingInstalled) {
@@ -49,17 +54,23 @@ export const initTemporal = async (): Promise<{
     });
     loggingInstalled = true;
   });
-  const env = await TestWorkflowEnvironment.createLocal({
-    server: {
-      ip: "127.0.0.1",
-    },
-    client: {
-      dataConverter: {
-        payloadConverterPath: require.resolve("~/temporal/data-converter"),
+  const testEnv = await withFreePort(async (port) => ({
+    host,
+    port,
+    env: await TestWorkflowEnvironment.createLocal({
+      server: {
+        ip: "127.0.0.1",
+        port,
       },
-    },
-  });
-  return { env };
+      client: {
+        dataConverter: {
+          payloadConverterPath: require.resolve("~/temporal/data-converter"),
+        },
+      },
+    }),
+  }));
+  console.log(`initialized temporal test env at ${testEnv.host}:${testEnv.port}`);
+  return testEnv;
 };
 
 export const suppressLogPattern = (taskQueue: string, pattern: string | RegExp) => {
