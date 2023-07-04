@@ -50,7 +50,7 @@ export const initTemporal = async (): Promise<{
         }
       }),
     });
-    const env = await TestWorkflowEnvironment.createLocal({
+    testEnv = await TestWorkflowEnvironment.createLocal({
       server: {
         ip: "127.0.0.1",
       },
@@ -60,9 +60,9 @@ export const initTemporal = async (): Promise<{
         },
       },
     });
-    address = getEphemeralServerTarget(env["server"]);
+    address = getEphemeralServerTarget(testEnv["server"]);
     console.log(`initialized temporal test env at ${address}`);
-    return { env, address };
+    return { env: testEnv, address };
   });
 };
 
