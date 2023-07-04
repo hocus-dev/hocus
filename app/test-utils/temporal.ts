@@ -7,7 +7,7 @@ import { DefaultLogger, Runtime } from "@temporalio/worker";
 import { Mutex } from "async-mutex";
 
 let testEnv: TestWorkflowEnvironment | undefined = void 0;
-let envAddress = "";
+let address = "";
 const suppressedLogPatterns = new Map<string, Array<string | RegExp>>();
 const mutex = new Mutex();
 
@@ -17,7 +17,7 @@ export const initTemporal = async (): Promise<{
 }> => {
   return mutex.runExclusive(async () => {
     if (testEnv != null) {
-      return { env: testEnv, address: envAddress };
+      return { env: testEnv, address };
     }
     Runtime.install({
       logger: new DefaultLogger("WARN", (entry: LogEntry) => {
@@ -60,7 +60,7 @@ export const initTemporal = async (): Promise<{
         },
       },
     });
-    const address = getEphemeralServerTarget(env["server"]);
+    address = getEphemeralServerTarget(env["server"]);
     console.log(`initialized temporal test env at ${address}`);
     return { env, address };
   });
