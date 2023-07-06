@@ -61,7 +61,6 @@ export const initTemporal = async (): Promise<{
       },
     });
     address = getEphemeralServerTarget(testEnv["server"]);
-    console.log(`initialized temporal test env at ${address}`);
     return { env: testEnv, address };
   });
 };

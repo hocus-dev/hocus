@@ -6,7 +6,7 @@ import fs from "fs/promises";
 import { join } from "path";
 import { formatWithOptions } from "util";
 
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
 import type { TestWorkflowEnvironment } from "@temporalio/testing";
@@ -336,30 +336,14 @@ export class TestEnvironmentBuilder<
           { runId, prismaSchemaPath: "prisma/schema.prisma" },
         );
         const dbUrl = `postgresql://postgres:pass@${DB_HOST}:5432/${rsp.dbName}`;
-
         const db = new PrismaClient({
           datasources: {
             db: { url: dbUrl },
           },
         });
-
-        const changeSequenceNumbers = async (): Promise<void> => {
-          const modelNames = Object.values(Prisma.ModelName).sort((a, b) => a.localeCompare(b));
-          const startId = Math.floor(Math.random() * 250000);
-          await waitForPromises(
-            modelNames.map((name, idx) =>
-              db.$executeRawUnsafe(
-                `ALTER SEQUENCE "${name}_id_seq" RESTART WITH ${(startId + idx + 1) * 1000000}`,
-              ),
-            ),
-          );
-        };
-        await changeSequenceNumbers();
-
         addTeardownFunction(async () => {
           await db.$disconnect();
         });
-
         return db;
       },
       ...this.lateInit,
