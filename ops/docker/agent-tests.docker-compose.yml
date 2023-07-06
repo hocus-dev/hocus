@@ -39,7 +39,6 @@ services:
         ops/bin/dev/download-kernel.sh /agent_data/resources
       "
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - agent-test-data:/agent_data:rw
 
   setup-tcmu:
