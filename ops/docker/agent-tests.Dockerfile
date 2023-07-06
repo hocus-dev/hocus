@@ -4,7 +4,6 @@ FROM quay.io/hocus/hocus-prebuilds-agent-dev:88597e72173bcb830fb69805bcfb9e0ebae
 
 WORKDIR /app
 COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
-COPY deps deps
 COPY package.json yarn.lock ./
 RUN --mount=type=cache,id=hocus-tests-yarn,sharing=locked,target=/usr/local/share/.cache/yarn \
    yarn --frozen-lockfile
