@@ -1,3 +1,4 @@
+# This Dockerfile is used to build images in https://quay.io/repository/hocus/core
 FROM alpine:3.18 AS fetchrepo
 
 RUN apk add \
