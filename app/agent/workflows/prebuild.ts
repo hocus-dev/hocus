@@ -188,7 +188,7 @@ async function runSingleBuildfsAndPrebuildInner(
   await changePrebuildEventStatus(prebuildEvent.id, "PREBUILD_EVENT_STATUS_RUNNING");
   if (buildfsEvent != null) {
     const { buildSuccessful, error } = await withSharedWorkflow({
-      lockId: `buildfs-${buildfsEvent.event.id}`,
+      lockId: `buildfs-${buildfsEvent.event.externalId}`,
       workflow: runBuildfs,
       params: [buildfsEvent.event.id, checkoutOutputId, batchId],
     });

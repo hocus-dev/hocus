@@ -168,6 +168,7 @@ model VmTask {
 
 model BuildfsEvent {
   id                 BigInt               @id @default(autoincrement())
+  externalId         String               @unique @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   vmTask             VmTask               @relation(fields: [vmTaskId], references: [id])
   vmTaskId           BigInt
   /// Relative path to the Dockerfile in the `project` directory of the input drive.
