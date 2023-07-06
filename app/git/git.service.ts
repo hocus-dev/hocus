@@ -8,7 +8,6 @@ import type { GitRepoConnectionStatus } from "./types.shared";
 import type { SshKeyService } from "~/ssh-key/ssh-key.service";
 import type { TimeService } from "~/time.service";
 import { Token } from "~/token";
-import { sha256 } from "~/utils.server";
 
 export class GitService {
   static inject = [Token.SshKeyService, Token.TimeService] as const;
@@ -163,23 +162,5 @@ export class GitService {
       return { status: "disconnected" };
     }
     return { status: "connected", lastConnectedAt };
-  }
-
-  computeGitRepositoryImageTag(args: {
-    gitRepositoryUrl: string;
-    extras?: {
-      lastFetchAt: Date;
-      randomId: string;
-    };
-  }): string {
-    let tag = sha256(args.gitRepositoryUrl);
-    if (args.extras != null) {
-      tag += `-${Math.floor(args.extras.lastFetchAt.getTime() / 1000)}`;
-      tag += `-${args.extras.randomId}`;
-    }
-    if (tag.length > 128) {
-      throw new Error(`Computed tag is too long: ${tag}`);
-    }
-    return tag;
   }
 }
