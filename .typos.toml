@@ -15,7 +15,6 @@ extend-exclude = [
     "public/font-awesome/*",
     "public/fonts/*",
     "ops/docker/resources/keycloak-db-dump.sql",
-    "deps/firecracker-client/",
     "app/agent/block-registry/oci-schema/typebox/typescript-to-typebox.ts",
     "app/agent/block-registry/test-data/*.Dockerfile",
     "app/agent/block-registry/test-data/resources",

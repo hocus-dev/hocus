@@ -42,7 +42,6 @@
     "dockerfile-ast": "^0.5.0",
     "dotenv": "^16.0.2",
     "express-openid-connect": "^2.8.0",
-    "firecracker-client": "./deps/firecracker-client",
     "flowbite": "^1.6.2",
     "flowbite-react": "0.4.2",
     "fs-ext": "^2.0.0",

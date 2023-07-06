@@ -1,4 +1,3 @@
-import { FetchError, ResponseError } from "firecracker-client";
 import * as sinon from "ts-sinon";
 import type { Class } from "ts-toolbelt";
 import { v4 as uuidv4 } from "uuid";
@@ -31,15 +30,7 @@ export const printErrors = <T>(testFn: () => Promise<T>, runId?: string): (() =>
       return await testFn();
     } catch (err) {
       /* eslint-disable no-console */
-      if (err instanceof ResponseError) {
-        console.error(
-          `[${runId}] Status: ${err.response.status} ${
-            err.response.statusText
-          }\n${await err.response.text()}`,
-        );
-      } else if (err instanceof FetchError) {
-        console.error(`[${runId}] ${JSON.stringify(err.cause)}`);
-      } else if (err instanceof GroupError) {
+      if (err instanceof GroupError) {
         for (const innerError of err.errors) {
           console.error(`[${runId}] ${JSON.stringify(innerError)}`);
         }

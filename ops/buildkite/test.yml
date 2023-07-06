@@ -32,7 +32,7 @@ steps:
                   "{{matrix}}",
                   "--text",
                   "--ignore",
-                  ".git/,deps/firecracker-client/,**/*.excalidraw,public/font-awesome/,public/fonts/,public/devicon.min.css,prisma/migrations/migration_lock.toml,ops/docker/resources/keycloak-db-dump.sql",
+                  ".git/,**/*.excalidraw,public/font-awesome/,public/fonts/,public/devicon.min.css,prisma/migrations/migration_lock.toml,ops/docker/resources/keycloak-db-dump.sql",
                   "--path",
                   ".",
                 ]

@@ -57,7 +57,6 @@ ignorePaths:
   - .linting
   - .env
   - .vscode
-  - deps/firecracker-client
   - buildkite-agent.cfg.example
   - ops/bin/kvm-ok
 words:

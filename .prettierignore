@@ -3,7 +3,6 @@ public/build
 public/font-awesome
 public/fonts
 ops/docker/resources/keycloak-db-dump.sql
-deps/firecracker-client/
 node_modules
 *.excalidraw
 *.min.css
