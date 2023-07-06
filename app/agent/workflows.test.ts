@@ -432,9 +432,8 @@ test.concurrent(
 
 test.concurrent(
   "scheduleNewPrebuild",
-  testEnv.run(async ({ activities, temporalTestEnv, runId, workflowBundle, injector, db }) => {
+  testEnv.run(async ({ activities, temporalTestEnv, taskQueue, workflowBundle, injector, db }) => {
     const { client, nativeConnection } = temporalTestEnv;
-    const taskQueue = runId;
     const worker = await Worker.create({
       connection: nativeConnection,
       taskQueue,
