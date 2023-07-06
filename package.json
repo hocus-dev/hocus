@@ -32,7 +32,6 @@
     "@temporalio/worker": "^1.7.4",
     "@types/fs-ext": "^2.0.0",
     "async-mutex": "^0.4.0",
-    "axios": "^0.27.2",
     "body-parser": "^1.20.0",
     "bson": "^5.1.0",
     "cbor-x": "^1.5.0",
@@ -59,7 +58,6 @@
     "sshpk": "^1.17.0",
     "tail": "^2.2.4",
     "ts-pattern": "^4.1.2",
-    "undici": "5.11.0",
     "unique-names-generator": "^4.7.1",
     "winston": "^3.8.1",
     "yaml": "^2.1.3"
