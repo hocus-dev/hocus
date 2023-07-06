@@ -160,7 +160,7 @@ build_service () {
 
 # Building images
 echo "Building docker images 👷📦"
-build_service setup-vm-images vm-builder
+build_service download-kernel vm-dependencies-setup
 build_service setup-keycloak db-autosetup
 build_service keycloak keycloak
 build_service temporal-hocus-codec temporal-codec
@@ -182,13 +182,13 @@ else
   echo -e "\r\033[KPulling docker images 📥 - ✅ in $DT s"
 fi
 
-echo -n "Building MicroVMs 👷🖥️ "
+echo -n "Downloading VM dependencies 🚄 "
 T0=$(date +%s%N | cut -b1-13)
-VM_BUILD_LOG=$($REPO_DIR/ops/bin/local-cmd.sh run --rm setup-vm-images 2>&1)
+VM_BUILD_LOG=$($REPO_DIR/ops/bin/local-cmd.sh run --rm download-kernel 2>&1)
 if ! [[ $? -eq 0 ]]; then
   T1=$(date +%s%N | cut -b1-13)
   DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KBuilding MicroVMs 👷🖥️ - ❌ in $DT"
+  echo -e "\r\033[KDownloading VM dependencies 🚄 - ❌ in $DT"
 
   echo -e "$VM_BUILD_LOG" | grep --color -E '^|ERROR:.*'
   echo -e "\nAbove you will find the vm build logs with the errors highlighted"
@@ -196,7 +196,7 @@ if ! [[ $? -eq 0 ]]; then
 else
   T1=$(date +%s%N | cut -b1-13)
   DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KBuilding MicroVMs 👷🖥️ - ✅ in $DT s"
+  echo -e "\r\033[KDownloading VM dependencies 🚄 - ✅ in $DT s"
 fi
 
 echo -n "Seeding the DB 🌱"

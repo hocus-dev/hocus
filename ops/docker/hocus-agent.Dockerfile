@@ -26,18 +26,38 @@ RUN yarn install --production
 COPY prisma prisma
 RUN yarn run regen
 
+FROM quay.io/hocus/hocus-prebuilds-obd:b3a68b6dc6cfac7eb730e10b1eabd74f9ac89fc4004fa820d8380382d45adc1b AS obd
 
 FROM node:16-bullseye AS runner
 
-RUN wget --continue --retry-connrefused --waitretry=1 --timeout=20 --tries=3 -q https://github.com/firecracker-microvm/firecracker/releases/download/v1.1.2/firecracker-v1.1.2-x86_64.tgz && \
-    tar -xf firecracker-v1.1.2-x86_64.tgz && \
-    mv release-v1.1.2-x86_64/firecracker-v1.1.2-x86_64 /usr/local/bin/firecracker && \
-    mv release-v1.1.2-x86_64/jailer-v1.1.2-x86_64 /usr/local/bin/jailer
-RUN apt-get update && apt-get install -y net-tools iproute2 iptables psmisc
-RUN apt-get update && apt-get install -y socat openssh-server
-RUN apt-get update && apt-get install -y iputils-ping
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        software-properties-common \
+        net-tools \
+        iproute2 \
+        iptables \
+        psmisc \
+        socat \
+        openssh-server \
+        iputils-ping \
+    && add-apt-repository "deb http://httpredir.debian.org/debian sid main" \
+    && apt-get update \
+    && apt-get -t sid install -y \
+        qemu-system \
+        skopeo \
+        # the following are used by overlaybd
+        libaio1 \
+        libnl-3-200 \
+        libnl-genl-3-200 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 RUN test -f /usr/sbin/nologin && useradd -ms /usr/sbin/nologin sshgateway
 COPY --chown=root:root --chmod=0644 ops/docker/resources/sshd_config /etc/ssh/sshd_config
+# Install crane
+RUN bash -c 'wget -O - "https://github.com/google/go-containerregistry/releases/download/v0.15.2/go-containerregistry_Linux_x86_64.tar.gz" | tar -zxvf - -C /usr/bin/ crane'
+
+COPY --from=obd /opt/overlaybd /opt/overlaybd
+COPY --from=obd /etc/overlaybd /etc/overlaybd
 
 WORKDIR /app
 ENV NODE_ENV production
@@ -47,6 +67,8 @@ COPY --from=builder /build/agent-build/workflow-bundle.js /app/workflow-bundle.j
 COPY --from=builder /build/agent-build/data-converter.js /app/data-converter.js
 COPY resources resources
 COPY ops/docker/resources/setup-network.sh setup-network.sh
+COPY ops/bin/setup-tcmu.sh setup-tcmu.sh
 CMD [ "bash", "-c", " \
+    ./setup-tcmu.sh && \
     ./setup-network.sh && \
     node agent.js" ]

@@ -42,9 +42,10 @@ export const config = makeConfig()({
     databaseUrl: get("AGENT_DATABASE_URL", "postgres://postgres:pass@localhost:5432/rooms"),
     defaultKernel: get("AGENT_KERNEL_PATH", "/srv/jailer/resources/vmlinux-6.2-x86_64.bin"),
     hostBuildfsResourcesDir: get("AGENT_HOST_BUILDFS_RESOURCES_DIR", "/app/resources"),
-    buildfsImageTag: get("AGENT_BUILDFS_IMAGE_TAG", "quay.io/hocus/core:buildfs-11-jun-2023"),
     // `get` is not used here because users usually will not want to set these manually
     // in production. `get` would throw an error if the env var was not set.
+    buildfsImageTag:
+      process.env.AGENT_BUILDFS_IMAGE_TAG ?? "quay.io/hocus/core:buildfs-11-jun-2023",
     fetchRepoImageTag:
       process.env.AGENT_FETCH_REPO_IMAGE_TAG ?? "quay.io/hocus/core:fetchrepo-11-jun-2023",
     checkoutOutputId:
