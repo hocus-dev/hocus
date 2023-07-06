@@ -72,3 +72,4 @@ vscode:
     # Shell script linter
     - timonwong.shellcheck
     - valentjn.vscode-ltex
+    - GitHub.vscode-pull-request-github
