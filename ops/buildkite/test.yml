@@ -97,10 +97,9 @@ steps:
 
   # TODO: Move to dprint ;)
   - label: ":prettier: Formatting"
-    plugins:
-      - docker#v5.6.0:
-          command: ["-c", "/workdir/"]
-          image: "tmknom/prettier:latest"
+    command: |
+      docker build -t hocus-tests:$BUILDKITE_COMMIT -f ops/docker/backend-tests.Dockerfile $BUILDKITE_BUILD_CHECKOUT_PATH \
+      && docker run -it --rm hocus-tests:$BUILDKITE_COMMIT yarn run format:check
 
   - label: ":typescript: Typecheck"
     command: |
