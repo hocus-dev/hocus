@@ -20,7 +20,7 @@ import { numericSort, waitForPromises } from "~/utils.shared";
 
 const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging().withTestDb();
 
-jest.setTimeout(1200000);
+jest.setTimeout(120000);
 
 test.concurrent(
   "getArchivablePrebuildEvents, getRemovablePrebuildEvents",
