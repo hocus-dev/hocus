@@ -9,7 +9,7 @@ services:
         condition: service_healthy
       temporal:
         condition: service_healthy
-      setup-vm-images:
+      download-kernel:
         condition: service_completed_successfully
       hocus-ui:
         condition: service_healthy
