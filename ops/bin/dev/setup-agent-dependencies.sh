@@ -40,5 +40,4 @@ fi
 cat /sys/kernel/config/target/version
 cat /sys/kernel/config/target/loopback/version
 
-/bin/bash "$REPO_DIR/ops/bin/dev/build-vm-images.sh" "/home/hocus/dev/hocus-resources/resources"
 /bin/bash "$REPO_DIR/ops/bin/dev/download-kernel.sh" "/home/hocus/dev/hocus-resources/resources"

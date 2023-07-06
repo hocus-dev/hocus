@@ -9,10 +9,6 @@ export SCRIPT_DIR="$(dirname "$0")"
 export REPO_DIR="$(realpath "${SCRIPT_DIR}/../../..")"
 export RESOURCES_DIR=$REPO_DIR/../hocus-resources/resources
 
-if ! [[ -f $RESOURCES_DIR/test-buildfs.ext4 ]]; then
-  $REPO_DIR/ops/bin/dev/build-test-buildfs.sh "$RESOURCES_DIR"
-fi
-
 # Detect agent
 AGENT_CONTAINER=$(docker ps | grep worker-dev | grep -o -e '^[0-9a-f]*')
 if ! [[ $? -eq 0 ]]; then
