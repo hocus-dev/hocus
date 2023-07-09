@@ -50,7 +50,7 @@ mkdir -p "$INIT_CONFIG_DIR_PATH"
 
 Hocus will create a file called `config.yaml` in this directory.
 
-Then start Hocus with the environment variable `INIT_CONFIG_DIR_PATH`. Make sure it's an absolute path.
+Then start Hocus with the environment variable `INIT_CONFIG_DIR_PATH`. Make sure it is an absolute path.
 
 ```bash
 INIT_CONFIG_DIR_PATH="$INIT_CONFIG_DIR_PATH" HOCUS_HOSTNAME="localhost" ops/bin/local-up.sh
