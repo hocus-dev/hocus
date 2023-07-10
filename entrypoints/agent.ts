@@ -21,7 +21,7 @@ async function run() {
 
   await brService.initializeRegistry();
   const [overlaybdProcess, overlaybdProcessPromise] = await brService.startOverlaybdProcess({
-    logFilePath: join(blockRegistryRoot, "overlaybd.log"),
+    logFilePath: join(blockRegistryRoot, "logs", "overlaybd-process.log"),
   });
 
   if (agentConfig.createHocusProjects || agentConfig.createDevelopmentProjects) {
