@@ -350,6 +350,7 @@ export class AgentGitService {
           if (outputDirOwner !== "hocus") {
             await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
           }
+          // TODO: use SSH agent forwarding for this to avoid writing the key to disk
           const sshKey = repository.credentials.privateSshKey;
           const sshDir = "/home/hocus/.ssh";
           const sshKeyPath = path.join(sshDir, `${uuidv4()}.key`);
