@@ -1,7 +1,6 @@
 FROM node:16-bullseye AS builder
 WORKDIR /build
 COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
-COPY deps deps
 COPY package.json yarn.lock ./
 RUN yarn
 COPY prisma prisma

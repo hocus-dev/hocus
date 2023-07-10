@@ -21,7 +21,7 @@ This builds test virtual machines, attaches to the running Hocus agent, and star
 You may also attach to the agent container manually. The following runs a single E2E test of the prebuild workflow:
 
 ```bash
-yarn jest 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
+TEST_STORAGE_DIR=/srv/jailer/tests yarn jest 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
 ```
 
 ## Add another BuildKite runner
@@ -50,7 +50,7 @@ mkdir -p "$INIT_CONFIG_DIR_PATH"
 
 Hocus will create a file called `config.yaml` in this directory.
 
-Then start Hocus with the environment variable `INIT_CONFIG_DIR_PATH`. Make sure it's an absolute path.
+Then start Hocus with the environment variable `INIT_CONFIG_DIR_PATH`. Make sure it is an absolute path.
 
 ```bash
 INIT_CONFIG_DIR_PATH="$INIT_CONFIG_DIR_PATH" HOCUS_HOSTNAME="localhost" ops/bin/local-up.sh

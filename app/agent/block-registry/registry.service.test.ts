@@ -17,7 +17,7 @@ import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { sleep, waitForPromises } from "~/utils.shared";
 
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 
 const noSetupEnv = new TestEnvironmentBuilder(createAgentInjector).withLateInits({
   brService: async ({ injector }) => injector.resolve(Token.BlockRegistryService),
@@ -984,5 +984,29 @@ test.concurrent(
       ac.abort();
       await registryPromise.catch(() => {});
     }
+  }),
+);
+
+test.concurrent("extractOutputId", async () => {
+  const outputId = "hello-there";
+  const imageId = BlockRegistryService.genImageId(outputId);
+  const containerId = BlockRegistryService.genContainerId(outputId);
+  expect(BlockRegistryService.extractOutputId(imageId)).toEqual(outputId);
+  expect(BlockRegistryService.extractOutputId(containerId)).toEqual(outputId);
+});
+
+test.concurrent(
+  "output id max length",
+  testEnv.run(async ({ brService }) => {
+    const outputId = Array.from({ length: BlockRegistryService.maxOutputIdLength })
+      .map((_) => "1")
+      .join("");
+    const ctId = await brService.createContainer(void 0, outputId, { mkfs: true, sizeInGB: 64 });
+    await brService.expose(ctId, EXPOSE_METHOD.HOST_MOUNT);
+    await brService.hide(ctId);
+
+    await expect(
+      brService.createContainer(void 0, outputId + "1", { mkfs: true, sizeInGB: 64 }),
+    ).rejects.toThrow(/is too long/);
   }),
 );

@@ -1,18 +1,26 @@
+import fs from "fs/promises";
+import path from "path";
+
 import type { PrebuildEvent } from "@prisma/client";
 import { LogGroupType, VmTaskStatus } from "@prisma/client";
 import { WorkspaceStatus } from "@prisma/client";
 import { PrebuildEventStatus } from "@prisma/client";
 
 import { createAgentInjector } from "./agent-injector";
+import { BlockRegistryService, EXPOSE_METHOD } from "./block-registry/registry.service";
+import { expectContent } from "./block-registry/test-utils";
 import { SUCCESSFUL_PREBUILD_STATES } from "./prebuild-constants";
 
 import { createExampleRepositoryAndProject } from "~/test-utils/project";
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { createTestUser } from "~/user/test-utils";
+import { doesFileExist, sha256 } from "~/utils.server";
 import { numericSort, waitForPromises } from "~/utils.shared";
 
 const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging().withTestDb();
+
+jest.setTimeout(120000);
 
 test.concurrent(
   "getArchivablePrebuildEvents, getRemovablePrebuildEvents",
@@ -143,11 +151,12 @@ test.concurrent(
         externalId: "xd",
       },
     });
-    const [projectFile, rootFsFile] = await waitForPromises(
-      ["a", "b"].map((path) =>
-        db.file.create({
+    const [projectImage, rootFsImage] = await waitForPromises(
+      ["a", "b"].map((tag) =>
+        db.localOciImage.create({
           data: {
-            path,
+            tag,
+            readonly: false,
             agentInstanceId: agentInstance.id,
           },
         }),
@@ -161,8 +170,8 @@ test.concurrent(
         prebuildEventId: archivedPrebuildEvents[1].id,
         status: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
         agentInstanceId: agentInstance.id,
-        projectFileId: projectFile.id,
-        rootFsFileId: rootFsFile.id,
+        projectImageId: projectImage.id,
+        rootFsImageId: rootFsImage.id,
         gitBranchId: newGitBranch.id,
       },
     });
@@ -175,7 +184,7 @@ test.concurrent(
   }),
 );
 
-test(
+test.concurrent(
   "cleanupDbAfterPrebuildError",
   testEnv.run(async ({ injector, db }) => {
     const prebuildService = injector.resolve(Token.PrebuildService);
@@ -284,4 +293,149 @@ test(
       ).toEqual([true, true]);
     }
   }),
+);
+
+test.concurrent(
+  "checkoutAndInspect",
+  testEnv
+    .withBlockRegistry()
+    .withImagePush((timestamp) => [
+      {
+        tag: `quay.io/hocus/hocus-tests:checkout-and-inspect-${timestamp}`,
+        imageId: BlockRegistryService.genImageId("output"),
+      },
+    ])
+    .run(async ({ injector, runId }) => {
+      const prebuildService = injector.resolve(Token.PrebuildService);
+      const brService = injector.resolve(Token.BlockRegistryService);
+
+      const repoImageTag = "im1";
+      const repoImageId = await brService.loadImageFromRemoteRepo(
+        "quay.io/hocus/hocus-tests:fetchrepo-06-11-2023-18-13-34",
+        repoImageTag,
+      );
+      const repoContainerId = await brService.createContainer(repoImageId, "fetchrepo");
+      await expectContent(brService, {
+        numTotalContent: 2,
+      });
+      const runtime = injector.resolve(Token.QemuService)(runId);
+      const outputId = "output";
+      const tmpContentPrefix = "tmp-content-1337-";
+
+      await prebuildService.checkoutAndInspect({
+        runtime,
+        repoContainerId,
+        targetBranch: "checkout-and-inspect-test-1",
+        outputId,
+        projectConfigPaths: ["/"],
+        tmpContentPrefix,
+      });
+      await expectContent(brService, {
+        numTotalContent: 6,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 2,
+        },
+      });
+
+      const imId = await BlockRegistryService.genImageId(outputId);
+      const { mountPoint } = await brService.expose(imId, EXPOSE_METHOD.HOST_MOUNT);
+      expect(await doesFileExist(path.join(mountPoint, "project", "hocus.yml"))).toBe(true);
+    }),
+);
+
+test.concurrent(
+  "Test prebuild",
+  testEnv
+    .withBlockRegistry()
+    .withImagePush((timestamp) => [
+      {
+        tag: `quay.io/hocus/hocus-tests:prebuild-rootfs-${timestamp}`,
+        imageId: BlockRegistryService.genImageId("output-rootfs"),
+      },
+      {
+        tag: `quay.io/hocus/hocus-tests:prebuild-project-${timestamp}`,
+        imageId: BlockRegistryService.genImageId("output-project"),
+      },
+    ])
+    .run(async ({ injector, runId, db }) => {
+      const prebuildService = injector.resolve(Token.PrebuildService);
+      const brService = injector.resolve(Token.BlockRegistryService);
+
+      const [rootFsImageId, projectImageId] = await waitForPromises(
+        [
+          "quay.io/hocus/hocus-tests:buildfs-06-11-2023-18-32-43",
+          "quay.io/hocus/hocus-tests:checkout-and-inspect-06-11-2023-18-17-06",
+        ].map((ref) => brService.loadImageFromRemoteRepo(ref, sha256(ref))),
+      );
+      const cwd = path.join(prebuildService.devDir, "project");
+      const tasks = [
+        { command: `echo -n "$ENV_VAR_1" > hey.txt`, cwd },
+        { command: `sudo sh -c "echo -n "$ENV_VAR_1" > /hey.txt"`, cwd },
+      ];
+      const vmTasks = await db.$transaction((tdb) =>
+        prebuildService.createPrebuildVmTasks(tdb, tasks),
+      );
+      const runtime = injector.resolve(Token.QemuService)(runId);
+      const outputRootFsId = "output-rootfs";
+      const outputProjectId = "output-project";
+
+      const outputRootFsImageId = BlockRegistryService.genImageId(outputRootFsId);
+      const outputProjectImageId = BlockRegistryService.genImageId(outputProjectId);
+      expect(await brService.hasContent(outputRootFsImageId)).toBe(false);
+      expect(await brService.hasContent(outputProjectImageId)).toBe(false);
+
+      const envVarValue = "value1";
+      const tmpContentPrefix = "tmp-content-1337-";
+      const prebuildArgs = {
+        db,
+        runtime,
+        envVariables: [
+          {
+            name: "ENV_VAR_1",
+            value: envVarValue,
+          },
+        ],
+        tasks: tasks.map((t, idx) => ({
+          idx,
+          vmTaskId: vmTasks[idx].id,
+          originalCommand: t.command,
+        })),
+        rootFsImageId,
+        projectImageId,
+        outputRootFsId,
+        outputProjectId,
+        memSizeMib: 1024,
+        vcpuCount: 1,
+        tmpContentPrefix,
+      };
+      const result = await prebuildService.prebuild(prebuildArgs);
+      expect(result.length).toBe(2);
+      expect(result[0].status).toBe(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
+      expect(result[1].status).toBe(VmTaskStatus.VM_TASK_STATUS_SUCCESS);
+      await expectContent(brService, {
+        numTotalContent: 4,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 0,
+        },
+      });
+
+      const readFile = (mountPoint: string, relativePath: string) =>
+        fs.readFile(path.join(mountPoint, relativePath)).then((b) => b.toString());
+      const rootFs = await brService.expose(outputRootFsImageId, EXPOSE_METHOD.HOST_MOUNT);
+      const projectFs = await brService.expose(outputProjectImageId, EXPOSE_METHOD.HOST_MOUNT);
+
+      expect(await readFile(rootFs.mountPoint, "hey.txt")).toBe(envVarValue);
+      expect(await readFile(projectFs.mountPoint, "project/hey.txt")).toBe(envVarValue);
+
+      await expect(prebuildService.prebuild({ ...prebuildArgs, memSizeMib: -1 })).rejects.toThrow();
+      await expectContent(brService, {
+        numTotalContent: 6,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 2,
+        },
+      });
+    }),
 );

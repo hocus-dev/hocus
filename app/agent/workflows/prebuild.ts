@@ -13,7 +13,6 @@ import path from "path-browserify";
 
 import type { CheckoutAndInspectResult } from "../activities-types";
 import type { GetOrCreateBuildfsEventsReturnType } from "../buildfs.service";
-import { HOST_PERSISTENT_DIR } from "../constants";
 import { PREBUILD_REPOSITORY_DIR } from "../prebuild-constants";
 import { parseWorkflowError } from "../workflows-utils";
 
@@ -22,7 +21,7 @@ import { withSharedWorkflow } from "./shared-workflow";
 import type { Activities } from "~/agent/activities/list";
 import { retryWorkflow, waitForPromisesWorkflow } from "~/temporal/utils";
 
-const { checkoutAndInspect, fetchRepository, prebuild, createPrebuildFiles } =
+const { checkoutAndInspect, fetchRepository, prebuild, createPrebuildImages } =
   proxyActivities<Activities>({
     startToCloseTimeout: "24 hours",
     heartbeatTimeout: "20 seconds",
@@ -41,7 +40,7 @@ const { buildfs } = proxyActivities<Activities>({
   cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
 });
 
-const { createPrebuildEvent } = proxyActivities<Activities>({
+const { createPrebuildEvent, removeContentWithPrefix } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
   heartbeatTimeout: "5 seconds",
   retry: {
@@ -65,9 +64,11 @@ const {
 
 export async function runBuildfs(
   buildfsEventId: bigint,
+  checkoutOutputId: string,
+  tmpContentPrefix: string,
 ): Promise<{ buildSuccessful: boolean; error?: string }> {
   try {
-    return await buildfs({ buildfsEventId });
+    return await buildfs({ buildfsEventId, checkoutOutputId, tmpContentPrefix });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);
@@ -77,13 +78,13 @@ export async function runBuildfs(
 
 export async function runPrebuild(
   prebuildEventId: bigint,
-  sourceProjectDrivePath: string,
+  checkoutOutputId: string,
+  tmpContentPrefix: string,
 ): Promise<void> {
-  await createPrebuildFiles({
+  await createPrebuildImages({
     prebuildEventId,
-    sourceProjectDrivePath,
   });
-  const prebuildOutput = await prebuild({ prebuildEventId });
+  const prebuildOutput = await prebuild({ prebuildEventId, checkoutOutputId, tmpContentPrefix });
   const prebuildTasksFailed = prebuildOutput.some((o) => o.status === "VM_TASK_STATUS_ERROR");
   await changePrebuildEventStatus(
     prebuildEventId,
@@ -91,15 +92,19 @@ export async function runPrebuild(
   );
 }
 
-export async function runFetchRepository(gitRepositoryId: bigint): Promise<void> {
-  await fetchRepository(gitRepositoryId);
+export async function runFetchRepository(
+  gitRepositoryId: bigint,
+  tmpContentPrefix: string,
+): Promise<void> {
+  await fetchRepository(gitRepositoryId, tmpContentPrefix);
 }
 
 export async function runCheckoutAndInspect(args: {
   gitRepositoryId: bigint;
-  outputDrivePath: string;
+  outputId: string;
   targetBranch: string;
   projectConfigPaths: string[];
+  tmpContentPrefix: string;
 }): Promise<CheckoutAndInspectResult[]> {
   return await checkoutAndInspect(args);
 }
@@ -127,19 +132,21 @@ async function runSingleBuildfsAndPrebuildInner(
   await withSharedWorkflow({
     lockId: `fetchrepo-${gitRepositoryId}-${batchId}`,
     workflow: runFetchRepository,
-    params: [gitRepositoryId],
+    params: [gitRepositoryId, batchId],
   });
-  const checkoutFileStem = `${batchId}-${prebuildEvent.gitObject.id}` as const;
-  const checkoutPath = `${HOST_PERSISTENT_DIR}/checked-out/${checkoutFileStem}.ext4` as const;
+  // Prefixing the outputId with batchId will make it garbage collected after the
+  // batch is done.
+  const checkoutOutputId = `${batchId}-checkout-${prebuildEvent.gitObject.id}` as const;
   const inspection = await withSharedWorkflow({
-    lockId: `checkout-${checkoutFileStem}`,
+    lockId: checkoutOutputId,
     workflow: runCheckoutAndInspect,
     params: [
       {
         gitRepositoryId,
-        outputDrivePath: checkoutPath,
+        outputId: checkoutOutputId,
         targetBranch: prebuildEvent.gitObject.hash,
         projectConfigPaths: batchProjectConfigPaths,
+        tmpContentPrefix: batchId,
       },
     ],
   }).then((r) => r[inspectResultIdx]);
@@ -148,14 +155,14 @@ async function runSingleBuildfsAndPrebuildInner(
   }
   let buildfsEvent: GetOrCreateBuildfsEventsReturnType | null = null;
   if (inspection != null) {
+    const buildfsOutputId = `buildfs-out-${uuid4()}`;
     const buildfsEventsArgs = {
       prebuildEventId: prebuildEvent.id,
       projectId: prebuildEvent.project.id,
       contextPath: inspection.projectConfig.image.buildContext,
       dockerfilePath: inspection.projectConfig.image.file,
       cacheHash: inspection.imageFileHash,
-      outputFilePath: `${HOST_PERSISTENT_DIR}/buildfs/${uuid4()}.ext4` as const,
-      projectFilePath: checkoutPath,
+      outputId: buildfsOutputId,
     };
     buildfsEvent = await getOrCreateBuildfsEvents([buildfsEventsArgs]).then((r) => r[0]);
   }
@@ -181,18 +188,18 @@ async function runSingleBuildfsAndPrebuildInner(
   await changePrebuildEventStatus(prebuildEvent.id, "PREBUILD_EVENT_STATUS_RUNNING");
   if (buildfsEvent != null) {
     const { buildSuccessful, error } = await withSharedWorkflow({
-      lockId: `buildfs-${buildfsEvent.event.id}`,
+      lockId: `buildfs-${buildfsEvent.event.externalId}`,
       workflow: runBuildfs,
-      params: [buildfsEvent.event.id],
+      params: [buildfsEvent.event.id, checkoutOutputId, batchId],
     });
     if (!buildSuccessful) {
       throw new ApplicationFailure(
-        `Buildfs failed. Project root dir path: "${prebuildEvent.project.rootDirectoryPath}", checkout drive path: "${checkoutPath}": ${error}`,
+        `Buildfs failed. Project root dir path: "${prebuildEvent.project.rootDirectoryPath}", checkout output id: "${checkoutOutputId}": ${error}`,
       );
     }
   }
   await executeChild(runPrebuild, {
-    args: [prebuildEvent.id, checkoutPath],
+    args: [prebuildEvent.id, checkoutOutputId, batchId],
   });
 }
 
@@ -249,6 +256,7 @@ export async function runBuildfsAndPrebuilds(prebuildEventIds: bigint[]): Promis
   ).catch(() => {
     // Ignore errors, they will be handled by the children.
   });
+  await removeContentWithPrefix({ prefix: batch.id });
 }
 
 export async function scheduleNewPrebuild(args: {

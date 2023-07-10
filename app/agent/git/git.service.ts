@@ -1,21 +1,29 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { GitBranch, GitObject, GitRepositoryFile, File } from "@prisma/client";
+import type { GitBranch, GitObject, GitRepositoryImage, LocalOciImage } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import type { Logger } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import type { AgentUtilService } from "../agent-util.service";
-import { HOST_PERSISTENT_DIR, PROJECT_DIR } from "../constants";
-import type { FirecrackerService } from "../runtime/firecracker-legacy/firecracker.service";
-import { doesFileExist, execCmdWithOpts, execSshCmd, withFileLock } from "../utils";
+import { BlockRegistryService } from "../block-registry/registry.service";
+import { PROJECT_DIR } from "../constants";
+import type { HocusRuntime } from "../runtime/hocus-runtime";
+import {
+  LocalLockNamespace,
+  execCmdWithOpts,
+  execSshCmd,
+  withLocalLock,
+  withRuntimeAndImages,
+} from "../utils";
 
 import { RemoteInfoTupleValidator } from "./validator";
 
 import type { Config } from "~/config";
 import type { ValidationError } from "~/schema/utils.server";
 import { Token } from "~/token";
+import { sha256 } from "~/utils.server";
 import { displayError, unwrap, waitForPromises } from "~/utils.shared";
 
 export interface GitRemoteInfo {
@@ -46,13 +54,19 @@ export interface UpdateBranchesResult {
 }
 
 export class AgentGitService {
-  static inject = [Token.Logger, Token.AgentUtilService, Token.Config] as const;
+  static inject = [
+    Token.Logger,
+    Token.AgentUtilService,
+    Token.BlockRegistryService,
+    Token.Config,
+  ] as const;
   private readonly agentConfig: ReturnType<Config["agent"]>;
   private readonly branchRefRegex = /^refs\/heads\/(.+)$/;
 
   constructor(
     private readonly logger: Logger,
     private readonly agentUtilService: AgentUtilService,
+    private readonly blockRegistryService: BlockRegistryService,
     config: Config,
   ) {
     this.agentConfig = config.agent();
@@ -96,7 +110,7 @@ export class AgentGitService {
    *
    * This private key must be added to GitHub somewhere. It can be added to a
    * different account than the one that owns the repository. Or it can even
-   * be a deploy key for a diffrerent repository. But GitHub must know
+   * be a deploy key for a different repository. But GitHub must know
    * that it exists, otherwise it will reject the connection.
    */
   async getRemotes(repositoryUrl: string, privateKey: string): Promise<GitRemoteInfo[]> {
@@ -265,12 +279,12 @@ export class AgentGitService {
     });
   }
 
-  async fetchRepository(
-    firecrackerService: FirecrackerService,
-    outputDrive: {
-      pathOnHost: string;
-      maxSizeMiB: number;
-    },
+  async fetchRepository(args: {
+    runtime: HocusRuntime;
+    /** A container with the fetched repository will be created from this */
+    outputId: string;
+    /** Every temporary image and container id will use this prefix. Used for garbage collection. */
+    tmpContentPrefix: string;
     repository: {
       url: string;
       credentials: {
@@ -286,40 +300,57 @@ export class AgentGitService {
          */
         privateSshKey: string;
       };
-    },
-  ): Promise<void> {
-    const outputDriveExists = await doesFileExist(outputDrive.pathOnHost);
-    if (!outputDriveExists) {
-      await fs.mkdir(path.dirname(outputDrive.pathOnHost), { recursive: true });
-      await this.agentUtilService.createExt4Image(outputDrive.pathOnHost, outputDrive.maxSizeMiB);
-      this.logger.info(`empty output image created at ${outputDrive.pathOnHost}`);
+    };
+  }): Promise<void> {
+    const { runtime, outputId, repository, tmpContentPrefix } = args;
+    const localRootFsImageTag = `fetchrepo-${sha256(this.agentConfig.fetchRepoImageTag)}`;
+    const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
+    if (!(await this.blockRegistryService.hasContent(rootFsImageId))) {
+      await this.blockRegistryService.loadImageFromRemoteRepo(
+        this.agentConfig.fetchRepoImageTag,
+        localRootFsImageTag,
+      );
     }
-    const outputDir = "/tmp/output";
-    return await withFileLock(outputDrive.pathOnHost, async () => {
-      await firecrackerService.withVM(
+    const rootFsContainerId = await this.blockRegistryService.createContainer(
+      rootFsImageId,
+      `${tmpContentPrefix}-fetchrepo-${uuidv4()}`,
+    );
+    const containerId = BlockRegistryService.genContainerId(outputId);
+    return await withLocalLock(LocalLockNamespace.CONTAINER, containerId, async () => {
+      await this.blockRegistryService.createContainer(void 0, outputId, {
+        mkfs: true,
+        sizeInGB: 64,
+      });
+      const outputDir = "/fetch-repository";
+      await withRuntimeAndImages(
+        this.blockRegistryService,
+        runtime,
         {
           ssh: {
             username: "hocus",
             password: "hocus",
           },
           kernelPath: this.agentConfig.defaultKernel,
-          rootFsPath: this.agentConfig.fetchRepositoryRootFs,
-          copyRootFs: true,
-          extraDrives: [
-            {
-              pathOnHost: outputDrive.pathOnHost,
-              guestMountPath: outputDir,
-            },
-          ],
-          memSizeMib: 4096,
-          vcpuCount: 2,
+          fs: {
+            "/": rootFsContainerId,
+            [outputDir]: containerId,
+          },
+          memSizeMib: 1024,
+          vcpuCount: 1,
         },
         async ({ ssh }) => {
           const repositoryDir = path.join(outputDir, PROJECT_DIR);
-          if (!outputDriveExists) {
+          const outputDirOwner = await execSshCmd({ ssh }, [
+            "sudo",
+            "stat",
+            "-c",
+            "%U",
+            outputDir,
+          ]).then((r) => r.stdout.trim());
+          if (outputDirOwner !== "hocus") {
             await execSshCmd({ ssh }, ["sudo", "chown", "-R", "hocus:hocus", outputDir]);
           }
-
+          // TODO: use SSH agent forwarding for this to avoid writing the key to disk
           const sshKey = repository.credentials.privateSshKey;
           const sshDir = "/home/hocus/.ssh";
           const sshKeyPath = path.join(sshDir, `${uuidv4()}.key`);
@@ -377,51 +408,72 @@ export class AgentGitService {
     });
   }
 
-  async getOrCreateGitRepositoryFile(
+  async getOrCreateGitRepoImage(
     db: Prisma.TransactionClient,
     agentInstanceId: bigint,
     gitRepositoryId: bigint,
   ): Promise<
-    GitRepositoryFile & {
-      file: File;
+    GitRepositoryImage & {
+      localOciImage: LocalOciImage;
     }
   > {
-    let gitRepositoryFile = await db.gitRepositoryFile.findUnique({
+    let gitRepoImage = await db.gitRepositoryImage.findUnique({
       // eslint-disable-next-line camelcase
       where: { gitRepositoryId_agentInstanceId: { gitRepositoryId, agentInstanceId } },
-      include: { file: true },
+      include: { localOciImage: true },
     });
-    if (gitRepositoryFile != null) {
-      return gitRepositoryFile;
+    if (gitRepoImage != null) {
+      return gitRepoImage;
     }
 
     await db.$executeRawUnsafe(
-      `LOCK TABLE "${Prisma.ModelName.GitRepositoryFile}" IN SHARE UPDATE EXCLUSIVE MODE`,
+      `LOCK TABLE "${Prisma.ModelName.GitRepositoryImage}" IN SHARE UPDATE EXCLUSIVE MODE`,
     );
 
-    gitRepositoryFile = await db.gitRepositoryFile.findUnique({
+    gitRepoImage = await db.gitRepositoryImage.findUnique({
       // eslint-disable-next-line camelcase
       where: { gitRepositoryId_agentInstanceId: { gitRepositoryId, agentInstanceId } },
-      include: { file: true },
+      include: { localOciImage: true },
     });
-    if (gitRepositoryFile != null) {
-      return gitRepositoryFile;
+    if (gitRepoImage != null) {
+      return gitRepoImage;
     }
-
-    const file = await db.file.create({
-      data: {
-        agentInstanceId,
-        path: path.join(HOST_PERSISTENT_DIR, "repositories", `${uuidv4()}.ext4`),
+    const repo = await db.gitRepository.findUniqueOrThrow({
+      where: {
+        id: gitRepositoryId,
+      },
+      select: {
+        url: true,
       },
     });
-    return await db.gitRepositoryFile.create({
+    const imageTag = `repo-${sha256(repo.url)}`;
+    return await db.gitRepositoryImage.create({
       data: {
-        gitRepositoryId,
-        fileId: file.id,
-        agentInstanceId,
+        gitRepository: {
+          connect: {
+            id: gitRepositoryId,
+          },
+        },
+        agentInstance: {
+          connect: {
+            id: agentInstanceId,
+          },
+        },
+        imageAgentMatch: {},
+        localOciImage: {
+          create: {
+            tag: imageTag,
+            readonly: false,
+            agentInstance: {
+              connect: {
+                id: agentInstanceId,
+              },
+            },
+          },
+        },
       },
       include: {
-        file: true,
+        localOciImage: true,
       },
     });
   }

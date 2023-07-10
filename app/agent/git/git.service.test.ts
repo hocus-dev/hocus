@@ -4,11 +4,11 @@ import path from "path";
 import { SshKeyPairType } from "@prisma/client";
 
 import { createAgentInjector } from "../agent-injector";
+import { BlockRegistryService, EXPOSE_METHOD } from "../block-registry/registry.service";
+import { withExposedImage } from "../block-registry/utils";
 import { PROJECT_DIR } from "../constants";
-import type { FirecrackerService } from "../runtime/firecracker-legacy/firecracker.service";
-import { PERSISTENT_TEST_DIR } from "../test-constants";
-import { withTestMount } from "../test-utils";
-import { execSshCmd } from "../utils";
+import type { HocusRuntime } from "../runtime/hocus-runtime";
+import { execCmdWithOpts } from "../utils";
 
 import type { GitRemoteInfo } from "./git.service";
 
@@ -16,6 +16,8 @@ import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
+
+jest.setTimeout(45_000);
 
 const testEnv = new TestEnvironmentBuilder(createAgentInjector).withTestLogging();
 
@@ -151,55 +153,74 @@ test.concurrent(
 
 test.concurrent(
   "fetchRepository",
-  testEnv.run(async ({ injector, runId }) => {
-    const gitService = injector.resolve(Token.AgentGitService);
-    const agentUtilService = injector.resolve(Token.AgentUtilService);
-    const agentConfig = injector.resolve(Token.Config).agent();
-    await fs.mkdir(PERSISTENT_TEST_DIR, { recursive: true });
-    const pathOnHost = path.join(PERSISTENT_TEST_DIR, `fetch-repository-test-${runId}`);
-    await fs.unlink(pathOnHost).catch(() => {});
+  testEnv
+    .withBlockRegistry()
+    .withImagePush((timestamp) => [
+      {
+        tag: `quay.io/hocus/hocus-tests:fetchrepo-${timestamp}`,
+        imageId: BlockRegistryService.genContainerId("fetchrepo"),
+      },
+    ])
+    .run(async ({ injector, runId, brService }) => {
+      const gitService = injector.resolve(Token.AgentGitService);
+      const outputId = "fetchrepo";
 
-    const fetchRepo = (fcService: FirecrackerService) =>
-      gitService.fetchRepository(
-        fcService,
-        {
-          pathOnHost,
-          maxSizeMiB: 100,
-        },
-        {
-          credentials: { privateSshKey: TESTS_PRIVATE_SSH_KEY },
-          url: TESTS_REPO_URL,
+      const fetchRepo = (runtime: HocusRuntime) =>
+        gitService.fetchRepository({
+          runtime,
+          outputId,
+          repository: {
+            credentials: { privateSshKey: TESTS_PRIVATE_SSH_KEY },
+            url: TESTS_REPO_URL,
+          },
+          tmpContentPrefix: "test",
+        });
+      let ctr = 0;
+      const getRuntime = () => {
+        ctr += 1;
+        return injector.resolve(Token.QemuService)(`${runId}-${ctr}`);
+      };
+
+      await fetchRepo(getRuntime());
+
+      const txtFilePath = "test.txt";
+      const txtFileContent = "test";
+      const containerId = BlockRegistryService.genContainerId(outputId);
+      await withExposedImage(
+        brService,
+        containerId,
+        EXPOSE_METHOD.HOST_MOUNT,
+        async ({ mountPoint }) => {
+          const out = await execCmdWithOpts(["ls", "-lah"], {
+            cwd: path.join(mountPoint, PROJECT_DIR),
+          });
+          expect(out.stdout).toContain(".git");
+          await fs.writeFile(path.join(mountPoint, txtFilePath), txtFileContent);
         },
       );
-    let fcId = 0;
-    const getFc = () => {
-      fcId += 1;
-      return injector.resolve(Token.FirecrackerService)(`fetch-repository-test-${runId}-${fcId}`);
-    };
+      await fetchRepo(getRuntime());
+      await withExposedImage(
+        brService,
+        containerId,
+        EXPOSE_METHOD.HOST_MOUNT,
+        async ({ mountPoint }) => {
+          expect((await fs.readFile(path.join(mountPoint, txtFilePath))).toString()).toEqual(
+            txtFileContent,
+          );
+        },
+      );
 
-    await fetchRepo(getFc());
-
-    const txtFilePath = "test.txt";
-    const txtFileContent = "test";
-    await withTestMount(getFc(), pathOnHost, agentConfig, async (ssh, mountPath) => {
-      const out = await execSshCmd({ ssh, opts: { cwd: path.join(mountPath, PROJECT_DIR) } }, [
-        "ls",
-        "-lah",
-      ]);
-      expect(out.stdout).toContain(".git");
-      await agentUtilService.writeFile(ssh, path.join(mountPath, txtFilePath), txtFileContent);
-    });
-    await fetchRepo(getFc());
-    await withTestMount(getFc(), pathOnHost, agentConfig, async (ssh, mountPath) => {
-      expect(
-        (await agentUtilService.readFile(ssh, path.join(mountPath, txtFilePath))).toString(),
-      ).toEqual(txtFileContent);
-    });
-  }),
+      const committedImageId = await brService.commitContainer(containerId, "committed", {
+        removeContainer: false,
+      });
+      const newContainerId = await brService.createContainer(committedImageId, "new");
+      // This would fail if fetchrepo created an invalid container, for example with max size > 64 GB
+      await brService.expose(newContainerId, EXPOSE_METHOD.HOST_MOUNT);
+    }),
 );
 
 test.concurrent(
-  "getOrCreateGitRepositoryFile",
+  "getOrCreateGitRepoImage",
   testEnv.withTestDb().run(async ({ injector, db }) => {
     const appGitService = injector.resolve(Token.GitService);
     const gitService = injector.resolve(Token.AgentGitService);
@@ -217,13 +238,13 @@ test.concurrent(
     const agentInstance = await db.$transaction((tdb) =>
       agentUtilService.getOrCreateSoloAgentInstance(tdb),
     );
-    const files = await waitForPromises(
+    const images = await waitForPromises(
       Array.from({ length: 10 }).map(() =>
         db.$transaction((tdb) =>
-          gitService.getOrCreateGitRepositoryFile(tdb, agentInstance.id, repo.id),
+          gitService.getOrCreateGitRepoImage(tdb, agentInstance.id, repo.id),
         ),
       ),
     );
-    expect(files.every((f) => f.id === files[0].id)).toBe(true);
+    expect(images.every((f) => f.id === images[0].id)).toBe(true);
   }),
 );

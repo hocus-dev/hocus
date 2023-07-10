@@ -1,7 +1,7 @@
 import type { SpawnOptionsWithoutStdio } from "child_process";
 import { spawn } from "child_process";
-import { createHash } from "crypto";
 import fs from "fs/promises";
+import os from "os";
 import path from "path";
 
 import type { Log } from "@prisma/client";
@@ -12,8 +12,15 @@ import type { SSHExecCommandResponse, SSHExecOptions, Config as SSHConfig } from
 import { NodeSSH } from "node-ssh";
 import lockfile from "proper-lockfile";
 import { Tail } from "tail";
-import type { Object } from "ts-toolbelt";
+import type { Object as Obj } from "ts-toolbelt";
 
+import type { BlockRegistryService, ContainerId, ImageId } from "./block-registry/registry.service";
+import { EXPOSE_METHOD } from "./block-registry/registry.service";
+import { withExposedImages } from "./block-registry/utils";
+import type { HocusRuntime } from "./runtime/hocus-runtime";
+
+import type { valueof } from "~/types/utils";
+import { doesFileExist, sha256 } from "~/utils.server";
 import { unwrap } from "~/utils.shared";
 
 export const execCmd = async (...args: string[]): Promise<{ stdout: string; stderr: string }> => {
@@ -28,11 +35,11 @@ export class ExecCmdError extends Error {
 
 export const execCmdWithOpts = async (
   args: string[],
-  options: Object.Overwrite<
+  options: Obj.Overwrite<
     SpawnOptionsWithoutStdio,
     { env?: Record<string, string | undefined>; cwd?: string | undefined }
   >,
-): Promise<{ stdout: string; stderr: string }> => {
+): Promise<{ stdout: string; stderr: string; pid?: number }> => {
   return await new Promise((resolve, reject) => {
     const cp = spawn(args[0], args.slice(1), options as SpawnOptionsWithoutStdio);
     let stdout = "";
@@ -253,24 +260,8 @@ export const retry = async <T>(
   throw lastError;
 };
 
-export const doesFileExist = async (filePath: string): Promise<boolean> => {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch (err: any) {
-    if (err?.code === "ENOENT") {
-      return false;
-    }
-    throw err;
-  }
-};
-
 export const isProcessAlive = async (pid: number): Promise<boolean> => {
   return await doesFileExist(path.join("/proc", pid.toString()));
-};
-
-export const sha256 = (str: Buffer | string): string => {
-  return createHash("sha256").update(str).digest("hex");
 };
 
 const lockedFilePaths = new Map<string, { mutex: Mutex; numLocks: number }>();
@@ -346,6 +337,20 @@ export const withManyFileLocks = async <T>(
   return await fnComposite();
 };
 
+export type LocalLockNamespace = valueof<typeof LocalLockNamespace>;
+export const LocalLockNamespace = {
+  CONTAINER: "container",
+} as const;
+
+export const withLocalLock = async <T>(
+  ns: LocalLockNamespace,
+  lockId: string,
+  fn: () => Promise<T>,
+): Promise<T> => {
+  const lockFilePath = path.join(os.tmpdir(), `local-lock-${ns}-${sha256(lockId)}`);
+  return await withFileLockCreateIfNotExists(lockFilePath, fn);
+};
+
 export const logErrors = <T extends (...args: any[]) => Promise<any>>(fn: T): T => {
   return (async (...args: Parameters<T>) => {
     try {
@@ -370,4 +375,46 @@ export const getActivityContext = (): Context | null => {
   } catch (err) {
     return null;
   }
+};
+
+type WithRuntimeFirstParam = Parameters<HocusRuntime["withRuntime"]>[0];
+type WithRuntimeAndImagesParams = Obj.Overwrite<
+  WithRuntimeFirstParam,
+  {
+    fs: {
+      "/": ContainerId | ImageId;
+      [path: string]: ContainerId | ImageId;
+    };
+  }
+>;
+
+const _withRuntime: HocusRuntime["withRuntime"] = null as any;
+type WithRuntime<T> = typeof _withRuntime<T>;
+
+export const withRuntimeAndImages = <T>(
+  brService: BlockRegistryService,
+  runtime: HocusRuntime,
+  args: WithRuntimeAndImagesParams,
+  innerFn: Parameters<WithRuntime<T>>[1],
+): Promise<T> => {
+  const exposeSpecs = Array.from(Object.entries(args.fs))
+    .map(([path, imageId]) => ({
+      path,
+      exposeArgs: [imageId, EXPOSE_METHOD.BLOCK_DEV] as const,
+    }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+  const exposeArgs = exposeSpecs.map((s) => s.exposeArgs);
+
+  return withExposedImages(
+    brService,
+    exposeArgs,
+    (deviceSpecs) => {
+      const fs = Object.fromEntries(
+        deviceSpecs.map((spec, idx) => [exposeSpecs[idx].path, spec] as const),
+      ) as WithRuntimeFirstParam["fs"];
+
+      return runtime.withRuntime({ ...args, fs }, innerFn);
+    },
+    { shouldHide: args.shouldPoweroff ?? true },
+  );
 };

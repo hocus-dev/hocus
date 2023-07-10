@@ -1,7 +1,7 @@
 // must be the first import
 import "./prisma-export-patch.server";
 
-import { spawn } from "child_process";
+import assert from "assert";
 import fs from "fs/promises";
 import { join } from "path";
 import { formatWithOptions } from "util";
@@ -9,22 +9,27 @@ import { formatWithOptions } from "util";
 import type { Prisma } from "@prisma/client";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
-import { TestWorkflowEnvironment } from "@temporalio/testing";
+import type { TestWorkflowEnvironment } from "@temporalio/testing";
 import type { Logger, LogLevel } from "@temporalio/worker";
 import { DefaultLogger } from "@temporalio/worker";
-import type { Any } from "ts-toolbelt";
+import deepmerge from "deepmerge";
 import { v4 as uuidv4 } from "uuid";
 
-import type { BlockRegistryService } from "~/agent/block-registry/registry.service";
-import type { Config } from "~/config";
+import { initTemporal, removeSuppressedLogPatterns, suppressLogPattern } from "./temporal";
+
+import type { ContainerId, ImageId } from "~/agent/block-registry/registry.service";
+import { BlockRegistryService } from "~/agent/block-registry/registry.service";
+import type { Config, ConfigOverrides } from "~/config";
 import { config as defaultConfig } from "~/config";
 import type { Injector, ProvidersOverrides } from "~/di/injector.server";
 import { Scope } from "~/di/injector.server";
 import { generateTemporalCodeBundle } from "~/temporal/bundle";
 import { TEST_STATE_MANAGER_REQUEST_TAG } from "~/test-state-manager/api";
 import type { TestStateManager } from "~/test-state-manager/client";
+import type { TimeService } from "~/time.service";
 import { Token } from "~/token";
-import { sleep, waitForPromises } from "~/utils.shared";
+import { runOnTimeout } from "~/utils.server";
+import { genFormattedTimestamp, unwrap, waitForPromises } from "~/utils.shared";
 
 const DB_HOST = process.env.DB_HOST ?? "localhost";
 
@@ -60,16 +65,24 @@ type EarlyInitFunction = (ctx: {
   // for some other init task to complete. For ex. if your init task
   // has a dependency on the logger you may wait for it here
   earlyInitPromises: Record<string, Promise<any>>;
+  /** Lets you override parts of the config. */
+  overrideConfig: (overrides: ConfigOverrides) => void;
   // For closing open handles. Don't use this to guarantee some operation will be executed
   addTeardownFunction: (task: () => Promise<void>) => void;
 }) => Promise<ProvidersOverrides<any>>;
 type EarlyInitMap = Record<string, EarlyInitFunction>;
 
+type LateInitMapToPromises<LateInitT> = {
+  [K in keyof LateInitT]: Promise<
+    LateInitT[K] extends LateInitFunction<any, any, infer T> ? T : never
+  >;
+};
+
 // Late Init functions operate on an already existing injector and are meant to either:
 // - Augment the test context with extra values
 // - Run nontrivial initialization on some service
 // - Register some state with the state manager server
-type LateInitFunction<InjectorT, T> = (ctx: {
+type LateInitFunction<LateInitT, InjectorT, T> = (ctx: {
   // The requested injector
   injector: InjectorT;
   // The test run id
@@ -78,33 +91,35 @@ type LateInitFunction<InjectorT, T> = (ctx: {
   // Here is a map of all the init promises in case you want to wait
   // for some other init task to complete. For ex. if your init task
   // has a dependency on the logger you may wait for it here
-  lateInitPromises: Record<string, Promise<any>>;
+  lateInitPromises: LateInitMapToPromises<LateInitT>;
   // For closing open handles, don't use this to guarantee some operation will be executed
   addTeardownFunction: (task: () => Promise<void>) => void;
 }) => Promise<T>;
-type LateInitMap<InjectorT> = Record<string, LateInitFunction<InjectorT, any>>;
+type LateInitMap<InjectorT, T> = Record<string, LateInitFunction<T, InjectorT, unknown>>;
 
 export class TestEnvironmentBuilder<
   InjectorT extends Injector<any, any, any>,
   OverridesT extends ProvidersOverrides<any>,
   EarlyInitT extends EarlyInitMap,
-  LateInitT extends LateInitMap<InjectorT>,
+  LateInitT extends LateInitMap<InjectorT, {}>,
 > {
   constructor(
     private readonly injectorCtor: (overrides?: OverridesT) => InjectorT,
     private readonly injectorOverrides: OverridesT = {} as any,
     private readonly earlyInit: EarlyInitT = {} as any,
     private readonly lateInit: LateInitT = {} as any,
+    private readonly postTest: ((
+      ctx: { injector: InjectorT; runId: string } & {
+        [K in keyof LateInitT]: Awaited<ReturnType<LateInitT[K]>>;
+      },
+    ) => Promise<void>)[] = [] as any,
   ) {}
 
   run(
     testFn: (
-      context: Any.Compute<
-        { injector: InjectorT; runId: string } & Record<string, never> & {
-            [K in keyof LateInitT]: Awaited<ReturnType<LateInitT[K]>>;
-          },
-        "flat"
-      >,
+      context: { injector: InjectorT; runId: string } & {
+        [K in keyof LateInitT]: Awaited<ReturnType<LateInitT[K]>>;
+      },
     ) => Promise<void>,
   ): () => Promise<void> {
     const testLocation = discoverCaller();
@@ -124,11 +139,16 @@ export class TestEnvironmentBuilder<
         const earlyInitPromises: {
           [K in keyof EarlyInitT]: Promise<any>;
         } = {} as any;
+        let configOverrides = {} as ConfigOverrides;
+        const overrideConfig = (overrides: ConfigOverrides): void => {
+          configOverrides = deepmerge(configOverrides, overrides);
+        };
         for (const [key, asyncEarlyInit] of Object.entries(this.earlyInit)) {
           earlyInitPromises[key as keyof EarlyInitT] = asyncEarlyInit({
             runId,
             earlyInitPromises,
             addTeardownFunction,
+            overrideConfig,
           });
         }
         let earlyInjectorOverrides: ProvidersOverrides<any> = {} as any;
@@ -137,22 +157,39 @@ export class TestEnvironmentBuilder<
           earlyInjectorOverrides = { ...res, ...earlyInjectorOverrides };
         }
 
+        const configOverrideFns = Object.fromEntries(
+          Object.entries(configOverrides).map(([key, value]) => {
+            return [key, () => deepmerge((defaultConfig as any)[key](), value as any)];
+          }),
+        );
+
         const injector = this.injectorCtor({
           ...earlyInjectorOverrides,
           ...this.injectorOverrides,
+          [Token.Config]: {
+            provide: {
+              value: { ...defaultConfig, ...configOverrideFns },
+            },
+          },
         });
 
         const lateInitPromises: {
           [K in keyof LateInitT]: Promise<any>;
         } = {} as any;
+        let resolveLateInitBarrier = (_?: unknown) => {};
+        const lateInitBarrier = new Promise((resolve) => (resolveLateInitBarrier = resolve));
         for (const [key, asyncLateInit] of Object.entries(this.lateInit)) {
-          lateInitPromises[key as keyof LateInitT] = asyncLateInit({
-            injector,
-            runId,
-            lateInitPromises,
-            addTeardownFunction,
-          });
+          lateInitPromises[key as keyof LateInitT] = lateInitBarrier.then(() =>
+            asyncLateInit({
+              injector,
+              runId,
+              lateInitPromises,
+              addTeardownFunction,
+            }),
+          );
         }
+        resolveLateInitBarrier();
+
         const extraCtx: {
           [K in keyof LateInitT]: Awaited<ReturnType<LateInitT[K]>>;
         } = {} as any;
@@ -160,12 +197,18 @@ export class TestEnvironmentBuilder<
           const res = await promise;
           extraCtx[key as keyof LateInitT] = res;
         }
-        const res = await testFn({ injector, runId, ...(extraCtx as any) });
+        const fullCtx = { injector, runId, ...(extraCtx as any) };
+        const res = await testFn(fullCtx);
         testFailed = false;
+
+        for (const postTestFn of this.postTest) {
+          await postTestFn(fullCtx);
+        }
+
         return res;
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error(`[${testLocation}]\nFailed test run`, runId, err, JSON.stringify(err));
+        console.error(`[${testLocation}]\nFailed test run`, runId, err);
         throw err;
       } finally {
         const rsp = await this.#getStateManager().mkRequest(
@@ -184,9 +227,9 @@ export class TestEnvironmentBuilder<
     };
   }
 
-  withEarlyInits<T extends LateInitMap<InjectorT>>(
-    arg: T,
-  ): TestEnvironmentBuilder<InjectorT, OverridesT, EarlyInitT & T, LateInitT> {
+  withEarlyInits(
+    arg: EarlyInitMap,
+  ): TestEnvironmentBuilder<InjectorT, OverridesT, EarlyInitT & EarlyInitMap, LateInitT> {
     return new TestEnvironmentBuilder(
       this.injectorCtor,
       this.injectorOverrides,
@@ -195,7 +238,7 @@ export class TestEnvironmentBuilder<
     );
   }
 
-  withLateInits<T extends LateInitMap<InjectorT>>(
+  withLateInits<T extends LateInitMap<InjectorT, LateInitT>>(
     arg: T,
   ): TestEnvironmentBuilder<InjectorT, OverridesT, EarlyInitT, LateInitT & T> {
     return new TestEnvironmentBuilder(this.injectorCtor, this.injectorOverrides, this.earlyInit, {
@@ -216,7 +259,7 @@ export class TestEnvironmentBuilder<
   }
 
   #getStateManager(): TestStateManager {
-    return (globalThis as any).stateManager as TestStateManager;
+    return unwrap((globalThis as any).stateManager) as TestStateManager;
   }
 
   // Sets up obtaining debug logs from the app
@@ -226,7 +269,7 @@ export class TestEnvironmentBuilder<
     InjectorT,
     OverridesT,
     EarlyInitT & { logger: EarlyInitFunction },
-    LateInitT & { logger: LateInitFunction<InjectorT, Logger> }
+    LateInitT & { logger: LateInitFunction<LateInitT, InjectorT, Logger> }
   > {
     return new TestEnvironmentBuilder(
       this.injectorCtor,
@@ -284,7 +327,7 @@ export class TestEnvironmentBuilder<
     InjectorT,
     OverridesT,
     EarlyInitT,
-    LateInitT & { db: LateInitFunction<InjectorT, Prisma.NonTransactionClient> }
+    LateInitT & { db: LateInitFunction<LateInitT, InjectorT, Prisma.NonTransactionClient> }
   > {
     return new TestEnvironmentBuilder(this.injectorCtor, this.injectorOverrides, this.earlyInit, {
       db: async ({ runId, addTeardownFunction }) => {
@@ -293,17 +336,14 @@ export class TestEnvironmentBuilder<
           { runId, prismaSchemaPath: "prisma/schema.prisma" },
         );
         const dbUrl = `postgresql://postgres:pass@${DB_HOST}:5432/${rsp.dbName}`;
-
         const db = new PrismaClient({
           datasources: {
             db: { url: dbUrl },
           },
         });
-
         addTeardownFunction(async () => {
           await db.$disconnect();
         });
-
         return db;
       },
       ...this.lateInit,
@@ -311,63 +351,93 @@ export class TestEnvironmentBuilder<
   }
 
   // TODO: Create a withWorker helper ;)
-  withTimeSkippingTemporal(): TestEnvironmentBuilder<
+  withLocalTemporal(workflowsPath?: string): TestEnvironmentBuilder<
     InjectorT,
     OverridesT,
-    EarlyInitT,
+    EarlyInitT & { withLocalTemporal: EarlyInitFunction },
     LateInitT & {
-      workflowBundle: LateInitFunction<InjectorT, any>;
-      temporalTestEnv: LateInitFunction<InjectorT, TestWorkflowEnvironment>;
+      workflowBundle: LateInitFunction<LateInitT, InjectorT, any>;
+      temporalTestEnv: LateInitFunction<LateInitT, InjectorT, TestWorkflowEnvironment>;
+      taskQueue: LateInitFunction<LateInitT, InjectorT, string>;
+      suppressLogPattern: LateInitFunction<
+        LateInitT,
+        InjectorT,
+        (pattern: string | RegExp) => void
+      >;
     }
   > {
-    return new TestEnvironmentBuilder(this.injectorCtor, this.injectorOverrides, this.earlyInit, {
-      workflowBundle: async () => {
-        return await generateTemporalCodeBundle();
-      },
-      temporalTestEnv: async ({ addTeardownFunction }) => {
-        const env = await TestWorkflowEnvironment.createTimeSkipping({
-          client: {
-            dataConverter: {
-              payloadConverterPath: require.resolve("~/temporal/data-converter"),
+    const bundles: Record<string, Promise<any>> = {};
+
+    return new TestEnvironmentBuilder(
+      this.injectorCtor,
+      this.injectorOverrides,
+      {
+        ...this.earlyInit,
+        withLocalTemporal: async ({ overrideConfig }) => {
+          const { address } = await initTemporal();
+          overrideConfig({
+            agent: {
+              temporalAddress: address,
             },
-          },
-        });
-        addTeardownFunction(async () => {
-          await env.teardown();
-        });
-        return env;
+            temporalConnection: {
+              temporalServerUrl: address,
+            },
+          });
+          return {};
+        },
       },
-      ...this.lateInit,
-    });
+      {
+        ...this.lateInit,
+        workflowBundle: async () => {
+          let bundlePath = workflowsPath ?? "!default";
+          if (bundles[bundlePath] === void 0) {
+            bundles[bundlePath] = generateTemporalCodeBundle(workflowsPath);
+          }
+          return bundles[bundlePath];
+        },
+        temporalTestEnv: async () => {
+          const { env } = await initTemporal();
+          return env;
+        },
+        taskQueue: async ({ runId }) => runId,
+        suppressLogPattern: async ({ lateInitPromises, addTeardownFunction }) => {
+          const taskQueue = await lateInitPromises.taskQueue;
+          assert(typeof taskQueue === "string");
+          addTeardownFunction(async () => {
+            removeSuppressedLogPatterns(taskQueue);
+          });
+          return (logPattern) => {
+            suppressLogPattern(taskQueue, logPattern);
+          };
+        },
+      },
+    );
   }
 
   withBlockRegistry(): TestEnvironmentBuilder<
     InjectorT,
     OverridesT,
     EarlyInitT & { brService: EarlyInitFunction },
-    LateInitT & { brService: LateInitFunction<InjectorT, BlockRegistryService> }
+    LateInitT & { brService: LateInitFunction<LateInitT, InjectorT, BlockRegistryService> }
   > {
     return new TestEnvironmentBuilder(
       this.injectorCtor,
       this.injectorOverrides,
       {
-        brService: async ({ runId }) => {
+        brService: async ({ runId, overrideConfig }) => {
           const rsp = await this.#getStateManager().mkRequest(
             TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_TEST_STATE_DIR,
             { runId },
           );
           const blockRegistryRoot = join(rsp.dirPath, "block-registry");
           const runtimeStateRoot = join(rsp.dirPath, "runtime");
-          return {
-            [Token.Config]: {
-              provide: {
-                value: {
-                  ...defaultConfig,
-                  agent: () => ({ ...defaultConfig.agent(), blockRegistryRoot, runtimeStateRoot }),
-                },
-              },
+          overrideConfig({
+            agent: {
+              blockRegistryRoot,
+              runtimeStateRoot,
             },
-          };
+          });
+          return {};
         },
         ...this.earlyInit,
       },
@@ -377,36 +447,14 @@ export class TestEnvironmentBuilder<
             TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_LOGS_FILE,
             { runId },
           );
-          const obdLogFile = await fs.open(obdLogRsp.path, "a");
 
           const brService: BlockRegistryService = injector.resolve(Token.BlockRegistryService);
           const config: Config = injector.resolve(Token.Config);
           const blockRegistryRoot: string = config.agent().blockRegistryRoot;
           await brService.initializeRegistry();
-          const cp = spawn(
-            "/opt/overlaybd/bin/overlaybd-tcmu",
-            [join(blockRegistryRoot, "overlaybd.json")],
-            { stdio: ["ignore", obdLogFile.fd, obdLogFile.fd] },
-          );
-          const cpWait = new Promise<void>((resolve, reject) => {
-            cp.on("error", reject);
-            cp.on("close", () => {
-              void obdLogFile.close();
-              resolve(void 0);
-            });
+          const [cp, cpWait] = await brService.startOverlaybdProcess({
+            logFilePath: obdLogRsp.path,
           });
-          // Wait for tcmu to overlaybd to fully initialize
-          for (let i = 0; i < 100; i += 1) {
-            try {
-              await fs.readFile(join(blockRegistryRoot, "logs", "overlaybd.log"), "utf-8");
-              break;
-            } catch (err) {
-              await sleep(5);
-            }
-            if (i == 99) {
-              throw new Error("TCMU failed to initialize");
-            }
-          }
 
           await this.#getStateManager().mkRequest(
             TEST_STATE_MANAGER_REQUEST_TAG.REQUEST_BLOCK_REGISTRY_WATCH,
@@ -420,23 +468,71 @@ export class TestEnvironmentBuilder<
           addTeardownFunction(async () => {
             await brService.hideEverything();
             cp.kill("SIGINT");
-            let timeout: NodeJS.Timeout | undefined;
-            await Promise.race([
-              cpWait,
-              new Promise((resolve) => {
-                timeout = setTimeout(() => {
-                  cp.kill("SIGKILL");
-                  resolve(void 0);
-                }, 1000);
-              }),
-            ]);
-            clearTimeout(timeout);
+            await runOnTimeout({ waitFor: cpWait, timeoutMs: 1000 }, () => cp.kill("SIGKILL"));
           });
 
           return brService;
         },
         ...this.lateInit,
       },
+    );
+  }
+
+  /**
+   * Pushes chosen images generated by the test to the OCI registry specified in the tag.
+   */
+  withImagePush(
+    chooseImages: (
+      /** a formatted timestamp in the format `YYYY-MM-DD-HH-MM-SS` */
+      formattedTimestamp: string,
+    ) => { tag: string; imageId: ImageId | ContainerId }[],
+  ): TestEnvironmentBuilder<InjectorT, OverridesT, EarlyInitT, LateInitT> {
+    return new TestEnvironmentBuilder(
+      this.injectorCtor,
+      this.injectorOverrides,
+      this.earlyInit,
+      this.lateInit,
+      [
+        ...this.postTest,
+        async (ctx) => {
+          const { injector } = ctx;
+          const config: Config = injector.resolve(Token.Config);
+          const {
+            testOutputOciRegistryUsername: username,
+            testOutputOciRegistryPassword: password,
+          } = config.tests();
+          const timeService: TimeService = injector.resolve(Token.TimeService);
+          const timestamp = genFormattedTimestamp(timeService.now());
+          const images = chooseImages(timestamp);
+          const tags = images.map((i) => `"${i.tag}"`).join(", ");
+          if (!username || !password) {
+            /* eslint-disable no-console */
+            console.log(`OCI registry credentials not found. Skipping image push for ${tags}.`);
+            return;
+          }
+          const brService = ctx.brService as any;
+          assert(
+            brService instanceof BlockRegistryService,
+            "BlockRegistryService not initialized. Did you forget to call withBlockRegistry()?",
+          );
+          console.log(
+            `OCI registry credentials found. Images with tags ${tags} will be pushed to the registry.`,
+          );
+
+          for (const { tag, imageId: suppliedImageId } of images) {
+            let imageId: ImageId;
+            if (BlockRegistryService.isContainerId(suppliedImageId)) {
+              imageId = await brService.commitContainer(suppliedImageId, uuidv4());
+            } else {
+              imageId = suppliedImageId;
+            }
+            console.log(`Pushing ${tag} to OCI registry...`);
+            await brService.pushImage(imageId, { tag, username, password });
+            console.log(`Pushed ${tag} to OCI registry.`);
+          }
+          /* eslint-enable no-console */
+        },
+      ],
     );
   }
 }

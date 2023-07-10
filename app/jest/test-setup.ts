@@ -3,6 +3,7 @@ import console from "console";
 import { dirname } from "path";
 
 import { TestStateManager } from "~/test-state-manager/client";
+import { doesFileExist } from "~/utils.server";
 // https://github.com/jestjs/jest/issues/10322#issuecomment-1304375267
 global.console = console;
 
@@ -25,7 +26,13 @@ if (origStackFormatter) {
 beforeAll(async () => {
   let testStorageDir = process.env.TEST_STORAGE_DIR;
   if (testStorageDir === void 0) {
-    throw new Error("Please provide TEST_STORAGE_DIR");
+    if (await doesFileExist("/srv/jailer")) {
+      testStorageDir = "/srv/jailer/tests";
+    } else if (await doesFileExist("/home/hocus/dev/hocus-resources")) {
+      testStorageDir = "/home/hocus/dev/hocus-resources/tests";
+    } else {
+      throw new Error("Please provide TEST_STORAGE_DIR");
+    }
   }
   const stateManager = new TestStateManager(testStorageDir);
   await stateManager.connect();

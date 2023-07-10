@@ -1,4 +1,6 @@
 import assert from "assert";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -135,10 +137,11 @@ export class BlockRegistryService {
     return path.join(this.paths.blockConfig, contentId);
   }
 
-  static genTCMUSubtype(length = 14): string {
+  static readonly tcmuSubtypeLength = 14;
+  static genTCMUSubtype(): string {
     const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     const charsetLength = charset.length;
-    const randomValues = new Uint32Array(length);
+    const randomValues = new Uint32Array(BlockRegistryService.tcmuSubtypeLength);
     crypto.webcrypto.getRandomValues(randomValues);
     return Array.from(randomValues, (value) => charset[value % charsetLength]).join("");
   }
@@ -147,12 +150,34 @@ export class BlockRegistryService {
     return uuidv4();
   }
 
+  /**
+   * The max length is dictated by https://github.com/open-iscsi/tcmu-runner/blob/1bdb239fa183c84d2ace6b52aa33476968a0cef7/libtcmu.c#L466
+   * The `tcm_dev_name` in the linked code has a maximum length of 128 characters.
+   * It consists of the tcmuSubtype, the content id, and 2 more chars.
+   * The content id is prefixed with `im_` for images and `ct_` for containers - that's
+   * the 3 chars in the formula below.
+   */
+  static maxOutputIdLength = 128 - (BlockRegistryService.tcmuSubtypeLength + 3 + 2);
+  static checkOutputIdLength(outputId: string): void {
+    if (outputId.length > BlockRegistryService.maxOutputIdLength) {
+      throw new Error(
+        `Output ID "${outputId}" is too long. Max length is ${BlockRegistryService.maxOutputIdLength}.`,
+      );
+    }
+  }
+
   static genImageId(outputId: string): ImageId {
+    BlockRegistryService.checkOutputIdLength(outputId);
     return ("im_" + outputId) as ImageId;
   }
 
   static genContainerId(outputId: string): ContainerId {
+    BlockRegistryService.checkOutputIdLength(outputId);
     return ("ct_" + outputId) as ContainerId;
+  }
+
+  static extractOutputId(contentId: ContainerId | ImageId): string {
+    return contentId.slice(3);
   }
 
   static isImageId(id: string): id is ImageId {
@@ -1654,5 +1679,45 @@ export class BlockRegistryService {
         await execCmdWithOpts(["crane", "push", exportDir, opts.tag], cmdOpts);
       });
     });
+  }
+
+  /**
+   * Returns the handle to the overlaybd process and a promise that resolves when the process exits,
+   * or rejects if the process errors out.
+   *
+   * Must be run after the block registry is initialized.
+   */
+  async startOverlaybdProcess(opts: {
+    logFilePath: string;
+  }): Promise<[ChildProcess, Promise<void>]> {
+    const obdLogFile = await fs.open(opts.logFilePath, "a");
+    const processHandle = spawn(
+      "/opt/overlaybd/bin/overlaybd-tcmu",
+      [path.join(this.agentConfig.blockRegistryRoot, "overlaybd.json")],
+      { stdio: ["ignore", obdLogFile.fd, obdLogFile.fd] },
+    );
+    const processPromise = new Promise<void>((resolve, reject) => {
+      processHandle.on("error", reject);
+      processHandle.on("close", () => {
+        void obdLogFile.close();
+        resolve(void 0);
+      });
+    });
+    // Wait for tcmu to overlaybd to fully initialize
+    for (let i = 0; i < 100; i++) {
+      try {
+        await fs.readFile(
+          path.join(this.agentConfig.blockRegistryRoot, "logs", "overlaybd.log"),
+          "utf-8",
+        );
+        break;
+      } catch (err) {
+        await sleep(5);
+      }
+      if (i >= 99) {
+        throw new Error("TCMU failed to initialize");
+      }
+    }
+    return [processHandle, processPromise];
   }
 }

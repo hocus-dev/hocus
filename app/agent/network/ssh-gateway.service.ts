@@ -1,6 +1,8 @@
 import fs from "fs/promises";
 
-import { doesFileExist, execCmd } from "../utils";
+import { execCmd } from "../utils";
+
+import { doesFileExist } from "~/utils.server";
 
 export class SSHGatewayService {
   async addPublicKeysToAuthorizedKeys(keys: string[]): Promise<void> {

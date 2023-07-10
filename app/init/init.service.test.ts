@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 
 import { SshKeyPairType } from "@prisma/client";
-import { DefaultLogger, Runtime, Worker } from "@temporalio/worker";
+import { Worker } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
 import { createActivities } from "~/agent/activities/list";
@@ -21,11 +21,8 @@ const USER2_ID = "166908ef-15d0-498f-88e3-bfd97cf5d21b";
 const EXPECTED_CONFIG = `projects:
   - config:
       maxPrebuildRamMib: 1
-      maxPrebuildRootDriveSizeMib: 7
       maxPrebuildVCPUCount: 2
-      maxWorkspaceProjectDriveSizeMib: 5
       maxWorkspaceRamMib: 3
-      maxWorkspaceRootDriveSizeMib: 6
       maxWorkspaceVCPUCount: 4
     env:
       project:
@@ -74,12 +71,6 @@ users:
       - name: name_b7b83d63-a9b0-4871-92d0-07779f28cfa8
         publicKey: pk_b7b83d63-a9b0-4871-92d0-07779f28cfa8
 `;
-
-beforeAll(async () => {
-  Runtime.install({
-    logger: new DefaultLogger("WARN"),
-  });
-});
 
 test.concurrent(
   "getInitConfig",
@@ -131,9 +122,6 @@ test.concurrent(
           maxPrebuildVCPUCount: 2,
           maxWorkspaceRamMib: 3,
           maxWorkspaceVCPUCount: 4,
-          maxWorkspaceProjectDriveSizeMib: 5,
-          maxWorkspaceRootDriveSizeMib: 6,
-          maxPrebuildRootDriveSizeMib: 7,
           gitRepository: {
             connect: {
               id: repo.id,
@@ -193,7 +181,7 @@ test.concurrent(
   new TestEnvironmentBuilder(createAppInjector)
     .withTestLogging()
     .withTestDb()
-    .withTimeSkippingTemporal()
+    .withLocalTemporal()
     .run(async ({ injector, db, temporalTestEnv, workflowBundle }) => {
       const taskQueue = `test-${uuidv4()}`;
       const initService = injector.resolve(Token.InitService);

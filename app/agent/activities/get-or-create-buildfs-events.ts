@@ -12,8 +12,7 @@ export type GetOrCreateBuildfsEventsActivity = (
     contextPath: string;
     dockerfilePath: string;
     cacheHash: string | null;
-    outputFilePath: string;
-    projectFilePath: string;
+    outputId: string;
     projectId: bigint;
   }[],
 ) => Promise<GetOrCreateBuildfsEventsReturnType[]>;

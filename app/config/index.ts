@@ -1,3 +1,5 @@
+import type { Object as Obj } from "ts-toolbelt";
+
 import { makeConfig, get, getEnv } from "./utils.server";
 
 import {
@@ -35,27 +37,22 @@ export const config = makeConfig()({
     license: process.env.HOCUS_LICENSE ?? void 0,
     licensePublicKey: HOCUS_LICENSE_PUBLIC_KEY,
   }),
-  shared: () => ({
-    maxRepositoryDriveSizeMib: parseIntWithMin(
-      process.env.SHARED_MAX_REPOSITORY_DRIVE_SIZE_MIB ?? "5000",
-      10,
-    ),
-  }),
   agent: () => ({
     temporalAddress: get("AGENT_TEMPORAL_ADDRESS", "localhost:7233"),
     databaseUrl: get("AGENT_DATABASE_URL", "postgres://postgres:pass@localhost:5432/rooms"),
     defaultKernel: get("AGENT_KERNEL_PATH", "/srv/jailer/resources/vmlinux-6.2-x86_64.bin"),
     hostBuildfsResourcesDir: get("AGENT_HOST_BUILDFS_RESOURCES_DIR", "/app/resources"),
-    buildfsRootFs: get("AGENT_BUILDFS_ROOTFS", "/srv/jailer/resources/buildfs.ext4"),
     // `get` is not used here because users usually will not want to set these manually
     // in production. `get` would throw an error if the env var was not set.
-    fetchRepositoryRootFs:
-      process.env.AGENT_FETCH_REPOSITORY_ROOTFS_PATH ?? "/srv/jailer/resources/fetchrepo.ext4",
-    checkoutAndInspectRootFs:
-      process.env.AGENT_CHECKOUT_AND_INSPECT_ROOTFS_PATH ??
-      "/srv/jailer/resources/checkout-and-inspect.ext4",
-    defaultWorkspaceRootFs:
-      process.env.DEFAULT_WORKSPACE_ROOTFS_PATH ?? "/srv/jailer/resources/default-workspace.ext4",
+    buildfsImageTag:
+      process.env.AGENT_BUILDFS_IMAGE_TAG ?? "quay.io/hocus/core:buildfs-11-jun-2023",
+    fetchRepoImageTag:
+      process.env.AGENT_FETCH_REPO_IMAGE_TAG ?? "quay.io/hocus/core:fetchrepo-11-jun-2023",
+    checkoutAndInspectImageTag:
+      process.env.AGENT_CHECKOUT_AND_INSPECT_IMAGE_TAG ??
+      "quay.io/hocus/core:checkout-and-inspect-11-jun-2023",
+    defaultWorkspaceImageTag:
+      process.env.DEFAULT_WORKSPACE_IMAGE_TAG ?? "quay.io/hocus/workspace-preview:base-13-06-2023",
     prebuildSshPublicKey:
       process.env.AGENT_PREBUILD_SSH_PUBLIC_KEY ?? DEFAULT_PREBUILD_SSH_KEY_PUBLIC,
     prebuildSshPrivateKey:
@@ -105,4 +102,16 @@ export const config = makeConfig()({
       1,
     ),
   }),
+  tests: () => ({
+    testOutputOciRegistryUsername: process.env.TEST_OUTPUT_OCI_REGISTRY_USERNAME,
+    testOutputOciRegistryPassword: process.env.TEST_OUTPUT_OCI_REGISTRY_PASSWORD,
+  }),
 });
+
+export type ConfigOverrides = {
+  [K in keyof Config]?: Config[K] extends () => infer R
+    ? R extends object
+      ? Obj.Partial<R, "deep">
+      : R
+    : Config[K];
+};

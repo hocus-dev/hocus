@@ -13,9 +13,6 @@ export const VmSettingsFields = [
   "maxPrebuildVCPUCount",
   "maxWorkspaceRamMib",
   "maxWorkspaceVCPUCount",
-  "maxWorkspaceProjectDriveSizeMib",
-  "maxWorkspaceRootDriveSizeMib",
-  "maxPrebuildRootDriveSizeMib",
 ] as const;
 
 export type VmSettingsField = (typeof VmSettingsFields)[number];
@@ -86,7 +83,6 @@ const InputField = React.memo(InputFieldComponent);
 
 function SettingsTabComponent(props: {
   projectExternalId: string;
-  maxRepositoryDriveSizeMib: number;
   vmSettings: Record<VmSettingsField, number>;
   showSuccess: boolean;
 }): JSX.Element {
@@ -134,28 +130,9 @@ function SettingsTabComponent(props: {
                 unit="MiB"
                 inputName={VmSettingsField.maxPrebuildRamMib}
               />
-              <InputField
-                title="Max Root Filesystem Size"
-                inputProps={{
-                  min: 1,
-                }}
-                unit="MiB"
-                inputExtraClassName="max-w-[10rem]"
-                inputName={VmSettingsField.maxPrebuildRootDriveSizeMib}
-              />
-              <div className="flex flex-col justify-end">
-                <h3 className="text-sm text-gray-400 mb-2">Max Project Filesystem Size</h3>
-                <TextInputAddonRight
-                  inputExtraClassName="max-w-[10rem]"
-                  inputProps={{ disabled: true, value: props.maxRepositoryDriveSizeMib }}
-                  addon={<span>MiB</span>}
-                />
-              </div>
             </div>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Resources available to a virtual machine running a prebuild. Increasing filesystem
-              size will lengthen prebuild times. You should change it if your workspace image is too
-              large.
+              Resources available to a virtual machine running a prebuild.
             </p>
           </div>
           <div>
@@ -177,24 +154,6 @@ function SettingsTabComponent(props: {
                 }}
                 unit="MiB"
                 inputName={VmSettingsField.maxWorkspaceRamMib}
-              />
-              <InputField
-                title="Max Root Filesystem Size"
-                inputProps={{
-                  min: 1,
-                }}
-                unit="MiB"
-                inputExtraClassName="max-w-[10rem]"
-                inputName={VmSettingsField.maxWorkspaceRootDriveSizeMib}
-              />
-              <InputField
-                title="Max Root Project Size"
-                inputProps={{
-                  min: 1,
-                }}
-                unit="MiB"
-                inputExtraClassName="max-w-[10rem]"
-                inputName={VmSettingsField.maxWorkspaceProjectDriveSizeMib}
               />
             </div>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">

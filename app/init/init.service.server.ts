@@ -113,9 +113,6 @@ export class InitService {
         maxPrebuildVCPUCount: project.maxPrebuildVCPUCount,
         maxWorkspaceRamMib: project.maxWorkspaceRamMib,
         maxWorkspaceVCPUCount: project.maxWorkspaceVCPUCount,
-        maxWorkspaceProjectDriveSizeMib: project.maxWorkspaceProjectDriveSizeMib,
-        maxWorkspaceRootDriveSizeMib: project.maxWorkspaceRootDriveSizeMib,
-        maxPrebuildRootDriveSizeMib: project.maxPrebuildRootDriveSizeMib,
       },
     }));
     return {

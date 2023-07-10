@@ -14,6 +14,7 @@ import { ProjectPathTabId } from "~/page-paths.shared";
 import type { ProjectService } from "~/project/project.service";
 import { NewWorkspaceValidator } from "~/schema/new-workspace.validator.server";
 import { Token } from "~/token";
+import { formatBranchName } from "~/utils.shared";
 
 const findPrebuild = async (db: Prisma.Client, prebuildId: string) => {
   const prebuildEvent = await db.prebuildEvent.findUnique({
@@ -93,7 +94,7 @@ export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
     branches: prebuildsByBranch
       .map((r) => ({
         branch: {
-          name: r.branch.name,
+          name: formatBranchName(r.branch.name),
           externalId: r.branch.externalId,
         },
         ongoingPrebuild:

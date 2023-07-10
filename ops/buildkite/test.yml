@@ -32,7 +32,7 @@ steps:
                   "{{matrix}}",
                   "--text",
                   "--ignore",
-                  ".git/,deps/firecracker-client/,**/*.excalidraw,public/font-awesome/,public/fonts/,public/devicon.min.css,prisma/migrations/migration_lock.toml,ops/docker/resources/keycloak-db-dump.sql",
+                  ".git/,**/*.excalidraw,public/font-awesome/,public/fonts/,public/devicon.min.css,prisma/migrations/migration_lock.toml,ops/docker/resources/keycloak-db-dump.sql",
                   "--path",
                   ".",
                 ]
@@ -97,10 +97,9 @@ steps:
 
   # TODO: Move to dprint ;)
   - label: ":prettier: Formatting"
-    plugins:
-      - docker#v5.6.0:
-          command: ["-c", "/workdir/"]
-          image: "tmknom/prettier:latest"
+    command: |
+      docker build -t hocus-tests:$BUILDKITE_COMMIT -f ops/docker/backend-tests.Dockerfile $BUILDKITE_BUILD_CHECKOUT_PATH \
+      && docker run -it --rm hocus-tests:$BUILDKITE_COMMIT yarn run format:check
 
   - label: ":typescript: Typecheck"
     command: |

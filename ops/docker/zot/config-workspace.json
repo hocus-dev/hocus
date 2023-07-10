@@ -22,7 +22,7 @@
           "retryDelay": "10s",
           "content": [
             {
-              "prefix": "/hocus/hocus-block-registry-tests"
+              "prefix": "/hocus/*"
             }
           ]
         }

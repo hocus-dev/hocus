@@ -1,10 +1,17 @@
 // cSpell:words httphey heyo
+import path from "path";
+
 import { createAgentInjector } from "./agent-injector";
-import { execSshCmd, sha256 } from "./utils";
+import { BlockRegistryService, EXPOSE_METHOD } from "./block-registry/registry.service";
+import { expectContent } from "./block-registry/test-utils";
+import { execSshCmd, withRuntimeAndImages } from "./utils";
 
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
+import { doesFileExist, sha256 } from "~/utils.server";
 import { waitForPromises } from "~/utils.shared";
+
+jest.setTimeout(3_600_000);
 
 const DOCKERFILE_1 = `FROM ubuntu:latest
 COPY ./foo /foo`;
@@ -70,11 +77,12 @@ test.concurrent(
 
 test.concurrent(
   "getSha256FromFiles",
-  testEnv.run(async ({ injector, runId }) => {
+  testEnv.withBlockRegistry().run(async ({ injector, runId }) => {
     const buildfsService = injector.resolve(Token.BuildfsService);
     const agentUtilService = injector.resolve(Token.AgentUtilService);
+    const brService = injector.resolve(Token.BlockRegistryService);
     const agentConfig = injector.resolve(Token.Config).agent();
-    const fcService = injector.resolve(Token.FirecrackerService)(runId);
+    const runtime = injector.resolve(Token.QemuService)(runId);
 
     const files = [
       { path: "/tmp/foo/foo", content: "foo" },
@@ -90,15 +98,20 @@ test.concurrent(
         .join("\n") + "\n",
     );
 
-    await fcService.withVM(
+    const imageId = await brService.loadImageFromRemoteRepo(agentConfig.buildfsImageTag, "im1");
+    const containerId = await brService.createContainer(imageId, "c1");
+    await withRuntimeAndImages(
+      brService,
+      runtime,
+
       {
         ssh: {
           username: "hocus",
-          privateKey: agentConfig.prebuildSshPrivateKey,
+          password: "hocus",
         },
-        kernelPath: agentConfig.defaultKernel,
-        rootFsPath: agentConfig.checkoutAndInspectRootFs,
-        copyRootFs: true,
+        fs: {
+          "/": containerId,
+        },
         memSizeMib: 1024,
         vcpuCount: 1,
       },
@@ -113,4 +126,85 @@ test.concurrent(
       },
     );
   }),
+);
+
+test.concurrent(
+  "buildfs",
+  testEnv
+    .withTestDb()
+    .withBlockRegistry()
+    .withImagePush((timestamp) => [
+      {
+        tag: `quay.io/hocus/hocus-tests:buildfs-${timestamp}`,
+        imageId: BlockRegistryService.genImageId("output"),
+      },
+    ])
+    .run(async ({ injector, runId, db }) => {
+      const buildfsService = injector.resolve(Token.BuildfsService);
+      const brService = injector.resolve(Token.BlockRegistryService);
+      const runtime = injector.resolve(Token.QemuService)(runId);
+
+      const vmTask = await db.$transaction((tdb) =>
+        buildfsService.createBuildfsVmTask(tdb, {
+          relativeProjectRootDirPath: "/",
+          contextPath: "/",
+          dockerfilePath: "hocus.Dockerfile",
+        }),
+      );
+
+      const repoImageId = await brService.loadImageFromRemoteRepo(
+        "quay.io/hocus/hocus-tests:checkout-and-inspect-06-11-2023-18-17-06",
+        "repo-image",
+      );
+      const outputId = "output";
+
+      await expectContent(brService, { numTotalContent: 1 });
+      const tmpContentPrefix = "hello-there";
+      const result = await buildfsService.buildfs({
+        db,
+        runtime,
+        vmTaskId: vmTask.id,
+        memSizeMib: 1024,
+        vcpuCount: 1,
+        repoImageId,
+        outputId,
+        tmpContentPrefix,
+      });
+      if (!result.buildSuccessful) {
+        // eslint-disable-next-line no-console
+        console.error(result);
+      }
+      expect(result.buildSuccessful).toBe(true);
+      await expectContent(brService, {
+        numTotalContent: 4,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 0,
+        },
+      });
+
+      await expect(
+        buildfsService.buildfs({
+          db,
+          runtime,
+          vmTaskId: vmTask.id,
+          memSizeMib: 1024,
+          vcpuCount: 1,
+          repoImageId: BlockRegistryService.genImageId("nonexistent-image-id"),
+          outputId: "output-2",
+          tmpContentPrefix,
+        }),
+      ).rejects.toThrow();
+      await expectContent(brService, {
+        numTotalContent: 5,
+        prefix: {
+          value: tmpContentPrefix,
+          numPrefixedContent: 1,
+        },
+      });
+
+      const outputImageId = BlockRegistryService.genImageId(outputId);
+      const { mountPoint } = await brService.expose(outputImageId, EXPOSE_METHOD.HOST_MOUNT);
+      expect(await doesFileExist(path.join(mountPoint, "home/hocus"))).toBe(true);
+    }),
 );

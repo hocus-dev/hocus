@@ -1,20 +1,21 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { BuildfsEvent, BuildfsEventFiles, Prisma } from "@prisma/client";
+import type { BuildfsEvent, BuildfsEventImages, Prisma, VmTask } from "@prisma/client";
 import { VmTaskStatus } from "@prisma/client";
 import { Add, Copy, DockerfileParser } from "dockerfile-ast";
 import type { NodeSSH } from "node-ssh";
+import { v4 as uuidv4 } from "uuid";
 
 import type { AgentUtilService } from "./agent-util.service";
-import { HOST_PERSISTENT_DIR } from "./constants";
-import type { FirecrackerService } from "./runtime/firecracker-legacy/firecracker.service";
-import { doesFileExist, execCmd, execSshCmd, withFileLock } from "./utils";
+import type { ImageId } from "./block-registry/registry.service";
+import { BlockRegistryService } from "./block-registry/registry.service";
+import type { HocusRuntime } from "./runtime/hocus-runtime";
+import { LocalLockNamespace, execSshCmd, withLocalLock, withRuntimeAndImages } from "./utils";
 
 import type { Config } from "~/config";
 import { Token } from "~/token";
 import { getLogsFromGroup } from "~/utils.server";
-import { unwrap } from "~/utils.shared";
 
 export interface GetOrCreateBuildfsEventsReturnType {
   event: BuildfsEvent;
@@ -29,17 +30,40 @@ export class BuildfsService {
   isUrlRegex = /^((git|ssh|https?):\/\/)|git@/;
   private readonly agentConfig: ReturnType<Config["agent"]>;
 
-  static inject = [Token.AgentUtilService, Token.Config] as const;
-  constructor(private readonly agentUtilService: AgentUtilService, config: Config) {
+  static inject = [Token.AgentUtilService, Token.BlockRegistryService, Token.Config] as const;
+  constructor(
+    private readonly agentUtilService: AgentUtilService,
+    private readonly brService: BlockRegistryService,
+    config: Config,
+  ) {
     this.agentConfig = config.agent();
+  }
+
+  async createBuildfsVmTask(
+    db: Prisma.TransactionClient,
+    args: {
+      relativeProjectRootDirPath: string;
+      contextPath: string;
+      dockerfilePath: string;
+    },
+  ): Promise<VmTask> {
+    const projectRootDir = path.join(this.inputDir, "project", args.relativeProjectRootDirPath);
+    return this.agentUtilService.createVmTask(db, {
+      command: [
+        this.buildfsScriptPath,
+        path.join(projectRootDir, args.dockerfilePath),
+        this.outputDir,
+        path.join(projectRootDir, args.contextPath),
+      ],
+      cwd: this.workdir,
+    });
   }
 
   async createBuildfsEvent(
     db: Prisma.TransactionClient,
     args: {
       agentInstanceId: bigint;
-      projectFilePath: string;
-      outputFilePath: string;
+      outputId: string;
       /**
        * Path to the directory which will be used as context for the docker build.
        * Relative to the given project's directory.
@@ -52,14 +76,10 @@ export class BuildfsService {
     },
   ): Promise<BuildfsEvent> {
     const project = await db.project.findUniqueOrThrow({ where: { id: args.projectId } });
-    const vmTask = await this.agentUtilService.createVmTask(db, {
-      command: [
-        this.buildfsScriptPath,
-        path.join(this.inputDir, "project", project.rootDirectoryPath, args.dockerfilePath),
-        this.outputDir,
-        path.join(this.inputDir, "project", project.rootDirectoryPath, args.contextPath),
-      ],
-      cwd: this.workdir,
+    const vmTask = await this.createBuildfsVmTask(db, {
+      relativeProjectRootDirPath: project.rootDirectoryPath,
+      contextPath: args.contextPath,
+      dockerfilePath: args.dockerfilePath,
     });
     const buildfsEvent = await db.buildfsEvent.create({
       data: {
@@ -71,8 +91,7 @@ export class BuildfsService {
       },
     });
     await this.createBuildfsEventFiles(db, {
-      projectFilePath: args.projectFilePath,
-      outputFilePath: args.outputFilePath,
+      outputId: args.outputId,
       agentInstanceId: args.agentInstanceId,
       buildfsEventId: buildfsEvent.id,
     });
@@ -82,31 +101,35 @@ export class BuildfsService {
   async createBuildfsEventFiles(
     db: Prisma.TransactionClient,
     args: {
-      projectFilePath: string;
-      outputFilePath: string;
+      outputId: string;
       agentInstanceId: bigint;
       buildfsEventId: bigint;
     },
-  ): Promise<BuildfsEventFiles> {
-    const result = await db.$queryRaw<[{ id: bigint }]>`
-      INSERT INTO "File" ("agentInstanceId", "path")
-      VALUES (${args.agentInstanceId}, ${args.projectFilePath})
-      ON CONFLICT ("agentInstanceId", "path")
-      DO UPDATE SET "agentInstanceId" = ${args.agentInstanceId}
-      RETURNING id`;
-    const projectFileId = BigInt(result[0].id);
-    const outputFile = await db.file.create({
+  ): Promise<BuildfsEventImages> {
+    return db.buildfsEventImages.create({
       data: {
-        agentInstanceId: args.agentInstanceId,
-        path: args.outputFilePath,
-      },
-    });
-    return await db.buildfsEventFiles.create({
-      data: {
-        buildfsEventId: args.buildfsEventId,
-        projectFileId,
-        outputFileId: outputFile.id,
-        agentInstanceId: args.agentInstanceId,
+        buildfsEvent: {
+          connect: {
+            id: args.buildfsEventId,
+          },
+        },
+        agentInstance: {
+          connect: {
+            id: args.agentInstanceId,
+          },
+        },
+        outputImage: {
+          create: {
+            readonly: true,
+            tag: args.outputId,
+            agentInstance: {
+              connect: {
+                id: args.agentInstanceId,
+              },
+            },
+          },
+        },
+        outputImageAgentMatch: {},
       },
     });
   }
@@ -160,7 +183,7 @@ export class BuildfsService {
         },
       },
       [
-        "/bin/bash",
+        "/bin/sh",
         "-c",
         `echo "$FILES" | xargs -d '\\n' -I _ find _ -type f -exec sha256sum {} \\; | cut -d ' ' -f 1 | sort | sha256sum | cut -d ' ' -f 1`,
       ],
@@ -177,7 +200,7 @@ export class BuildfsService {
     cacheHash: string,
     agentInstanceId: bigint,
   ): Promise<BuildfsEvent | null> {
-    const buildfsFile = await db.buildfsEventFiles.findFirst({
+    const buildfsFile = await db.buildfsEventImages.findFirst({
       where: {
         agentInstanceId,
         buildfsEvent: {
@@ -200,37 +223,10 @@ export class BuildfsService {
     return null;
   }
 
-  /**
-   * Returns the path to the rootfs drive.
-   */
-  private async getOrCreateRootFsDriveForProject(projectExternalId: string): Promise<string> {
-    const buildfsDrivesDir = path.join(HOST_PERSISTENT_DIR, "buildfs-drives");
-    const drivePath = path.join(buildfsDrivesDir, `${projectExternalId}.ext4`);
-    const lockPath = path.join(buildfsDrivesDir, `${projectExternalId}.lock`);
-    await fs.mkdir(buildfsDrivesDir, { recursive: true });
-    await fs.appendFile(lockPath, "");
-
-    return await withFileLock(lockPath, async () => {
-      if (await doesFileExist(drivePath)) {
-        return drivePath;
-      }
-      await execCmd("cp", "--sparse=always", this.agentConfig.buildfsRootFs, drivePath);
-      // We keep the drive image small to reduce the time it takes to copy it.
-      // Copying 50GB would take a long time, like more than 30s. On the other hand,
-      // expansion is fast, like less than a second fast, so we do it here.
-      // Keep in mind that we are adding empty space - when not filled up,
-      // it takes up almost no extra space on the host.
-      await this.agentUtilService.expandDriveImage(drivePath, 50000);
-
-      return drivePath;
-    });
-  }
-
   async getOrCreateBuildfsEvent(
     db: Prisma.TransactionClient,
     args: {
-      outputFilePath: string;
-      projectFilePath: string;
+      outputId: string;
       agentInstanceId: bigint;
       contextPath: string;
       dockerfilePath: string;
@@ -251,83 +247,97 @@ export class BuildfsService {
     return { event, status: "created" };
   }
 
+  async transferBuildfsScript(ssh: NodeSSH): Promise<void> {
+    const scriptPathOnHost = path.join(
+      this.agentConfig.hostBuildfsResourcesDir,
+      "bin",
+      "buildfs.sh",
+    );
+    const script = (await fs.readFile(scriptPathOnHost)).toString();
+    await execSshCmd({ ssh }, ["mkdir", "-p", path.dirname(this.buildfsScriptPath)]);
+    await this.agentUtilService.writeFile(ssh, this.buildfsScriptPath, script);
+    await execSshCmd({ ssh }, ["chmod", "+x", this.buildfsScriptPath]);
+  }
+
   async buildfs(args: {
     db: Prisma.NonTransactionClient;
-    firecrackerService: FirecrackerService;
-    buildfsEventId: bigint;
+    runtime: HocusRuntime;
+    vmTaskId: bigint;
+    memSizeMib: number;
+    vcpuCount: number;
+    /** Result of checkout and inspect. */
+    repoImageId: ImageId;
+    /** A new image will be created based on this id. */
+    outputId: string;
+    /** Every temporary image and container id will use this prefix. Used for garbage collection. */
+    tmpContentPrefix: string;
   }): Promise<{ buildSuccessful: boolean; error?: string }> {
-    const agentInstance = await args.db.$transaction((tdb) =>
-      this.agentUtilService.getOrCreateSoloAgentInstance(tdb),
+    const buildfsImageOutputId = "buildfs";
+    const rootFsImageId = BlockRegistryService.genImageId(buildfsImageOutputId);
+    if (!(await this.brService.hasContent(rootFsImageId))) {
+      await this.brService.loadImageFromRemoteRepo(
+        this.agentConfig.buildfsImageTag,
+        buildfsImageOutputId,
+      );
+    }
+    const rootFsContainerId = await this.brService.createContainer(
+      rootFsImageId,
+      buildfsImageOutputId,
     );
-    const buildfsEvent = await args.db.buildfsEvent.findUniqueOrThrow({
-      where: { id: args.buildfsEventId },
-      include: {
-        buildfsEventFiles: {
-          include: {
-            outputFile: true,
-            projectFile: true,
-          },
-        },
-        vmTask: true,
-        project: true,
+    const outputContainerOutputId = `${args.tmpContentPrefix}-${uuidv4()}`;
+    const outputContainerId = await this.brService.createContainer(
+      void 0,
+      outputContainerOutputId,
+      {
+        mkfs: true,
+        sizeInGB: 64,
       },
-    });
-    const files = unwrap(
-      buildfsEvent.buildfsEventFiles.find((f) => f.agentInstanceId === agentInstance.id),
-    );
-    const outputFile = files.outputFile;
-    const projectFile = files.projectFile;
-
-    await this.agentUtilService.createExt4Image(
-      outputFile.path,
-      buildfsEvent.project.maxPrebuildRootDriveSizeMib,
-      true,
-    );
-    const rootfsDrivePath = await this.getOrCreateRootFsDriveForProject(
-      buildfsEvent.project.externalId,
     );
 
-    return await withFileLock(rootfsDrivePath, async () => {
-      const result = await args.firecrackerService.withVM(
+    const result = await withLocalLock(LocalLockNamespace.CONTAINER, "buildfs", () =>
+      withRuntimeAndImages(
+        this.brService,
+        args.runtime,
         {
           ssh: {
             username: "root",
             password: "root",
           },
           kernelPath: this.agentConfig.defaultKernel,
-          rootFsPath: rootfsDrivePath,
-          extraDrives: [
-            { pathOnHost: outputFile.path, guestMountPath: this.outputDir },
-            { pathOnHost: projectFile.path, guestMountPath: this.inputDir },
-          ],
-          memSizeMib: buildfsEvent.project.maxPrebuildRamMib,
-          vcpuCount: buildfsEvent.project.maxPrebuildVCPUCount,
+          fs: {
+            "/": rootFsContainerId,
+            [this.inputDir]: args.repoImageId,
+            [this.outputDir]: outputContainerId,
+          },
+          memSizeMib: args.memSizeMib,
+          vcpuCount: args.vcpuCount,
         },
         async ({ ssh, sshConfig }) => {
-          const workdir = "/tmp/workdir";
-          const buildfsScriptPath = `${workdir}/bin/buildfs.sh`;
+          const workdir = this.workdir;
           await execSshCmd({ ssh }, ["rm", "-rf", workdir]);
           await execSshCmd({ ssh }, ["mkdir", "-p", workdir]);
-          await ssh.putDirectory(this.agentConfig.hostBuildfsResourcesDir, workdir);
-          await execSshCmd({ ssh }, ["chmod", "+x", buildfsScriptPath]);
+          await this.transferBuildfsScript(ssh);
 
           const taskResults = await this.agentUtilService.execVmTasks(sshConfig, args.db, [
-            { vmTaskId: buildfsEvent.vmTaskId },
+            { vmTaskId: args.vmTaskId },
           ]);
           return taskResults[0];
         },
-      );
-      const buildSuccessful = result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS;
-      if (buildSuccessful) {
-        return { buildSuccessful };
-      } else {
-        return {
-          buildSuccessful,
-          error: await getLogsFromGroup(args.db, buildfsEvent.vmTask.logGroupId).then((b) =>
-            b.toString("utf-8"),
-          ),
-        };
-      }
-    });
+      ),
+    );
+
+    const buildSuccessful = result.status === VmTaskStatus.VM_TASK_STATUS_SUCCESS;
+    if (buildSuccessful) {
+      await this.brService.commitContainer(outputContainerId, args.outputId);
+      return { buildSuccessful };
+    } else {
+      const task = await args.db.vmTask.findUniqueOrThrow({
+        where: { id: args.vmTaskId },
+      });
+      return {
+        buildSuccessful,
+        error: await getLogsFromGroup(args.db, task.logGroupId).then((b) => b.toString("utf-8")),
+      };
+    }
   }
 }

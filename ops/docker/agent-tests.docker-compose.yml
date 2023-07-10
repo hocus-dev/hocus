@@ -26,8 +26,6 @@ services:
       retries: 30
 
   setup-vm-images:
-    # We need to mount images and have access to the docker daemon
-    # TODO: build images in kaniko and export tarballs using virt-make-fs
     privileged: true
     build:
       dockerfile: ops/docker/setup.Dockerfile
@@ -35,58 +33,21 @@ services:
     restart: "no"
     command: |
       bash -o errexit -o nounset -o pipefail -o xtrace -c "
-        mkdir -pv /agent_data/firecracker
         mkdir -pv /agent_data/qemu
         mkdir -pv /agent_data/resources
 
-        ops/bin/dev/build-vm-images.sh /agent_data/resources
         ops/bin/dev/download-kernel.sh /agent_data/resources
-        ops/bin/dev/build-test-buildfs.sh /agent_data/resources
       "
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - agent-test-data:/agent_data:rw
 
   setup-tcmu:
-    image: alpine:3.14
+    build:
+      dockerfile: ops/docker/setup-tcmu.Dockerfile
+      context: ${REPO_DIR}
     privileged: true
     restart: "no"
-    command: |
-      sh -o errexit -o nounset -o pipefail -o xtrace -c "
-        # First check whether we need to load target_core_user
-        if ! [ -d /sys/kernel/config/target ] ; then
-          if [ -f /proc/modules ] ; then
-            echo \"Trying to load target_core_user\";
-            modprobe target_core_user;
-          fi;
-          # Check if loading target_core_user worked
-          if ! [ -d /sys/kernel/config/target ] ; then
-            echo \"Kernel module target_core_user is not available\";
-            exit 1
-          fi;
-        fi;
-
-        # Secondly check whether we need to load tcm_loop
-        if ! [ -d /sys/kernel/config/target/loopback/ ] ; then
-            echo \"Trying to load tcm_loop\";
-            # Oh perhaps the module is there but not started?
-            mkdir /sys/kernel/config/target/loopback/ || true
-            # If the directory is not there then the kernel doesn't have tcm_loop
-            if ! [ -d /sys/kernel/config/target/loopback/ ] ; then
-                echo \"Kernel module tcm_loop is not available\";
-                exit 1
-            fi
-        fi
-
-        # Check for scsi disk support
-        if ! [ -d /sys/bus/scsi/drivers/sd ] ; then
-          # TODO: try to load the module
-          #       please note that 99% of kernels should have this available
-          #       cause otherwise one cannot boot from an hdd ;)
-          echo \"No scsi disk support detected\";
-          exit 1
-        fi
-      "
+    command: ops/bin/setup-tcmu.sh
     volumes:
       - /lib/modules:/lib/modules:ro
       - /sys/kernel/config:/sys/kernel/config

@@ -6,23 +6,16 @@ volumes:
   db_init:
   agent_data:
 services:
-  setup-vm-images:
-    # We need to mount images and have access to the docker daemon
-    # TODO: build images in kaniko and export tarballs using virt-make-fs
-    privileged: true
+  download-kernel:
     build:
       dockerfile: ops/docker/setup.Dockerfile
       context: ${REPO_DIR}
     restart: "no"
     command: |
       bash -o errexit -o nounset -o pipefail -o xtrace -c "
-        mkdir -pv /agent_data/firecracker
         mkdir -pv /agent_data/resources
-        ops/bin/buildfs.sh resources/docker/checkout-and-inspect.Dockerfile /agent_data/resources/checkout-and-inspect.ext4 resources/ 500
-        ops/bin/buildfs.sh resources/docker/default-workspace.Dockerfile /agent_data/resources/default-workspace.ext4 resources/ 1500
-        ops/bin/buildfs.sh resources/docker/buildfs.Dockerfile /agent_data/resources/buildfs.ext4 resources/ 1000
-        ops/bin/buildfs.sh resources/docker/fetchrepo.Dockerfile /agent_data/resources/fetchrepo.ext4 resources 2500
         curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 https://github.com/hocus-dev/linux-kernel/releases/download/0.0.5/vmlinux-6.2-x86_64.bin -z /agent_data/resources/vmlinux-6.2-x86_64.bin -o /agent_data/resources/vmlinux-6.2-x86_64.bin --location
+        curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 https://github.com/hocus-dev/tiny-initramfs/releases/download/v0.2/initrd.img -z /agent_data/resources/initrd.img -o /agent_data/resources/initrd.img --location
       "
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -206,7 +199,7 @@ services:
         condition: service_healthy
       temporal:
         condition: service_healthy
-      setup-vm-images:
+      download-kernel:
         condition: service_completed_successfully
       hocus-ui:
         condition: service_healthy
@@ -235,3 +228,7 @@ services:
     volumes:
       - agent_data:/srv/jailer:rw
       - /dev/kvm:/dev/kvm
+      - /dev:/dev/hocus
+      - /sys/kernel/config:/sys/kernel/config
+      # used by setup-tcmu.sh
+      - /lib/modules:/lib/modules:ro

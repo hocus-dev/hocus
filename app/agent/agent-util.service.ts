@@ -14,12 +14,13 @@ import {
   TASK_INPUT_TEMPLATE,
   ATTACH_TO_TASK_SCRIPT_TEMPLATE,
 } from "./constants";
-import { doesFileExist, execCmd, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
+import { execCmd, ExecCmdError, execSshCmd, sleep, withSsh } from "./utils";
 
 import type { Config } from "~/config";
 import { config } from "~/config";
 import { GroupError } from "~/group-error";
 import { Token } from "~/token";
+import { doesFileExist } from "~/utils.server";
 import { unwrap, waitForPromises } from "~/utils.shared";
 
 export class AgentUtilService {
@@ -118,7 +119,7 @@ export class AgentUtilService {
             },
           },
         },
-        ["bash", "-c", `echo -n "$FILE_CONTENT" > ${path}`],
+        ["sh", "-c", `echo -n "$FILE_CONTENT" > ${path}`],
       );
     } catch (err) {
       throw new Error(`Failed to write file "${path}": ${(err as any)?.message}`);

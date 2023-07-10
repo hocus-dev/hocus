@@ -24,7 +24,6 @@
     "public/font-awesome",
     "public/fonts",
     "ops/docker/resources/keycloak-db-dump.sql",
-    "deps/firecracker-client/",
     "*.excalidraw",
     "*.min.css"
   ],

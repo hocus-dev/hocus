@@ -1,137 +1,45 @@
 /* eslint-disable no-console */
-import type { PrebuildEvent, Prisma } from "@prisma/client";
-import { WorkspaceStatus } from "@prisma/client";
+import type { PrebuildEvent } from "@prisma/client";
 import { PrebuildEventStatus, VmTaskStatus } from "@prisma/client";
-import { TestWorkflowEnvironment } from "@temporalio/testing";
-import type { LogEntry } from "@temporalio/worker";
-import { Worker, Runtime, DefaultLogger } from "@temporalio/worker";
+import { Worker } from "@temporalio/worker";
 import { v4 as uuidv4 } from "uuid";
 
-import type { Activities } from "./activities/list";
 import { createActivities } from "./activities/list";
-import type { AgentInjector } from "./agent-injector";
 import { createAgentInjector } from "./agent-injector";
+import { BlockRegistryService } from "./block-registry/registry.service";
+import { expectContent } from "./block-registry/test-utils";
 import { HOST_PERSISTENT_DIR } from "./constants";
-import { execSshCmdThroughProxy } from "./test-utils";
-import { doesFileExist, retry, sleep } from "./utils";
+import { sleep } from "./utils";
 import {
   runBuildfsAndPrebuilds,
   runAddProjectAndRepository,
   runCreateWorkspace,
-  runStartWorkspace,
-  runStopWorkspace,
-  runDeleteWorkspace,
   runArchivePrebuild,
   runDeleteRemovablePrebuilds,
   scheduleNewPrebuild,
 } from "./workflows";
 import { createTestRepo } from "./workflows/tests/utils";
+import { testWorkspace } from "./workflows/workspace/test-utils";
 
-import { config } from "~/config";
-import { generateTemporalCodeBundle } from "~/temporal/bundle";
-import { printErrors } from "~/test-utils";
 import { TESTS_REPO_URL } from "~/test-utils/constants";
-import { provideDb } from "~/test-utils/db.server";
+import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
-import { TEST_USER_PRIVATE_SSH_KEY } from "~/user/test-constants";
 import { createTestUser } from "~/user/test-utils";
-import { unwrap, waitForPromises, formatBranchName, numericSort } from "~/utils.shared";
+import { unwrap, waitForPromises } from "~/utils.shared";
 
-const provideActivities = (
-  testFn: (args: {
-    activities: Activities;
-    runId: string;
-    db: Prisma.NonTransactionClient;
-    injector: AgentInjector;
-  }) => Promise<void>,
-): (() => Promise<void>) => {
-  const injector = createAgentInjector({
-    [Token.Logger]: {
-      provide: {
-        factory: function () {
-          return new DefaultLogger("ERROR");
-        },
-      },
-    },
-    [Token.Config]: {
-      provide: {
-        value: {
-          ...config,
-          agent: () => ({
-            ...config.agent(),
-            /**
-             * It's a regular buildfs root fs but with docker cache.
-             * I generated it manually, by executing a buildfs workflow
-             * with the regular buildfs root fs and then copying the
-             * resulting drive to the test-buildfs.ext4 file.
-             * I also shrank it with `resize2fs -M`.
-             * The tests will also work with a regular buildfs root fs,
-             * but they will be slower.
-             */
-            buildfsRootFs: "/srv/jailer/resources/test-buildfs.ext4",
-          }),
-          shared: () => ({
-            ...config.shared(),
-            maxRepositoryDriveSizeMib: 100,
-          }),
-        },
-      },
-    },
-    [Token.TemporalClient]: {
-      provide: {
-        factory: () => (fn) => {
-          const { client } = testEnv;
-          return fn(client);
-        },
-      },
+jest.setTimeout(5 * 60 * 1000);
+
+const testEnv = new TestEnvironmentBuilder(createAgentInjector)
+  .withTestLogging()
+  .withTestDb()
+  .withBlockRegistry()
+  .withLocalTemporal()
+  .withLateInits({
+    activities: async ({ lateInitPromises, injector }) => {
+      const db = await lateInitPromises.db;
+      return createActivities(injector, db);
     },
   });
-  const runId = uuidv4();
-  return printErrors(
-    provideDb(async (db) =>
-      testFn({ activities: await createActivities(injector, db), runId, db, injector }),
-    ),
-  );
-};
-
-let testEnv: TestWorkflowEnvironment;
-let workflowBundle: any;
-
-const expectedErrorMessage =
-  "Workspace state WORKSPACE_STATUS_STARTED is not one of WORKSPACE_STATUS_STOPPED, WORKSPACE_STATUS_STOPPED_WITH_ERROR";
-
-beforeAll(async () => {
-  // Use console.log instead of console.error to avoid red output
-  // Filter INFO log messages for clearer test output
-  Runtime.install({
-    logger: new DefaultLogger("WARN", (entry: LogEntry) => {
-      const error = entry.meta?.error;
-      const msg = expectedErrorMessage;
-      if (error?.stack?.includes(msg) || error?.cause?.stack?.includes(msg)) {
-        // there is a test case where we expect this error,
-        // so in order not to pollute the test output with it,
-        // we suppress it
-        return;
-      }
-
-      // eslint-disable-next-line no-console
-      console.log(`[${entry.level}]`, entry.message, entry.meta);
-    }),
-  });
-
-  testEnv = await TestWorkflowEnvironment.createLocal({
-    client: {
-      dataConverter: {
-        payloadConverterPath: require.resolve("~/temporal/data-converter"),
-      },
-    },
-  });
-  workflowBundle = await generateTemporalCodeBundle();
-});
-
-afterAll(async () => {
-  await testEnv?.teardown();
-});
 
 test.concurrent("HOST_PERSISTENT_DIR has no trailing slash", async () => {
   expect(HOST_PERSISTENT_DIR).not.toMatch(/\/$/);
@@ -139,10 +47,18 @@ test.concurrent("HOST_PERSISTENT_DIR has no trailing slash", async () => {
 
 test.concurrent(
   "runBuildfsAndPrebuilds",
-  provideActivities(async ({ activities, injector, db }) => {
+  testEnv.run(async (args) => {
+    const {
+      activities,
+      injector,
+      db,
+      workflowBundle,
+      temporalTestEnv,
+      taskQueue,
+      suppressLogPattern,
+    } = args;
     let isGetWorkspaceInstanceStatusMocked = true;
-    const { client, nativeConnection } = testEnv;
-    const taskQueue = `test-${uuidv4()}`;
+    const { client, nativeConnection } = temporalTestEnv;
     const worker = await Worker.create({
       connection: nativeConnection,
       taskQueue,
@@ -166,6 +82,7 @@ test.concurrent(
 
     const agentGitService = injector.resolve(Token.AgentGitService);
     const projectService = injector.resolve(Token.ProjectService);
+    const brService = injector.resolve(Token.BlockRegistryService);
     const repo = await createTestRepo(db, injector);
     const updates = await agentGitService.updateBranches(db, repo.id);
     console.log("branches updated");
@@ -191,7 +108,6 @@ test.concurrent(
           maxPrebuildVCPUCount: 1,
           maxWorkspaceRamMib: 1024,
           maxWorkspaceVCPUCount: 1,
-          maxPrebuildRootDriveSizeMib: 1024,
         },
       });
     }
@@ -256,6 +172,12 @@ test.concurrent(
       }
       console.log("prebuild events created");
 
+      await suppressLogPattern("Failed to parse project config");
+      await suppressLogPattern("dockerfile parse error on line 1: unknown instruction: an");
+
+      await expectContent(brService, {
+        numTotalContent: 0,
+      });
       await client.workflow.execute(runBuildfsAndPrebuilds, {
         workflowId: uuidv4(),
         taskQueue,
@@ -287,74 +209,6 @@ test.concurrent(
           });
           expect(prebuildEvents.length).toBe(1);
           const prebuildEvent = prebuildEvents[0];
-          if (prebuildEvent.status !== expectedPrebuildStatus) {
-            const prebuildEventWithTasks = await db.prebuildEvent.findUniqueOrThrow({
-              where: {
-                id: prebuildEvent.id,
-              },
-              include: {
-                tasks: {
-                  include: {
-                    vmTask: {
-                      include: {
-                        logGroup: {
-                          include: {
-                            logs: {
-                              orderBy: {
-                                idx: "asc",
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            });
-            const vmTasks = prebuildEventWithTasks.tasks
-              .sort((a, b) => numericSort(a.idx, b.idx))
-              .map((t) => t.vmTask);
-            if (buildfsStatus != null) {
-              const buildfsEvent = await db.buildfsEvent.findUniqueOrThrow({
-                where: {
-                  id: unwrap(prebuildEvent.buildfsEventId),
-                },
-                include: {
-                  vmTask: {
-                    include: {
-                      logGroup: {
-                        include: {
-                          logs: {
-                            orderBy: {
-                              idx: "asc",
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              });
-              vmTasks.unshift(buildfsEvent.vmTask);
-            }
-            console.error(`Repository: ${repo.url}, root directory: ${project.rootDirectoryPath}`);
-            console.error(
-              `Expected prebuild event status ${expectedPrebuildStatus}, got ${prebuildEvent.status}`,
-            );
-            console.error(`Tasks:`);
-            for (const vmTask of vmTasks) {
-              console.error(`### ${vmTask.command} ###`);
-              console.error(`Status: ${vmTask.status}`);
-              if (
-                vmTask.status === VmTaskStatus.VM_TASK_STATUS_ERROR ||
-                vmTask.status === VmTaskStatus.VM_TASK_STATUS_CANCELLED
-              ) {
-                console.error(`Logs:`);
-                console.error(vmTask.logGroup.logs.map((l) => l.content).join());
-              }
-            }
-          }
           expect(prebuildEvent.status).toBe(expectedPrebuildStatus);
           if (buildfsStatus != null) {
             expect(prebuildEvent.buildfsEvent?.vmTask?.status).toBe(buildfsStatus);
@@ -363,6 +217,40 @@ test.concurrent(
           }
         }
       }
+      // we expect the following block registry content:
+      //
+      // - fetchRepository
+      //   - 1 root fs image
+      //   - 1 repo container
+      // - checkoutAndInspect
+      //   - 1 root fs image
+      // - buildfs
+      //   - 1 root fs image
+      //   - 1 root fs container
+      //   - 1 workspace image for prebuild case 1
+      //   - 1 workspace image for prebuild case 2
+      //   - 1 default workspace image for case 3
+      // - prebuilds
+      //   - case 1
+      //     - 1 workspace fs image
+      //     - 1 project image
+      //   - case 2
+      //     - 1 workspace fs image
+      //     - 1 project image
+      //   - case 3
+      //     - nothing, because the prebuild ended with error
+      //   - case 4
+      //     - 1 workspace fs image
+      //     - 1 project image
+      //   - case 5
+      //     - nothing, because the prebuild ended with error
+      //   - case 6
+      //     - nothing, because the prebuild ended with error
+      //
+      // In total, we expect 14 content items. All temporary content items should have been garbage collected.
+      await expectContent(brService, {
+        numTotalContent: 14,
+      });
 
       const project = await db.project.findUniqueOrThrow({
         where: {
@@ -407,175 +295,51 @@ test.concurrent(
           },
         ],
       });
-      const updateWorkspace = (update: { status: WorkspaceStatus }) =>
-        db.workspace.update({
-          where: {
-            id: workspace.id,
-          },
-          data: update,
-        });
-      const startWorkspace = () =>
-        client.workflow.execute(runStartWorkspace, {
-          workflowId: uuidv4(),
-          taskQueue,
-          retry: { maximumAttempts: 1 },
-          args: [workspace.id],
-        });
-      const stopWorkspace = () =>
-        client.workflow.execute(runStopWorkspace, {
-          workflowId: uuidv4(),
-          taskQueue,
-          retry: { maximumAttempts: 1 },
-          args: [workspace.id],
-        });
 
-      const { workspaceInstance: workspaceInstance1 } = await startWorkspace();
-      const execInInstance1 = async (cmd: string) => {
-        const cmdBash = `bash -c '${cmd}'`;
-        return await execSshCmdThroughProxy({
-          vmIp: workspaceInstance1.vmIp,
-          privateKey: TEST_USER_PRIVATE_SSH_KEY,
-          cmd: cmdBash,
-        });
-      };
       console.log("running workspace tests");
-      const sshOutput = await execInInstance1("cat /home/hocus/dev/project/proxy-test.txt");
-      expect(sshOutput.stdout.toString()).toEqual("hello from the tests repository!\n");
-      const cdRepo = "cd /home/hocus/dev/project &&";
-      const [gitName, gitEmail] = await waitForPromises(
-        ["user.name", "user.email"].map((item) =>
-          execInInstance1(`${cdRepo} git config --global ${item}`).then((o) =>
-            o.stdout.toString().trim(),
-          ),
-        ),
-      );
-      expect(gitName).toEqual(testUser.gitConfig.gitUsername);
-      expect(gitEmail).toEqual(testUser.gitConfig.gitEmail);
-      const gitBranchName = await execInInstance1(`${cdRepo} git branch --show-current`).then((o) =>
-        o.stdout.toString().trim(),
-      );
-      expect(gitBranchName).toEqual(formatBranchName(testBranches[0].name));
-
-      await stopWorkspace();
-
-      const { workspaceInstance: workspaceInstance2 } = await startWorkspace();
-      const firecrackerService2 = injector.resolve(Token.FirecrackerService)(
-        workspaceInstance2.firecrackerInstanceId,
-      );
-      await firecrackerService2.cleanup();
-      await stopWorkspace();
-
-      const { workspaceInstance: workspaceInstance3 } = await startWorkspace();
-      const { status: startWorkspaceStatus } = await startWorkspace();
-      expect(startWorkspaceStatus).toBe("found");
-      const firecrackerService3 = injector.resolve(Token.FirecrackerService)(
-        workspaceInstance3.firecrackerInstanceId,
-      );
-      await firecrackerService3.cleanup();
-      await stopWorkspace();
-
-      const { workspaceInstance: workspaceInstance4 } = await startWorkspace();
-      isGetWorkspaceInstanceStatusMocked = false;
-      const firecrackerService4 = injector.resolve(Token.FirecrackerService)(
-        workspaceInstance4.firecrackerInstanceId,
-      );
-      await firecrackerService4.cleanup();
-      await sleep(1000);
-      const waitForStatus = (statuses: WorkspaceStatus[]) =>
-        retry(
-          async () => {
-            const workspace4 = await db.workspace.findUniqueOrThrow({
-              where: {
-                id: workspace.id,
-              },
-            });
-            // the monitoring workflow should have stopped the workspace
-            expect(statuses.includes(workspace4.status)).toBe(true);
-          },
-          10,
-          1000,
-        );
-      await waitForStatus([
-        WorkspaceStatus.WORKSPACE_STATUS_PENDING_STOP,
-        WorkspaceStatus.WORKSPACE_STATUS_STOPPED,
-      ]);
-      await waitForStatus([WorkspaceStatus.WORKSPACE_STATUS_STOPPED]);
-      await retry(
-        async () => {
-          const monitoringWorkflowInfo = await client.workflow
-            .getHandle(workspaceInstance4.monitoringWorkflowId)
-            .describe();
-          expect(monitoringWorkflowInfo.status.name).toBe("COMPLETED");
-        },
-        5,
-        3000,
-      );
-
-      await updateWorkspace({
-        status: WorkspaceStatus.WORKSPACE_STATUS_STARTED,
-      });
-      await startWorkspace()
-        .then(() => {
-          throw new Error("should have thrown");
-        })
-        .catch((err: any) => {
-          expect(err?.cause?.cause?.message).toMatch(expectedErrorMessage);
-        });
-      const workspaceWithFiles = await db.workspace.findUniqueOrThrow({
-        where: {
-          id: workspace.id,
-        },
-        include: {
-          projectFile: true,
-          rootFsFile: true,
-        },
-      });
-      expect(workspaceWithFiles.status).toBe(WorkspaceStatus.WORKSPACE_STATUS_STOPPED_WITH_ERROR);
-      expect(workspaceWithFiles.latestError).not.toBeNull();
-      await client.workflow.execute(runDeleteWorkspace, {
-        workflowId: uuidv4(),
+      await testWorkspace({
+        db,
+        client,
         taskQueue,
-        retry: { maximumAttempts: 1 },
-        args: [{ workspaceId: workspace.id }],
-      });
-      expect(await doesFileExist(workspaceWithFiles.projectFile.path)).toBe(false);
-      expect(await doesFileExist(workspaceWithFiles.rootFsFile.path)).toBe(false);
-      const workspaceAfterDelete = await db.workspace.findUnique({
-        where: {
-          id: workspace.id,
+        workspace,
+        branchName: testBranches[0].name,
+        injector,
+        testUser,
+        setWorkspaceInstanceStatusMocked: (value) => {
+          isGetWorkspaceInstanceStatusMocked = value;
         },
+        suppressLogPattern,
       });
-      expect(workspaceAfterDelete).toBeNull();
 
       const successfulPrebuildEvents = await db.prebuildEvent.findMany({
         where: {
           status: PrebuildEventStatus.PREBUILD_EVENT_STATUS_SUCCESS,
         },
         include: {
-          prebuildEventFiles: {
+          prebuildEventImages: {
             include: {
-              projectFile: true,
-              fsFile: true,
+              projectImage: true,
+              fsImage: true,
             },
           },
         },
       });
       await waitForPromises(
         successfulPrebuildEvents.map(async (e) => {
-          const doPrebuildFilesExist: () => Promise<boolean[]> = () =>
+          const doPrebuildImagesExist: () => Promise<boolean[]> = () =>
             waitForPromises(
-              [e.prebuildEventFiles[0].projectFile, e.prebuildEventFiles[0].fsFile].map((f) =>
-                doesFileExist(f.path),
+              [e.prebuildEventImages[0].projectImage, e.prebuildEventImages[0].fsImage].map((im) =>
+                brService.hasContent(BlockRegistryService.genImageId(im.tag)),
               ),
             );
-          expect(await doPrebuildFilesExist()).toEqual([true, true]);
+          expect(await doPrebuildImagesExist()).toEqual([true, true]);
           await client.workflow.execute(runArchivePrebuild, {
             workflowId: uuidv4(),
             taskQueue,
             retry: { maximumAttempts: 1 },
             args: [{ prebuildEventId: e.id, waitForDeletion: true }],
           });
-          expect(await doPrebuildFilesExist()).toEqual([false, false]);
+          expect(await doPrebuildImagesExist()).toEqual([false, false]);
           const prebuildEvent = await db.prebuildEvent.findUniqueOrThrow({
             where: {
               id: e.id,
@@ -618,9 +382,8 @@ test.concurrent(
 
 test.concurrent(
   "runAddProjectAndRepository",
-  provideActivities(async ({ activities }) => {
-    const { client, nativeConnection } = testEnv;
-    const taskQueue = `test-${uuidv4()}`;
+  testEnv.run(async ({ activities, temporalTestEnv, taskQueue, workflowBundle }) => {
+    const { client, nativeConnection } = temporalTestEnv;
     const updateGitBranchesAndObjects: typeof activities.updateGitBranchesAndObjects = async () => {
       return {
         newGitBranches: [],
@@ -669,9 +432,8 @@ test.concurrent(
 
 test.concurrent(
   "scheduleNewPrebuild",
-  provideActivities(async ({ activities, db, injector }) => {
-    const { client, nativeConnection } = testEnv;
-    const taskQueue = `test-${uuidv4()}`;
+  testEnv.run(async ({ activities, temporalTestEnv, taskQueue, workflowBundle, injector, db }) => {
+    const { client, nativeConnection } = temporalTestEnv;
     const worker = await Worker.create({
       connection: nativeConnection,
       taskQueue,

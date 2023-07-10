@@ -5,7 +5,6 @@ module.exports = {
     "public/**/*",
     "build/**/*",
     "ops/**/*",
-    "deps/**/*",
     "agent-build/**/*",
   ],
   overrides: [
