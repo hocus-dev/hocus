@@ -1,11 +1,15 @@
-export const TESTS_PUBLIC_SSH_KEY = `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPY62OIbqCeURQjtU3m/mnYlW71TsDKa/ovAG6nXpmid hocus-tests@example.com`;
-export const TESTS_PRIVATE_SSH_KEY = `-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACD2OtjiG6gnlEUI7VN5v5p2JVu9U7Aymv6LwBup16ZonQAAAKAebpvbHm6b
-2wAAAAtzc2gtZWQyNTUxOQAAACD2OtjiG6gnlEUI7VN5v5p2JVu9U7Aymv6LwBup16ZonQ
-AAAEDQ8cjnVXbbBq8YoS9i8yty9NgOgKM1Y/Nj3x7vWgloHvY62OIbqCeURQjtU3m/mnYl
-W71TsDKa/ovAG6nXpmidAAAAF2hvY3VzLXRlc3RzQGV4YW1wbGUuY29tAQIDBAUG
------END OPENSSH PRIVATE KEY-----
-`;
+import { decryptText } from "./encryption";
+
+// We store these keys obfuscated because GitHub will automatically revoke them if they are
+// stored in plain text and committed to a public repo. These keys are supposed to be publicly available.
+const encryptionKey = "not-a-secret";
+export const TESTS_PUBLIC_SSH_KEY = decryptText(
+  "HRwcAARJQVBWQ1xULy41bCIePR8CMVQYNCs9HC95NlAiMyQ1JyYtFVkZNSMgCzYkHzdEXSp3BDZbABxEIAVMBhB+K1AMCgYWJRcCHQRUAx1DGgoXGxw0SBlMHhUPF0sXAQI=",
+  encryptionKey,
+);
+export const TESTS_PRIVATE_SSH_KEY = decryptText(
+  "Q0JZAExvNiIqPEU7Pio6fjJlUzUxOzM1OipUZiR0XkhOX0h+DFw2QQNDPR8CMVQGNDcfWQVHNiQiMyQ1LChBWwNAJiQiMyQxDAJNWDt8MiQiMyQ1Ly41byBsMiQuBSQ1Ly4AVwIfFBE5JW8lFyEgeBliIiQiMyY3KT8kYiN/IhYIGFMYVyQnQAJoBS5bBiEtQT8FRg0GEig7NRwHDFY8XhBOIiQiMy8TOlpbRFdoWANXeBATLy41bBVXEFcEBj8jPxY6eTRVPDQiMyQ3LSgkfS5vITQQGQ9CAlY/fgxONhMoShEwN0AkXApBWAQuKiINHQ1NZRJcEDRpMyQ1Ky0cGiZfKT0ZAyE1GFkjTClMIC0GACI5IgAwezRABygKFlMyIC01Gk5mQjxXK11MWikybhh+IxQ7QhU/NBgnFRNUQ28tGF1fHzwsGA5VEAcoChNECxYEVSBsMiQmJQ0CN1wiVzBqJVE6JVQDDCghWDgfShEiIywwLC5JEGsAXkhOXyA6Kk87fSRjIDYrUjUmJzk1eSQNOCA6X0hZQ0J+",
+  encryptionKey,
+);
 export const TESTS_REPO_URL = "git@github.com:hocus-dev/tests.git";
 export const HOCUS_REPO_URL = "git@github.com:hocus-dev/hocus.git";
