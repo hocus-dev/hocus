@@ -21,7 +21,7 @@ This builds test virtual machines, attaches to the running Hocus agent, and star
 You may also attach to the agent container manually. The following runs a single E2E test of the prebuild workflow:
 
 ```bash
-TEST_STORAGE_DIR=/srv/jailer/tests yarn jest 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
+OCI_PROXY=host.docker.internal:9999 yarn jest 'app/agent/workflows.test.ts' -t 'runBuildfsAndPrebuilds' --testTimeout 600000
 ```
 
 ## Add another BuildKite runner
