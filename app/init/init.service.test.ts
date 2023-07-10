@@ -7,7 +7,11 @@ import { v4 as uuidv4 } from "uuid";
 import { createActivities } from "~/agent/activities/list";
 import { createAgentInjector } from "~/agent/agent-injector";
 import { createAppInjector } from "~/app-injector.server";
-import { TESTS_PRIVATE_SSH_KEY, TESTS_REPO_URL } from "~/test-utils/constants";
+import {
+  TESTS_PRIVATE_SSH_KEY,
+  TESTS_PUBLIC_SSH_KEY,
+  TESTS_REPO_URL,
+} from "~/test-utils/constants";
 import { TestEnvironmentBuilder } from "~/test-utils/test-environment-builder";
 import { Token } from "~/token";
 import { waitForPromises } from "~/utils.shared";
@@ -18,59 +22,64 @@ jest.setTimeout(30 * 1000);
 const USER1_ID = "b7b83d63-a9b0-4871-92d0-07779f28cfa8";
 const USER2_ID = "166908ef-15d0-498f-88e3-bfd97cf5d21b";
 
-const EXPECTED_CONFIG = `projects:
-  - config:
-      maxPrebuildRamMib: 1
-      maxPrebuildVCPUCount: 2
-      maxWorkspaceRamMib: 3
-      maxWorkspaceVCPUCount: 4
-    env:
-      project:
-        a: "3"
-        b: "2"
-        c: "1"
-      user:
-        166908ef-15d0-498f-88e3-bfd97cf5d21b:
-          a1: "1"
-          b1: "2"
-          c1: "3"
-        b7b83d63-a9b0-4871-92d0-07779f28cfa8:
-          a0: "1"
-          b0: "2"
-          c0: "3"
-    externalId: 6f5157ef-a51e-489e-890f-6637983a4b3c
-    name: test
-    repoUrl: git@github.com:hocus-dev/tests.git
-    rootDirectoryPath: /
-repos:
-  - privateKey: |
-      -----BEGIN OPENSSH PRIVATE KEY-----
-      b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-      QyNTUxOQAAACD2OtjiG6gnlEUI7VN5v5p2JVu9U7Aymv6LwBup16ZonQAAAKAebpvbHm6b
-      2wAAAAtzc2gtZWQyNTUxOQAAACD2OtjiG6gnlEUI7VN5v5p2JVu9U7Aymv6LwBup16ZonQ
-      AAAEDQ8cjnVXbbBq8YoS9i8yty9NgOgKM1Y/Nj3x7vWgloHvY62OIbqCeURQjtU3m/mnYl
-      W71TsDKa/ovAG6nXpmidAAAAF2hvY3VzLXRlc3RzQGV4YW1wbGUuY29tAQIDBAUG
-      -----END OPENSSH PRIVATE KEY-----
-    publicKey: ssh-ed25519
-      AAAAC3NzaC1lZDI1NTE5AAAAIPY62OIbqCeURQjtU3m/mnYlW71TsDKa/ovAG6nXpmid
-      hocus-tests@example.com
-    url: git@github.com:hocus-dev/tests.git
-users:
-  - externalId: 166908ef-15d0-498f-88e3-bfd97cf5d21b
-    git:
-      email: email_166908ef-15d0-498f-88e3-bfd97cf5d21b
-      username: username_166908ef-15d0-498f-88e3-bfd97cf5d21b
-    publicKeys:
-      - name: name_166908ef-15d0-498f-88e3-bfd97cf5d21b
-        publicKey: pk_166908ef-15d0-498f-88e3-bfd97cf5d21b
-  - externalId: b7b83d63-a9b0-4871-92d0-07779f28cfa8
-    git:
-      email: email_b7b83d63-a9b0-4871-92d0-07779f28cfa8
-      username: username_b7b83d63-a9b0-4871-92d0-07779f28cfa8
-    publicKeys:
-      - name: name_b7b83d63-a9b0-4871-92d0-07779f28cfa8
-        publicKey: pk_b7b83d63-a9b0-4871-92d0-07779f28cfa8
-`;
+const EXPECTED_CONFIG = {
+  repos: [
+    {
+      url: "git@github.com:hocus-dev/tests.git",
+      publicKey: TESTS_PUBLIC_SSH_KEY,
+      privateKey: TESTS_PRIVATE_SSH_KEY,
+    },
+  ],
+  users: [
+    {
+      externalId: "166908ef-15d0-498f-88e3-bfd97cf5d21b",
+      git: {
+        username: "username_166908ef-15d0-498f-88e3-bfd97cf5d21b",
+        email: "email_166908ef-15d0-498f-88e3-bfd97cf5d21b",
+      },
+      publicKeys: [
+        {
+          publicKey: "pk_166908ef-15d0-498f-88e3-bfd97cf5d21b",
+          name: "name_166908ef-15d0-498f-88e3-bfd97cf5d21b",
+        },
+      ],
+    },
+    {
+      externalId: "b7b83d63-a9b0-4871-92d0-07779f28cfa8",
+      git: {
+        username: "username_b7b83d63-a9b0-4871-92d0-07779f28cfa8",
+        email: "email_b7b83d63-a9b0-4871-92d0-07779f28cfa8",
+      },
+      publicKeys: [
+        {
+          publicKey: "pk_b7b83d63-a9b0-4871-92d0-07779f28cfa8",
+          name: "name_b7b83d63-a9b0-4871-92d0-07779f28cfa8",
+        },
+      ],
+    },
+  ],
+  projects: [
+    {
+      name: "test",
+      externalId: "6f5157ef-a51e-489e-890f-6637983a4b3c",
+      repoUrl: "git@github.com:hocus-dev/tests.git",
+      rootDirectoryPath: "/",
+      env: {
+        project: { a: "3", b: "2", c: "1" },
+        user: {
+          "166908ef-15d0-498f-88e3-bfd97cf5d21b": { a1: "1", b1: "2", c1: "3" },
+          "b7b83d63-a9b0-4871-92d0-07779f28cfa8": { a0: "1", b0: "2", c0: "3" },
+        },
+      },
+      config: {
+        maxPrebuildRamMib: 1,
+        maxPrebuildVCPUCount: 2,
+        maxWorkspaceRamMib: 3,
+        maxWorkspaceVCPUCount: 4,
+      },
+    },
+  ],
+};
 
 test.concurrent(
   "getInitConfig",
@@ -157,8 +166,7 @@ test.concurrent(
         },
       });
       const initConfig = await initService["getInitConfig"](db);
-      const initConfigStr = initService["stringifyInitConfig"](initConfig);
-      expect(initConfigStr).toEqual(EXPECTED_CONFIG);
+      expect(initConfig).toEqual(EXPECTED_CONFIG);
     }),
 );
 
@@ -166,12 +174,12 @@ test.concurrent(
   "dump and load",
   new TestEnvironmentBuilder(createAppInjector).withTestLogging().run(async ({ injector }) => {
     const initService = injector.resolve(Token.InitService);
-    const initConfig = initService["parseInitConfig"](EXPECTED_CONFIG);
     const filePath = `/tmp/init-config-test-${uuidv4()}`;
-    await initService["dumpInitConfigToFile"](filePath, initConfig);
+    await initService["dumpInitConfigToFile"](filePath, EXPECTED_CONFIG);
     const loadedConfig = await initService["loadInitConfigFromFile"](filePath);
     const stringifiedConfig = initService["stringifyInitConfig"](loadedConfig);
-    expect(stringifiedConfig).toEqual(EXPECTED_CONFIG);
+    const expectedStringifiedConfig = initService["stringifyInitConfig"](EXPECTED_CONFIG);
+    expect(stringifiedConfig).toEqual(expectedStringifiedConfig);
     await fs.rm(filePath);
   }),
 );
@@ -186,7 +194,7 @@ test.concurrent(
       const taskQueue = `test-${uuidv4()}`;
       const initService = injector.resolve(Token.InitService);
       initService["temporalQueue"] = taskQueue;
-      const initConfig = initService["parseInitConfig"](EXPECTED_CONFIG);
+      const initConfig = EXPECTED_CONFIG;
 
       const agentInjector = createAgentInjector();
       const activities = await createActivities(agentInjector, db);
