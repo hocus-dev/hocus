@@ -11,7 +11,7 @@ import { Token } from "~/token";
 import { doesFileExist, sha256 } from "~/utils.server";
 import { waitForPromises } from "~/utils.shared";
 
-jest.setTimeout(3600000);
+jest.setTimeout(3_600_000);
 
 const DOCKERFILE_1 = `FROM ubuntu:latest
 COPY ./foo /foo`;

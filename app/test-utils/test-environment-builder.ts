@@ -501,7 +501,13 @@ export class TestEnvironmentBuilder<
             testOutputOciRegistryUsername: username,
             testOutputOciRegistryPassword: password,
           } = config.tests();
+          const timeService: TimeService = injector.resolve(Token.TimeService);
+          const timestamp = genFormattedTimestamp(timeService.now());
+          const images = chooseImages(timestamp);
+          const tags = images.map((i) => `"${i.tag}"`).join(", ");
           if (!username || !password) {
+            /* eslint-disable no-console */
+            console.log(`OCI registry credentials not found. Skipping image push for ${tags}.`);
             return;
           }
           const brService = ctx.brService as any;
@@ -509,14 +515,8 @@ export class TestEnvironmentBuilder<
             brService instanceof BlockRegistryService,
             "BlockRegistryService not initialized. Did you forget to call withBlockRegistry()?",
           );
-          const timeService: TimeService = injector.resolve(Token.TimeService);
-          const timestamp = genFormattedTimestamp(timeService.now());
-          const images = chooseImages(timestamp);
-          /* eslint-disable no-console */
           console.log(
-            `OCI registry credentials found. Images with tags ${images
-              .map((i) => `"${i.tag}"`)
-              .join(", ")} will be pushed to the registry.`,
+            `OCI registry credentials found. Images with tags ${tags} will be pushed to the registry.`,
           );
 
           for (const { tag, imageId: suppliedImageId } of images) {

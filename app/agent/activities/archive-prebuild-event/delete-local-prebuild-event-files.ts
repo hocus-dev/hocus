@@ -36,4 +36,5 @@ export const deleteLocalPrebuildEventFiles: CreateActivity<
         .map((tag) => BlockRegistryService.genImageId(tag))
         .map((imageId) => brService.removeContent(imageId)),
     );
+    await brService.garbageCollect();
   });

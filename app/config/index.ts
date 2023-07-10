@@ -48,7 +48,7 @@ export const config = makeConfig()({
       process.env.AGENT_BUILDFS_IMAGE_TAG ?? "quay.io/hocus/core:buildfs-11-jun-2023",
     fetchRepoImageTag:
       process.env.AGENT_FETCH_REPO_IMAGE_TAG ?? "quay.io/hocus/core:fetchrepo-11-jun-2023",
-    checkoutOutputId:
+    checkoutAndInspectImageTag:
       process.env.AGENT_CHECKOUT_AND_INSPECT_IMAGE_TAG ??
       "quay.io/hocus/core:checkout-and-inspect-11-jun-2023",
     defaultWorkspaceImageTag:

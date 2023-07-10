@@ -260,11 +260,11 @@ export class PrebuildService {
     );
     const outputContainerId = await this.brService.createContainer(tmpOutputImageId, args.outputId);
 
-    const localRootFsImageTag = sha256(this.agentConfig.checkoutOutputId);
+    const localRootFsImageTag = sha256(this.agentConfig.checkoutAndInspectImageTag);
     const rootFsImageId = BlockRegistryService.genImageId(localRootFsImageTag);
     if (!(await this.brService.hasContent(rootFsImageId))) {
       await this.brService.loadImageFromRemoteRepo(
-        this.agentConfig.checkoutOutputId,
+        this.agentConfig.checkoutAndInspectImageTag,
         localRootFsImageTag,
       );
     }

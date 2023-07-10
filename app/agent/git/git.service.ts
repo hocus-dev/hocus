@@ -321,7 +321,7 @@ export class AgentGitService {
         mkfs: true,
         sizeInGB: 64,
       });
-      const outputDir = "/fr";
+      const outputDir = "/fetch-repository";
       await withRuntimeAndImages(
         this.blockRegistryService,
         runtime,
