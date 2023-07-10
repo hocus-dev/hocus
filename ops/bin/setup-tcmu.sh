@@ -46,7 +46,7 @@ fi
 
 # Ensure scsi sync mode is enabled
 if ! [ -f /sys/module/scsi_mod/parameters/scan ] ; then
-  echo "Unable to veryfy scsi scan mode. /sys/module/scsi_mod/parameters/scan not found";
+  echo "Unable to verify scsi scan mode. /sys/module/scsi_mod/parameters/scan not found";
   exit 1
 fi;
 
