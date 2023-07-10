@@ -37,7 +37,7 @@ type CreateWorkerFn = (args?: {
 const testEnv = new TestEnvironmentBuilder(createAgentInjector)
   .withTestLogging()
   .withTestDb()
-  .withTimeSkippingTemporal("~/agent/workflows/tests/workflows")
+  .withLocalTemporal("~/agent/workflows/tests/workflows")
   .withBlockRegistry()
   .withLateInits({
     activities: async ({ lateInitPromises, injector }) => {

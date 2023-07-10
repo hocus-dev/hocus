@@ -181,7 +181,7 @@ test.concurrent(
   new TestEnvironmentBuilder(createAppInjector)
     .withTestLogging()
     .withTestDb()
-    .withTimeSkippingTemporal()
+    .withLocalTemporal()
     .run(async ({ injector, db, temporalTestEnv, workflowBundle }) => {
       const taskQueue = `test-${uuidv4()}`;
       const initService = injector.resolve(Token.InitService);

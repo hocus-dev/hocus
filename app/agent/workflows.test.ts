@@ -33,7 +33,7 @@ const testEnv = new TestEnvironmentBuilder(createAgentInjector)
   .withTestLogging()
   .withTestDb()
   .withBlockRegistry()
-  .withTimeSkippingTemporal()
+  .withLocalTemporal()
   .withLateInits({
     activities: async ({ lateInitPromises, injector }) => {
       const db = await lateInitPromises.db;

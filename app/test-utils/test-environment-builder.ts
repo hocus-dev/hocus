@@ -351,10 +351,10 @@ export class TestEnvironmentBuilder<
   }
 
   // TODO: Create a withWorker helper ;)
-  withTimeSkippingTemporal(workflowsPath?: string): TestEnvironmentBuilder<
+  withLocalTemporal(workflowsPath?: string): TestEnvironmentBuilder<
     InjectorT,
     OverridesT,
-    EarlyInitT & { withTimeSkippingTemporal: EarlyInitFunction },
+    EarlyInitT & { withLocalTemporal: EarlyInitFunction },
     LateInitT & {
       workflowBundle: LateInitFunction<LateInitT, InjectorT, any>;
       temporalTestEnv: LateInitFunction<LateInitT, InjectorT, TestWorkflowEnvironment>;
@@ -373,7 +373,7 @@ export class TestEnvironmentBuilder<
       this.injectorOverrides,
       {
         ...this.earlyInit,
-        withTimeSkippingTemporal: async ({ overrideConfig }) => {
+        withLocalTemporal: async ({ overrideConfig }) => {
           const { address } = await initTemporal();
           overrideConfig({
             agent: {
