@@ -14,7 +14,7 @@ import { auth } from "express-openid-connect";
 import { createAppInjector } from "~/app-injector.server";
 import { HttpError } from "~/http-error.server";
 import { OidcUserValidator } from "~/schema/oidc-user.validator.server";
-import { TELEMETRY_DISABLED_COOKIE } from "~/telemetry/constants";
+import { TELEMETRY_DEPLOY_ID_COOKIE, TELEMETRY_DISABLED_COOKIE } from "~/telemetry/constants";
 import { Token } from "~/token";
 
 const db = new PrismaClient();
@@ -23,6 +23,13 @@ const config = appInjector.resolve(Token.Config);
 const userService = appInjector.resolve(Token.UserService);
 const initService = appInjector.resolve(Token.InitService);
 const telemetryConfig = config.telemetry();
+const telemetryService = appInjector.resolve(Token.TelemetryService);
+
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
+telemetryService.init().then(async () => {
+  telemetryService.capture({ event: "ui-start" });
+});
+
 const withClient = appInjector.resolve(Token.TemporalClient);
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -62,8 +69,10 @@ app.all("*", async (req, res, next) => {
     }
     if (telemetryConfig.disabled) {
       res.cookie(TELEMETRY_DISABLED_COOKIE, "1");
+      res.clearCookie(TELEMETRY_DEPLOY_ID_COOKIE);
     } else {
       res.clearCookie(TELEMETRY_DISABLED_COOKIE);
+      res.cookie(TELEMETRY_DEPLOY_ID_COOKIE, telemetryService.deployId);
     }
 
     const oidcUser = req.oidc?.user != null ? OidcUserValidator.Parse(req.oidc.user) : void 0;

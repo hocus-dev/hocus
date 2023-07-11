@@ -31,6 +31,7 @@ export const Token = {
   GitService: "GitServiceT",
   LicenseService: "LicenseServiceT",
   TimeService: "TimeServiceT",
+  TelemetryService: "TelemetryServiceT",
   PerfService: "PerfServiceT",
   InitService: "InitServiceT",
   BlockRegistryService: "BlockRegistryServiceT",

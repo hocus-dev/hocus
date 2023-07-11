@@ -7,6 +7,7 @@ import { LicenseService } from "./license/license.service";
 import { PerfService } from "./perf.service.server";
 import { ProjectService } from "./project/project.service";
 import { SshKeyService } from "./ssh-key/ssh-key.service";
+import { TelemetryService } from "./telemetry.service";
 import { clientFactory } from "./temporal/client-factory";
 import { TimeService } from "./time.service";
 import { WorkspaceService } from "./workspace/workspace.service";
@@ -26,6 +27,7 @@ const providers = [
   { token: Token.Config, provide: { value: config } },
   { token: Token.TimeService, provide: { class: TimeService } },
   { token: Token.Logger, provide: { factory: newLogger }, scope: Scope.Transient },
+  { token: Token.TelemetryService, provide: { class: TelemetryService } },
   { token: Token.PerfService, provide: { class: PerfService } },
   { token: Token.LicenseService, provide: { class: LicenseService } },
   { token: Token.SshKeyService, provide: { class: SshKeyService } },
