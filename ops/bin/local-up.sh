@@ -6,6 +6,8 @@ SCRIPT_DIR="$(dirname "$0")"
 export REPO_DIR="$(realpath "${SCRIPT_DIR}/../..")"
 export HOCUS_RESOURCES_DIR="$(realpath ${REPO_DIR}/../hocus-resources)"
 
+PHOG_EVENT_NAME=local-up ENABLE_SENTRY=1 eval "$(cat "$REPO_DIR"/ops/bin/phog-telemetry.hook)"
+
 # Try to make the script as idiotproof as it gets
 # First check if docker is installed on the system
 docker -v &>/dev/null
