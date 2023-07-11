@@ -1,0 +1,120 @@
+_SCRIPT_DIR="$(dirname "$0")"
+export _REPO_DIR="$(realpath "${_SCRIPT_DIR}/../..")"
+
+if [ -z ${TELEMETRY_DISABLED+x} ]; then
+  curl --version &>/dev/null
+  if ! [[ $? -eq 0 ]]; then
+    echo "Looks like curl is not installed 😭"
+    echo "Try running one of the following commands to install it:"
+    echo "Ubuntu/Debian: sudo apt-get install curl"
+    echo "Arch/Manjaro: sudo pacman -S curl"
+    echo "Windows/macOS: buy/rent some 🐧🐧🐧"
+    exit 1
+  fi
+
+  if ! [ -f "$_REPO_DIR"/.phogDeploymentID ]; then
+    cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32 > "$_REPO_DIR"/.phogDeploymentID
+  fi
+
+  export DEPLOY_ID="$(cat "$_REPO_DIR"/.phogDeploymentID)"
+
+  # shellcheck disable=SC2016
+  curl -L --header "Content-Type: application/json" -d '{
+    "api_key": "phc_RlJoTOGCBVKphsU0uucflyOm0cj0sakMdYCRcJ0qj9Q",
+    "properties": {
+        "$current_url": "'"$0 $*"'",
+        "$lib": "curl"
+    },
+    "event": "'"$PHOG_EVENT_NAME"'",
+    "distinct_id": "'"$DEPLOY_ID"'"
+}' https://phog.hocus.dev/capture/ &> /dev/null || true
+
+  if [[ -n ${ENABLE_SENTRY+x} ]]; then
+    export LC_ALL="${LC_ALL:-C}"
+    export SENTRY_DSN=https://8381693467914ef2b708e99f6f75d0d2@o4505510143787008.ingest.sentry.io/4505510149095424
+    _RUN_ID=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)
+    _SENTRY_TRACEBACK_FILE="/tmp/.sentry-$_RUN_ID.traceback"
+    _SENTRY_LOG_FILE="/tmp/.sentry-$_RUN_ID.out"
+
+    if [ "${SENTRY_CLI_NO_EXIT_TRAP-0}" != 1 ]; then
+      trap _sentry_exit_trap EXIT
+    fi
+    trap _sentry_err_trap ERR
+
+    _sentry_shown_traceback=0
+
+    _sentry_exit_trap() {
+      local _exit_code="$?"
+      local _command="${BASH_COMMAND:-unknown}"
+      if [[ $_exit_code != 0 && "${_sentry_shown_traceback}" != 1 ]]; then
+        _sentry_err_trap "$_command" "$_exit_code"
+      fi
+      rm -f "$_SENTRY_TRACEBACK_FILE" "$_SENTRY_LOG_FILE"
+      exit $_exit_code
+    }
+
+    _sentry_err_trap() {
+      local _exit_code="$?"
+      local _command="${BASH_COMMAND:-unknown}"
+      if [ $# -ge 1 ] && [ "x$1" != x ]; then
+        _command="$1"
+      fi
+      if [ $# -ge 2 ] && [ "x$2" != x ]; then
+        _exit_code="$2"
+      fi
+      _sentry_traceback 1
+      echo "@command:${_command}" >> "$_SENTRY_TRACEBACK_FILE"
+      echo "@exit_code:${_exit_code}" >> "$_SENTRY_TRACEBACK_FILE"
+
+      : >> "$_SENTRY_LOG_FILE"
+      if ! [ -f /tmp/sentry-cli ]; then
+        export INSTALL_DIR=/tmp
+        curl -sL https://sentry.io/get-cli/ | bash
+      fi
+      export SENTRY_LAST_EVENT=$(/tmp/sentry-cli bash-hook --send-event --traceback "$_SENTRY_TRACEBACK_FILE" --log "$_SENTRY_LOG_FILE" )
+      # shellcheck disable=SC2016
+      curl -L --header "Content-Type: application/json" -d '{
+        "api_key": "phc_RlJoTOGCBVKphsU0uucflyOm0cj0sakMdYCRcJ0qj9Q",
+        "properties": {
+            "$current_url": "'"$0 $*"'",
+            "$lib": "curl",
+            "$sentry_event_id": "'"$SENTRY_LAST_EVENT"'",
+            "$sentry_url": "'"https://sentry.io/organizations/hocus/issues/?project=4505510149095424&query=$SENTRY_LAST_EVENT"'"
+        },
+        "event": "$exception",
+        "distinct_id": "'"$DEPLOY_ID"'"
+    }' https://phog.hocus.dev/capture/ &> /dev/null || true
+
+      rm -f "$_SENTRY_TRACEBACK_FILE" "$_SENTRY_LOG_FILE"
+    }
+
+    _sentry_traceback() {
+      _sentry_shown_traceback=1
+      local -i start=$(( ${1:-0} + 1 ))
+      local -i end=${#BASH_SOURCE[@]}
+      local -i i=0
+      local -i j=0
+
+      : > "$_SENTRY_TRACEBACK_FILE"
+      for ((i=${start}; i < ${end}; i++)); do
+        j=$(( $i - 1 ))
+        local function="${FUNCNAME[$i]}"
+        local file="${BASH_SOURCE[$i]}"
+        local line="${BASH_LINENO[$j]}"
+        echo "${function}:${file}:${line}" >> "$_SENTRY_TRACEBACK_FILE"
+      done
+    }
+
+    : > "$_SENTRY_LOG_FILE"
+
+    if command -v perl >/dev/null; then
+      exec \
+        1> >(tee >(perl '-MPOSIX' -ne '$|++; print strftime("%Y-%m-%d %H:%M:%S %z: ", localtime()), "stdout: ", $_;' >> "$_SENTRY_LOG_FILE")) \
+        2> >(tee >(perl '-MPOSIX' -ne '$|++; print strftime("%Y-%m-%d %H:%M:%S %z: ", localtime()), "stderr: ", $_;' >> "$_SENTRY_LOG_FILE") >&2)
+    else
+      exec \
+        1> >(tee >(awk '{ system(""); print strftime("%Y-%m-%d %H:%M:%S %z:"), "stdout:", $0; system(""); }' >> "$_SENTRY_LOG_FILE")) \
+        2> >(tee >(awk '{ system(""); print strftime("%Y-%m-%d %H:%M:%S %z:"), "stderr:", $0; system(""); }' >> "$_SENTRY_LOG_FILE") >&2)
+    fi
+  fi
+fi
