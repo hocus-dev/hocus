@@ -19,10 +19,11 @@ FROM node:16-bullseye AS deps
 ENV NODE_ENV production
 WORKDIR /build
 COPY ops/bin/override-prisma-types.sh ops/bin/override-prisma-types.sh
+COPY ops/bin/download-kernel.sh ops/bin/download-kernel.sh
 COPY package.json yarn.lock ./
 RUN yarn install --production
 COPY prisma prisma
-RUN yarn run regen
+RUN yarn run regen && mkdir /kernel/ && ops/bin/download-kernel.sh /kernel
 
 FROM quay.io/hocus/hocus-prebuilds-obd:b3a68b6dc6cfac7eb730e10b1eabd74f9ac89fc4004fa820d8380382d45adc1b AS obd
 
@@ -60,6 +61,7 @@ COPY --from=obd /etc/overlaybd /etc/overlaybd
 WORKDIR /app
 ENV NODE_ENV production
 COPY --from=deps /build/node_modules /app/node_modules
+COPY --from=deps /kernel /kernel
 COPY --from=builder /build/agent-build/agent.js /app/agent.js
 COPY --from=builder /build/agent-build/workflow-bundle.js /app/workflow-bundle.js
 COPY --from=builder /build/agent-build/data-converter.js /app/data-converter.js

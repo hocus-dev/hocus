@@ -14,7 +14,7 @@ if [ "$(uname)" = 'Darwin' ]; then
   echo "Unsupported environment detected. MacOS is not supported due to the lack of KVM support."
   echo "Hocus currently only works on Linux 🐧."
   echo "Please deploy Hocus on a linux 🐧 server and then use it from the web interface using any web browser"
-  echo "For a demo or ready deployment please reach out to the founders in the Hocus slack"
+  echo "For a demo deployment please reach out to the founders in the Hocus slack"
   exit 1
 fi
 
@@ -22,7 +22,7 @@ if [ -f "/proc/sys/fs/binfmt_misc/WSLInterop" ]; then
   echo "Unsupported environment detected. WSL 2.0 is not supported due to https://github.com/microsoft/WSL/issues/9511."
   echo "Hocus currently only works on Linux 🐧."
   echo "Please deploy Hocus on a linux 🐧 server and then use it from the web interface using any web browser"
-  echo "For a demo or ready deployment please reach out to the founders in the Hocus slack"
+  echo "For a demo deployment please reach out to the founders in the Hocus slack"
   exit 1
 fi
 
@@ -149,7 +149,6 @@ build_service () {
 
 # Building images
 echo "Building docker images 👷📦"
-build_service download-kernel vm-dependencies-setup
 build_service setup-keycloak db-autosetup
 build_service keycloak keycloak
 build_service temporal-hocus-codec temporal-codec
@@ -169,23 +168,6 @@ else
   T1=$(date +%s%N | cut -b1-13)
   DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
   echo -e "\r\033[KPulling docker images 📥 - ✅ in $DT s"
-fi
-
-echo -n "Downloading VM dependencies 🚄 "
-T0=$(date +%s%N | cut -b1-13)
-VM_BUILD_LOG=$($REPO_DIR/ops/bin/local-cmd.sh run --rm download-kernel 2>&1)
-if ! [[ $? -eq 0 ]]; then
-  T1=$(date +%s%N | cut -b1-13)
-  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KDownloading VM dependencies 🚄 - ❌ in $DT"
-
-  echo -e "$VM_BUILD_LOG" | grep --color -E '^|ERROR:.*'
-  echo -e "\nAbove you will find the vm build logs with the errors highlighted"
-  fatal_error
-else
-  T1=$(date +%s%N | cut -b1-13)
-  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KDownloading VM dependencies 🚄 - ✅ in $DT s"
 fi
 
 echo -n "Seeding the DB 🌱"

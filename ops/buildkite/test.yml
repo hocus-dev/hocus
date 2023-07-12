@@ -163,6 +163,8 @@ steps:
 
   - label: ":fire: E2E agent tests"
     command: |
+      mkdir /kernel/ && ops/bin/download-kernel.sh /kernel/
+      ops/bin/setup-tcmu.sh
       export DB_HOST="db";
       export AGENT_DATABASE_URL="postgres://postgres:pass@db:5432/rooms";
       ops/docker/resources/setup-network.sh;
