@@ -88,6 +88,12 @@ export const config = makeConfig()({
   }),
   telemetry: () => ({
     disabled: (process.env.TELEMETRY_DISABLED ?? "") !== "",
+    sentryDSN:
+      "https://8381693467914ef2b708e99f6f75d0d2@o4505510143787008.ingest.sentry.io/4505510149095424",
+    sentryProjectId: "4505510149095424",
+    phogApiKey: "phc_RlJoTOGCBVKphsU0uucflyOm0cj0sakMdYCRcJ0qj9Q",
+    phogHost: "https://phog.hocus.dev",
+    deployId: process.env.DEPLOY_ID,
   }),
   perfMonitoring: () => ({
     enabled: (process.env.PERF_MONITORING_ENABLED ?? "") !== "",

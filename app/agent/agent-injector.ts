@@ -20,6 +20,7 @@ import { GitService } from "~/git/git.service";
 import { PerfService } from "~/perf.service.server";
 import { ProjectService } from "~/project/project.service";
 import { SshKeyService } from "~/ssh-key/ssh-key.service";
+import { TelemetryService } from "~/telemetry.service";
 import { clientFactory } from "~/temporal/client-factory";
 import { TimeService } from "~/time.service";
 import { Token } from "~/token";
@@ -35,6 +36,7 @@ const providers = [
   { token: Token.Config, provide: { value: config } },
   { token: Token.TimeService, provide: { class: TimeService } },
   { token: Token.Logger, provide: { class: DefaultLogger }, scope: Scope.Transient },
+  { token: Token.TelemetryService, provide: { class: TelemetryService } },
   { token: Token.PerfService, provide: { class: PerfService } },
   { token: Token.BlockRegistryService, provide: { class: BlockRegistryService } },
   { token: Token.LowLevelStorageService, provide: { class: LowLevelStorageService } },
