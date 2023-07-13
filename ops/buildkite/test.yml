@@ -4,9 +4,7 @@ env:
   BUILDKIT_PROGRESS: plain
 steps:
   - label: ":pleading_face: Test build"
-    command: "echo $MY_SECRET"
-    plugins:
-      - muhlba91/doppler-secrets#v1.1.0
+    command: "echo $$MY_SECRET"
 
   # In theory the pipeline can be executed locally using the buildkite CLI but there are bugs...
   # 1. Group steps are not supported in the cli .-. https://github.com/buildkite/cli/issues/123

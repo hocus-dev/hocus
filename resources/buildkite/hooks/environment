@@ -3,6 +3,10 @@ set -eu -o pipefail
 
 # shellcheck disable=SC1091
 source /etc/buildkite-agent/hooks/secrets.rc
+set -a
+# shellcheck disable=SC2046
+eval $(doppler secrets download --no-file --format env)
+set +a
 
 # Based on https://github.com/buildkite/elastic-ci-stack-for-aws/blob/16a3f45aa0b5e7ac9c3eca123b01a344eab8d009/packer/linux/conf/buildkite-agent/hooks/environment
 
@@ -15,7 +19,7 @@ source /etc/buildkite-agent/hooks/secrets.rc
 # but we need to chop it up, safely. The path looks like:
 #
 #   BUILDKITE_BUILD_CHECKOUT_PATH="/var/lib/buildkite-agent/builds/my-agent-1/my-org/my-pipeline"
-#
+# 
 # We know the beginning of this path, it's in BUILDKITE_BUILD_PATH:
 #
 #   BUILDKITE_BUILD_PATH="/var/lib/buildkite-agent/builds"
