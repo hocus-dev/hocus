@@ -13,16 +13,16 @@ PHOG_EVENT_NAME=local-up ENABLE_SENTRY=1 eval "$(cat "$REPO_DIR"/ops/bin/phog-te
 if [ "$(uname)" = 'Darwin' ]; then
   echo "Unsupported environment detected. MacOS is not supported due to the lack of KVM support."
   echo "Hocus currently only works on Linux 🐧."
-  echo "Please deploy Hocus on a linux 🐧 server and then use it from the web interface using any web browser"
-  echo "For a demo deployment please reach out to the founders in the Hocus slack"
+  echo "Please deploy Hocus on a Linux 🐧 server and then use it from the web interface using any web browser"
+  echo "For a demo deployment please reach out to the founders in the Hocus Slack"
   exit 1
 fi
 
 if [ -f "/proc/sys/fs/binfmt_misc/WSLInterop" ]; then
   echo "Unsupported environment detected. WSL 2.0 is not supported due to https://github.com/microsoft/WSL/issues/9511."
   echo "Hocus currently only works on Linux 🐧."
-  echo "Please deploy Hocus on a linux 🐧 server and then use it from the web interface using any web browser"
-  echo "For a demo deployment please reach out to the founders in the Hocus slack"
+  echo "Please deploy Hocus on a Linux 🐧 server and then use it from the web interface using any web browser"
+  echo "For a demo deployment please reach out to the founders in the Hocus Slack"
   exit 1
 fi
 
