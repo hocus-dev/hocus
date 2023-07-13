@@ -2,7 +2,7 @@
 set -eu -o pipefail
 
 # shellcheck disable=SC1091
-source /etc/buildkite-agent/hooks/environment/secrets.rc
+source /etc/buildkite-agent/hooks/secrets.rc
 
 # Based on https://github.com/buildkite/elastic-ci-stack-for-aws/blob/16a3f45aa0b5e7ac9c3eca123b01a344eab8d009/packer/linux/conf/buildkite-agent/hooks/environment
 
