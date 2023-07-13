@@ -34,7 +34,7 @@ Hocus integrates with any Git provider that uses the SSH protocol, like GitHub, 
 
 - x86_64 Linux, preferably with at least the 5.10 kernel
 - KVM support on the host
-- `target_core_user` and `tcm_loop` kernel modules(available in most distributions with the exception to WSL)
+- A Linux distribution which supports the `target_core_user` and `tcm_loop` kernel modules (generally available with the notable exception of WSL https://github.com/microsoft/WSL/issues/9511)
 - Git
 - Docker, Docker Compose, and Buildx
 
