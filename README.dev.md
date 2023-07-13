@@ -28,10 +28,13 @@ OCI_PROXY=host.docker.internal:9999 yarn jest 'app/agent/workflows.test.ts' -t '
 
 ```bash
 cp resources/buildkite/buildkite-agent.cfg.example resources/buildkite/buildkite-agent.cfg
+cp resources/buildkite/hooks/secrets.rc.example resources/buildkite/hooks/secrets.rc
 # Change what you need in buildkite-agent.cfg
 vim resources/buildkite/buildkite-agent.cfg
+# And in secrets.rc
+vim resources/buildkite/hooks/secrets.rc
 # This will build a new VM based on resources/docker/buildkite-agent.Dockerfile and start it in qemu.
-# 80% of host memory is passed to the VM as a balloon device with free page reporting enabled :)
+# 16GB of host memory is passed to the VM as a balloon device with free page reporting enabled :)
 # Half of the host cores are passed to the VM
 sudo ./ops/bin/dev/run-buildkite.sh
 ```

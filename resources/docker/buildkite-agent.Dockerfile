@@ -42,6 +42,7 @@ RUN systemctl enable docuum
 # Configure Buildkite Agent & Docker
 COPY ./buildkite/hooks/fix-buildkite-agent-builds-permissions /usr/bin/
 COPY ./buildkite/hooks/environment /etc/buildkite-agent/hooks/environment
+COPY ./buildkite/hooks/secrets.rc /etc/buildkite-agent/hooks/secrets.rc
 COPY ./buildkite/buildkite-agent.cfg /etc/buildkite-agent/buildkite-agent.cfg
 COPY ./buildkite/daemon.json /etc/docker/daemon.json
 RUN systemctl enable buildkite-agent && usermod -aG docker buildkite-agent && echo "buildkite-agent ALL = (root) NOPASSWD: /usr/bin/fix-buildkite-agent-builds-permissions" >> /etc/sudoers
