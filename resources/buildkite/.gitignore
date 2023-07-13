@@ -1,2 +1,2 @@
 buildkite-agent.cfg
-hooks/secrets.sh
+hooks/secrets.rc

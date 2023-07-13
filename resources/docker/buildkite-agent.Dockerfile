@@ -39,6 +39,9 @@ RUN wget https://github.com/stepchowfun/docuum/releases/download/v0.22.0/docuum-
 COPY ./buildkite/docuum.service /etc/systemd/system/docuum.service
 RUN systemctl enable docuum
 
+# Install doppler
+RUN (curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh || wget -t 3 -qO- https://cli.doppler.com/install.sh) | sudo sh
+
 # Configure Buildkite Agent & Docker
 COPY ./buildkite/hooks/fix-buildkite-agent-builds-permissions /usr/bin/
 COPY ./buildkite/hooks/environment /etc/buildkite-agent/hooks/environment
