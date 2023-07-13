@@ -313,6 +313,7 @@ export class QemuService implements HocusRuntime {
   ): Promise<T> {
     const t1 = performance.now();
     const kernelPath = config.kernelPath ?? this.agentConfig.defaultKernel;
+    const initrdPath = this.agentConfig.defaultInitrd;
     const shouldPoweroff = config.shouldPoweroff ?? true;
     let vmStarted = false;
     if (config.fs["/"] === void 0) {
@@ -393,7 +394,7 @@ export class QemuService implements HocusRuntime {
            * Here is the code:
            * https://github.com/hocus-dev/tiny-initramfs/
            */
-          "/srv/jailer/resources/initrd.img",
+          initrdPath,
           "-qmp",
           `unix:${this.qmpSocketPath},server,nowait`,
           "-machine",

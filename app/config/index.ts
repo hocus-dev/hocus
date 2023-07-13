@@ -40,7 +40,8 @@ export const config = makeConfig()({
   agent: () => ({
     temporalAddress: get("AGENT_TEMPORAL_ADDRESS", "localhost:7233"),
     databaseUrl: get("AGENT_DATABASE_URL", "postgres://postgres:pass@localhost:5432/rooms"),
-    defaultKernel: get("AGENT_KERNEL_PATH", "/srv/jailer/resources/vmlinux-6.2-x86_64.bin"),
+    defaultKernel: get("AGENT_KERNEL_PATH", "/kernel/vmlinux-6.2-x86_64.bin"),
+    defaultInitrd: get("AGENT_INITRD_PATH", "/kernel/initrd.img"),
     hostBuildfsResourcesDir: get("AGENT_HOST_BUILDFS_RESOURCES_DIR", "/app/resources"),
     // `get` is not used here because users usually will not want to set these manually
     // in production. `get` would throw an error if the env var was not set.

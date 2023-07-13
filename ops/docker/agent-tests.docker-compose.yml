@@ -25,33 +25,6 @@ services:
       timeout: 10s
       retries: 30
 
-  setup-vm-images:
-    privileged: true
-    build:
-      dockerfile: ops/docker/setup.Dockerfile
-      context: ${REPO_DIR}
-    restart: "no"
-    command: |
-      bash -o errexit -o nounset -o pipefail -o xtrace -c "
-        mkdir -pv /agent_data/qemu
-        mkdir -pv /agent_data/resources
-
-        ops/bin/dev/download-kernel.sh /agent_data/resources
-      "
-    volumes:
-      - agent-test-data:/agent_data:rw
-
-  setup-tcmu:
-    build:
-      dockerfile: ops/docker/setup-tcmu.Dockerfile
-      context: ${REPO_DIR}
-    privileged: true
-    restart: "no"
-    command: ops/bin/setup-tcmu.sh
-    volumes:
-      - /lib/modules:/lib/modules:ro
-      - /sys/kernel/config:/sys/kernel/config
-
   agent:
     build:
       dockerfile: ops/docker/agent-tests.Dockerfile
@@ -59,10 +32,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      setup-vm-images:
-        condition: service_completed_successfully
-      setup-tcmu:
-        condition: service_completed_successfully
     restart: "no"
     privileged: true
     ports:
@@ -73,5 +42,6 @@ services:
       - "agent-test-data:/srv/jailer"
       - /dev/kvm:/dev/kvm
       - /dev:/dev/hocus
+      - /lib/modules:/lib/modules:ro
       - /sys/kernel/config:/sys/kernel/config
     command: sleep infinity

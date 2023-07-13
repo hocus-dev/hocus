@@ -6,21 +6,6 @@ volumes:
   db_init:
   agent_data:
 services:
-  download-kernel:
-    build:
-      dockerfile: ops/docker/setup.Dockerfile
-      context: ${REPO_DIR}
-    restart: "no"
-    command: |
-      bash -o errexit -o nounset -o pipefail -o xtrace -c "
-        mkdir -pv /agent_data/resources
-        curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 https://github.com/hocus-dev/linux-kernel/releases/download/0.0.5/vmlinux-6.2-x86_64.bin -z /agent_data/resources/vmlinux-6.2-x86_64.bin -o /agent_data/resources/vmlinux-6.2-x86_64.bin --location
-        curl --retry-all-errors --connect-timeout 5 --retry 5 --retry-delay 0 --retry-max-time 40 https://github.com/hocus-dev/tiny-initramfs/releases/download/v0.2/initrd.img -z /agent_data/resources/initrd.img -o /agent_data/resources/initrd.img --location
-      "
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - agent_data:/agent_data:rw
-
   setup-keycloak:
     build:
       dockerfile: ops/docker/setup.Dockerfile
@@ -200,8 +185,6 @@ services:
         condition: service_healthy
       temporal:
         condition: service_healthy
-      download-kernel:
-        condition: service_completed_successfully
       hocus-ui:
         condition: service_healthy
     build:
@@ -214,8 +197,8 @@ services:
       - TELEMETRY_DISABLED=${TELEMETRY_DISABLED:-}
       - DEPLOY_ID=${DEPLOY_ID:-}
       - AGENT_KERNEL_PATH=/srv/jailer/resources/vmlinux-6.2-x86_64.bin
+      - AGENT_INITRD_PATH=/kernel/initrd.img
       - AGENT_HOST_BUILDFS_RESOURCES_DIR=/app/resources
-      - AGENT_BUILDFS_ROOTFS=/srv/jailer/resources/buildfs.ext4
       - AGENT_DEV_CREATE_HOCUS_PROJECTS=${AGENT_DEV_CREATE_HOCUS_PROJECTS}
       - AGENT_DEV_CREATE_DEVELOPMENT_PROJECTS=${AGENT_DEV_CREATE_DEVELOPMENT_PROJECTS}
       - HOCUS_REPO_PRIVATE_KEY=${HOCUS_REPO_PRIVATE_KEY}

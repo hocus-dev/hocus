@@ -32,9 +32,10 @@ Hocus integrates with any Git provider that uses the SSH protocol, like GitHub, 
 
 ### Requirements
 
-- x86_64 Linux
+- x86_64 Linux, preferably with at least the 5.10 kernel
 - KVM support on the host
-- Git and Git LFS
+- A Linux distribution which supports the `target_core_user` and `tcm_loop` kernel modules (generally available with the notable exception of WSL https://github.com/microsoft/WSL/issues/9511)
+- Git
 - Docker, Docker Compose, and Buildx
 
 That's it! Hocus is fully containerized and won't install anything directly on your host system. The following script will check if your system meets the requirements, prompt you to install any missing dependencies, and set up Hocus with `docker-compose`.
