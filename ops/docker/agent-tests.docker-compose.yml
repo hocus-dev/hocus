@@ -43,5 +43,4 @@ services:
       - /dev/kvm:/dev/kvm
       - /dev:/dev/hocus
       - /lib/modules:/lib/modules:ro
-      - /sys/kernel/config:/sys/kernel/config
     command: sleep infinity

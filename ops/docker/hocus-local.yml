@@ -217,7 +217,6 @@ services:
       - agent_data:/srv/jailer:rw
       - /dev/kvm:/dev/kvm
       - /dev:/dev/hocus
-      - /sys/kernel/config:/sys/kernel/config
       # used by setup-tcmu.sh
       - /lib/modules:/lib/modules:ro
     healthcheck:

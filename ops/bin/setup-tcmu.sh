@@ -10,6 +10,16 @@ if [ "$(id -u)" != "0" ]; then
   exit 1
 fi
 
+# Check if configfs is mounted
+if ! mountpoint -q /sys/kernel/config/; then
+    mount -t configfs none /sys/kernel/config
+fi
+
+if ! mountpoint -q /sys/kernel/config/; then
+    echo "Configfs not available";
+    exit 1
+fi
+
 # First check whether we need to load target_core_user
 if ! [ -d /sys/kernel/config/target ] ; then
   if [ -f /proc/modules ] ; then

@@ -11,9 +11,4 @@ fi
 export SCRIPT_DIR="$(dirname "$0")"
 export REPO_DIR="$(realpath "${SCRIPT_DIR}/../../..")"
 
-# Check if configfs is mounted(for some reason right now hocus workspaces don't automount this)
-if ! mountpoint -q /sys/kernel/config/; then
-    mount -t configfs none /sys/kernel/config
-fi
-
 "$REPO_DIR"/ops/bin/setup-tcmu.sh

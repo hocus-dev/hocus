@@ -19,7 +19,6 @@ services:
       - "${HOCUS_RESOURCES_DIR}:/srv/jailer"
       - /dev/kvm:/dev/kvm
       - /dev:/dev/hocus
-      - /sys/kernel/config:/sys/kernel/config
     environment:
       - "HOCUS_DEV_GIT_NAME=${HOCUS_DEV_GIT_NAME}"
       - "HOCUS_DEV_GIT_EMAIL=${HOCUS_DEV_GIT_EMAIL}"
