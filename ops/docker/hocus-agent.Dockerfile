@@ -44,6 +44,7 @@ RUN apt-get update \
     && apt-get -t sid install -y \
         qemu-system \
         skopeo \
+        kmod \
         # the following are used by overlaybd
         libaio1 \
         libnl-3-200 \
