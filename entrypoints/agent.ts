@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import { join } from "path";
 
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
@@ -61,7 +62,22 @@ async function run() {
   // eslint-disable-next-line no-console
   console.log("Starting worker...");
 
+  const healtcheckInterval = setInterval(async () => {
+    let file: fs.FileHandle | null = null;
+    try {
+      file = await fs.open("/run/.hocus-agent-healthcheck", "w");
+      await file.write("A");
+    } catch (err) {
+      if (telemetryService) telemetryService.captureException(err);
+      // eslint-disable-next-line no-console
+      console.error(err);
+    } finally {
+      if (file !== null) await file.close();
+    }
+  }, 2000);
+
   await Promise.race([worker.run(), overlaybdProcessPromise])
+    .finally(() => clearInterval(healtcheckInterval))
     .finally(worker.shutdown.bind(worker))
     // https://hocus.sentry.io/issues/4308331837/events/dc3b651528aa4155a57a24da65b9d161/?project=4505510149095424&referrer=issue-list
     .finally(brService.hideEverything.bind(brService))

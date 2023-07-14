@@ -136,7 +136,7 @@ build_service () {
     DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
     echo -e "\r\033[KBuilding $2 failed in $DT s ❌\n"
 
-    echo -e "$BUILD_OUTPUT" | grep --color -E '^|ERROR:.*'
+    echo -e "$BUILD_OUTPUT" | grep --color=always -E '^|ERROR:.*'
     echo "We were unable to build Hocus 😭"
     echo "Above you will find the docker build logs with the errors highlighted"
     fatal_error
@@ -195,9 +195,8 @@ start_service () {
     T1=$(date +%s%N | cut -b1-13)
     DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
     echo -e "\r\033[KStarting $2 - ❌ in $DT\n"
-
-    echo -e "$DOCKER_UP_LOGS" | grep -v "variable is not set" | grep --color -E '^|Bind for.*failed'
     $REPO_DIR/ops/bin/local-cmd.sh logs $1 2> /dev/null
+    echo -e "$DOCKER_UP_LOGS" | grep -v "variable is not set" | grep --color=always -i -E '^|Bind for.*failed|unhealthy'
     echo -e "\nAbove you will find the logs"
     fatal_error
   else
