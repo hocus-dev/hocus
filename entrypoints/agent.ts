@@ -1,5 +1,5 @@
-import { join } from "path";
 import fs from "fs/promises";
+import { join } from "path";
 
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { PrismaClient } from "@prisma/client";
