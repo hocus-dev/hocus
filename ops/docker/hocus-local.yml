@@ -63,6 +63,7 @@ services:
     command: "start"
     build:
       dockerfile: keycloak-dev.Dockerfile
+    restart: unless-stopped
     networks:
       - hocus_net
     environment:
@@ -72,7 +73,6 @@ services:
       - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
     ports:
       - "${NO_EXPOSE_PORTS-4200:}8080"
-    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl --fail http://localhost:8080/health"]
       interval: 10s
@@ -92,6 +92,7 @@ services:
       - POSTGRES_DB=temporal
       #- DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development_es.yaml
     image: temporalio/auto-setup:1.20.0
+    restart: unless-stopped
     networks:
       - hocus_net
     healthcheck:
@@ -150,6 +151,7 @@ services:
     build:
       dockerfile: ops/docker/hocus-ui.Dockerfile
       context: ${REPO_DIR}
+    restart: unless-stopped
     environment:
       - LOG_LEVEL=info
       - OIDC_ISSUER_BASE_URL=http://keycloak:8080/realms/hocus
@@ -190,6 +192,7 @@ services:
     build:
       dockerfile: ops/docker/hocus-agent.Dockerfile
       context: ${REPO_DIR}
+    restart: unless-stopped
     environment:
       - LOG_LEVEL=info
       - AGENT_TEMPORAL_ADDRESS=temporal:7233
@@ -207,7 +210,6 @@ services:
       - CONTROL_PLANE_AGENT_HOSTNAME=${HOCUS_HOSTNAME}
     networks:
       - hocus_net
-    restart: "no"
     privileged: true
     ports:
       - "${NO_EXPOSE_PORTS-8822:}22"
@@ -218,3 +220,14 @@ services:
       - /sys/kernel/config:/sys/kernel/config
       # used by setup-tcmu.sh
       - /lib/modules:/lib/modules:ro
+    healthcheck:
+      # Use the mtime of the file in /run
+      # /tmp is not guaranteed to be a tmpfs, atime is not used due to the possibility of noatime being enabled
+      test:
+        [
+          "CMD-SHELL",
+          "if [ `stat -c %Y /run/.hocus-agent-healthcheck` -ge `date +%s -d'3 seconds ago'` ]; then exit 0; else exit 1; fi",
+        ]
+      interval: 1s
+      timeout: 1s
+      retries: 7
