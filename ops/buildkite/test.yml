@@ -11,13 +11,12 @@ steps:
           server: quay.io
           password-env: QUAY_PASSWORD
       - docker-compose#v4.14.0:
-          push:
+          build:
             - setup-keycloak
             - keycloak
             - temporal-hocus-codec
             - hocus-ui
             - hocus-agent
-          build-parallel: true
           config:
             - ops/docker/hocus-local.yml
           image-repository: quay.io/hocus/test-release-build
