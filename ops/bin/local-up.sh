@@ -82,7 +82,9 @@ if ! [[ $? -eq 0 ]]; then
   exit 1
 fi
 
+if [[ -z $(git status -s) ]]; then
 export HOCUS_BUILD_COMMIT_HASH=$(git rev-parse HEAD)
+fi
 
 # TODO: ensure this is set
 export HOCUS_DEV_GIT_NAME=$(git config --get user.name || echo "dev")
