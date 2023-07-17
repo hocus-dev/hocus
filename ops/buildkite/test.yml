@@ -20,6 +20,9 @@ steps:
             - temporal-hocus-codec
             - hocus-ui
             - hocus-agent
+          push:
+            - hocus-ui:quay.io/hocus/ui:$BUILDKITE_COMMIT
+            - hocus-agent:quay.io/hocus/agent:$BUILDKITE_COMMIT
           config:
             - ops/docker/hocus-local.yml
           image-repository: quay.io/hocus/test-release-build
