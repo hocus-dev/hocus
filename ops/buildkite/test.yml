@@ -3,33 +3,6 @@ env:
   # So the build logs are actually useful
   BUILDKIT_PROGRESS: plain
 steps:
-  - label: ":pleading_face: Build release containers"
-    env:
-      REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
-      HOCUS_HOSTNAME: localhost
-      NO_EXPOSE_PORTS: ""
-    plugins:
-      - docker-login#v2.1.0:
-          username: hocus+buildkite
-          server: quay.io
-          password-env: QUAY_PASSWORD
-      - docker-compose#v4.14.0:
-          build:
-            - setup-keycloak
-            - keycloak
-            - temporal-hocus-codec
-            - hocus-ui
-            - hocus-agent
-          push:
-            - setup-keycloak:quay.io/hocus/setup:$BUILDKITE_COMMIT
-            - keycloak:quay.io/hocus/keycloak:$BUILDKITE_COMMIT
-            - temporal-hocus-codec:quay.io/hocus/temporal-codec:$BUILDKITE_COMMIT
-            - hocus-ui:quay.io/hocus/ui:$BUILDKITE_COMMIT
-            - hocus-agent:quay.io/hocus/agent:$BUILDKITE_COMMIT
-          config:
-            - ops/docker/hocus-local.yml
-          image-repository: quay.io/hocus/test-release-build
-
   # In theory the pipeline can be executed locally using the buildkite CLI but there are bugs...
   # 1. Group steps are not supported in the cli .-. https://github.com/buildkite/cli/issues/123
   # 2. When running on a real agent the repo is cleared before executing the CI, when running locally node_modules and other stuff if present .-.
@@ -220,3 +193,30 @@ steps:
     # TODO: This will be fixed in a separate PR xd
     soft_fail:
       - exit_status: 1
+
+  - label: ":pleading_face: Build release containers"
+    env:
+      REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
+      HOCUS_HOSTNAME: localhost
+      NO_EXPOSE_PORTS: ""
+    plugins:
+      - docker-login#v2.1.0:
+          username: hocus+buildkite
+          server: quay.io
+          password-env: QUAY_PASSWORD
+      - docker-compose#v4.14.0:
+          build:
+            - setup-keycloak
+            - keycloak
+            - temporal-hocus-codec
+            - hocus-ui
+            - hocus-agent
+          push:
+            - setup-keycloak:quay.io/hocus/setup:$BUILDKITE_COMMIT
+            - keycloak:quay.io/hocus/keycloak:$BUILDKITE_COMMIT
+            - temporal-hocus-codec:quay.io/hocus/temporal-codec:$BUILDKITE_COMMIT
+            - hocus-ui:quay.io/hocus/ui:$BUILDKITE_COMMIT
+            - hocus-agent:quay.io/hocus/agent:$BUILDKITE_COMMIT
+          config:
+            - ops/docker/hocus-local.yml
+          image-repository: quay.io/hocus/test-release-build
