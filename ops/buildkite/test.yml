@@ -11,7 +11,7 @@ steps:
           server: quay.io
           password-env: QUAY_PASSWORD
       - docker-compose#v4.14.0:
-          build:
+          push:
             - setup-keycloak
             - keycloak
             - temporal-hocus-codec
