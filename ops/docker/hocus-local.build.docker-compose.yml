@@ -1,0 +1,21 @@
+version: "3"
+services:
+  setup-keycloak:
+    build:
+      dockerfile: ops/docker/setup.Dockerfile
+      context: ${REPO_DIR}
+  keycloak:
+    build:
+      dockerfile: keycloak-dev.Dockerfile
+  temporal-hocus-codec:
+    build:
+      dockerfile: ops/docker/hocus-temporal-codec.Dockerfile
+      context: ${REPO_DIR}
+  hocus-ui:
+    build:
+      dockerfile: ops/docker/hocus-ui.Dockerfile
+      context: ${REPO_DIR}
+  hocus-agent:
+    build:
+      dockerfile: ops/docker/hocus-agent.Dockerfile
+      context: ${REPO_DIR}

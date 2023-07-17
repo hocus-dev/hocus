@@ -82,6 +82,8 @@ if ! [[ $? -eq 0 ]]; then
   exit 1
 fi
 
+export HOCUS_BUILD_COMMIT_HASH=$(git rev-parse HEAD)
+
 # TODO: ensure this is set
 export HOCUS_DEV_GIT_NAME=$(git config --get user.name || echo "dev")
 export HOCUS_DEV_GIT_EMAIL=$(git config --get user.email || echo "dev@example.com")
@@ -147,23 +149,27 @@ build_service () {
   fi
 }
 
-# Building images
-echo "Building docker images 👷📦"
-build_service setup-keycloak db-autosetup
-build_service keycloak keycloak
-build_service temporal-hocus-codec temporal-codec
-build_service hocus-ui ui
-build_service hocus-agent agent
+if [ -z ${HOCUS_BUILD_COMMIT_HASH+x} ]; then
+  # Building images
+  echo "Building docker images 👷📦"
+  build_service setup-keycloak db-autosetup
+  build_service keycloak keycloak
+  build_service temporal-hocus-codec temporal-codec
+  build_service hocus-ui ui
+  build_service hocus-agent agent
+fi;
 
 # Pulling images
 echo -n "Pulling docker images 📥"
 T0=$(date +%s%N | cut -b1-13)
-$REPO_DIR/ops/bin/local-cmd.sh pull --ignore-buildable -q 2> /dev/null
+DOCKER_PULL_LOGS=$("$REPO_DIR"/ops/bin/local-cmd.sh pull --ignore-buildable -q 2>&1)
 if ! [[ $? -eq 0 ]]; then
   T1=$(date +%s%N | cut -b1-13)
   DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
   echo -e "\r\033[KPulling docker images 📥 - ❌ in $DT"
-  exit 1
+  echo -e "$DOCKER_PULL_LOGS" | grep -v "variable is not set" | grep --color=always -i -E '^|Bind for.*failed|unhealthy|manifest for .* not found'
+  echo -e "\nAbove you will find the logs"
+  fatal_error
 else
   T1=$(date +%s%N | cut -b1-13)
   DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")

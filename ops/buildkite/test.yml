@@ -134,8 +134,9 @@ steps:
           run: tester
           build-parallel: true
           config:
-            - ops/docker/hocus-local.yml
-            - ops/docker/deploy-smoke-test.yml
+            - ops/docker/hocus-local.common.docker-compose.yml
+            - ops/docker/hocus-local.build.docker-compose.yml
+            - ops/docker/hocus-local.smoke-test.docker-compose.yml
 
   - label: ":jest: Backend tests"
     command: |
@@ -218,5 +219,6 @@ steps:
             - hocus-ui:quay.io/hocus/ui:$BUILDKITE_COMMIT
             - hocus-agent:quay.io/hocus/agent:$BUILDKITE_COMMIT
           config:
-            - ops/docker/hocus-local.yml
+            - ops/docker/hocus-local.common.docker-compose.yml
+            - ops/docker/hocus-local.build.docker-compose.yml
           image-repository: quay.io/hocus/test-release-build

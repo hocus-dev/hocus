@@ -7,9 +7,6 @@ volumes:
   agent_data:
 services:
   setup-keycloak:
-    build:
-      dockerfile: ops/docker/setup.Dockerfile
-      context: ${REPO_DIR}
     restart: "no"
     environment:
       - OIDC_CALLBACK_URL=http://${HOCUS_HOSTNAME}:3000/app/callback
@@ -61,8 +58,6 @@ services:
       db:
         condition: service_healthy
     command: "start"
-    build:
-      dockerfile: keycloak-dev.Dockerfile
     restart: unless-stopped
     networks:
       - hocus_net
@@ -130,9 +125,6 @@ services:
       - "${NO_EXPOSE_PORTS-8080:}8080"
 
   temporal-hocus-codec:
-    build:
-      dockerfile: ops/docker/hocus-temporal-codec.Dockerfile
-      context: ${REPO_DIR}
     environment:
       - PORT=8081
     networks:
@@ -148,9 +140,6 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
-    build:
-      dockerfile: ops/docker/hocus-ui.Dockerfile
-      context: ${REPO_DIR}
     restart: unless-stopped
     environment:
       - LOG_LEVEL=info
@@ -189,9 +178,6 @@ services:
         condition: service_healthy
       hocus-ui:
         condition: service_healthy
-    build:
-      dockerfile: ops/docker/hocus-agent.Dockerfile
-      context: ${REPO_DIR}
     restart: unless-stopped
     environment:
       - LOG_LEVEL=info
