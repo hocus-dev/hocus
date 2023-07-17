@@ -21,6 +21,9 @@ steps:
             - hocus-ui
             - hocus-agent
           push:
+            - setup-keycloak:quay.io/hocus/setup:$BUILDKITE_COMMIT
+            - keycloak:quay.io/hocus/keycloak:$BUILDKITE_COMMIT
+            - temporal-hocus-codec:quay.io/hocus/temporal-codec:$BUILDKITE_COMMIT
             - hocus-ui:quay.io/hocus/ui:$BUILDKITE_COMMIT
             - hocus-agent:quay.io/hocus/agent:$BUILDKITE_COMMIT
           config:
