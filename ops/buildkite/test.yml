@@ -10,6 +10,17 @@ steps:
           username: hocus+buildkite
           server: quay.io
           password-env: QUAY_PASSWORD
+      - docker-compose#v4.14.0:
+          build:
+            - setup-keycloak
+            - keycloak
+            - temporal-hocus-codec
+            - hocus-ui
+            - hocus-agent
+          build-parallel: true
+          config:
+            - ops/docker/hocus-local.yml
+          image-repository: quay.io/hocus/test-release-build
 
   # In theory the pipeline can be executed locally using the buildkite CLI but there are bugs...
   # 1. Group steps are not supported in the cli .-. https://github.com/buildkite/cli/issues/123

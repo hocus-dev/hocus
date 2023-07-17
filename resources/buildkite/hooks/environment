@@ -19,7 +19,7 @@ set +a
 # but we need to chop it up, safely. The path looks like:
 #
 #   BUILDKITE_BUILD_CHECKOUT_PATH="/var/lib/buildkite-agent/builds/my-agent-1/my-org/my-pipeline"
-# 
+#
 # We know the beginning of this path, it's in BUILDKITE_BUILD_PATH:
 #
 #   BUILDKITE_BUILD_PATH="/var/lib/buildkite-agent/builds"
