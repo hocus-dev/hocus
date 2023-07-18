@@ -4,6 +4,7 @@ set -o pipefail
 set -o nounset
 
 ops/docker/resources/setup-network.sh
+ops/bin/setup-tcmu.sh
 
 export DB_HOST="db"
 export AGENT_TEMPORAL_ADDRESS="temporal:7233"
