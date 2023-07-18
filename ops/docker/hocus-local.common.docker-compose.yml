@@ -211,8 +211,8 @@ services:
       test:
         [
           "CMD-SHELL",
-          "if [ `stat -c %Y /run/.hocus-agent-healthcheck` -ge `date +%s -d'3 seconds ago'` ]; then exit 0; else exit 1; fi",
+          "if [ `stat -c %Y /run/.hocus-agent-healthcheck` -ge `date +%s -d'5 seconds ago'` ]; then exit 0; else exit 1; fi",
         ]
       interval: 1s
-      timeout: 1s
-      retries: 7
+      timeout: 10s
+      retries: 30
