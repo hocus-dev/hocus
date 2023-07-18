@@ -134,8 +134,9 @@ steps:
           run: tester
           build-parallel: true
           config:
-            - ops/docker/hocus-local.yml
-            - ops/docker/deploy-smoke-test.yml
+            - ops/docker/hocus-local.common.docker-compose.yml
+            - ops/docker/hocus-local.build.docker-compose.yml
+            - ops/docker/hocus-local.smoke-test.docker-compose.yml
 
   - label: ":jest: Backend tests"
     command: |
@@ -193,3 +194,31 @@ steps:
     # TODO: This will be fixed in a separate PR xd
     soft_fail:
       - exit_status: 1
+
+  - label: ":pleading_face: Build release containers"
+    env:
+      REPO_DIR: $BUILDKITE_BUILD_CHECKOUT_PATH
+      HOCUS_HOSTNAME: localhost
+      NO_EXPOSE_PORTS: ""
+    plugins:
+      - docker-login#v2.1.0:
+          username: hocus+buildkite
+          server: quay.io
+          password-env: QUAY_PASSWORD
+      - docker-compose#v4.14.0:
+          build:
+            - setup-keycloak
+            - keycloak
+            - temporal-hocus-codec
+            - hocus-ui
+            - hocus-agent
+          push:
+            - setup-keycloak:quay.io/hocus/setup:$BUILDKITE_COMMIT
+            - keycloak:quay.io/hocus/keycloak:$BUILDKITE_COMMIT
+            - temporal-hocus-codec:quay.io/hocus/temporal-codec:$BUILDKITE_COMMIT
+            - hocus-ui:quay.io/hocus/ui:$BUILDKITE_COMMIT
+            - hocus-agent:quay.io/hocus/agent:$BUILDKITE_COMMIT
+          config:
+            - ops/docker/hocus-local.common.docker-compose.yml
+            - ops/docker/hocus-local.build.docker-compose.yml
+          image-repository: quay.io/hocus/test-release-build

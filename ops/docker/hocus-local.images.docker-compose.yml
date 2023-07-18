@@ -1,0 +1,12 @@
+version: "3"
+services:
+  setup-keycloak:
+    image: quay.io/hocus/setup:${HOCUS_BUILD_COMMIT_HASH}
+  keycloak:
+    image: quay.io/hocus/keycloak:${HOCUS_BUILD_COMMIT_HASH}
+  temporal-hocus-codec:
+    image: quay.io/hocus/temporal-codec:${HOCUS_BUILD_COMMIT_HASH}
+  hocus-ui:
+    image: quay.io/hocus/ui:${HOCUS_BUILD_COMMIT_HASH}
+  hocus-agent:
+    image: quay.io/hocus/agent:${HOCUS_BUILD_COMMIT_HASH}
