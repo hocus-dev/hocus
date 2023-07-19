@@ -36,6 +36,7 @@ import { LocalLockNamespace, execSshCmd, withLocalLock, withRuntimeAndImages } f
 import type { Config } from "~/config";
 import type { PerfService } from "~/perf.service.server";
 import { ValidationError } from "~/schema/utils.server";
+import type { TelemetryService } from "~/telemetry.service";
 import { Token } from "~/token";
 import { sha256 } from "~/utils.server";
 import { displayError, mapOverNull, waitForPromises } from "~/utils.shared";
@@ -43,6 +44,7 @@ import { displayError, mapOverNull, waitForPromises } from "~/utils.shared";
 export class PrebuildService {
   static inject = [
     Token.Logger,
+    Token.TelemetryService,
     Token.AgentUtilService,
     Token.ProjectConfigService,
     Token.BuildfsService,
@@ -54,6 +56,7 @@ export class PrebuildService {
 
   constructor(
     private readonly logger: Logger,
+    private readonly telemetryService: TelemetryService,
     private readonly agentUtilService: AgentUtilService,
     private readonly projectConfigService: ProjectConfigService,
     private readonly buildfsService: BuildfsService,
@@ -569,6 +572,7 @@ export class PrebuildService {
       },
     });
     if (errorMessage != null) {
+      this.telemetryService.captureException(new Error(errorMessage));
       await db.prebuildEventSystemError.create({
         data: {
           prebuildEventId,
