@@ -12,6 +12,7 @@ export TEMPORAL_SERVER_URL="temporal:7233"
 export AGENT_DATABASE_URL="postgres://postgres:pass@db:5432/rooms"
 export AGENT_DEV_CREATE_DEVELOPMENT_PROJECTS="true"
 export NODE_ENV="development"
+export TELEMETRY_DISABLED=1
 
 mkdir /kernel/ && ops/bin/download-kernel.sh /kernel/
 yarn run regen
