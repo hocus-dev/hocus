@@ -10,49 +10,54 @@ if [ "$(id -u)" != "0" ]; then
   exit 1
 fi
 
-# Check if configfs is mounted
+# Check if ConfigFS is mounted
 if ! mountpoint -q /sys/kernel/config/; then
     mount -t configfs none /sys/kernel/config
 fi
 
 if ! mountpoint -q /sys/kernel/config/; then
-    echo "Configfs not available";
+    echo "Unable to mount ConfigFS at /sys/kernel/config";
     exit 1
 fi
 
 # First check whether we need to load target_core_user
 if ! [ -d /sys/kernel/config/target ] ; then
   if [ -f /proc/modules ] ; then
-    echo "Trying to load target_core_user";
+    echo "Trying to load kernel module target_core_user";
     modprobe target_core_user;
   fi;
   # Check if loading target_core_user worked
   if ! [ -d /sys/kernel/config/target ] ; then
-    echo "Kernel module target_core_user is not available";
+    echo "Kernel module target_core_user is not available on the system";
     exit 1
   fi;
 fi;
 
 # Secondly check whether we need to load tcm_loop
 if ! [ -d /sys/kernel/config/target/loopback/ ] ; then
-  echo "Trying to load tcm_loop";
+  echo "Trying to load kernel module tcm_loop";
   # Oh perhaps the module is there but not started?
   mkdir /sys/kernel/config/target/loopback/ || true
   # If the directory is not there then the kernel doesn't have tcm_loop
   if ! [ -d /sys/kernel/config/target/loopback/ ] ; then
-    echo "Kernel module tcm_loop is not available";
+    echo "Kernel module tcm_loop is not available on the system";
     exit 1
   fi
 fi
 
 # Check for scsi disk support
+# This is handled by the sd_mod driver but should be compiled into the kernel on most distros
 if ! [ -d /sys/bus/scsi/drivers/sd ] ; then
-  # TODO: try to load the module
-  #       please note that 99% of kernels should have this available
-  #       cause otherwise one cannot boot from an hdd ;)
-  echo "No scsi disk support detected";
-  exit 1
-fi
+  if [ -f /proc/modules ] ; then
+    echo "Trying to load kernel module sd_mod";
+    modprobe sd_mod;
+  fi;
+  # Check if loading target_core_user worked
+  if ! [ -d /sys/bus/scsi/drivers/sd ] ; then
+    echo "No SCSI disk support detected. Kernel module sd_mod is not available on the system";
+    exit 1
+  fi;
+fi;
 
 # Ensure scsi sync mode is enabled
 if ! [ -f /sys/module/scsi_mod/parameters/scan ] ; then
