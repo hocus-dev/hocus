@@ -88,7 +88,10 @@ export const config = makeConfig()({
       process.env.TEMPORAL_SERVER_URL ?? process.env.AGENT_TEMPORAL_ADDRESS ?? "localhost:7233",
   }),
   telemetry: () => ({
-    disabled: (process.env.TELEMETRY_DISABLED ?? "") !== "",
+    disabled:
+      (process.env.TELEMETRY_DISABLED ?? "") !== "" ||
+      process.env.NODE_ENV === "development" ||
+      process.env.NODE_ENV === "test",
     sentryDSN:
       "https://8381693467914ef2b708e99f6f75d0d2@o4505510143787008.ingest.sentry.io/4505510149095424",
     sentryProjectId: "4505510149095424",
