@@ -52,7 +52,7 @@ if ! [ -d /sys/bus/scsi/drivers/sd ] ; then
     echo "Trying to load kernel module sd_mod";
     modprobe sd_mod;
   fi;
-  # Check if loading target_core_user worked
+  # Check if loading sd_mod worked
   if ! [ -d /sys/bus/scsi/drivers/sd ] ; then
     echo "No SCSI disk support detected. Kernel module sd_mod is not available on the system";
     exit 1
