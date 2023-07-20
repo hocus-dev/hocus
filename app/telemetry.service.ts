@@ -33,6 +33,8 @@ export class TelemetryService {
       Sentry.init({
         dsn: this.telemetryConfig.sentryDSN,
         maxValueLength: 25000,
+        sendClientReports: true,
+        enableTracing: false,
         integrations: [
           {
             name: "hocus-sentry-posthog",

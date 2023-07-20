@@ -21,6 +21,7 @@ import { VmInfoValidator } from "../vm-info.validator";
 import type { IpBlockId, WorkspaceNetworkService } from "~/agent/network/workspace-network.service";
 import { NS_PREFIX } from "~/agent/network/workspace-network.service";
 import type { Config } from "~/config";
+import type { TelemetryService } from "~/telemetry.service";
 import { Token } from "~/token";
 import { doesFileExist } from "~/utils.server";
 import { displayError, sleep, unwrap, waitForPromises } from "~/utils.shared";
@@ -171,10 +172,17 @@ export function factoryQemuService(
   logger: DefaultLogger,
   config: Config,
   networkService: WorkspaceNetworkService,
+  telemetryService: TelemetryService,
 ): (instanceId: string) => HocusRuntime {
-  return (instanceId: string) => new QemuService(logger, config, networkService, instanceId);
+  return (instanceId: string) =>
+    new QemuService(logger, config, networkService, telemetryService, instanceId);
 }
-factoryQemuService.inject = [Token.Logger, Token.Config, Token.WorkspaceNetworkService] as const;
+factoryQemuService.inject = [
+  Token.Logger,
+  Token.Config,
+  Token.WorkspaceNetworkService,
+  Token.TelemetryService,
+] as const;
 
 export class QemuService implements HocusRuntime {
   private readonly qmpSocketPath: string;
@@ -187,6 +195,7 @@ export class QemuService implements HocusRuntime {
     private readonly logger: DefaultLogger,
     config: Config,
     private readonly networkService: WorkspaceNetworkService,
+    private readonly telemetryService: TelemetryService,
     public readonly instanceId: string,
   ) {
     this.agentConfig = config.agent();
@@ -238,6 +247,7 @@ export class QemuService implements HocusRuntime {
       if (err?.code === "ENOENT") {
         return null;
       }
+      this.telemetryService.captureException(err);
       throw err;
     });
     if (info === null) {
@@ -249,6 +259,7 @@ export class QemuService implements HocusRuntime {
       await qmpSock.connect(this.qmpSocketPath);
     } catch (err: any) {
       if (err instanceof QmpConnectionFailedError) return null;
+      this.telemetryService.captureException(err);
       throw err;
     }
 
@@ -454,6 +465,7 @@ export class QemuService implements HocusRuntime {
         // Without this block the error is handled by the nodejs process itself and makes it
         // exit with code 1 crashing everything
         this.logger.error(`qemu process errored: ${displayError(err)}`);
+        this.telemetryService.captureException(err);
         qemuExited.abort(err);
       });
       cp.on("close", (code) => {
@@ -503,6 +515,9 @@ export class QemuService implements HocusRuntime {
           qemuExited,
         ),
       ]);
+    } catch (err) {
+      this.telemetryService.captureException(err);
+      throw err;
     } finally {
       if (shouldPoweroff && vmStarted) {
         await this.shutdownVM();
@@ -582,6 +597,7 @@ export class QemuService implements HocusRuntime {
             (err?.message && err?.message.includes("Failed to press"))
           )
         ) {
+          this.telemetryService.captureException(err);
           throw err;
         }
       } finally {
