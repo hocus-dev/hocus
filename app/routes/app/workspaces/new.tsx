@@ -39,11 +39,13 @@ const findPrebuild = async (db: Prisma.Client, prebuildId: string) => {
   }
   return [
     prebuildEvent.project,
-    prebuildEvent.gitObject.gitObjectToBranch.map((link) => ({
-      branch: link.gitBranch,
-      ongoingPrebuild: null,
-      finishedPrebuild: prebuildEvent,
-    })),
+    prebuildEvent.gitObject.gitObjectToBranch
+      .filter((link) => link.gitBranch.gitRepositoryId === prebuildEvent.project.gitRepositoryId)
+      .map((link) => ({
+        branch: link.gitBranch,
+        ongoingPrebuild: null,
+        finishedPrebuild: prebuildEvent,
+      })),
   ] as const;
 };
 

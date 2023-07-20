@@ -19,6 +19,7 @@ export const loader = async ({ context: { db, req, app } }: LoaderArgs) => {
       gitObject: {
         include: {
           gitObjectToBranch: {
+            where: { gitBranch: { gitRepositoryId: project.gitRepositoryId } },
             include: {
               gitBranch: true,
             },
