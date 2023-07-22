@@ -41,7 +41,7 @@ RUN apt-get update \
         iputils-ping \
     && add-apt-repository "deb http://httpredir.debian.org/debian sid main" \
     && apt-get update \
-    && apt-get -t sid install -y \
+    && apt-get -t sid install --no-install-recommends -y \
         qemu-system \
         skopeo \
         kmod \
