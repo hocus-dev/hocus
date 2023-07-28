@@ -1,10 +1,10 @@
-import { mkdir } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 
 import { v4 as uuidv4 } from "uuid";
 
 import { createAgentInjector } from "~/agent/agent-injector";
-import { ContainerId, ImageId } from "~/agent/block-registry/registry.service";
+import type { ContainerId, ImageId } from "~/agent/block-registry/registry.service";
 import { execCmd, execSshCmd, withRuntimeAndImages, withSsh } from "~/agent/utils";
 import { Token } from "~/token";
 import { runOnTimeout } from "~/utils.server";
@@ -32,17 +32,16 @@ async function run() {
     let prevQcow2: string | undefined = void 0;
     let prevObd: ImageId | undefined = void 0;
 
-    for (let i = 0; i < 2; i += 1) {
+    const results = [];
+    for (let i = 1; i <= 2; i += 1) {
       const curQcow2 = join(qcow2Path, uuidv4());
       const curObd: ContainerId = await brService.createContainer(prevObd, uuidv4(), {
         mkfs: prevObd === void 0,
         sizeInGB: 64,
       });
       if (prevQcow2 !== void 0) {
-        console.log(
-          await execCmd(
-            ...["qemu-img", "create", "-F", "qcow2", "-b", prevQcow2, "-f", "qcow2", curQcow2],
-          ),
+        await execCmd(
+          ...["qemu-img", "create", "-F", "qcow2", "-b", prevQcow2, "-f", "qcow2", curQcow2],
         );
       } else {
         // First image
@@ -53,47 +52,61 @@ async function run() {
         );
       }
 
-      await withRuntimeAndImages(
-        brService,
-        qemuService(uuidv4()),
-        {
-          cleanupAfterStop: true,
-          shouldPoweroff: true,
-          ssh: {
-            username: "hocus",
-            password: "hocus",
+      for (let storageBackend of [curObd, { qcow2: curQcow2 }]) {
+        const runRes = await withRuntimeAndImages(
+          brService,
+          qemuService(uuidv4()),
+          {
+            cleanupAfterStop: true,
+            shouldPoweroff: true,
+            ssh: {
+              username: "hocus",
+              password: "hocus",
+            },
+            fs: {
+              "/": rootfsContainer,
+              "/benchmark": storageBackend,
+            },
+            memSizeMib: 1024,
+            vcpuCount: 2,
           },
-          fs: {
-            "/": rootfsContainer,
-            "/benchmark": { qcow2: curQcow2 },
+          async ({ ssh }) => {
+            if (i === 1) {
+              await execSshCmd({ ssh }, ["sudo", "sh", "-c", "apk add hyperfine"]);
+            }
+            console.log(
+              await execSshCmd({ ssh }, [
+                "sudo",
+                "sh",
+                "-c",
+                "dd if=/dev/urandom bs=1M count=10 >> /benchmark/file",
+              ]),
+              await execSshCmd({ ssh }, ["sudo", "sh", "-c", "ls -lha /benchmark/file"]),
+              await execSshCmd({ ssh }, [
+                "sudo",
+                "sh",
+                "-c",
+                "hyperfine --export-json /tmp/a --runs 10 --prepare 'sync; echo 3 > /proc/sys/vm/drop_caches' 'sha256sum /benchmark/file'",
+              ]),
+            );
+            return JSON.parse(
+              (await execSshCmd({ ssh }, ["sudo", "sh", "-c", "cat /tmp/a"])).stdout,
+            );
           },
-          memSizeMib: 1024,
-          vcpuCount: 2,
-        },
-        async ({ ssh }) => {
-          if (i === 0) {
-            await execSshCmd({ ssh }, ["sudo", "sh", "-c", "apk add hyperfine"]);
-          }
-          console.log(
-            await execSshCmd({ ssh }, [
-              "sudo",
-              "sh",
-              "-c",
-              "dd if=/dev/urandom bs=1M count=10 >> /benchmark/file",
-            ]),
-            await execSshCmd({ ssh }, ["sudo", "sh", "-c", "ls -lha /benchmark/file"]),
-            await execSshCmd({ ssh }, [
-              "sudo",
-              "sh",
-              "-c",
-              "hyperfine --runs 10 --prepare 'sync; echo 3 > /proc/sys/vm/drop_caches' 'sha256sum /benchmark/file'",
-            ]),
-          );
-        },
-      );
+        );
+        results.push({
+          layers: i,
+          backend: (storageBackend as any).qcow2 ? "qcow2" : "overlaybd",
+          fileSizeInMib: 10 * i,
+          res: runRes,
+        });
+      }
       prevQcow2 = curQcow2;
       prevObd = await brService.commitContainer(curObd, uuidv4());
     }
+    const c = "./" + uuidv4() + ".res";
+    await writeFile(c, JSON.stringify(results));
+    console.log(`Results written to ${c}`);
   })()
     .finally(brService.hideEverything.bind(brService))
     .finally(async () => {

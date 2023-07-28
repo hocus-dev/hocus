@@ -329,7 +329,6 @@ export class QemuService implements HocusRuntime {
     const initrdPath = this.agentConfig.defaultInitrd;
     const shouldPoweroff = config.shouldPoweroff ?? true;
     let vmStarted = false;
-    console.log(config.fs);
     if (config.fs["/"] === void 0) {
       throw new Error("No root fs specified");
     }
@@ -355,6 +354,8 @@ export class QemuService implements HocusRuntime {
       mountOrder.map(async ([path, what]) => {
         if ("device" in what) {
           diskPathToVirtioId[path] = await this.getVirtioDeviceId(what.device);
+        } else if ("qcow2" in what) {
+          diskPathToVirtioId[path] = "12345";
         }
       }),
     );
@@ -419,16 +420,29 @@ export class QemuService implements HocusRuntime {
             if ("mountPoint" in what) {
               throw new Error("virtiofs unsupported for now");
             }
+            if ("device" in what) {
+              diskCtr += 1;
+              return [
+                "-blockdev",
+                `node-name=q${diskCtr},driver=raw,file.driver=host_device,file.filename=${
+                  what.device
+                },discard=unmap,detect-zeroes=unmap,file.aio=io_uring${
+                  what.readonly ? ",read-only=on" : ""
+                }`,
+                "-device",
+                `virtio-blk,drive=q${diskCtr},discard=on,serial=${diskPathToVirtioId[path]}`,
+              ];
+            }
             diskCtr += 1;
             return [
               "-blockdev",
-              `node-name=q${diskCtr},driver=raw,file.driver=host_device,file.filename=${
-                what.device
+              `node-name=q${diskCtr},driver=qcow2,file.driver=file,file.filename=${
+                what.qcow2
               },discard=unmap,detect-zeroes=unmap,file.aio=io_uring${
                 what.readonly ? ",read-only=on" : ""
               }`,
               "-device",
-              `| { mountPoint: string; readonly: boolean },drive=q${diskCtr},discard=on,serial=${diskPathToVirtioId[path]}`,
+              `virtio-blk,drive=q${diskCtr},discard=on,serial=${diskPathToVirtioId[path]}`,
             ];
           }),
           "--kernel",
