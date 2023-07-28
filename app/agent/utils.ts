@@ -383,7 +383,7 @@ type WithRuntimeAndImagesParams = Obj.Overwrite<
   {
     fs: {
       "/": ContainerId | ImageId;
-      [path: string]: ContainerId | ImageId;
+      [path: string]: ContainerId | ImageId | { qcow2: string };
     };
   }
 >;

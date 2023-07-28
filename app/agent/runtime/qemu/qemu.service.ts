@@ -303,7 +303,9 @@ export class QemuService implements HocusRuntime {
        */
       fs: Record<
         string,
-        { device: string; readonly: boolean } | { mountPoint: string; readonly: boolean }
+        | { device: string; readonly: boolean }
+        | { mountPoint: string; readonly: boolean }
+        | { qcow2: string; readonly: boolean }
       >;
       /**
        * Defaults to true.
@@ -327,6 +329,7 @@ export class QemuService implements HocusRuntime {
     const initrdPath = this.agentConfig.defaultInitrd;
     const shouldPoweroff = config.shouldPoweroff ?? true;
     let vmStarted = false;
+    console.log(config.fs);
     if (config.fs["/"] === void 0) {
       throw new Error("No root fs specified");
     }
@@ -425,7 +428,7 @@ export class QemuService implements HocusRuntime {
                 what.readonly ? ",read-only=on" : ""
               }`,
               "-device",
-              `virtio-blk,drive=q${diskCtr},discard=on,serial=${diskPathToVirtioId[path]}`,
+              `| { mountPoint: string; readonly: boolean },drive=q${diskCtr},discard=on,serial=${diskPathToVirtioId[path]}`,
             ];
           }),
           "--kernel",

@@ -950,17 +950,21 @@ export class BlockRegistryService {
   }
 
   async expose<M extends EXPOSE_METHOD>(
-    contentId: ImageId | ContainerId,
+    contentId: ImageId | ContainerId | { qcow2: string },
     method: M,
   ): Promise<
     PickOne<
       {
         [EXPOSE_METHOD.HOST_MOUNT]: { mountPoint: string; readonly: boolean };
-        [EXPOSE_METHOD.BLOCK_DEV]: { device: string; readonly: boolean };
+        [EXPOSE_METHOD.BLOCK_DEV]:
+          | { device: string; readonly: boolean }
+          | { qcow2: string; readonly: boolean };
       },
       M
     >
   > {
+    if ((contentId as any).qcow2 !== void 0)
+      return { qcow2: (contentId as any).qcow2, readonly: false };
     if (!BlockRegistryService.isContentId(contentId)) {
       throw new Error(`Invalid id: ${contentId}`);
     }
@@ -1253,6 +1257,7 @@ export class BlockRegistryService {
   }
 
   async hide(contentId: ImageId | ContainerId): Promise<void> {
+    if ((contentId as any).qcow2 !== void 0) return;
     if (!BlockRegistryService.isContentId(contentId)) {
       throw new Error(`Invalid id: ${contentId}`);
     }
