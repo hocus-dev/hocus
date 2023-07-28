@@ -171,13 +171,6 @@ services:
       retries: 30
 
   hocus-agent:
-    depends_on:
-      db:
-        condition: service_healthy
-      temporal:
-        condition: service_healthy
-      hocus-ui:
-        condition: service_healthy
     restart: unless-stopped
     environment:
       - LOG_LEVEL=info

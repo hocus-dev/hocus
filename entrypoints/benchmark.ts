@@ -33,7 +33,7 @@ async function run() {
     let prevObd: ImageId | undefined = void 0;
 
     const results = [];
-    for (let i = 1; i <= 2; i += 1) {
+    for (let i = 1; i <= 16; i += 1) {
       const curQcow2 = join(qcow2Path, uuidv4());
       const curObd: ContainerId = await brService.createContainer(prevObd, uuidv4(), {
         mkfs: prevObd === void 0,
@@ -104,7 +104,7 @@ async function run() {
       prevQcow2 = curQcow2;
       prevObd = await brService.commitContainer(curObd, uuidv4());
     }
-    const c = "./" + uuidv4() + ".res";
+    const c = join(blockRegistryRoot, "bench-" + uuidv4() + ".json");
     await writeFile(c, JSON.stringify(results));
     console.log(`Results written to ${c}`);
   })()

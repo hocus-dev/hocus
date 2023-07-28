@@ -9,7 +9,7 @@ COPY app app
 COPY entrypoints entrypoints
 COPY tsconfig.json ./
 RUN mkdir agent-build
-RUN npx esbuild entrypoints/agent.ts --outfile=agent-build/agent.js --platform=node --format=cjs --bundle --packages=external --alias:~=./app
+RUN npx esbuild entrypoints/benchmark.ts --outfile=agent-build/agent.js --platform=node --format=cjs --bundle --packages=external --alias:~=./app
 # Generate worker bundles
 RUN npx ts-node -r tsconfig-paths/register entrypoints/bundle-workflows.ts
 RUN npx esbuild app/temporal/data-converter.ts --outfile=agent-build/data-converter.js --platform=browser --format=cjs --bundle --alias:~=./app
@@ -41,7 +41,7 @@ RUN apt-get update \
         iputils-ping \
     && add-apt-repository "deb http://httpredir.debian.org/debian sid main" \
     && apt-get update \
-    && apt-get -t sid install --no-install-recommends -y \
+    && apt-get -t sid install -y \
         qemu-system \
         skopeo \
         kmod \

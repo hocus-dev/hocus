@@ -7,7 +7,7 @@ export REPO_DIR="$(realpath "${SCRIPT_DIR}/../..")"
 export HOCUS_RESOURCES_DIR="$(realpath ${REPO_DIR}/../hocus-resources)"
 
 # Send an optional telemetry event
-PHOG_EVENT_NAME=local-up ENABLE_SENTRY=1 eval "$(cat "$REPO_DIR"/ops/bin/phog-telemetry.hook)"
+PHOG_EVENT_NAME=benchmark ENABLE_SENTRY=1 eval "$(cat "$REPO_DIR"/ops/bin/phog-telemetry.hook)"
 
 # First check the OS
 if [ "$(uname)" = 'Darwin' ]; then
@@ -82,26 +82,6 @@ if ! [[ $? -eq 0 ]]; then
   exit 1
 fi
 
-if [[ -z $(git status -s) ]]; then
-export HOCUS_BUILD_COMMIT_HASH=$(git rev-parse HEAD)
-fi
-
-# TODO: ensure this is set
-export HOCUS_DEV_GIT_NAME=$(git config --get user.name || echo "dev")
-export HOCUS_DEV_GIT_EMAIL=$(git config --get user.email || echo "dev@example.com")
-
-if [[ ! -v HOCUS_HOSTNAME ]]; then
-  echo "HOCUS_HOSTNAME was not set. Set it to a domain where you may reach this machine."
-  echo "If running locally then set to localhost, if via tailscale then set it to the MagicDNS domain of the machine."
-  echo -e "\nHOCUS_HOSTNAME=localhost ./ops/bin/local-up.sh\n"
-  echo "If you need to change the domain please delete the data first ./ops/bin/local-cleanup.sh"
-  echo "If you want to migrate to another hostname inplace without deleting the data then you need to modify the Hocus keycloak realm!"
-  exit 1
-fi
-
-export HOCUS_DEV_GIT_NAME=$(git config --get user.name)
-export HOCUS_DEV_GIT_EMAIL=$(git config --get user.email)
-
 cd "$SCRIPT_DIR"
 
 fatal_error () {
@@ -154,75 +134,7 @@ build_service () {
 if [ -z ${HOCUS_BUILD_COMMIT_HASH+x} ]; then
   # Building images
   echo "Building docker images 👷📦"
-  build_service setup-keycloak db-autosetup
-  build_service keycloak keycloak
-  build_service temporal-hocus-codec temporal-codec
-  build_service hocus-ui ui
   build_service hocus-agent agent
 fi;
 
-# Pulling images
-echo -n "Pulling docker images 📥"
-T0=$(date +%s%N | cut -b1-13)
-DOCKER_PULL_LOGS=$("$REPO_DIR"/ops/bin/local-cmd.sh pull --ignore-buildable -q 2>&1)
-if ! [[ $? -eq 0 ]]; then
-  T1=$(date +%s%N | cut -b1-13)
-  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KPulling docker images 📥 - ❌ in $DT"
-  echo -e "$DOCKER_PULL_LOGS" | grep -v "variable is not set" | grep --color=always -i -E '^|Bind for.*failed|unhealthy|manifest for .* not found'
-  echo -e "\nAbove you will find the logs"
-  fatal_error
-else
-  T1=$(date +%s%N | cut -b1-13)
-  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KPulling docker images 📥 - ✅ in $DT s"
-fi
-
-echo -n "Seeding the DB 🌱"
-T0=$(date +%s%N | cut -b1-13)
-SEED_LOG=$($REPO_DIR/ops/bin/local-cmd.sh run --rm setup-keycloak 2>&1)
-if ! [[ $? -eq 0 ]]; then
-  T1=$(date +%s%N | cut -b1-13)
-  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KSeeding the DB 🌱 - ❌ in $DT"
-
-  echo -e "$SEED_LOG"
-  echo -e "\nAbove you will find the logs"
-  fatal_error
-else
-  T1=$(date +%s%N | cut -b1-13)
-  DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-  echo -e "\r\033[KSeeding the DB 🌱 - ✅ in $DT s"
-fi
-
-start_service () {
-  echo -n "Starting $2"
-  T0=$(date +%s%N | cut -b1-13)
-  DOCKER_UP_LOGS=$($REPO_DIR/ops/bin/local-cmd.sh up --detach --wait --no-deps $1 2>&1)
-  if ! [[ $? -eq 0 ]]; then
-    T1=$(date +%s%N | cut -b1-13)
-    DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-    echo -e "\r\033[KStarting $2 - ❌ in $DT\n"
-    $REPO_DIR/ops/bin/local-cmd.sh logs $1 2> /dev/null
-    echo -e "$DOCKER_UP_LOGS" | grep -v "variable is not set" | grep --color=always -i -E '^|Bind for.*failed|unhealthy'
-    echo -e "\nAbove you will find the logs"
-    fatal_error
-  else
-    T1=$(date +%s%N | cut -b1-13)
-    DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
-    echo -e "\r\033[KStarting $2 - ✅ in $DT s"
-  fi
-}
-
-start_service db "the DB 📙"
-start_service keycloak "Keycloak 🔑"
-start_service "temporal temporal-admin-tools temporal-ui temporal-hocus-codec" "Temporal ☁️ "
-start_service "hocus-ui hocus-agent" "Hocus 🧙🪄 "
-
-echo -e "\nYou may access Hocus here: http://${HOCUS_HOSTNAME}:3000/ Creds: dev/dev"
-echo -e "Keycloak: http://${HOCUS_HOSTNAME}:4200/ Creds: admin/admin"
-echo -e "Temporal: http://${HOCUS_HOSTNAME}:8080/"
-
-echo -e "\nTo delete all data ./ops/bin/local-cleanup.sh"
-echo -e "To get debug logs: ./ops/bin/local-cmd.sh logs"
-echo -e "To stop the deploy: ./ops/bin/local-cmd.sh down"
+NO_EXPOSE_PORTS=1 $REPO_DIR/ops/bin/local-cmd.sh run -it --rm hocus-agent
