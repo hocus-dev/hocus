@@ -164,7 +164,25 @@ fi;
 # Pulling images
 echo -n "Pulling docker images 📥"
 T0=$(date +%s%N | cut -b1-13)
-DOCKER_PULL_LOGS=$("$REPO_DIR"/ops/bin/local-cmd.sh pull --ignore-buildable -q 2>&1)
+EXTRA_PULL_FLAGS=
+if [ -z ${HOCUS_BUILD_COMMIT_HASH+x} ]; then
+  # When building images locally this flag is needed
+  EXTRA_PULL_FLAGS=--ignore-buildable
+  # Check minimum version of docker compose
+  # We require docker compose of at least version 2.15.0 which introduced --ignore-buildable
+  COMPOSE_VERSION="$(docker compose version | grep -o -E '[0-9]+(\.[0-9]+){2}$')"
+  COMPOSE_REQUIRED_VERSION="2.15.0"
+  if ! [ "$(printf '%s\n' "$COMPOSE_REQUIRED_VERSION" "$COMPOSE_VERSION" | sort -V | head -n1)" = "$COMPOSE_REQUIRED_VERSION" ]; then
+    T1=$(date +%s%N | cut -b1-13)
+    DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
+    echo -e "\r\033[KPulling docker images 📥 - ❌ in $DT"
+    echo "When building local images Hocus requires docker compose to be least version $COMPOSE_REQUIRED_VERSION, the local version is $COMPOSE_VERSION"
+    echo "Consult the docker compose documentation on how to upgrade https://docs.docker.com/compose/install/linux/#install-using-the-repository"
+    exit 1
+  fi
+fi
+
+DOCKER_PULL_LOGS=$("$REPO_DIR"/ops/bin/local-cmd.sh pull $EXTRA_PULL_FLAGS -q 2>&1)
 if ! [[ $? -eq 0 ]]; then
   T1=$(date +%s%N | cut -b1-13)
   DT=$(printf %.2f\\n "$(( $T1 - $T0 ))e-3")
